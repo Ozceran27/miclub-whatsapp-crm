@@ -13,7 +13,8 @@
     "@miclub/shared": "0.1.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "googleapis": "^144.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
