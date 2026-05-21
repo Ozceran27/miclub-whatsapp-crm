@@ -8,4 +8,5 @@ build/
 *.log
 *.sqlite
 *.sqlite3
+*.tsbuildinfo
 !apps/api/data/.gitkeep
