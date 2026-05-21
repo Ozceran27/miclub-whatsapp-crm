@@ -16,24 +16,31 @@ fs.mkdirSync(path.dirname(configuredDbPath), { recursive: true });
 
 const db = new sqlite3.Database(configuredDbPath);
 
+const addColumnIfMissing = (
+  existingColumns: Set<string>,
+  columnName: string,
+  definition: string
+) => {
+  if (!existingColumns.has(columnName)) {
+    db.run(`ALTER TABLE message_history ADD COLUMN ${columnName} ${definition}`);
+  }
+};
+
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS message_history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      memberId TEXT NOT NULL,
-      nombre TEXT NOT NULL,
-      telefono TEXT NOT NULL,
-      mensaje TEXT NOT NULL,
-      waLink TEXT NOT NULL,
-      estado TEXT NOT NULL,
-      createdAt TEXT NOT NULL
-    )`);
-
-  const requiredColumns: Array<{ name: string; definition: string }> = [
-    { name: "status", definition: "TEXT NOT NULL DEFAULT 'prepared'" },
-    { name: "openedAt", definition: "TEXT" },
-    { name: "sentAt", definition: "TEXT" },
-    { name: "note", definition: "TEXT" }
-  ];
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memberId TEXT NOT NULL,
+    nombre TEXT NOT NULL,
+    telefono TEXT NOT NULL,
+    mensaje TEXT NOT NULL,
+    waLink TEXT NOT NULL,
+    estado TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'prepared',
+    openedAt TEXT,
+    sentAt TEXT,
+    note TEXT
+  )`);
 
   db.all<{ name: string }>("PRAGMA table_info(message_history)", (err, rows) => {
     if (err) {
@@ -42,15 +49,15 @@ db.serialize(() => {
     }
 
     const existingColumns = new Set(rows.map((row) => row.name));
-    for (const column of requiredColumns) {
-      if (!existingColumns.has(column.name)) {
-        db.run(`ALTER TABLE message_history ADD COLUMN ${column.name} ${column.definition}`);
-      }
-    }
 
-    if (existingColumns.has("estado") && !existingColumns.has("status")) {
-      db.run("UPDATE message_history SET status = COALESCE(estado, 'prepared') WHERE status IS NULL");
-    }
+    db.serialize(() => {
+      addColumnIfMissing(existingColumns, "status", "TEXT NOT NULL DEFAULT 'prepared'");
+      addColumnIfMissing(existingColumns, "openedAt", "TEXT");
+      addColumnIfMissing(existingColumns, "sentAt", "TEXT");
+      addColumnIfMissing(existingColumns, "note", "TEXT");
+
+      db.run("UPDATE message_history SET status = 'prepared' WHERE status IS NULL");
+    });
   });
 });
 
