@@ -24,8 +24,9 @@ GOOGLE_SHEETS_ENABLED=false
 GOOGLE_SHEET_ID=
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_PRIVATE_KEY=
-GOOGLE_SHEETS_RANGE_START=33
-GOOGLE_SHEETS_RANGE_END=500
+GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY500
+GOOGLE_SHEETS_SALON_RANGE=SALON!AB34:AY500
+GOOGLE_SHEETS_AULA_RANGE=AULA!AB34:AY500
 ```
 
 ## Integración Google Sheets (Fase 1)
@@ -42,8 +43,9 @@ La API puede leer miembros reales de las hojas `FITNESS`, `SALON` y `AULA`.
 - `GOOGLE_SHEET_ID=<ID de la planilla>`
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL=<client_email del JSON>`
 - `GOOGLE_PRIVATE_KEY=<private_key del JSON, conservando saltos de línea con \n>`
-- `GOOGLE_SHEETS_RANGE_START=33`
-- `GOOGLE_SHEETS_RANGE_END=500`
+- `GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY500`
+- `GOOGLE_SHEETS_SALON_RANGE=SALON!AB34:AY500`
+- `GOOGLE_SHEETS_AULA_RANGE=AULA!AB34:AY500`
 
 ### 3) Compartir la planilla con la Service Account
 En Google Sheets, compartir la planilla con el email de la service account (permiso de lectura).
@@ -76,7 +78,8 @@ npm run test -w @miclub/api
 ```
 
 ## Endpoints principales
-- `GET /debtors`: deudores (Google Sheets o mock, con fallback).
+- `GET /members-debug`: miembros sin filtrar por estado (Google Sheets o mock, con fallback).
+- `GET /debtors`: deudores filtrados por estado normalizado `Adeudando` (Google Sheets o mock, con fallback).
 - `GET /sync-status`: estado de sincronización `{ source, enabled, sheets, lastSyncAt?, error? }`.
 - `GET /templates`
 - `GET /history`
