@@ -68,6 +68,14 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
 };
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
+app.get("/members-debug", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    res.json(members);
+  } catch {
+    jsonError(res, 500, "No se pudo obtener la lista de miembros.");
+  }
+});
 app.get("/debtors", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
