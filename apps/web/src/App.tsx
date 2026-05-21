@@ -324,7 +324,7 @@ export default function App() {
           <div className="history-table-wrap">
             <table className="history-table">
               <thead>
-                <tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Mensaje</th><th>Acción</th></tr>
+                <tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Mensaje</th><th>Actividad</th></tr>
               </thead>
               <tbody>
                 {history.slice(0, 20).map((h) => (
@@ -333,8 +333,13 @@ export default function App() {
                     <td>{formatDateTime(h.createdAt)}</td>
                     <td>{h.nombre ?? h.memberId}</td>
                     <td>{h.phone}</td>
-                    <td className="history-message-preview">{summarizeMessage(h.message, 120)}</td>
-                    <td><a href={h.waLink} target="_blank" rel="noreferrer" className="icon-btn"><Icon label="↗" />Abrir enlace</a></td>
+                    <td>
+                      <div className="history-message-card">
+                        <p className="history-message-preview">{summarizeMessage(h.message, 120)}</p>
+                        <a href={h.waLink} target="_blank" rel="noreferrer" className="icon-btn history-link-btn"><Icon label="↗" />Abrir enlace</a>
+                      </div>
+                    </td>
+                    <td>{h.actividad ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>
