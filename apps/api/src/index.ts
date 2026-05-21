@@ -34,6 +34,11 @@ const allDb = <T>(query: string, params: unknown[] = []): Promise<T[]> =>
     db.all(query, params, (err, rows) => (err ? reject(err) : resolve(rows as T[])));
   });
 
+const getDb = <T>(query: string, params: unknown[] = []): Promise<T | undefined> =>
+  new Promise((resolve, reject) => {
+    db.get(query, params, (err, row) => (err ? reject(err) : resolve(row as T | undefined)));
+  });
+
 let lastSyncAt: string | undefined;
 let lastSyncError: string | undefined;
 
@@ -140,8 +145,12 @@ app.get("/templates", (_req, res) => res.json(templates));
 
 app.get("/history", async (_req, res) => {
   try {
-    const rows = await allDb<PreparedMessage & { nombre: string; telefono: string; estado: string }>(
-      "SELECT memberId, mensaje as message, waLink, createdAt, telefono as phone FROM message_history ORDER BY datetime(createdAt) DESC LIMIT 100"
+    const rows = await allDb<PreparedMessage>(
+      `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
+        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note
+      FROM message_history
+      ORDER BY datetime(createdAt) DESC
+      LIMIT 20`
     );
     res.json(rows);
   } catch {
@@ -173,25 +182,68 @@ app.post("/prepare-messages", async (req, res) => {
   }
 
   try {
+    const existingPrepared = await allDb<{ memberId: string }>(
+      "SELECT DISTINCT memberId FROM message_history WHERE COALESCE(status, estado) = 'prepared'"
+    );
+    const existingPreparedSet = new Set(existingPrepared.map((row) => row.memberId));
     const prepared: PreparedMessage[] = [];
 
     for (const member of selected) {
+      if (existingPreparedSet.has(member.id)) continue;
       const message = interpolateTemplate(body.message, member);
       const phone = normalizeArPhone(member.telefono);
       const waLink = buildWaLink(phone, message);
       const createdAt = new Date().toISOString();
 
-      await runDb(
-        "INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [member.id, `${member.nombre} ${member.apellido}`, phone, message, waLink, "prepared", createdAt]
-      );
+      const historyInsert = await new Promise<number>((resolve, reject) => {
+        db.run(
+          "INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [member.id, `${member.nombre} ${member.apellido}`, phone, message, waLink, "prepared", "prepared", createdAt],
+          function onRun(err) {
+            if (err) return reject(err);
+            resolve(this.lastID);
+          }
+        );
+      });
 
-      prepared.push({ memberId: member.id, phone, message, waLink, createdAt });
+      prepared.push({ historyId: historyInsert, memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt });
     }
 
     res.json(prepared);
   } catch {
     jsonError(res, 500, "No se pudieron preparar los mensajes.");
+  }
+});
+
+app.patch("/history/:id/status", async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body as { status?: "prepared" | "opened" | "sent_manual" | "skipped"; note?: string | null };
+  const validStatuses = new Set(["prepared", "opened", "sent_manual", "skipped"]);
+
+  if (!Number.isInteger(id) || id <= 0) return jsonError(res, 400, "id inválido.");
+  if (!body.status || !validStatuses.has(body.status)) return jsonError(res, 400, "status inválido.");
+
+  try {
+    const existing = await getDb<{ id: number }>("SELECT id FROM message_history WHERE id = ?", [id]);
+    if (!existing) return jsonError(res, 404, "Mensaje no encontrado.");
+
+    const now = new Date().toISOString();
+    const openedAt = body.status === "opened" ? now : null;
+    const sentAt = body.status === "sent_manual" ? now : null;
+    await runDb(
+      "UPDATE message_history SET status = ?, openedAt = COALESCE(?, openedAt), sentAt = COALESCE(?, sentAt), note = COALESCE(?, note) WHERE id = ?",
+      [body.status, openedAt, sentAt, body.note ?? null, id]
+    );
+
+    const updated = await getDb<PreparedMessage>(
+      `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
+        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note
+      FROM message_history WHERE id = ?`,
+      [id]
+    );
+    res.json(updated);
+  } catch {
+    jsonError(res, 500, "No se pudo actualizar el estado del mensaje.");
   }
 });
 

@@ -27,6 +27,31 @@ db.serialize(() => {
       estado TEXT NOT NULL,
       createdAt TEXT NOT NULL
     )`);
+
+  const requiredColumns: Array<{ name: string; definition: string }> = [
+    { name: "status", definition: "TEXT NOT NULL DEFAULT 'prepared'" },
+    { name: "openedAt", definition: "TEXT" },
+    { name: "sentAt", definition: "TEXT" },
+    { name: "note", definition: "TEXT" }
+  ];
+
+  db.all<{ name: string }>("PRAGMA table_info(message_history)", (err, rows) => {
+    if (err) {
+      console.error("No se pudo inspeccionar schema de message_history", err);
+      return;
+    }
+
+    const existingColumns = new Set(rows.map((row) => row.name));
+    for (const column of requiredColumns) {
+      if (!existingColumns.has(column.name)) {
+        db.run(`ALTER TABLE message_history ADD COLUMN ${column.name} ${column.definition}`);
+      }
+    }
+
+    if (existingColumns.has("estado") && !existingColumns.has("status")) {
+      db.run("UPDATE message_history SET status = COALESCE(estado, 'prepared') WHERE status IS NULL");
+    }
+  });
 });
 
 export default db;
