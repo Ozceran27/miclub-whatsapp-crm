@@ -27,6 +27,15 @@ const addColumnIfMissing = (
 };
 
 db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS message_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    body TEXT NOT NULL,
+    isDefault INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS message_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     memberId TEXT NOT NULL,

@@ -20,6 +20,9 @@ export interface MessageTemplate {
   id: string;
   name: string;
   body: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PreparedMessage {
