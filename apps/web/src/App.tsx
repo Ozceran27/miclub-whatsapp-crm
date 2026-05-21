@@ -22,6 +22,14 @@ type Summary = {
 };
 type ViewMode = 'debtors' | 'members';
 type MessageStatus = 'prepared' | 'opened' | 'sent_manual' | 'skipped';
+const ACTIONABLE_STATUSES: MessageStatus[] = ['prepared', 'opened'];
+
+const STATUS_META: Record<MessageStatus, { label: string; icon: string; className: string }> = {
+  prepared: { label: 'Pendiente', icon: '🕒', className: 'status-prepared' },
+  opened: { label: 'Abierto', icon: '↗', className: 'status-opened' },
+  sent_manual: { label: 'Enviado manualmente', icon: '✓', className: 'status-sent' },
+  skipped: { label: 'Omitido', icon: '⤼', className: 'status-skipped' }
+};
 
 const fill = (tpl: string, m?: Member) => {
   if (!m) return tpl;
@@ -35,6 +43,14 @@ const fill = (tpl: string, m?: Member) => {
   };
   return tpl.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? '');
 };
+
+const getStatusMeta = (status?: MessageStatus) => STATUS_META[status ?? 'prepared'];
+const formatDateTime = (value?: string) => {
+  if (!value) return 'Sin fecha';
+  return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+};
+const summarizeMessage = (message: string, max = 120) =>
+  message.length > max ? `${message.slice(0, max).trimEnd()}…` : message;
 
 export default function App() {
 // ...
@@ -167,7 +183,11 @@ export default function App() {
       throw new Error(payload.message ?? 'No se pudo actualizar el estado.');
     }
 
-    setPrepared(prev => prev.map((item) => item.historyId === historyId ? { ...item, status } : item));
+    setPrepared(prev =>
+      prev
+        .map((item) => (item.historyId === historyId ? { ...item, status } : item))
+        .filter((item) => ACTIONABLE_STATUSES.includes(item.status ?? 'prepared'))
+    );
     await loadHistory();
   };
 
@@ -183,6 +203,9 @@ export default function App() {
       return acc;
     },
     { prepared: 0, opened: 0, sent_manual: 0, skipped: 0 } as Record<MessageStatus, number>
+  );
+  const actionablePrepared = prepared.filter((item) =>
+    ACTIONABLE_STATUSES.includes(item.status ?? 'prepared')
   );
 
   const previewMember = members.find((d) => d.id === selected[0]);
@@ -239,24 +262,53 @@ export default function App() {
         <h3>Vista previa</h3><pre>{preview}</pre>
         <button className="icon-btn" disabled={!canPrepare} onClick={prepare}><Icon label="✉" />{preparing ? 'Preparando...' : 'Preparar mensajes'}</button></section>
 
-      <section>
+      <section className="messages-panel">
         <h3>Mensajes preparados</h3>
-        <p>
-          Preparados: {preparedCounts.prepared} · Abiertos: {preparedCounts.opened} · Enviados manualmente: {preparedCounts.sent_manual} · Omitidos: {preparedCounts.skipped}
-        </p>
+        <div className="count-chips">
+          <span className="count-chip status-prepared">Pendientes: {preparedCounts.prepared}</span>
+          <span className="count-chip status-opened">Abiertos: {preparedCounts.opened}</span>
+          <span className="count-chip status-sent">Enviados: {preparedCounts.sent_manual}</span>
+          <span className="count-chip status-skipped">Omitidos: {preparedCounts.skipped}</span>
+        </div>
         <button className="icon-btn" onClick={() => setPrepared([])}><Icon label="⌫" />Limpiar mensajes preparados de pantalla</button>
-        {prepared.length === 0 ? <p>No hay mensajes preparados en pantalla.</p> : prepared.map(p => (
-          <article key={`${p.historyId ?? p.memberId}-${p.createdAt}`}>
-            <p><strong>{p.nombre ?? p.memberId}</strong> · {p.phone} · {p.actividad ?? '-'} · Estado: {p.status ?? 'prepared'}</p>
-            <div className="actions-row">
+        <p className="section-note">Esta acción solo limpia la pantalla actual y no borra el historial.</p>
+        {actionablePrepared.length === 0 ? <p className="empty-state">No hay mensajes pendientes para gestionar.</p> : <div className="prepared-grid">{actionablePrepared.map(p => {
+          const status = getStatusMeta(p.status);
+          return (
+          <article key={`${p.historyId ?? p.memberId}-${p.createdAt}`} className="prepared-card">
+            <div className="prepared-header">
+              <h4>{p.nombre ?? p.memberId}</h4>
+              <span className={`status-badge ${status.className}`}><Icon label={status.icon} />{status.label}</span>
+            </div>
+            <p className="prepared-meta"><strong>Teléfono:</strong> {p.phone}</p>
+            <p className="prepared-meta"><strong>Actividad:</strong> {p.actividad ?? '-'}</p>
+            <p className="prepared-meta"><strong>Preparado:</strong> {formatDateTime(p.createdAt)}</p>
+            <div className="actions-row prepared-actions">
               <button className="icon-btn" onClick={() => void openWhatsApp(p)}><Icon label="↗" />Abrir WhatsApp</button>
               <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'sent_manual')}><Icon label="✓" />Marcar como enviado</button>
               <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'skipped')}><Icon label="⤼" />Omitir</button>
             </div>
           </article>
-        ))}
+        )})}</div>}
       </section>
-      <section><h3>Historial (últimos 20)</h3><button className="icon-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>{history.length === 0 ? <p>Sin historial todavía.</p> : history.map(h => <article key={`${h.historyId ?? h.memberId}-${h.createdAt}`}><p><strong>{new Date(h.createdAt).toLocaleString()}</strong> · {h.phone} · Estado: {h.status ?? 'prepared'}</p><p>{h.message}</p><a href={h.waLink} target="_blank" rel="noreferrer">{h.waLink}</a></article>)}</section>
+      <section className="history-panel">
+        <h3>Historial (últimos 20)</h3>
+        <button className="icon-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>
+        {history.length === 0 ? <p className="empty-state">Sin historial todavía.</p> : <div className="history-list">{history.slice(0, 20).map(h => {
+          const status = getStatusMeta(h.status);
+          return (
+            <article key={`${h.historyId ?? h.memberId}-${h.createdAt}`} className="history-item">
+              <div className="history-top">
+                <span className={`status-badge ${status.className}`}><Icon label={status.icon} />{status.label}</span>
+                <span className="history-date">{formatDateTime(h.createdAt)}</span>
+              </div>
+              <p className="history-member"><strong>{h.nombre ?? h.memberId}</strong> · {h.phone}</p>
+              <p className="history-message">{summarizeMessage(h.message)}</p>
+              <a href={h.waLink} target="_blank" rel="noreferrer" className="history-link"><Icon label="↗" />Abrir enlace</a>
+            </article>
+          );
+        })}</div>}
+      </section>
     </main>
   );
 }

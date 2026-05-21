@@ -52,8 +52,56 @@ tr:hover td { background: rgba(71, 113, 191, 0.12); }
 textarea { width: 100%; margin-top: 8px; }
 .composer pre { white-space: pre-wrap; background: rgba(7,14,30,.88); color: #dbe7ff; padding: 12px; border-radius: 8px; border: 1px solid #2f466f; }
 a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
+.messages-panel, .history-panel {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #2f466f;
+  border-radius: 14px;
+  background: rgba(9, 17, 33, 0.52);
+}
+.history-panel { margin-top: 18px; }
+.count-chips { display:flex; flex-wrap:wrap; gap:8px; margin: 8px 0 12px; }
+.count-chip, .status-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.status-prepared { background: rgba(247, 181, 0, 0.16); color: #ffd36f; border-color: rgba(247, 181, 0, 0.36); }
+.status-opened { background: rgba(100, 188, 255, 0.16); color: #8fd8ff; border-color: rgba(100, 188, 255, 0.36); }
+.status-sent { background: rgba(73, 208, 147, 0.16); color: #9df7ce; border-color: rgba(73, 208, 147, 0.36); }
+.status-skipped { background: rgba(186, 194, 207, 0.16); color: #cbd6e6; border-color: rgba(186, 194, 207, 0.36); }
+.section-note { margin: 10px 0; color: #a9b9d7; font-size: 13px; }
+.empty-state {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px dashed #3b5684;
+  border-radius: 12px;
+  color: #a9badb;
+  text-align: center;
+}
+.prepared-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+.prepared-card, .history-item {
+  border: 1px solid #2c4672;
+  border-radius: 12px;
+  background: rgba(14, 24, 44, 0.92);
+  padding: 12px;
+}
+.prepared-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom: 8px; }
+.prepared-header h4 { margin:0; font-size: 16px; }
+.prepared-meta, .history-member, .history-message { margin: 6px 0; color: #cedaf1; }
+.prepared-actions { margin-top: 10px; }
+.history-list { display:grid; gap: 10px; margin-top: 12px; }
+.history-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.history-date { color:#a8b7d6; font-size: 12px; }
+.history-link { margin-top: 6px; }
 
 @media (max-width: 900px) {
   .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filters { grid-template-columns: 1fr; }
+  .prepared-grid { grid-template-columns: 1fr; }
 }
