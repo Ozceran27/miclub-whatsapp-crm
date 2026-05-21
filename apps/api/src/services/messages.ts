@@ -1,12 +1,24 @@
 import type { Member } from "@miclub/shared";
 
 export const normalizeArPhone = (raw: string): string => {
-  const digits = raw.replace(/\D/g, "").replace(/^0+/, "");
-  const without15 = digits.replace(/(\d{2,4})15(\d+)/, "$1$2");
-  if (without15.startsWith("549")) return without15;
-  if (without15.startsWith("54")) return `549${without15.slice(2)}`;
-  if (without15.startsWith("9")) return `54${without15}`;
-  return `549${without15}`;
+  const digitsOnly = raw.replace(/\D/g, "");
+  if (!digitsOnly) return "";
+
+  let digits = digitsOnly;
+
+  if (digits.startsWith("549")) {
+    digits = digits.slice(3);
+  } else if (digits.startsWith("54")) {
+    digits = digits.slice(2);
+  }
+
+  if (digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+
+  digits = digits.replace(/^(\d{2,4})15/, "$1");
+
+  return `549${digits}`;
 };
 
 export const interpolateTemplate = (template: string, member: Member): string => {

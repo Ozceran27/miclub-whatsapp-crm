@@ -5,15 +5,16 @@ import sqlite3 from "sqlite3";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, "../../../../");
 
-const defaultDbPath = path.resolve(__dirname, "../../data/miclub.sqlite");
-const dbPath = process.env.SQLITE_DB_PATH
-  ? path.resolve(process.env.SQLITE_DB_PATH)
+const defaultDbPath = path.resolve(repoRoot, "apps/api/data/miclub.sqlite");
+const configuredDbPath = process.env.SQLITE_DB_PATH
+  ? path.resolve(repoRoot, process.env.SQLITE_DB_PATH)
   : defaultDbPath;
 
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+fs.mkdirSync(path.dirname(configuredDbPath), { recursive: true });
 
-const db = new sqlite3.Database(dbPath);
+const db = new sqlite3.Database(configuredDbPath);
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS message_history (
