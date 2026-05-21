@@ -1,31 +1,38 @@
-# miclub-whatsapp-crm
-Herramienta interna para sincronizar inscriptos de Google Sheets y gestionar mensajes de cobranza por WhatsApp para miClub.
-
-
 # miClub WhatsApp CRM
 
-Herramienta interna para sincronizar inscriptos desde Google Sheets y preparar mensajes de WhatsApp para gestión administrativa y cobranzas de miClub.
+Herramienta interna para gestión de cobranzas y preparación manual de mensajes por WhatsApp para miClub.
 
-## Fase 1
+## Stack
+- Node.js + TypeScript
+- Express (API)
+- React + Vite (Web)
+- SQLite (historial local)
+- Monorepo con workspaces npm
 
-- Lectura de inscriptos.
-- Filtro de personas con estado Adeudando.
-- Selección manual de destinatarios.
-- Plantillas de mensajes.
-- Apertura de WhatsApp Web con mensajes precargados mediante links wa.me.
-- Sin automatización directa del envío.
+## Instalación
+```bash
+npm install
+```
 
-## Fase 2
+## Desarrollo
+```bash
+npm run dev
+```
+Esto inicia:
+- API: http://localhost:4000
+- Web: http://localhost:5173
 
-- Integración futura con WhatsApp Business Platform / Cloud API.
-- Plantillas aprobadas.
-- Automatización profesional.
-- Historial avanzado.
-- Webhooks y métricas.
+## Fase 1 (MVP)
+- Datos mock de deudores.
+- Filtros y selección múltiple.
+- Plantillas editables.
+- Generación de links `wa.me`.
+- Registro local de mensajes preparados en SQLite.
 
-## Stack previsto
+## Fase 2 (futura)
+- Integración Google Sheets real.
+- WhatsApp Business Platform / Cloud API.
+- Webhooks, estados de entrega y métricas.
 
-- React + Vite + TypeScript
-- Node.js + Express + TypeScript
-- SQLite
-- Google Sheets API
+## Política WhatsApp
+En Fase 1 no se automatiza el envío ni se manipula WhatsApp Web: el usuario confirma manualmente cada mensaje.
