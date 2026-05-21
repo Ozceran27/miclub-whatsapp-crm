@@ -92,8 +92,17 @@ const resolvePhoneForMode = (memberPhone: string, mode: "test" | "real"): string
   return normalizedMemberPhone;
 };
 
-const unresolvedTemplateVariables = (message: string): string[] =>
-  Array.from(new Set((message.match(/\{\w+\}/g) ?? []).map((token) => token.toLowerCase())));
+const unresolvedTemplateVariables = (message: string): string[] => {
+  const variables = message.match(/\{\w+\}/g) ?? [];
+
+  return Array.from(
+    new Set(
+      variables
+        .map((token) => token.toLowerCase())
+        .filter((token) => !ALLOWED_TEMPLATE_VARIABLES.has(token))
+    )
+  );
+};
 
 const RECENT_STATUSES = ["prepared", "opened", "sent_manual"] as const;
 const normalizeFeeToArs = (fee: number | undefined): number => {
