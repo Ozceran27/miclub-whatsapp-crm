@@ -1,0 +1,17 @@
+{
+  "name": "miclub-whatsapp-crm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Herramienta interna para gestionar cobranzas y mensajes por WhatsApp para miClub.",
+  "scripts": {
+    "dev": "echo \"Proyecto base listo. Codex deberá crear apps/web y apps/api.\""
+  },
+  "keywords": [
+    "miclub",
+    "whatsapp",
+    "crm",
+    "google-sheets"
+  ],
+  "author": "miClub",
+  "license": "UNLICENSED"
+}
