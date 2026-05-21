@@ -27,6 +27,8 @@ GOOGLE_PRIVATE_KEY=
 GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY500
 GOOGLE_SHEETS_SALON_RANGE=SALON!AB34:AY500
 GOOGLE_SHEETS_AULA_RANGE=AULA!AB34:AY500
+
+TEST_PHONE_OVERRIDE=54911XXXXXXXX
 ```
 
 ## Integración Google Sheets (Fase 1)
@@ -60,6 +62,17 @@ Configurar:
 ```env
 GOOGLE_SHEETS_ENABLED=false
 ```
+
+
+## Prueba real controlada
+- `TEST_PHONE_OVERRIDE`: si está definido, al preparar en **modo prueba** los enlaces `wa.me` se generan hacia ese número para evitar envíos accidentales.
+- La interfaz mantiene visible el teléfono real del cliente para verificación manual.
+- Flujo recomendado:
+  1. Seleccionar deudores y plantilla.
+  2. Revisar panel de confirmación (cantidad, clientes, actividad, cuota y mensaje ejemplo).
+  3. Abrir WhatsApp Business Web manualmente desde cada enlace.
+  4. Enviar manualmente y luego marcar estado (`opened`, `sent_manual` o `skipped`).
+- En modo real, usar lotes chicos y confirmar antes de preparar más de un mensaje.
 
 ## Desarrollo
 ```bash

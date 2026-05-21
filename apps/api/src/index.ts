@@ -10,7 +10,7 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
 import cors from "cors";
-import type { Member, PrepareMessagesRequest, PreparedMessage } from "@miclub/shared";
+import type { Member, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
@@ -82,6 +82,19 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
   }
 };
 
+
+const TEST_PHONE_OVERRIDE = process.env.TEST_PHONE_OVERRIDE?.trim();
+
+const resolvePhoneForMode = (memberPhone: string, mode: "test" | "real"): string => {
+  const normalizedMemberPhone = normalizeArPhone(memberPhone);
+  if (mode === "test" && TEST_PHONE_OVERRIDE) return normalizeArPhone(TEST_PHONE_OVERRIDE);
+  return normalizedMemberPhone;
+};
+
+const unresolvedTemplateVariables = (message: string): string[] =>
+  Array.from(new Set((message.match(/\{\w+\}/g) ?? []).map((token) => token.toLowerCase())));
+
+const RECENT_STATUSES = ["prepared", "opened", "sent_manual"] as const;
 const normalizeFeeToArs = (fee: number | undefined): number => {
   if (typeof fee !== "number" || Number.isNaN(fee)) return 0;
   if (fee === 0) return 0;
@@ -95,7 +108,7 @@ const byKey = (members: Member[], getter: (m: Member) => string): Record<string,
     return acc;
   }, {});
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
+app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api", testPhoneOverride: TEST_PHONE_OVERRIDE ?? null }));
 app.get("/members", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
@@ -158,8 +171,27 @@ app.get("/history", async (_req, res) => {
   }
 });
 
+app.post("/prepare-messages/validate", async (req, res) => {
+  const body = req.body as Partial<PrepareMessagesRequest>;
+  const mode = body.mode === "real" ? "real" : "test";
+  if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) return jsonError(res, 400, "memberIds debe ser un array no vacío.");
+  if (typeof body.message !== "string" || body.message.trim().length === 0) return jsonError(res, 400, "message debe ser un string no vacío.");
+  const { members } = await getMembersSource();
+  const selected = members.filter((m) => body.memberIds?.includes(m.id));
+  const missingPhoneMembers = selected.filter((m) => normalizeArPhone(m.telefono).length === 0).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}` }));
+  const unresolvedVariables = unresolvedTemplateVariables(body.message);
+  const placeholders = selected.slice(0, 3).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}`, actividad: m.actividad, cuota: m.cuota, phone: m.telefono }));
+  const duplicateRows = selected.length === 0 ? [] : await allDb<{ memberId: string; nombre: string; status: string; createdAt: string }>(`SELECT memberId, nombre, COALESCE(status, estado, 'prepared') as status, createdAt FROM message_history WHERE memberId IN (${selected.map(()=>'?').join(',')}) AND COALESCE(status, estado) IN ('prepared','opened','sent_manual') ORDER BY datetime(createdAt) DESC`, selected.map(m=>m.id));
+  const seen = new Set<string>();
+  const duplicates = duplicateRows.filter((r) => { if (seen.has(r.memberId)) return false; seen.add(r.memberId); return true; });
+  const sample = selected[0] ? interpolateTemplate(body.message, selected[0]) : body.message;
+  const response: PrepareMessagesValidation = { selectedCount: selected.length, selectedPreview: placeholders, missingPhoneMembers, unresolvedVariables, duplicates, sampleMessage: sample, mode, testPhoneOverride: TEST_PHONE_OVERRIDE };
+  res.json(response);
+});
+
 app.post("/prepare-messages", async (req, res) => {
   const body = req.body as Partial<PrepareMessagesRequest>;
+  const mode = body.mode === "real" ? "real" : "test";
 
   if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) {
     return jsonError(res, 400, "memberIds debe ser un array no vacío.");
@@ -191,7 +223,8 @@ app.post("/prepare-messages", async (req, res) => {
     for (const member of selected) {
       if (existingPreparedSet.has(member.id)) continue;
       const message = interpolateTemplate(body.message, member);
-      const phone = normalizeArPhone(member.telefono);
+      const phone = resolvePhoneForMode(member.telefono, mode);
+      if (!phone) continue;
       const waLink = buildWaLink(phone, message);
       const createdAt = new Date().toISOString();
 
@@ -206,7 +239,7 @@ app.post("/prepare-messages", async (req, res) => {
         );
       });
 
-      prepared.push({ historyId: historyInsert, memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt });
+      prepared.push({ historyId: historyInsert, memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, note: mode === "test" ? "Modo prueba activo" : null });
     }
 
     res.json(prepared);
