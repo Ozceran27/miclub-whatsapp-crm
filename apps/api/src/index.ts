@@ -77,6 +77,12 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
   }
 };
 
+const normalizeFeeToArs = (fee: number | undefined): number => {
+  if (typeof fee !== "number" || Number.isNaN(fee)) return 0;
+  if (fee === 0) return 0;
+  return Math.abs(fee) < 1000 ? fee * 1000 : fee;
+};
+
 const byKey = (members: Member[], getter: (m: Member) => string): Record<string, number> =>
   members.reduce<Record<string, number>>((acc, member) => {
     const key = getter(member) || "Sin datos";
@@ -114,7 +120,7 @@ app.get("/summary", async (_req, res) => {
       debtorsBySheet: byKey(debtors, (m) => m.sourceSheet),
       totalByActivity: byKey(members, (m) => m.actividad ?? "Sin actividad"),
       debtorsByActivity: byKey(debtors, (m) => m.actividad ?? "Sin actividad"),
-      totalEstimatedDebt: debtors.reduce((sum, d) => sum + (typeof d.cuota === "number" ? d.cuota : 0), 0)
+      totalEstimatedDebt: debtors.reduce((sum, d) => sum + normalizeFeeToArs(d.cuota), 0)
     });
   } catch {
     jsonError(res, 500, "No se pudo obtener el resumen.");
