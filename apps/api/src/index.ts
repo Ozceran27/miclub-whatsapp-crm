@@ -1,3 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, "../../..");
+
+dotenv.config({ path: path.join(repoRoot, ".env") });
+
 import express from "express";
 import cors from "cors";
 import type { Member, PrepareMessagesRequest, PreparedMessage } from "@miclub/shared";
@@ -68,6 +78,7 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
 };
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
+
 app.get("/debtors", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
@@ -76,6 +87,7 @@ app.get("/debtors", async (_req, res) => {
     jsonError(res, 500, "No se pudo obtener la lista de deudores.");
   }
 });
+
 app.get("/sync-status", async (_req, res) => {
   try {
     const { syncStatus } = await getMembersSource();
@@ -84,6 +96,7 @@ app.get("/sync-status", async (_req, res) => {
     jsonError(res, 500, "No se pudo obtener el estado de sincronización.");
   }
 });
+
 app.get("/templates", (_req, res) => res.json(templates));
 
 app.get("/history", async (_req, res) => {
