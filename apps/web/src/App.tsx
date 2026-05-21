@@ -3,7 +3,20 @@ import type { Member, MessageTemplate, PreparedMessage } from '@miclub/shared';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-const fill = (tpl: string, m?: Member) => m ? tpl.replace(/\{(\w+)\}/g, (_, k) => ({ nombre: m.nombre, apellido: m.apellido, actividad: m.actividad ?? '', modalidad: m.modalidad ?? '', cuota: m.cuota?.toString() ?? '', instructor: m.instructor ?? '' }[k] ?? '')) : tpl;
+const fill = (tpl: string, m?: Member) => {
+  if (!m) return tpl;
+
+  const values: Record<string, string> = {
+    nombre: m.nombre,
+    apellido: m.apellido,
+    actividad: m.actividad ?? '',
+    modalidad: m.modalidad ?? '',
+    cuota: m.cuota?.toString() ?? '',
+    instructor: m.instructor ?? ''
+  };
+
+  return tpl.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? '');
+};
 
 export default function App() {
   const [debtors, setDebtors] = useState<Member[]>([]);
