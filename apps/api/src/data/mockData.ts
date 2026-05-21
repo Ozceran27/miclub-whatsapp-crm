@@ -8,8 +8,8 @@ export const members: Member[] = [
 ];
 
 export const templates: MessageTemplate[] = [
-  { id: "friendly", name: "Recordatorio amable", body: "Hola {nombre}, ¿cómo estás? Te escribimos desde miClub para recordarte que registrás una cuota pendiente correspondiente a {actividad}. Cuando puedas, podés acercarte a administración o consultarnos por este medio. ¡Gracias!" },
-  { id: "direct", name: "Recordatorio directo", body: "Hola {nombre}. Desde miClub te informamos que figura pendiente el pago de tu cuota de {actividad}. Por favor, regularizá tu situación para mantener activa tu inscripción." },
-  { id: "warning", name: "Aviso previo a vencimiento/suspensión", body: "Hola {nombre}. Te contactamos desde miClub porque tu inscripción en {actividad} figura con deuda pendiente. Para evitar la suspensión temporal del servicio, te pedimos regularizar el pago a la brevedad." },
-  { id: "custom-amount", name: "Recordatorio personalizado con monto", body: "Hola {nombre}, te escribimos por tu cuota pendiente de {actividad}. El monto registrado es ${cuota}. Si ya abonaste, por favor ignorá este mensaje. ¡Gracias!" }
+  { id: "friendly", name: "Recordatorio amable", body: "Hola {nombre}, ¿cómo estás? Te escribimos desde miClub para recordarte que registrás una cuota pendiente correspondiente a {actividad}. Cuando puedas, podés acercarte a administración o consultarnos por este medio. ¡Gracias!", isDefault: true, createdAt: "", updatedAt: "" },
+  { id: "direct", name: "Recordatorio directo", body: "Hola {nombre}. Desde miClub te informamos que figura pendiente el pago de tu cuota de {actividad}. Por favor, regularizá tu situación para mantener activa tu inscripción.", isDefault: true, createdAt: "", updatedAt: "" },
+  { id: "warning", name: "Aviso previo a vencimiento/suspensión", body: "Hola {nombre}. Te contactamos desde miClub porque tu inscripción en {actividad} figura con deuda pendiente. Para evitar la suspensión temporal del servicio, te pedimos regularizar el pago a la brevedad.", isDefault: true, createdAt: "", updatedAt: "" },
+  { id: "custom-amount", name: "Recordatorio personalizado con monto", body: "Hola {nombre}, te escribimos por tu cuota pendiente de {actividad}. El monto registrado es ${cuota}. Si ya abonaste, por favor ignorá este mensaje. ¡Gracias!", isDefault: true, createdAt: "", updatedAt: "" }
 ];

@@ -10,7 +10,8 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
 import cors from "cors";
-import type { Member, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
+import { randomUUID } from "node:crypto";
+import type { Member, MessageTemplate, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
@@ -108,6 +109,41 @@ const byKey = (members: Member[], getter: (m: Member) => string): Record<string,
     return acc;
   }, {});
 
+const ALLOWED_TEMPLATE_VARIABLES = new Set(["{nombre}", "{apellido}", "{actividad}", "{cuota}", "{modalidad}", "{instructor}"]);
+
+const validateTemplateInput = (name: unknown, body: unknown): string | null => {
+  if (typeof name !== "string" || name.trim().length === 0) return "name no puede estar vacío.";
+  if (typeof body !== "string" || body.trim().length === 0) return "body no puede estar vacío.";
+  const variables = body.match(/\{\w+\}/g) ?? [];
+  const invalidVariables = variables.filter((variable) => !ALLOWED_TEMPLATE_VARIABLES.has(variable.toLowerCase()));
+  if (invalidVariables.length > 0) return `Variables inválidas en body: ${Array.from(new Set(invalidVariables)).join(", ")}.`;
+  return null;
+};
+
+const mapTemplateRow = (row: {
+  id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string;
+}): MessageTemplate => ({
+  id: row.id,
+  name: row.name,
+  body: row.body,
+  isDefault: row.isDefault === 1,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt
+});
+
+const seedDefaultTemplates = async () => {
+  const [{ total }] = await allDb<{ total: number }>("SELECT COUNT(1) as total FROM message_templates");
+  if (total > 0) return;
+  const now = new Date().toISOString();
+  for (const template of templates) {
+    await runDb(
+      `INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt)
+       VALUES (?, ?, ?, 1, ?, ?)`,
+      [template.id, template.name, template.body, now, now]
+    );
+  }
+};
+
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api", testPhoneOverride: TEST_PHONE_OVERRIDE ?? null }));
 app.get("/members", async (_req, res) => {
   try {
@@ -154,7 +190,89 @@ app.get("/sync-status", async (_req, res) => {
   }
 });
 
-app.get("/templates", (_req, res) => res.json(templates));
+app.get("/templates", async (_req, res) => {
+  try {
+    const rows = await allDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
+      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates ORDER BY isDefault DESC, datetime(createdAt) ASC"
+    );
+    res.json(rows.map(mapTemplateRow));
+  } catch {
+    jsonError(res, 500, "No se pudieron obtener las plantillas.");
+  }
+});
+
+app.post("/templates", async (req, res) => {
+  const body = req.body as { name?: string; body?: string };
+  const validationError = validateTemplateInput(body.name, body.body);
+  if (validationError) return jsonError(res, 400, validationError);
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  try {
+    await runDb(
+      "INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, 0, ?, ?)",
+      [id, body.name?.trim(), body.body?.trim(), now, now]
+    );
+    const created = await getDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
+      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates WHERE id = ?",
+      [id]
+    );
+    res.status(201).json(created ? mapTemplateRow(created) : null);
+  } catch {
+    jsonError(res, 500, "No se pudo crear la plantilla.");
+  }
+});
+
+app.patch("/templates/:id", async (req, res) => {
+  const { id } = req.params;
+  const body = req.body as { name?: string; body?: string };
+  const validationError = validateTemplateInput(body.name, body.body);
+  if (validationError) return jsonError(res, 400, validationError);
+  try {
+    const existing = await getDb<{ id: string }>("SELECT id FROM message_templates WHERE id = ?", [id]);
+    if (!existing) return jsonError(res, 404, "Plantilla no encontrada.");
+    const now = new Date().toISOString();
+    await runDb("UPDATE message_templates SET name = ?, body = ?, updatedAt = ? WHERE id = ?", [body.name?.trim(), body.body?.trim(), now, id]);
+    const updated = await getDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
+      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates WHERE id = ?",
+      [id]
+    );
+    res.json(updated ? mapTemplateRow(updated) : null);
+  } catch {
+    jsonError(res, 500, "No se pudo actualizar la plantilla.");
+  }
+});
+
+app.delete("/templates/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const existing = await getDb<{ id: string; isDefault: number }>("SELECT id, isDefault FROM message_templates WHERE id = ?", [id]);
+    if (!existing) return jsonError(res, 404, "Plantilla no encontrada.");
+    if (existing.isDefault === 1) return jsonError(res, 400, "No se pueden eliminar plantillas predeterminadas.");
+    await runDb("DELETE FROM message_templates WHERE id = ?", [id]);
+    res.status(204).send();
+  } catch {
+    jsonError(res, 500, "No se pudo eliminar la plantilla.");
+  }
+});
+
+app.post("/templates/reset-defaults", async (_req, res) => {
+  const now = new Date().toISOString();
+  try {
+    await runDb("DELETE FROM message_templates");
+    for (const template of templates) {
+      await runDb(
+        "INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)",
+        [template.id, template.name, template.body, now, now]
+      );
+    }
+    const rows = await allDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
+      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates ORDER BY datetime(createdAt) ASC"
+    );
+    res.json(rows.map(mapTemplateRow));
+  } catch {
+    jsonError(res, 500, "No se pudieron restaurar las plantillas predeterminadas.");
+  }
+});
 
 app.get("/history", async (_req, res) => {
   try {
@@ -280,6 +398,14 @@ app.patch("/history/:id/status", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`API running at http://localhost:${port}`);
+const startServer = async () => {
+  await seedDefaultTemplates();
+  app.listen(port, () => {
+    console.log(`API running at http://localhost:${port}`);
+  });
+};
+
+startServer().catch((error) => {
+  console.error("No se pudo iniciar la API", error);
+  process.exit(1);
 });

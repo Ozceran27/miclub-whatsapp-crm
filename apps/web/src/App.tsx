@@ -59,6 +59,8 @@ export default function App() {
   const [members, setMembers] = useState<Member[]>([]);
   const [debtors, setDebtors] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [templateName, setTemplateName] = useState('');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -73,6 +75,9 @@ export default function App() {
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testMode, setTestMode] = useState(true);
+  const [templateStatus, setTemplateStatus] = useState<'idle' | 'dirty' | 'saved'>('idle');
+
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
 
   const loadHistory = async () => {
     const res = await fetch(`${API}/history`);
@@ -113,7 +118,14 @@ export default function App() {
       setSyncStatus(s as SyncStatus);
       setSummary(sum as Summary);
       setHistory((h as PreparedMessage[]).slice(0, 20));
-      if (!message && t[0]) setMessage((t[0] as MessageTemplate).body);
+      const firstTemplate = (t as MessageTemplate[])[0];
+      if (firstTemplate) {
+        setSelectedTemplateId((prev) => prev || firstTemplate.id);
+        if (!selectedTemplateId) {
+          setTemplateName(firstTemplate.name);
+          setMessage(firstTemplate.body);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido al sincronizar.');
     } finally {
@@ -124,6 +136,86 @@ export default function App() {
   useEffect(() => {
     void sync();
   }, []);
+
+  useEffect(() => {
+    if (!selectedTemplate) return;
+    setTemplateName(selectedTemplate.name);
+    setMessage(selectedTemplate.body);
+    setTemplateStatus('idle');
+  }, [selectedTemplateId, selectedTemplate?.updatedAt]);
+
+  const saveTemplate = async () => {
+    if (!selectedTemplate) return;
+    const res = await fetch(`${API}/templates/${selectedTemplate.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: templateName, body: message })
+    });
+    if (!res.ok) {
+      const payload = (await res.json()) as ApiError;
+      throw new Error(payload.message ?? 'No se pudo guardar la plantilla.');
+    }
+    const updated = (await res.json()) as MessageTemplate;
+    setTemplates((prev) => prev.map((template) => (template.id === updated.id ? updated : template)));
+    setTemplateStatus('saved');
+  };
+
+  const handleTemplateChange = (nextId: string) => {
+    if (templateStatus === 'dirty' && !window.confirm('Tenés cambios sin guardar. ¿Deseás descartarlos?')) return;
+    setSelectedTemplateId(nextId);
+  };
+
+  const createTemplate = async () => {
+    const name = window.prompt('Nombre de la nueva plantilla:');
+    if (!name?.trim()) return;
+    const res = await fetch(`${API}/templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), body: message || 'Hola {nombre}, ' })
+    });
+    if (!res.ok) {
+      const payload = (await res.json()) as ApiError;
+      throw new Error(payload.message ?? 'No se pudo crear la plantilla.');
+    }
+    const created = (await res.json()) as MessageTemplate;
+    setTemplates((prev) => [...prev, created]);
+    setSelectedTemplateId(created.id);
+    setTemplateStatus('saved');
+  };
+
+  const duplicateTemplate = async () => {
+    if (!selectedTemplate) return;
+    const res = await fetch(`${API}/templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: `${templateName} (copia)`, body: message })
+    });
+    if (!res.ok) throw new Error('No se pudo duplicar la plantilla.');
+    const duplicated = (await res.json()) as MessageTemplate;
+    setTemplates((prev) => [...prev, duplicated]);
+    setSelectedTemplateId(duplicated.id);
+    setTemplateStatus('saved');
+  };
+
+  const deleteTemplate = async () => {
+    if (!selectedTemplate || selectedTemplate.isDefault) return;
+    if (!window.confirm('¿Eliminar plantilla seleccionada?')) return;
+    const res = await fetch(`${API}/templates/${selectedTemplate.id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('No se pudo eliminar la plantilla.');
+    const remaining = templates.filter((template) => template.id !== selectedTemplate.id);
+    setTemplates(remaining);
+    if (remaining[0]) setSelectedTemplateId(remaining[0].id);
+  };
+
+  const resetDefaultTemplates = async () => {
+    if (!window.confirm('Esto restaurará las plantillas predeterminadas y quitará las personalizadas.')) return;
+    const res = await fetch(`${API}/templates/reset-defaults`, { method: 'POST' });
+    if (!res.ok) throw new Error('No se pudieron restaurar plantillas.');
+    const restored = (await res.json()) as MessageTemplate[];
+    setTemplates(restored);
+    if (restored[0]) setSelectedTemplateId(restored[0].id);
+    setTemplateStatus('saved');
+  };
 
   const baseRows = viewMode === 'debtors' ? debtors : members;
   const filtered = useMemo(
@@ -286,8 +378,17 @@ export default function App() {
 
       {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <table><thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Actividad</th><th>Cuota</th><th>Instructor</th><th>Hoja</th><th>Estado</th></tr></thead><tbody>{filtered.map(m => <tr key={m.id}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota ? formatArPeso(m.cuota) : '-'}</td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td></tr>)}</tbody></table>}
 
-      <section className="composer"><select onChange={(e) => setMessage(e.target.value)} value={message}>{templates.map(t => <option key={t.id} value={t.body}>{t.name}</option>)}</select>
-        <textarea value={message} onChange={e => setMessage(e.target.value)} rows={5} />
+      <section className="composer"><select onChange={(e) => handleTemplateChange(e.target.value)} value={selectedTemplateId}>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+        <input value={templateName} onChange={(e) => { setTemplateName(e.target.value); setTemplateStatus('dirty'); }} placeholder="Nombre de plantilla" />
+        <textarea value={message} onChange={e => { setMessage(e.target.value); setTemplateStatus('dirty'); }} rows={5} />
+        <p><strong>Estado:</strong> {templateStatus === 'dirty' ? 'Cambios sin guardar' : templateStatus === 'saved' ? 'Plantilla guardada' : 'Sin cambios'}</p>
+        <div className="actions-row">
+          <button className="icon-btn" onClick={() => void saveTemplate()} disabled={!selectedTemplate || templateStatus !== 'dirty'}><Icon label="💾" />Guardar cambios</button>
+          <button className="icon-btn" onClick={() => void createTemplate()}><Icon label="＋" />Crear plantilla</button>
+          <button className="icon-btn" onClick={() => void duplicateTemplate()} disabled={!selectedTemplate}><Icon label="⧉" />Duplicar plantilla</button>
+          {!selectedTemplate?.isDefault && <button className="icon-btn" onClick={() => void deleteTemplate()}><Icon label="🗑" />Eliminar plantilla</button>}
+          <button className="icon-btn ghost-btn" onClick={() => void resetDefaultTemplates()}><Icon label="↺" />Restaurar plantillas predeterminadas</button>
+        </div>
         <h3>Vista previa</h3><pre>{preview}</pre>
         <button className="icon-btn" disabled={!canPrepare} onClick={prepare}><Icon label="✉" />{preparing ? 'Preparando...' : 'Preparar mensajes'}</button></section>
 
