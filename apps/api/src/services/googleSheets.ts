@@ -47,9 +47,9 @@ export const getGoogleSheetsConfig = () => {
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() ?? "";
   const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n")?.trim() ?? "";
   const sheetRanges: Record<(typeof SHEET_NAMES)[number], string> = {
-    FITNESS: process.env.GOOGLE_SHEETS_FITNESS_RANGE?.trim() || "FITNESS!AB20:AY500",
-    SALON: process.env.GOOGLE_SHEETS_SALON_RANGE?.trim() || "SALON!AB34:AY500",
-    AULA: process.env.GOOGLE_SHEETS_AULA_RANGE?.trim() || "AULA!AB34:AY500"
+    FITNESS: process.env.GOOGLE_SHEETS_FITNESS_RANGE?.trim() || "FITNESS!AB20:AY800",
+    SALON: process.env.GOOGLE_SHEETS_SALON_RANGE?.trim() || "SALON!AB34:AY800",
+    AULA: process.env.GOOGLE_SHEETS_AULA_RANGE?.trim() || "AULA!AB34:AY800"
   };
 
   return {
