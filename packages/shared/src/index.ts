@@ -40,4 +40,16 @@ export interface PreparedMessage {
 export interface PrepareMessagesRequest {
   memberIds: string[];
   message: string;
+  mode?: "test" | "real";
+}
+
+export interface PrepareMessagesValidation {
+  selectedCount: number;
+  selectedPreview: Array<{ memberId: string; nombre: string; actividad?: string; cuota?: number; phone: string }>;
+  missingPhoneMembers: Array<{ memberId: string; nombre: string }>;
+  unresolvedVariables: string[];
+  duplicates: Array<{ memberId: string; nombre: string; status: string; createdAt: string }>;
+  sampleMessage: string;
+  mode: "test" | "real";
+  testPhoneOverride?: string;
 }
