@@ -12,6 +12,14 @@ Herramienta interna para gestión de cobranzas y preparación manual de mensajes
 ## Instalación
 ```bash
 npm install
+cp .env.example .env
+```
+
+## Variables de entorno
+```env
+PORT=4000
+SQLITE_DB_PATH=apps/api/data/miclub.sqlite
+VITE_API_URL=http://localhost:4000
 ```
 
 ## Desarrollo
@@ -22,14 +30,29 @@ Esto inicia:
 - API: http://localhost:4000
 - Web: http://localhost:5173
 
-## Fase 1 (MVP)
+## Scripts útiles
+```bash
+npm run typecheck
+npm run build
+npm run dev
+```
+
+## Fase 1 (MVP robustecido)
 - Datos mock de deudores.
 - Filtros y selección múltiple.
-- Plantillas editables.
-- Generación de links `wa.me`.
-- Registro local de mensajes preparados en SQLite.
+- Plantillas editables con vista previa.
+- Preparación manual de mensajes por links `wa.me`.
+- Historial local en SQLite y endpoint `GET /history`.
+- Validaciones en `POST /prepare-messages` con errores JSON estándar.
 
-## Fase 2 (futura)
+## Flujo operativo
+1. Sincronizar deudores y plantillas mock.
+2. Filtrar y seleccionar miembros.
+3. Personalizar mensaje y preparar envíos.
+4. Abrir manualmente cada link de WhatsApp.
+5. Consultar historial preparado desde la UI.
+
+## Fase 2 (futura, no incluida)
 - Integración Google Sheets real.
 - WhatsApp Business Platform / Cloud API.
 - Webhooks, estados de entrega y métricas.
