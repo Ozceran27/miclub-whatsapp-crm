@@ -21,6 +21,7 @@ type Summary = {
   totalEstimatedDebt: number;
 };
 type ViewMode = 'debtors' | 'members';
+type MessageStatus = 'prepared' | 'opened' | 'sent_manual' | 'skipped';
 
 const fill = (tpl: string, m?: Member) => {
   if (!m) return tpl;
@@ -129,6 +130,10 @@ export default function App() {
   const clearSelection = () => setSelected([]);
 
   const prepare = async () => {
+    if (selected.length === 0) {
+      setError('Seleccioná al menos un miembro Adeudando antes de preparar mensajes.');
+      return;
+    }
     setPreparing(true);
     setError(null);
     try {
@@ -149,6 +154,36 @@ export default function App() {
       setPreparing(false);
     }
   };
+
+  const updatePreparedStatus = async (historyId: number | undefined, status: MessageStatus) => {
+    if (!historyId) return;
+    const res = await fetch(`${API}/history/${historyId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) {
+      const payload = (await res.json()) as ApiError;
+      throw new Error(payload.message ?? 'No se pudo actualizar el estado.');
+    }
+
+    setPrepared(prev => prev.map((item) => item.historyId === historyId ? { ...item, status } : item));
+    await loadHistory();
+  };
+
+  const openWhatsApp = async (item: PreparedMessage) => {
+    window.open(item.waLink, '_blank', 'noopener,noreferrer');
+    await updatePreparedStatus(item.historyId, 'opened');
+  };
+
+  const preparedCounts = prepared.reduce(
+    (acc, item) => {
+      const key = item.status ?? 'prepared';
+      acc[key] += 1;
+      return acc;
+    },
+    { prepared: 0, opened: 0, sent_manual: 0, skipped: 0 } as Record<MessageStatus, number>
+  );
 
   const previewMember = members.find((d) => d.id === selected[0]);
   const preview = fill(message, previewMember);
@@ -204,8 +239,24 @@ export default function App() {
         <h3>Vista previa</h3><pre>{preview}</pre>
         <button className="icon-btn" disabled={!canPrepare} onClick={prepare}><Icon label="✉" />{preparing ? 'Preparando...' : 'Preparar mensajes'}</button></section>
 
-      <section><h3>Mensajes preparados</h3>{prepared.map(p => <div key={`${p.memberId}-${p.createdAt}`}><a href={p.waLink} target="_blank" rel="noreferrer"><Icon label="↗" />Abrir WhatsApp - {p.phone}</a></div>)}</section>
-      <section><h3>Historial (últimos 20)</h3><button className="icon-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>{history.length === 0 ? <p>Sin historial todavía.</p> : history.map(h => <article key={`${h.memberId}-${h.createdAt}`}><p><strong>{new Date(h.createdAt).toLocaleString()}</strong> · {h.phone}</p><p>{h.message}</p><a href={h.waLink} target="_blank" rel="noreferrer">{h.waLink}</a></article>)}</section>
+      <section>
+        <h3>Mensajes preparados</h3>
+        <p>
+          Preparados: {preparedCounts.prepared} · Abiertos: {preparedCounts.opened} · Enviados manualmente: {preparedCounts.sent_manual} · Omitidos: {preparedCounts.skipped}
+        </p>
+        <button className="icon-btn" onClick={() => setPrepared([])}><Icon label="⌫" />Limpiar mensajes preparados de pantalla</button>
+        {prepared.length === 0 ? <p>No hay mensajes preparados en pantalla.</p> : prepared.map(p => (
+          <article key={`${p.historyId ?? p.memberId}-${p.createdAt}`}>
+            <p><strong>{p.nombre ?? p.memberId}</strong> · {p.phone} · {p.actividad ?? '-'} · Estado: {p.status ?? 'prepared'}</p>
+            <div className="actions-row">
+              <button className="icon-btn" onClick={() => void openWhatsApp(p)}><Icon label="↗" />Abrir WhatsApp</button>
+              <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'sent_manual')}><Icon label="✓" />Marcar como enviado</button>
+              <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'skipped')}><Icon label="⤼" />Omitir</button>
+            </div>
+          </article>
+        ))}
+      </section>
+      <section><h3>Historial (últimos 20)</h3><button className="icon-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>{history.length === 0 ? <p>Sin historial todavía.</p> : history.map(h => <article key={`${h.historyId ?? h.memberId}-${h.createdAt}`}><p><strong>{new Date(h.createdAt).toLocaleString()}</strong> · {h.phone} · Estado: {h.status ?? 'prepared'}</p><p>{h.message}</p><a href={h.waLink} target="_blank" rel="noreferrer">{h.waLink}</a></article>)}</section>
     </main>
   );
 }

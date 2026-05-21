@@ -23,11 +23,18 @@ export interface MessageTemplate {
 }
 
 export interface PreparedMessage {
+  historyId?: number;
   memberId: string;
+  nombre?: string;
   phone: string;
+  actividad?: string;
   message: string;
   waLink: string;
+  status?: "prepared" | "opened" | "sent_manual" | "skipped";
   createdAt: string;
+  openedAt?: string | null;
+  sentAt?: string | null;
+  note?: string | null;
 }
 
 export interface PrepareMessagesRequest {
