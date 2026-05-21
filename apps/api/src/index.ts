@@ -77,13 +77,47 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
   }
 };
 
+const byKey = (members: Member[], getter: (m: Member) => string): Record<string, number> =>
+  members.reduce<Record<string, number>>((acc, member) => {
+    const key = getter(member) || "Sin datos";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
+app.get("/members", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    res.json(members);
+  } catch {
+    jsonError(res, 500, "No se pudo obtener la lista de miembros.");
+  }
+});
+
 app.get("/debtors", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
     res.json(members.filter((m) => m.estado === "Adeudando"));
   } catch {
     jsonError(res, 500, "No se pudo obtener la lista de deudores.");
+  }
+});
+
+app.get("/summary", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    const debtors = members.filter((m) => m.estado === "Adeudando");
+    res.json({
+      totalMembers: members.length,
+      totalDebtors: debtors.length,
+      totalBySheet: byKey(members, (m) => m.sourceSheet),
+      debtorsBySheet: byKey(debtors, (m) => m.sourceSheet),
+      totalByActivity: byKey(members, (m) => m.actividad ?? "Sin actividad"),
+      debtorsByActivity: byKey(debtors, (m) => m.actividad ?? "Sin actividad"),
+      totalEstimatedDebt: debtors.reduce((sum, d) => sum + (typeof d.cuota === "number" ? d.cuota : 0), 0)
+    });
+  } catch {
+    jsonError(res, 500, "No se pudo obtener el resumen.");
   }
 });
 
@@ -122,9 +156,14 @@ app.post("/prepare-messages", async (req, res) => {
 
   const { members } = await getMembersSource();
   const selected = members.filter((m) => body.memberIds?.includes(m.id));
+  const nonDebtors = selected.filter((m) => m.estado !== "Adeudando");
 
   if (selected.length === 0) {
     return jsonError(res, 400, "No se encontraron miembros válidos para preparar mensajes.");
+  }
+
+  if (nonDebtors.length > 0) {
+    return jsonError(res, 400, "Solo se pueden preparar mensajes para miembros con estado Adeudando.");
   }
 
   try {

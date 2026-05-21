@@ -9,18 +9,21 @@ const fill = (tpl, m) => {
         apellido: m.apellido,
         actividad: m.actividad ?? '',
         modalidad: m.modalidad ?? '',
-        cuota: m.cuota?.toString() ?? '',
+        cuota: m.cuota !== undefined ? String(m.cuota) : '',
         instructor: m.instructor ?? ''
     };
     return tpl.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
 };
 export default function App() {
+    const [members, setMembers] = useState([]);
     const [debtors, setDebtors] = useState([]);
     const [templates, setTemplates] = useState([]);
+    const [summary, setSummary] = useState(null);
     const [selected, setSelected] = useState([]);
     const [query, setQuery] = useState('');
     const [sheetFilter, setSheetFilter] = useState('ALL');
     const [activityFilter, setActivityFilter] = useState('ALL');
+    const [viewMode, setViewMode] = useState('debtors');
     const [message, setMessage] = useState('');
     const [prepared, setPrepared] = useState([]);
     const [history, setHistory] = useState([]);
@@ -28,17 +31,44 @@ export default function App() {
     const [syncing, setSyncing] = useState(false);
     const [preparing, setPreparing] = useState(false);
     const [error, setError] = useState(null);
+    const loadHistory = async () => {
+        const res = await fetch(`${API}/history`);
+        if (!res.ok) {
+            const payload = (await res.json());
+            throw new Error(payload.message ?? 'No se pudo cargar el historial.');
+        }
+        const rows = (await res.json());
+        setHistory(rows.slice(0, 20));
+    };
     const sync = async () => {
         setSyncing(true);
         setError(null);
         try {
-            const [dRes, tRes, sRes] = await Promise.all([fetch(`${API}/debtors`), fetch(`${API}/templates`), fetch(`${API}/sync-status`)]);
-            if (!dRes.ok || !tRes.ok || !sRes.ok)
+            const [mRes, dRes, tRes, sRes, sumRes, hRes] = await Promise.all([
+                fetch(`${API}/members`),
+                fetch(`${API}/debtors`),
+                fetch(`${API}/templates`),
+                fetch(`${API}/sync-status`),
+                fetch(`${API}/summary`),
+                fetch(`${API}/history`)
+            ]);
+            if (!mRes.ok || !dRes.ok || !tRes.ok || !sRes.ok || !sumRes.ok || !hRes.ok) {
                 throw new Error('No se pudo sincronizar la información.');
-            const [d, t, s] = await Promise.all([dRes.json(), tRes.json(), sRes.json()]);
+            }
+            const [m, d, t, s, sum, h] = await Promise.all([
+                mRes.json(),
+                dRes.json(),
+                tRes.json(),
+                sRes.json(),
+                sumRes.json(),
+                hRes.json()
+            ]);
+            setMembers(m);
             setDebtors(d);
             setTemplates(t);
             setSyncStatus(s);
+            setSummary(sum);
+            setHistory(h.slice(0, 20));
             if (!message && t[0])
                 setMessage(t[0].body);
         }
@@ -49,27 +79,13 @@ export default function App() {
             setSyncing(false);
         }
     };
-    const loadHistory = async () => {
-        setError(null);
-        try {
-            const res = await fetch(`${API}/history`);
-            if (!res.ok) {
-                const payload = (await res.json());
-                throw new Error(payload.message ?? 'No se pudo cargar el historial.');
-            }
-            setHistory(await res.json());
-        }
-        catch (e) {
-            setError(e instanceof Error ? e.message : 'Error desconocido al cargar historial.');
-        }
-    };
-    useEffect(() => {
-        void sync();
-        void loadHistory();
-    }, []);
-    const filtered = useMemo(() => debtors.filter(d => `${d.nombre} ${d.apellido}`.toLowerCase().includes(query.toLowerCase()) && (sheetFilter === 'ALL' || d.sourceSheet === sheetFilter) && (activityFilter === 'ALL' || d.actividad === activityFilter)), [debtors, query, sheetFilter, activityFilter]);
-    const allVisibleSelected = filtered.length > 0 && filtered.every((d) => selected.includes(d.id));
-    const toggleAll = () => setSelected(allVisibleSelected ? selected.filter(id => !filtered.some(f => f.id === id)) : Array.from(new Set([...selected, ...filtered.map(f => f.id)])));
+    useEffect(() => { void sync(); }, []);
+    const baseRows = viewMode === 'debtors' ? debtors : members;
+    const filtered = useMemo(() => baseRows.filter(d => `${d.nombre} ${d.apellido}`.toLowerCase().includes(query.toLowerCase()) && (sheetFilter === 'ALL' || d.sourceSheet === sheetFilter) && (activityFilter === 'ALL' || d.actividad === activityFilter)), [baseRows, query, sheetFilter, activityFilter]);
+    const visibleDebtors = filtered.filter((m) => m.estado === 'Adeudando');
+    const allVisibleSelected = visibleDebtors.length > 0 && visibleDebtors.every((d) => selected.includes(d.id));
+    const toggleAllDebtors = () => setSelected(allVisibleSelected ? selected.filter(id => !visibleDebtors.some(f => f.id === id)) : Array.from(new Set([...selected, ...visibleDebtors.map(f => f.id)])));
+    const clearSelection = () => setSelected([]);
     const prepare = async () => {
         setPreparing(true);
         setError(null);
@@ -89,7 +105,7 @@ export default function App() {
             setPreparing(false);
         }
     };
-    const previewMember = debtors.find(d => d.id === selected[0]);
+    const previewMember = members.find(d => d.id === selected[0]);
     const preview = fill(message, previewMember);
     const canPrepare = selected.length > 0 && message.trim().length > 0 && !preparing;
     const syncMessage = !syncStatus
@@ -99,5 +115,7 @@ export default function App() {
             : syncStatus.source === 'google_sheets'
                 ? 'Conectado a Google Sheets'
                 : 'Usando datos mock';
-    return _jsxs("main", { className: "container", children: [_jsx("h1", { children: "miClub WhatsApp CRM" }), _jsx("p", { children: "Gesti\u00F3n de cobranzas y mensajes por WhatsApp" }), _jsx("button", { onClick: sync, disabled: syncing, children: syncing ? 'Sincronizando...' : 'Sincronizar' }), _jsxs("p", { children: [_jsx("strong", { children: "Origen de datos:" }), " ", syncMessage] }), error && _jsxs("p", { style: { color: 'crimson', fontWeight: 700 }, children: ["Error: ", error] }), _jsxs("section", { className: "filters", children: [_jsx("input", { placeholder: "Buscar por nombre/apellido", value: query, onChange: e => setQuery(e.target.value) }), _jsxs("select", { value: sheetFilter, onChange: e => setSheetFilter(e.target.value), children: [_jsx("option", { value: "ALL", children: "Todas las hojas" }), Array.from(new Set(debtors.map(d => d.sourceSheet))).map(s => _jsx("option", { children: s }, s))] }), _jsxs("select", { value: activityFilter, onChange: e => setActivityFilter(e.target.value), children: [_jsx("option", { value: "ALL", children: "Todas las actividades" }), Array.from(new Set(debtors.map(d => d.actividad).filter(Boolean))).map(s => _jsx("option", { children: s }, s))] })] }), _jsxs("p", { children: [_jsx("strong", { children: "Seleccionados:" }), " ", selected.length] }), _jsxs("table", { children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { children: _jsx("input", { type: "checkbox", checked: allVisibleSelected, onChange: toggleAll }) }), _jsx("th", { children: "Nombre" }), _jsx("th", { children: "Actividad" }), _jsx("th", { children: "Hoja" }), _jsx("th", { children: "Estado" })] }) }), _jsx("tbody", { children: filtered.map(m => _jsxs("tr", { children: [_jsx("td", { children: _jsx("input", { type: "checkbox", checked: selected.includes(m.id), onChange: () => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]) }) }), _jsxs("td", { children: [m.nombre, " ", m.apellido] }), _jsx("td", { children: m.actividad }), _jsx("td", { children: m.sourceSheet }), _jsx("td", { children: m.estado })] }, m.id)) })] }), _jsxs("section", { children: [_jsx("select", { onChange: (e) => setMessage(e.target.value), value: message, children: templates.map(t => _jsx("option", { value: t.body, children: t.name }, t.id)) }), _jsx("textarea", { value: message, onChange: e => setMessage(e.target.value), rows: 5 }), _jsx("h3", { children: "Vista previa" }), _jsx("pre", { style: { whiteSpace: 'pre-wrap', background: '#f7f7f7', padding: 12, borderRadius: 8 }, children: preview }), _jsx("button", { disabled: !canPrepare, onClick: prepare, children: preparing ? 'Preparando...' : 'Preparar mensajes' })] }), _jsxs("section", { children: [_jsx("h3", { children: "Mensajes preparados" }), prepared.map(p => _jsx("div", { children: _jsxs("a", { href: p.waLink, target: "_blank", rel: "noreferrer", children: ["Abrir WhatsApp - ", p.phone] }) }, `${p.memberId}-${p.createdAt}`))] }), _jsxs("section", { children: [_jsx("h3", { children: "Historial" }), _jsx("button", { onClick: loadHistory, children: "Actualizar historial" }), history.length === 0 ? _jsx("p", { children: "Sin historial todav\u00EDa." }) : history.map(h => _jsxs("article", { children: [_jsxs("p", { children: [_jsx("strong", { children: h.phone }), " \u00B7 ", new Date(h.createdAt).toLocaleString()] }), _jsx("p", { children: h.message }), _jsx("a", { href: h.waLink, target: "_blank", rel: "noreferrer", children: "Abrir enlace" })] }, `${h.memberId}-${h.createdAt}`))] })] });
+    const allSheets = Array.from(new Set(members.map(d => d.sourceSheet)));
+    const allActivities = Array.from(new Set(members.map(d => d.actividad).filter(Boolean)));
+    return _jsxs("main", { className: "container", children: [_jsx("h1", { children: "miClub WhatsApp CRM" }), _jsx("p", { children: "Gesti\u00F3n de cobranzas y mensajes por WhatsApp" }), _jsx("button", { onClick: sync, disabled: syncing, children: syncing ? 'Sincronizando...' : 'Sincronizar' }), error && _jsxs("p", { style: { color: 'crimson', fontWeight: 700 }, children: ["Error: ", error] }), _jsxs("section", { className: "dashboard", children: [_jsxs("article", { className: "card", children: [_jsx("h4", { children: "Total inscriptos" }), _jsx("p", { children: summary?.totalMembers ?? members.length })] }), _jsxs("article", { className: "card", children: [_jsx("h4", { children: "Total adeudando" }), _jsx("p", { children: summary?.totalDebtors ?? debtors.length })] }), _jsxs("article", { className: "card", children: [_jsx("h4", { children: "Deuda estimada" }), _jsxs("p", { children: ["$", (summary?.totalEstimatedDebt ?? 0).toLocaleString('es-AR')] })] }), _jsxs("article", { className: "card", children: [_jsx("h4", { children: "Origen de datos" }), _jsx("p", { children: syncMessage })] })] }), _jsxs("section", { className: "filters", children: [_jsxs("select", { value: viewMode, onChange: e => { setViewMode(e.target.value); setSelected([]); }, children: [_jsx("option", { value: "debtors", children: "Solo deudores" }), _jsx("option", { value: "members", children: "Todos los inscriptos" })] }), _jsx("input", { placeholder: "Buscar por nombre/apellido", value: query, onChange: e => setQuery(e.target.value) }), _jsxs("select", { value: sheetFilter, onChange: e => setSheetFilter(e.target.value), children: [_jsx("option", { value: "ALL", children: "Todas las hojas" }), allSheets.map(s => _jsx("option", { children: s }, s))] }), _jsxs("select", { value: activityFilter, onChange: e => setActivityFilter(e.target.value), children: [_jsx("option", { value: "ALL", children: "Todas las actividades" }), allActivities.map(s => _jsx("option", { children: s }, s))] })] }), _jsxs("div", { className: "actions-row", children: [_jsxs("p", { children: [_jsx("strong", { children: "Resultados visibles:" }), " ", filtered.length, " \u00B7 ", _jsx("strong", { children: "Seleccionados:" }), " ", selected.length] }), _jsx("button", { onClick: toggleAllDebtors, children: "Seleccionar todos los visibles (deudores)" }), _jsx("button", { onClick: clearSelection, children: "Limpiar selecci\u00F3n" })] }), filtered.length === 0 ? _jsx("p", { children: "No hay resultados con los filtros actuales." }) : _jsxs("table", { children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", {}), _jsx("th", { children: "Nombre" }), _jsx("th", { children: "Tel\u00E9fono" }), _jsx("th", { children: "Actividad" }), _jsx("th", { children: "Cuota" }), _jsx("th", { children: "Instructor" }), _jsx("th", { children: "Hoja" }), _jsx("th", { children: "Estado" })] }) }), _jsx("tbody", { children: filtered.map(m => _jsxs("tr", { children: [_jsx("td", { children: _jsx("input", { type: "checkbox", disabled: m.estado !== 'Adeudando', checked: selected.includes(m.id), onChange: () => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]) }) }), _jsxs("td", { children: [m.nombre, " ", m.apellido] }), _jsx("td", { children: m.telefono }), _jsx("td", { children: m.actividad ?? '-' }), _jsx("td", { children: m.cuota ? `$${m.cuota}` : '-' }), _jsx("td", { children: m.instructor ?? '-' }), _jsx("td", { children: m.sourceSheet }), _jsx("td", { children: m.estado })] }, m.id)) })] }), _jsxs("section", { children: [_jsx("select", { onChange: (e) => setMessage(e.target.value), value: message, children: templates.map(t => _jsx("option", { value: t.body, children: t.name }, t.id)) }), _jsx("textarea", { value: message, onChange: e => setMessage(e.target.value), rows: 5 }), _jsx("h3", { children: "Vista previa" }), _jsx("pre", { style: { whiteSpace: 'pre-wrap', background: '#f7f7f7', color: '#101010', padding: 12, borderRadius: 8 }, children: preview }), _jsx("button", { disabled: !canPrepare, onClick: prepare, children: preparing ? 'Preparando...' : 'Preparar mensajes' })] }), _jsxs("section", { children: [_jsx("h3", { children: "Mensajes preparados" }), prepared.map(p => _jsx("div", { children: _jsxs("a", { href: p.waLink, target: "_blank", rel: "noreferrer", children: ["Abrir WhatsApp - ", p.phone] }) }, `${p.memberId}-${p.createdAt}`))] }), _jsxs("section", { children: [_jsx("h3", { children: "Historial (\u00FAltimos 20)" }), _jsx("button", { onClick: () => void loadHistory(), children: "Actualizar historial" }), history.length === 0 ? _jsx("p", { children: "Sin historial todav\u00EDa." }) : history.map(h => _jsxs("article", { children: [_jsxs("p", { children: [_jsx("strong", { children: new Date(h.createdAt).toLocaleString() }), " \u00B7 ", h.phone] }), _jsx("p", { children: h.message }), _jsx("a", { href: h.waLink, target: "_blank", rel: "noreferrer", children: h.waLink })] }, `${h.memberId}-${h.createdAt}`))] })] });
 }

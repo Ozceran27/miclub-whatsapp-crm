@@ -1,10 +1,15 @@
 :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
 body { margin: 0; background: #141821; color: #f0f3f7; }
-.container { max-width: 1050px; margin: 0 auto; padding: 24px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
 button, select, input, textarea { background: #202736; color: #f0f3f7; border: 1px solid #3a455f; border-radius: 8px; padding: 8px; }
 button { cursor: pointer; }
 table { width: 100%; border-collapse: collapse; margin: 16px 0; }
 th, td { border-bottom: 1px solid #2f3a50; padding: 8px; text-align: left; }
-.filters { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin: 16px 0; }
+.filters { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr; gap: 8px; margin: 16px 0; }
 textarea { width: 100%; margin-top: 8px; }
 a { color: #77ddff; }
+.dashboard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.card { background: #202736; border: 1px solid #3a455f; border-radius: 10px; padding: 10px; }
+.card h4 { margin: 0 0 8px 0; font-size: 14px; color: #b8c8e6; }
+.card p { margin: 0; font-weight: 700; }
+.actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
