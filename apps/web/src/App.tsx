@@ -25,10 +25,10 @@ type MessageStatus = 'prepared' | 'opened' | 'sent_manual' | 'skipped';
 const ACTIONABLE_STATUSES: MessageStatus[] = ['prepared', 'opened'];
 
 const STATUS_META: Record<MessageStatus, { label: string; icon: string; className: string }> = {
-  prepared: { label: 'Pendiente', icon: '🕒', className: 'status-prepared' },
-  opened: { label: 'Abierto', icon: '↗', className: 'status-opened' },
-  sent_manual: { label: 'Enviado manualmente', icon: '✓', className: 'status-sent' },
-  skipped: { label: 'Omitido', icon: '⤼', className: 'status-skipped' }
+  prepared: { label: 'Pendiente', icon: '🕒', className: 'status-chip--prepared' },
+  opened: { label: 'Abierto', icon: '👁', className: 'status-chip--opened' },
+  sent_manual: { label: 'Enviado manualmente', icon: '✓', className: 'status-chip--sent' },
+  skipped: { label: 'Omitido', icon: '✕', className: 'status-chip--skipped' }
 };
 
 const fill = (tpl: string, m?: Member) => {
@@ -44,7 +44,9 @@ const fill = (tpl: string, m?: Member) => {
   return tpl.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? '');
 };
 
-const getStatusMeta = (status?: MessageStatus) => STATUS_META[status ?? 'prepared'];
+const getStatusLabel = (status?: MessageStatus) => STATUS_META[status ?? 'prepared'].label;
+const getStatusIcon = (status?: MessageStatus) => STATUS_META[status ?? 'prepared'].icon;
+const getStatusClass = (status?: MessageStatus) => STATUS_META[status ?? 'prepared'].className;
 const formatDateTime = (value?: string) => {
   if (!value) return 'Sin fecha';
   return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
@@ -262,52 +264,83 @@ export default function App() {
         <h3>Vista previa</h3><pre>{preview}</pre>
         <button className="icon-btn" disabled={!canPrepare} onClick={prepare}><Icon label="✉" />{preparing ? 'Preparando...' : 'Preparar mensajes'}</button></section>
 
-      <section className="messages-panel">
-        <h3>Mensajes preparados</h3>
-        <div className="count-chips">
-          <span className="count-chip status-prepared">Pendientes: {preparedCounts.prepared}</span>
-          <span className="count-chip status-opened">Abiertos: {preparedCounts.opened}</span>
-          <span className="count-chip status-sent">Enviados: {preparedCounts.sent_manual}</span>
-          <span className="count-chip status-skipped">Omitidos: {preparedCounts.skipped}</span>
+      <section className="section-panel">
+        <div className="section-header">
+          <div>
+            <h3>Mensajes preparados</h3>
+            <p>Gestioná los mensajes listos para enviar y movelos al historial cuando finalices.</p>
+          </div>
+          <button className="icon-btn ghost-btn" onClick={() => setPrepared([])}><Icon label="⌫" />Limpiar mensajes preparados de pantalla</button>
         </div>
-        <button className="icon-btn" onClick={() => setPrepared([])}><Icon label="⌫" />Limpiar mensajes preparados de pantalla</button>
-        <p className="section-note">Esta acción solo limpia la pantalla actual y no borra el historial.</p>
-        {actionablePrepared.length === 0 ? <p className="empty-state">No hay mensajes pendientes para gestionar.</p> : <div className="prepared-grid">{actionablePrepared.map(p => {
-          const status = getStatusMeta(p.status);
-          return (
-          <article key={`${p.historyId ?? p.memberId}-${p.createdAt}`} className="prepared-card">
-            <div className="prepared-header">
-              <h4>{p.nombre ?? p.memberId}</h4>
-              <span className={`status-badge ${status.className}`}><Icon label={status.icon} />{status.label}</span>
-            </div>
-            <p className="prepared-meta"><strong>Teléfono:</strong> {p.phone}</p>
-            <p className="prepared-meta"><strong>Actividad:</strong> {p.actividad ?? '-'}</p>
-            <p className="prepared-meta"><strong>Preparado:</strong> {formatDateTime(p.createdAt)}</p>
-            <div className="actions-row prepared-actions">
-              <button className="icon-btn" onClick={() => void openWhatsApp(p)}><Icon label="↗" />Abrir WhatsApp</button>
-              <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'sent_manual')}><Icon label="✓" />Marcar como enviado</button>
-              <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'skipped')}><Icon label="⤼" />Omitir</button>
-            </div>
-          </article>
-        )})}</div>}
+        <p className="section-note">Esta acción solo limpia la pantalla actual y no borra historial.</p>
+        <div className="count-chips">
+          <span className="status-chip status-chip--prepared">Pendientes: {preparedCounts.prepared}</span>
+          <span className="status-chip status-chip--opened">Abiertos: {preparedCounts.opened}</span>
+          <span className="status-chip status-chip--sent">Enviados: {preparedCounts.sent_manual}</span>
+          <span className="status-chip status-chip--skipped">Omitidos: {preparedCounts.skipped}</span>
+        </div>
+        {actionablePrepared.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">📭</div>
+            <p className="empty-state-title">No hay mensajes pendientes</p>
+            <p>Prepará mensajes desde la lista de deudores para gestionarlos acá.</p>
+          </div>
+        ) : (
+          <div className="prepared-grid">
+            {actionablePrepared.map((p) => (
+              <article key={`${p.historyId ?? p.memberId}-${p.createdAt}`} className="prepared-card">
+                <div className="prepared-header">
+                  <h4>{p.nombre ?? p.memberId}</h4>
+                  <span className={`status-chip ${getStatusClass(p.status)}`}><Icon label={getStatusIcon(p.status)} />{getStatusLabel(p.status)}</span>
+                </div>
+                <p className="prepared-meta"><strong>Teléfono:</strong> {p.phone}</p>
+                <p className="prepared-meta"><strong>Actividad:</strong> {p.actividad ?? '-'}</p>
+                <div className="actions-row prepared-actions">
+                  <button className="icon-btn" onClick={() => void openWhatsApp(p)}><Icon label="↗" />Abrir WhatsApp</button>
+                  <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'sent_manual')}><Icon label="✓" />Marcar enviado</button>
+                  <button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'skipped')}><Icon label="✕" />Omitir</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
-      <section className="history-panel">
-        <h3>Historial (últimos 20)</h3>
-        <button className="icon-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>
-        {history.length === 0 ? <p className="empty-state">Sin historial todavía.</p> : <div className="history-list">{history.slice(0, 20).map(h => {
-          const status = getStatusMeta(h.status);
-          return (
-            <article key={`${h.historyId ?? h.memberId}-${h.createdAt}`} className="history-item">
-              <div className="history-top">
-                <span className={`status-badge ${status.className}`}><Icon label={status.icon} />{status.label}</span>
-                <span className="history-date">{formatDateTime(h.createdAt)}</span>
-              </div>
-              <p className="history-member"><strong>{h.nombre ?? h.memberId}</strong> · {h.phone}</p>
-              <p className="history-message">{summarizeMessage(h.message)}</p>
-              <a href={h.waLink} target="_blank" rel="noreferrer" className="history-link"><Icon label="↗" />Abrir enlace</a>
-            </article>
-          );
-        })}</div>}
+
+      <section className="section-panel">
+        <div className="section-header">
+          <div>
+            <h3>Historial</h3>
+            <p>Últimos 20 movimientos</p>
+          </div>
+          <button className="icon-btn ghost-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>
+        </div>
+        {history.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">🗂</div>
+            <p className="empty-state-title">Aún no hay movimientos</p>
+            <p>Cuando prepares o gestiones mensajes, aparecerán en este historial.</p>
+          </div>
+        ) : (
+          <div className="history-table-wrap">
+            <table className="history-table">
+              <thead>
+                <tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Mensaje</th><th>Acción</th></tr>
+              </thead>
+              <tbody>
+                {history.slice(0, 20).map((h) => (
+                  <tr key={`${h.historyId ?? h.memberId}-${h.createdAt}`}>
+                    <td><span className={`status-chip ${getStatusClass(h.status)}`}><Icon label={getStatusIcon(h.status)} />{getStatusLabel(h.status)}</span></td>
+                    <td>{formatDateTime(h.createdAt)}</td>
+                    <td>{h.nombre ?? h.memberId}</td>
+                    <td>{h.phone}</td>
+                    <td className="history-message-preview">{summarizeMessage(h.message, 120)}</td>
+                    <td><a href={h.waLink} target="_blank" rel="noreferrer" className="icon-btn"><Icon label="↗" />Abrir enlace</a></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </main>
   );
