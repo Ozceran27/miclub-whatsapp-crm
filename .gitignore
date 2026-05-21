@@ -6,4 +6,6 @@ build/
 .DS_Store
 .vscode/
 *.log
-database.sqlite
+*.sqlite
+*.sqlite3
+!apps/api/data/.gitkeep
