@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "tsx --test src/**/*.test.ts",
-    "start": "set NODE_ENV=production&& node dist/apps/api/src/index.js"
+    "start": "node dist/apps/api/src/index.js"
   },
   "dependencies": {
     "@miclub/shared": "0.1.0",

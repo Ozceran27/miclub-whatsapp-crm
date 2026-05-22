@@ -126,6 +126,15 @@ npm run start
 5. Abrir la app en:
 - `http://localhost:4000`
 
+6. Si en el navegador aparece el error `Frontend no compilado. Ejecutá npm run build.`, volver a compilar:
+```bash
+npm run build
+```
+
+Notas:
+- El backend busca `.env` en la **raíz del proyecto** (`miclub-whatsapp-crm/.env`).
+- En producción local, el servidor sirve el frontend compilado desde `apps/web/dist`.
+
 ### Inicio rápido en Windows (sin VS Code)
 En la carpeta `scripts/` se incluyen:
 - `build-prod.bat`: compila todo el monorepo.
