@@ -1,12 +1,39 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, "../../..");
-const webDistPath = path.resolve(repoRoot, "apps/web/dist");
-const isProduction = process.env.NODE_ENV === "production";
+
+const findRepoRoot = (startDir: string): string => {
+  let currentDir = startDir;
+
+  while (true) {
+    const packageJsonPath = path.join(currentDir, "package.json");
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as { name?: string };
+        if (packageJson.name === "miclub-whatsapp-crm") return currentDir;
+      } catch (error) {
+        console.warn(`No se pudo leer ${packageJsonPath}:`, error);
+      }
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) break;
+    currentDir = parentDir;
+  }
+
+  const fallbackDir = process.cwd();
+  console.warn(`No se encontró la raíz del repo (package.json con name=miclub-whatsapp-crm) desde ${startDir}. Usando fallback process.cwd(): ${fallbackDir}`);
+  return fallbackDir;
+};
+
+const repoRoot = findRepoRoot(__dirname);
+const webDistPath = path.join(repoRoot, "apps/web/dist");
+const webIndexPath = path.join(webDistPath, "index.html");
+const isProduction = process.env.NODE_ENV === "production" || __dirname.includes(`${path.sep}dist${path.sep}`);
 
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
@@ -414,9 +441,15 @@ app.patch("/history/:id/status", async (req, res) => {
 });
 
 if (isProduction) {
-  app.get("/", (_req, res) => {
-    res.sendFile(path.join(webDistPath, "index.html"));
-  });
+  const sendFrontendIndex = (res: express.Response) => {
+    if (!fs.existsSync(webIndexPath)) {
+      return jsonError(res, 500, "Frontend no compilado. Ejecutá npm run build.");
+    }
+
+    return res.sendFile(webIndexPath);
+  };
+
+  app.get("/", (_req, res) => sendFrontendIndex(res));
 
   app.get("*", (req, res, next) => {
     if (
@@ -432,7 +465,7 @@ if (isProduction) {
       return next();
     }
 
-    res.sendFile(path.join(webDistPath, "index.html"));
+    return sendFrontendIndex(res);
   });
 }
 
