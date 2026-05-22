@@ -100,3 +100,40 @@ npm run test -w @miclub/api
 
 ## Política WhatsApp
 En Fase 1 no se automatiza el envío ni se manipula WhatsApp Web: el usuario confirma manualmente cada mensaje.
+
+## Uso local en producción
+
+1. Instalar dependencias:
+```bash
+npm install
+```
+
+2. Configurar variables de entorno en la raíz del repo:
+- Ubicación: `./.env`
+- Tomar como base `./.env.example`
+- **No subir `.env` a GitHub** (mantenerlo fuera de control de versiones).
+
+3. Compilar backend + frontend:
+```bash
+npm run build
+```
+
+4. Iniciar en modo producción local:
+```bash
+npm run start
+```
+
+5. Abrir la app en:
+- `http://localhost:4000`
+
+### Inicio rápido en Windows (sin VS Code)
+En la carpeta `scripts/` se incluyen:
+- `build-prod.bat`: compila todo el monorepo.
+- `start-prod.bat`: abre el navegador en `http://localhost:4000` y levanta el servidor.
+- `start-miclub-crm.bat`: compila + inicia en una sola acción (`npm run start:prod`).
+
+Para crear un acceso directo:
+1. Ir a `scripts/start-miclub-crm.bat`.
+2. Clic derecho → **Crear acceso directo**.
+3. Mover el acceso directo al Escritorio.
+4. Ejecutar el acceso directo para iniciar la app local.

@@ -9,7 +9,10 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w @miclub/api\" \"npm run dev -w @miclub/web\"",
     "build": "npm run build -ws",
-    "typecheck": "npm run typecheck -ws"
+    "typecheck": "npm run typecheck -ws",
+    "start": "npm run start -w @miclub/api",
+    "start:prod": "npm run build && npm run start",
+    "check": "npm run typecheck && npm run build && npm run test -w @miclub/api"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
