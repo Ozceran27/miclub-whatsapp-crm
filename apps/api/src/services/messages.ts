@@ -34,5 +34,10 @@ export const interpolateTemplate = (template: string, member: Member): string =>
   return template.replace(/\{(\w+)\}/g, (_, k: string) => values[k] ?? "");
 };
 
-export const buildWaLink = (phone: string, message: string): string =>
-  `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+export const buildWaLink = (phone: string, message: string): string => {
+  const url = new URL("https://web.whatsapp.com/send");
+  url.searchParams.set("phone", phone);
+  url.searchParams.set("text", message.normalize("NFC"));
+  url.searchParams.set("app_absent", "0");
+  return url.toString();
+};
