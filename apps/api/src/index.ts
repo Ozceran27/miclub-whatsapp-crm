@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "../../..");
+const webDistPath = path.resolve(repoRoot, "apps/web/dist");
+const isProduction = process.env.NODE_ENV === "production";
 
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
@@ -21,6 +23,10 @@ const app = express();
 const port = Number(process.env.PORT ?? 4000);
 app.use(cors());
 app.use(express.json());
+
+if (isProduction) {
+  app.use(express.static(webDistPath));
+}
 
 const jsonError = (res: express.Response, status: number, message: string) =>
   res.status(status).json({ error: true, message });
@@ -406,6 +412,29 @@ app.patch("/history/:id/status", async (req, res) => {
     jsonError(res, 500, "No se pudo actualizar el estado del mensaje.");
   }
 });
+
+if (isProduction) {
+  app.get("/", (_req, res) => {
+    res.sendFile(path.join(webDistPath, "index.html"));
+  });
+
+  app.get("*", (req, res, next) => {
+    if (
+      req.path.startsWith("/health") ||
+      req.path.startsWith("/members") ||
+      req.path.startsWith("/debtors") ||
+      req.path.startsWith("/summary") ||
+      req.path.startsWith("/templates") ||
+      req.path.startsWith("/history") ||
+      req.path.startsWith("/sync-status") ||
+      req.path.startsWith("/prepare-messages")
+    ) {
+      return next();
+    }
+
+    res.sendFile(path.join(webDistPath, "index.html"));
+  });
+}
 
 const startServer = async () => {
   await seedDefaultTemplates();
