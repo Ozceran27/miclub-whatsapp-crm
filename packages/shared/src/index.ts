@@ -56,3 +56,24 @@ export interface PrepareMessagesValidation {
   mode: "test" | "real";
   testPhoneOverride?: string;
 }
+
+
+export interface PaginatedHistoryResponse {
+  items: PreparedMessage[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ContactedRecentMemberInfo {
+  lastSentAt: string;
+  count: number;
+}
+
+export interface ContactedRecentResponse {
+  windowDays: number;
+  since: string;
+  memberIds: string[];
+  byMemberId: Record<string, ContactedRecentMemberInfo>;
+}

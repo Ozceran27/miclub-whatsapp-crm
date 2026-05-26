@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Member, MessageTemplate, PreparedMessage, PrepareMessagesValidation } from '@miclub/shared';
+import type { ContactedRecentResponse, Member, MessageTemplate, PaginatedHistoryResponse, PreparedMessage, PrepareMessagesValidation } from '@miclub/shared';
 import { formatArPeso } from './utils';
 
 const Icon = ({ label }: { label: string }) => <span aria-hidden="true" className="mini-icon">{label}</span>;
@@ -70,6 +70,9 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [prepared, setPrepared] = useState<PreparedMessage[]>([]);
   const [history, setHistory] = useState<PreparedMessage[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyMeta, setHistoryMeta] = useState({ pageSize: 20, total: 0, totalPages: 0 });
+  const [contactedRecent, setContactedRecent] = useState<ContactedRecentResponse>({ windowDays: 30, since: new Date(0).toISOString(), memberIds: [], byMemberId: {} });
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -79,45 +82,53 @@ export default function App() {
 
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
 
-  const loadHistory = async () => {
-    const res = await fetch(`${API}/history`);
+  const loadHistory = async (page = 1) => {
+    const res = await fetch(`${API}/history?page=${page}&pageSize=20`);
     if (!res.ok) {
       const payload = (await res.json()) as ApiError;
       throw new Error(payload.message ?? 'No se pudo cargar el historial.');
     }
-    const rows = (await res.json()) as PreparedMessage[];
-    setHistory(rows.slice(0, 20));
+    const payload = (await res.json()) as PaginatedHistoryResponse;
+    setHistory(payload.items);
+    setHistoryPage(payload.page);
+    setHistoryMeta({ pageSize: payload.pageSize, total: payload.total, totalPages: payload.totalPages });
   };
 
   const sync = async () => {
     setSyncing(true);
     setError(null);
     try {
-      const [mRes, dRes, tRes, sRes, sumRes, hRes] = await Promise.all([
+      const [mRes, dRes, tRes, sRes, sumRes, hRes, cRes] = await Promise.all([
         fetch(`${API}/members`),
         fetch(`${API}/debtors`),
         fetch(`${API}/templates`),
         fetch(`${API}/sync-status`),
         fetch(`${API}/summary`),
-        fetch(`${API}/history`)
+        fetch(`${API}/history?page=1&pageSize=20`),
+        fetch(`${API}/contacted-recent`)
       ]);
-      if (!mRes.ok || !dRes.ok || !tRes.ok || !sRes.ok || !sumRes.ok || !hRes.ok) {
+      if (!mRes.ok || !dRes.ok || !tRes.ok || !sRes.ok || !sumRes.ok || !hRes.ok || !cRes.ok) {
         throw new Error('No se pudo sincronizar la información.');
       }
-      const [m, d, t, s, sum, h] = await Promise.all([
+      const [m, d, t, s, sum, h, c] = await Promise.all([
         mRes.json(),
         dRes.json(),
         tRes.json(),
         sRes.json(),
         sumRes.json(),
-        hRes.json()
+        hRes.json(),
+        cRes.json()
       ]);
       setMembers(m as Member[]);
       setDebtors(d as Member[]);
       setTemplates(t as MessageTemplate[]);
       setSyncStatus(s as SyncStatus);
       setSummary(sum as Summary);
-      setHistory((h as PreparedMessage[]).slice(0, 20));
+      const historyPayload = h as PaginatedHistoryResponse;
+      setHistory(historyPayload.items);
+      setHistoryPage(historyPayload.page);
+      setHistoryMeta({ pageSize: historyPayload.pageSize, total: historyPayload.total, totalPages: historyPayload.totalPages });
+      setContactedRecent(c as ContactedRecentResponse);
       const firstTemplate = (t as MessageTemplate[])[0];
       if (firstTemplate) {
         setSelectedTemplateId((prev) => prev || firstTemplate.id);
@@ -372,11 +383,11 @@ export default function App() {
         <select value={activityFilter} onChange={e => setActivityFilter(e.target.value)}><option value="ALL">Todas las actividades</option>{allActivities.map(s => <option key={s}>{s}</option>)}</select>
       </section>
 
-      <div className="actions-row"><p><strong>Resultados visibles:</strong> {filtered.length} · <strong>Seleccionados:</strong> {selected.length}</p>
+      <div className="actions-row"><p><strong>Resultados visibles:</strong> {filtered.length} · <strong>Seleccionados:</strong> {selected.length} · <strong>Contactados últimos 30 días:</strong> {contactedRecent.memberIds.length}</p>
         <button className="icon-btn" onClick={toggleAllDebtors}><Icon label="☑" />Seleccionar todos los visibles</button>
         <button className="icon-btn" onClick={clearSelection}><Icon label="⌫" />Limpiar selección</button></div>
 
-      {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <table><thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Actividad</th><th>Cuota</th><th>Instructor</th><th>Hoja</th><th>Estado</th></tr></thead><tbody>{filtered.map(m => <tr key={m.id}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota ? formatArPeso(m.cuota) : '-'}</td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td></tr>)}</tbody></table>}
+      {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <table><thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Actividad</th><th>Cuota</th><th>Instructor</th><th>Hoja</th><th>Estado</th><th>Contacto</th></tr></thead><tbody>{filtered.map(m => { const recent = contactedRecent.byMemberId[m.id]; return <tr key={m.id} className={recent ? 'recent-contact-row' : ''}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota ? formatArPeso(m.cuota) : '-'}</td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td><td>{recent ? <span className="recent-contact-badge" title="Mensaje enviado en los últimos 30 días">📩 Contactado: {new Date(recent.lastSentAt).toLocaleDateString('es-AR')}</span> : '-'}</td></tr>; })}</tbody></table>}
 
       <section className="composer"><select onChange={(e) => handleTemplateChange(e.target.value)} value={selectedTemplateId}>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <input value={templateName} onChange={(e) => { setTemplateName(e.target.value); setTemplateStatus('dirty'); }} placeholder="Nombre de plantilla" />
@@ -439,7 +450,7 @@ export default function App() {
         <div className="section-header">
           <div>
             <h3>Historial</h3>
-            <p>Últimos 20 movimientos</p>
+            <p>Últimos 200 movimientos (20 por página)</p>
           </div>
           <button className="icon-btn ghost-btn" onClick={() => void loadHistory()}><Icon label="◴" />Actualizar historial</button>
         </div>
@@ -456,7 +467,7 @@ export default function App() {
                 <tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Mensaje</th><th>Actividad</th></tr>
               </thead>
               <tbody>
-                {history.slice(0, 20).map((h) => (
+                {history.map((h) => (
                   <tr key={`${h.historyId ?? h.memberId}-${h.createdAt}`}>
                     <td><span className={`status-chip ${getStatusClass(h.status)}`}><Icon label={getStatusIcon(h.status)} />{getStatusLabel(h.status)}</span></td>
                     <td>{formatDateTime(h.createdAt)}</td>
@@ -475,6 +486,11 @@ export default function App() {
             </table>
           </div>
         )}
+        <div className="history-pagination">
+          <button className="icon-btn ghost-btn" disabled={historyPage <= 1} onClick={() => void loadHistory(historyPage - 1)}>Anterior</button>
+          <span>Página {historyMeta.totalPages === 0 ? 0 : historyPage} de {historyMeta.totalPages}</span>
+          <button className="icon-btn ghost-btn" disabled={historyPage >= historyMeta.totalPages} onClick={() => void loadHistory(historyPage + 1)}>Siguiente</button>
+        </div>
       </section>
     </main>
   );

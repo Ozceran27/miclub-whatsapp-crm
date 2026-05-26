@@ -40,7 +40,7 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 import express from "express";
 import cors from "cors";
 import { randomUUID } from "node:crypto";
-import type { Member, MessageTemplate, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
+import type { ContactedRecentResponse, Member, MessageTemplate, PaginatedHistoryResponse, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
@@ -316,18 +316,82 @@ app.post("/templates/reset-defaults", async (_req, res) => {
   }
 });
 
-app.get("/history", async (_req, res) => {
+app.get("/history", async (req, res) => {
+  const pageRaw = Number.parseInt(String(req.query.page ?? "1"), 10);
+  const pageSizeRaw = Number.parseInt(String(req.query.pageSize ?? "20"), 10);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+  const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(pageSizeRaw, 20) : 20;
+
   try {
+    const [{ total }] = await allDb<{ total: number }>(
+      `SELECT COUNT(*) as total FROM (
+        SELECT id
+        FROM message_history
+        ORDER BY datetime(createdAt) DESC
+        LIMIT 200
+      )`
+    );
+
+    const offset = (page - 1) * pageSize;
     const rows = await allDb<PreparedMessage>(
       `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
         COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note
-      FROM message_history
+      FROM (
+        SELECT *
+        FROM message_history
+        ORDER BY datetime(createdAt) DESC
+        LIMIT 200
+      )
       ORDER BY datetime(createdAt) DESC
-      LIMIT 20`
+      LIMIT ? OFFSET ?`,
+      [pageSize, offset]
     );
-    res.json(rows);
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+    const payload: PaginatedHistoryResponse = { items: rows, page, pageSize, total, totalPages };
+    res.json(payload);
   } catch {
     jsonError(res, 500, "No se pudo obtener el historial.");
+  }
+});
+
+app.get("/contacted-recent", async (_req, res) => {
+  const windowDays = 30;
+  const sinceDate = new Date();
+  sinceDate.setUTCDate(sinceDate.getUTCDate() - windowDays);
+  const since = sinceDate.toISOString();
+
+  try {
+    const rows = await allDb<{ memberId: string; eventAt: string }>(
+      `SELECT memberId, COALESCE(sentAt, createdAt) as eventAt
+      FROM message_history
+      WHERE COALESCE(status, estado) = 'sent_manual'
+      AND datetime(COALESCE(sentAt, createdAt)) >= datetime(?)
+      ORDER BY datetime(COALESCE(sentAt, createdAt)) DESC`,
+      [since]
+    );
+
+    const byMemberId: ContactedRecentResponse["byMemberId"] = {};
+    for (const row of rows) {
+      if (!row.memberId) continue;
+      const existing = byMemberId[row.memberId];
+      if (!existing) {
+        byMemberId[row.memberId] = { lastSentAt: row.eventAt, count: 1 };
+      } else {
+        existing.count += 1;
+      }
+    }
+
+    const payload: ContactedRecentResponse = {
+      windowDays,
+      since,
+      memberIds: Object.keys(byMemberId),
+      byMemberId
+    };
+
+    res.json(payload);
+  } catch {
+    jsonError(res, 500, "No se pudo obtener contactos recientes.");
   }
 });
 
