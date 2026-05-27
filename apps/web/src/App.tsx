@@ -262,7 +262,7 @@ export default function App() {
       const validationRes = await fetch(`${API}/prepare-messages/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberIds: selected, message, mode: testMode ? 'test' : 'real', templateName })
+        body: JSON.stringify({ memberIds: selected, message, mode: testMode ? 'test' : 'real', templateName: selectedTemplate?.name ?? templateName })
       });
       if (!validationRes.ok) {
         const payload = (await validationRes.json()) as ApiError;
@@ -284,7 +284,7 @@ export default function App() {
       const res = await fetch(`${API}/prepare-messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberIds: selected, message, mode: testMode ? 'test' : 'real', templateName })
+        body: JSON.stringify({ memberIds: selected, message, mode: testMode ? 'test' : 'real', templateName: selectedTemplate?.name ?? templateName })
       });
       if (!res.ok) {
         const payload = (await res.json()) as ApiError;
@@ -464,7 +464,7 @@ export default function App() {
           <div className="history-table-wrap">
             <table className="history-table">
               <thead>
-                <tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Plantilla</th><th>Actividad</th></tr>
+                <tr><th>Estado</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Mensaje</th><th>Actividad</th></tr>
               </thead>
               <tbody>
                 {history.map((h) => (
@@ -475,8 +475,7 @@ export default function App() {
                     <td>{h.phone}</td>
                     <td>
                       <div className="history-message-card">
-                        <p className="history-message-preview">{h.templateName?.trim() || 'Plantilla sin nombre'}</p>
-                        <a href={h.waLink} target="_blank" rel="noreferrer" className="icon-btn history-link-btn"><Icon label="↗" />Abrir enlace</a>
+                        <p className="history-message-preview">{h.templateName?.trim() || 'Recordatorio amable'}</p>
                       </div>
                     </td>
                     <td>{h.actividad ?? '-'}</td>
