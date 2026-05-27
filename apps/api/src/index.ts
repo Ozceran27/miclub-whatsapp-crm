@@ -335,7 +335,7 @@ app.get("/history", async (req, res) => {
     const offset = (page - 1) * pageSize;
     const rows = await allDb<PreparedMessage>(
       `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
-        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note
+        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note, templateName
       FROM (
         SELECT *
         FROM message_history
@@ -454,8 +454,8 @@ app.post("/prepare-messages", async (req, res) => {
 
       const historyInsert = await new Promise<number>((resolve, reject) => {
         db.run(
-          "INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [member.id, `${member.nombre} ${member.apellido}`, phone, message, waLink, "prepared", "prepared", createdAt],
+          "INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt, templateName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [member.id, `${member.nombre} ${member.apellido}`, phone, message, waLink, "prepared", "prepared", createdAt, body.templateName?.trim() || null],
           function onRun(err) {
             if (err) return reject(err);
             resolve(this.lastID);
@@ -494,7 +494,7 @@ app.patch("/history/:id/status", async (req, res) => {
 
     const updated = await getDb<PreparedMessage>(
       `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
-        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note
+        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note, templateName
       FROM message_history WHERE id = ?`,
       [id]
     );

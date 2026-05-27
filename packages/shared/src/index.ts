@@ -32,6 +32,7 @@ export interface PreparedMessage {
   phone: string;
   actividad?: string;
   message: string;
+  templateName?: string | null;
   waLink: string;
   status?: "prepared" | "opened" | "sent_manual" | "skipped";
   createdAt: string;
@@ -43,6 +44,7 @@ export interface PreparedMessage {
 export interface PrepareMessagesRequest {
   memberIds: string[];
   message: string;
+  templateName?: string | null;
   mode?: "test" | "real";
 }
 

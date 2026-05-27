@@ -48,7 +48,8 @@ db.serialize(() => {
     status TEXT NOT NULL DEFAULT 'prepared',
     openedAt TEXT,
     sentAt TEXT,
-    note TEXT
+    note TEXT,
+    templateName TEXT
   )`);
 
   db.all<{ name: string }>("PRAGMA table_info(message_history)", (err, rows) => {
@@ -64,6 +65,7 @@ db.serialize(() => {
       addColumnIfMissing(existingColumns, "openedAt", "TEXT");
       addColumnIfMissing(existingColumns, "sentAt", "TEXT");
       addColumnIfMissing(existingColumns, "note", "TEXT");
+      addColumnIfMissing(existingColumns, "templateName", "TEXT");
 
       db.run("UPDATE message_history SET status = 'prepared' WHERE status IS NULL");
     });
