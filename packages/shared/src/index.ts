@@ -49,7 +49,6 @@ export interface PrepareMessagesRequest {
   memberIds: string[];
   message: string;
   templateName?: string | null;
-  mode?: "test" | "real";
 }
 
 export interface PrepareMessagesValidation {
@@ -59,8 +58,6 @@ export interface PrepareMessagesValidation {
   unresolvedVariables: string[];
   duplicates: Array<{ memberId: string; nombre: string; status: string; createdAt: string }>;
   sampleMessage: string;
-  mode: "test" | "real";
-  testPhoneOverride?: string;
 }
 
 
