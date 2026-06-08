@@ -1,8 +1,8 @@
 import type { Member, MessageTemplate } from "@miclub/shared";
 
 export const members: Member[] = [
-  { id: "1", nombre: "Lucía", apellido: "Gómez", dni: "30111222", telefono: "(011) 15-6234-1133", actividad: "Entrenamiento Funcional", modalidad: "Mensual", cuota: 32000, estado: "Adeudando", instructor: "Pablo Ruiz", sourceSheet: "FITNESS" },
-  { id: "2", nombre: "Martín", apellido: "Pérez", dni: "27888999", telefono: "011 1544456677", actividad: "Yoga", modalidad: "Mensual", cuota: 28000, estado: "Adeudando", instructor: "Mariana Costa", sourceSheet: "AULA" },
+  { id: "1", nombre: "Lucía", apellido: "Gómez", dni: "30111222", telefono: "(011) 15-6234-1133", actividad: "Entrenamiento Funcional", modalidad: "Mensual", cuota: 32000, estado: "Adeudando", instructor: "Pablo Ruiz", lastPaymentAt: "2026-06-05T00:00:00.000Z", lastPaymentAmount: 25000, lastPaymentSourceSheet: "FITNESS", lastPaymentConcept: "Cuota mensual", sourceSheet: "FITNESS" },
+  { id: "2", nombre: "Martín", apellido: "Pérez", dni: "27888999", telefono: "011 1544456677", actividad: "Yoga", modalidad: "Mensual", cuota: 28000, estado: "Adeudando", instructor: "Mariana Costa", lastPaymentAt: "2026-05-28T00:00:00.000Z", lastPaymentAmount: 28000, lastPaymentSourceSheet: "AULA", lastPaymentConcept: "Cuota yoga", sourceSheet: "AULA" },
   { id: "3", nombre: "Valeria", apellido: "Luna", dni: "33222111", telefono: "+54 9 11 5722 1199", actividad: "Salón de eventos", modalidad: "Reserva", cuota: 90000, estado: "Adeudando", instructor: "Equipo Comercial", sourceSheet: "SALON" },
   { id: "4", nombre: "Nicolás", apellido: "Suárez", telefono: "011-1541112233", actividad: "Musculación", modalidad: "Mensual", cuota: 30000, estado: "Al día", instructor: "Romina Diaz", sourceSheet: "FITNESS" }
 ];

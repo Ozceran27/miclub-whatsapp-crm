@@ -36,7 +36,7 @@ button:disabled { opacity: .65; cursor:not-allowed; }
 .mini-icon { width: 16px; display:inline-flex; justify-content:center; opacity: .9; font-size: 13px; }
 .error-msg { color: #ff8a9a; font-weight: 700; }
 
-.dashboard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 18px 0; }
 .card { background: rgba(19, 31, 53, 0.88); border: 1px solid #31476f; border-radius: 14px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
 .card h4 { margin: 0 0 8px 0; font-size: 14px; color: #bfd2f7; display:flex; align-items:center; gap:7px; }
 .card p { margin: 0; font-weight: 700; font-size: 20px; }
@@ -133,4 +133,31 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   justify-content: flex-end;
   gap: 10px;
   margin-top: 12px;
+}
+
+.members-table-wrap {
+  overflow-x: auto;
+}
+
+.members-table {
+  min-width: 1120px;
+}
+
+.last-payment-badge {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #bff4de;
+  background: rgba(73, 208, 147, 0.13);
+  border: 1px solid rgba(73, 208, 147, 0.32);
+}
+
+.last-payment-badge--empty {
+  color: #b9c4d6;
+  background: rgba(186, 194, 207, 0.12);
+  border-color: rgba(186, 194, 207, 0.25);
 }

@@ -13,6 +13,10 @@ export interface Member {
   cuota?: number;
   estado: DebtorStatus;
   instructor?: string;
+  lastPaymentAt?: string;
+  lastPaymentAmount?: number;
+  lastPaymentSourceSheet?: string;
+  lastPaymentConcept?: string;
   sourceSheet: SourceSheet;
 }
 

@@ -44,7 +44,7 @@ import type { ContactedRecentResponse, Member, MessageTemplate, PaginatedHistory
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
-import { getGoogleSheetsConfig, getMembersFromGoogleSheets, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
+import { getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -216,6 +216,7 @@ app.get("/summary", async (_req, res) => {
       debtorsBySheet: byKey(debtors, (m) => m.sourceSheet),
       totalByActivity: byKey(members, (m) => m.actividad ?? "Sin actividad"),
       debtorsByActivity: byKey(debtors, (m) => m.actividad ?? "Sin actividad"),
+      debtorsWithoutPayments: debtors.filter((d) => !d.lastPaymentAt).length,
       totalEstimatedDebt: debtors.reduce((sum, d) => sum + normalizeFeeToArs(d.cuota), 0)
     });
   } catch {
@@ -229,6 +230,15 @@ app.get("/sync-status", async (_req, res) => {
     res.json(syncStatus);
   } catch {
     jsonError(res, 500, "No se pudo obtener el estado de sincronización.");
+  }
+});
+
+app.get("/payments-debug", async (_req, res) => {
+  try {
+    res.json(await getPaymentsDebugFromGoogleSheets());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo leer el debug de pagos.";
+    jsonError(res, 500, message);
   }
 });
 
