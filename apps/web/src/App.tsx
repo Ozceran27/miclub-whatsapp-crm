@@ -22,6 +22,114 @@ type Summary = {
   debtorsWithoutPayments?: number;
 };
 type ViewMode = 'debtors' | 'members';
+
+type SortDirection = 'asc' | 'desc';
+type SortBy = 'nombre' | 'apellido' | 'actividad' | 'sourceSheet' | 'estado' | 'cuota' | 'lastPaymentAt' | 'lastContactAt' | 'contactedRecently';
+type SortValue = string | number | boolean | undefined | null;
+
+const DEFAULT_SORT_BY: SortBy = 'lastPaymentAt';
+const DEFAULT_SORT_DIRECTION: SortDirection = 'asc';
+
+const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
+  { value: 'nombre', label: 'Nombre' },
+  { value: 'apellido', label: 'Apellido' },
+  { value: 'actividad', label: 'Actividad / Disciplina' },
+  { value: 'sourceSheet', label: 'Hoja / Sector' },
+  { value: 'estado', label: 'Estado' },
+  { value: 'cuota', label: 'Cuota' },
+  { value: 'lastPaymentAt', label: 'Último pago' },
+  { value: 'lastContactAt', label: 'Último contacto' },
+  { value: 'contactedRecently', label: 'Contactado recientemente' }
+];
+
+const SORT_LABEL_BY_VALUE = SORT_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.value]: option.label }),
+  {} as Record<SortBy, string>
+);
+
+const isEmptySortValue = (value: SortValue) =>
+  value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+
+const compareText = (a: SortValue, b: SortValue) => {
+  const aEmpty = isEmptySortValue(a);
+  const bEmpty = isEmptySortValue(b);
+  if (aEmpty || bEmpty) return aEmpty === bEmpty ? 0 : aEmpty ? 1 : -1;
+  return String(a).localeCompare(String(b), 'es-AR', { sensitivity: 'base' });
+};
+
+const compareNumber = (a: SortValue, b: SortValue) => {
+  const aNumber = typeof a === 'number' ? a : Number(a);
+  const bNumber = typeof b === 'number' ? b : Number(b);
+  const aEmpty = isEmptySortValue(a) || Number.isNaN(aNumber);
+  const bEmpty = isEmptySortValue(b) || Number.isNaN(bNumber);
+  if (aEmpty || bEmpty) return aEmpty === bEmpty ? 0 : aEmpty ? 1 : -1;
+  return aNumber - bNumber;
+};
+
+const compareDate = (a: SortValue, b: SortValue) => {
+  const aTime = typeof a === 'string' || typeof a === 'number' ? Date.parse(String(a)) : NaN;
+  const bTime = typeof b === 'string' || typeof b === 'number' ? Date.parse(String(b)) : NaN;
+  const aEmpty = isEmptySortValue(a) || Number.isNaN(aTime);
+  const bEmpty = isEmptySortValue(b) || Number.isNaN(bTime);
+  if (aEmpty || bEmpty) return aEmpty === bEmpty ? 0 : aEmpty ? 1 : -1;
+  return aTime - bTime;
+};
+
+const getSortValue = (member: Member, sortBy: SortBy, recentContact?: ContactedRecentResponse['byMemberId'][string]): SortValue => {
+  switch (sortBy) {
+    case 'nombre':
+      return member.nombre;
+    case 'apellido':
+      return member.apellido;
+    case 'actividad':
+      return member.actividad;
+    case 'sourceSheet':
+      return member.sourceSheet;
+    case 'estado':
+      return member.estado;
+    case 'cuota':
+      return member.cuota;
+    case 'lastPaymentAt':
+      return member.lastPaymentAt;
+    case 'lastContactAt':
+      return recentContact?.lastSentAt;
+    case 'contactedRecently':
+      return Boolean(recentContact);
+    default:
+      return undefined;
+  }
+};
+
+const compareMembers = (
+  a: Member,
+  b: Member,
+  sortBy: SortBy,
+  sortDirection: SortDirection,
+  contactedByMemberId: ContactedRecentResponse['byMemberId']
+) => {
+  const aValue = getSortValue(a, sortBy, contactedByMemberId[a.id]);
+  const bValue = getSortValue(b, sortBy, contactedByMemberId[b.id]);
+  const baseComparison =
+    sortBy === 'cuota' || sortBy === 'contactedRecently'
+      ? compareNumber(Number(aValue), Number(bValue))
+      : sortBy === 'lastPaymentAt' || sortBy === 'lastContactAt'
+        ? compareDate(aValue, bValue)
+        : compareText(aValue, bValue);
+
+  if (baseComparison === 0) {
+    return compareText(`${a.apellido} ${a.nombre}`, `${b.apellido} ${b.nombre}`);
+  }
+
+  const aEmpty = sortBy === 'lastPaymentAt' || sortBy === 'lastContactAt'
+    ? Number.isNaN(Date.parse(String(aValue ?? '')))
+    : isEmptySortValue(aValue);
+  const bEmpty = sortBy === 'lastPaymentAt' || sortBy === 'lastContactAt'
+    ? Number.isNaN(Date.parse(String(bValue ?? '')))
+    : isEmptySortValue(bValue);
+
+  if (aEmpty || bEmpty) return baseComparison;
+  return sortDirection === 'asc' ? baseComparison : -baseComparison;
+};
 type MessageStatus = 'prepared' | 'opened' | 'sent_manual' | 'skipped';
 const ACTIONABLE_STATUSES: MessageStatus[] = ['prepared', 'opened'];
 
@@ -76,6 +184,8 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [sheetFilter, setSheetFilter] = useState('ALL');
   const [activityFilter, setActivityFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState<SortBy>(DEFAULT_SORT_BY);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_SORT_DIRECTION);
   const [viewMode, setViewMode] = useState<ViewMode>('debtors');
   const [message, setMessage] = useState('');
   const [prepared, setPrepared] = useState<PreparedMessage[]>([]);
@@ -239,16 +349,36 @@ export default function App() {
   };
 
   const baseRows = viewMode === 'debtors' ? debtors : members;
-  const filtered = useMemo(
-    () =>
-      baseRows.filter(
-        (d) =>
-          `${d.nombre} ${d.apellido}`.toLowerCase().includes(query.toLowerCase()) &&
-          (sheetFilter === 'ALL' || d.sourceSheet === sheetFilter) &&
-          (activityFilter === 'ALL' || d.actividad === activityFilter)
-      ),
-    [baseRows, query, sheetFilter, activityFilter]
-  );
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.toLowerCase();
+    const filteredRows = baseRows.filter(
+      (d) =>
+        `${d.nombre} ${d.apellido}`.toLowerCase().includes(normalizedQuery) &&
+        (sheetFilter === 'ALL' || d.sourceSheet === sheetFilter) &&
+        (activityFilter === 'ALL' || d.actividad === activityFilter)
+    );
+
+    return [...filteredRows].sort((a, b) => compareMembers(a, b, sortBy, sortDirection, contactedRecent.byMemberId));
+  }, [baseRows, query, sheetFilter, activityFilter, sortBy, sortDirection, contactedRecent.byMemberId]);
+
+  const changeSort = (nextSortBy: SortBy) => {
+    setSortBy((currentSortBy) => {
+      if (currentSortBy === nextSortBy) {
+        setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'));
+        return currentSortBy;
+      }
+
+      setSortDirection(DEFAULT_SORT_DIRECTION);
+      return nextSortBy;
+    });
+  };
+
+  const resetSort = () => {
+    setSortBy(DEFAULT_SORT_BY);
+    setSortDirection(DEFAULT_SORT_DIRECTION);
+  };
+
+  const renderSortIndicator = (columnSortBy: SortBy) => (sortBy === columnSortBy ? (sortDirection === 'asc' ? '↑' : '↓') : '');
   const visibleDebtors = filtered.filter((m) => m.estado === 'Adeudando');
   const allVisibleSelected = visibleDebtors.length > 0 && visibleDebtors.every((d) => selected.includes(d.id));
 
@@ -394,11 +524,29 @@ export default function App() {
         <select value={activityFilter} onChange={e => setActivityFilter(e.target.value)}><option value="ALL">Todas las actividades</option>{allActivities.map(s => <option key={s}>{s}</option>)}</select>
       </section>
 
+      <section className="sort-controls" aria-label="Controles de ordenamiento">
+        <label>
+          Ordenar por
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
+            {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label>
+          Dirección
+          <select value={sortDirection} onChange={(e) => setSortDirection(e.target.value as SortDirection)}>
+            <option value="asc">Ascendente</option>
+            <option value="desc">Descendente</option>
+          </select>
+        </label>
+        <button className="icon-btn ghost-btn" onClick={resetSort}><Icon label="↺" />Restablecer orden</button>
+        <p className="sort-summary">Ordenando por: {SORT_LABEL_BY_VALUE[sortBy]} · {sortDirection === 'asc' ? 'Ascendente' : 'Descendente'}</p>
+      </section>
+
       <div className="actions-row"><p><strong>Resultados visibles:</strong> {filtered.length} · <strong>Seleccionados:</strong> {selected.length} · <strong>Contactados últimos 30 días:</strong> {contactedRecent.memberIds.length}</p>
         <button className="icon-btn" onClick={toggleAllDebtors}><Icon label="☑" />Seleccionar todos los visibles</button>
         <button className="icon-btn" onClick={clearSelection}><Icon label="⌫" />Limpiar selección</button></div>
 
-      {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <div className="members-table-wrap"><table className="members-table"><thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Actividad</th><th>Cuota</th><th>Último pago</th><th>Instructor</th><th>Hoja</th><th>Estado</th><th>Contacto</th></tr></thead><tbody>{filtered.map(m => { const recent = contactedRecent.byMemberId[m.id]; return <tr key={m.id} className={recent ? 'recent-contact-row' : ''}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota ? formatArPeso(m.cuota) : '-'}</td><td><span className={m.lastPaymentAt ? 'last-payment-badge' : 'last-payment-badge last-payment-badge--empty'} title={m.lastPaymentConcept ? `Concepto: ${m.lastPaymentConcept}` : undefined}>{formatLastPayment(m)}</span></td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td><td>{recent ? <span className="recent-contact-badge" title="Mensaje enviado en los últimos 30 días">📩 Contactado: {new Date(recent.lastSentAt).toLocaleDateString('es-AR')}</span> : '-'}</td></tr>; })}</tbody></table></div>}
+      {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <div className="members-table-wrap"><table className="members-table"><thead><tr><th></th><th><button className="sortable-header" onClick={() => changeSort('nombre')}>Nombre {renderSortIndicator('nombre')}</button></th><th>Teléfono</th><th><button className="sortable-header" onClick={() => changeSort('actividad')}>Actividad {renderSortIndicator('actividad')}</button></th><th><button className="sortable-header" onClick={() => changeSort('cuota')}>Cuota {renderSortIndicator('cuota')}</button></th><th><button className="sortable-header" onClick={() => changeSort('lastPaymentAt')}>Último pago {renderSortIndicator('lastPaymentAt')}</button></th><th>Instructor</th><th><button className="sortable-header" onClick={() => changeSort('sourceSheet')}>Hoja {renderSortIndicator('sourceSheet')}</button></th><th><button className="sortable-header" onClick={() => changeSort('estado')}>Estado {renderSortIndicator('estado')}</button></th><th><button className="sortable-header" onClick={() => changeSort('lastContactAt')}>Contacto {renderSortIndicator('lastContactAt')}</button></th></tr></thead><tbody>{filtered.map(m => { const recent = contactedRecent.byMemberId[m.id]; return <tr key={m.id} className={recent ? 'recent-contact-row' : ''}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota !== undefined ? formatArPeso(m.cuota) : '-'}</td><td><span className={m.lastPaymentAt ? 'last-payment-badge' : 'last-payment-badge last-payment-badge--empty'} title={m.lastPaymentConcept ? `Concepto: ${m.lastPaymentConcept}` : undefined}>{formatLastPayment(m)}</span></td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td><td>{recent ? <span className="recent-contact-badge" title="Mensaje enviado en los últimos 30 días">📩 Contactado: {new Date(recent.lastSentAt).toLocaleDateString('es-AR')}</span> : '-'}</td></tr>; })}</tbody></table></div>}
 
       <section className="composer"><select onChange={(e) => handleTemplateChange(e.target.value)} value={selectedTemplateId}>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <input value={templateName} onChange={(e) => { setTemplateName(e.target.value); setTemplateStatus('dirty'); }} placeholder="Nombre de plantilla" />
