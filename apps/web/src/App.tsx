@@ -19,6 +19,7 @@ type Summary = {
   totalMembers: number;
   totalDebtors: number;
   totalEstimatedDebt: number;
+  debtorsWithoutPayments?: number;
 };
 type ViewMode = 'debtors' | 'members';
 type MessageStatus = 'prepared' | 'opened' | 'sent_manual' | 'skipped';
@@ -50,6 +51,15 @@ const getStatusClass = (status?: MessageStatus) => STATUS_META[status ?? 'prepar
 const formatDateTime = (value?: string) => {
   if (!value) return 'Sin fecha';
   return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+};
+const formatPaymentDate = (value?: string) => {
+  if (!value) return 'Sin pagos registrados';
+  return new Date(value).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+const formatLastPayment = (member: Member) => {
+  if (!member.lastPaymentAt) return 'Sin pagos registrados';
+  const amount = member.lastPaymentAmount !== undefined ? ` · ${formatArPeso(member.lastPaymentAmount)}` : '';
+  return `${formatPaymentDate(member.lastPaymentAt)}${amount}`;
 };
 const summarizeMessage = (message: string, max = 120) =>
   message.length > max ? `${message.slice(0, max).trimEnd()}…` : message;
@@ -370,6 +380,7 @@ export default function App() {
         <article className="card"><h4><Icon label="👥" />Total inscriptos</h4><p>{summary?.totalMembers ?? members.length}</p></article>
         <article className="card"><h4><Icon label="💳" />Total adeudando</h4><p>{summary?.totalDebtors ?? debtors.length}</p></article>
         <article className="card"><h4><Icon label="$" />Deuda estimada</h4><p>{formatArPeso(summary?.totalEstimatedDebt ?? 0)}</p></article>
+        <article className="card"><h4><Icon label="🧾" />Deudores sin pagos registrados</h4><p>{summary?.debtorsWithoutPayments ?? debtors.filter((d) => !d.lastPaymentAt).length}</p></article>
         <article className="card"><h4><Icon label="🗂" />Origen de datos</h4><p>{syncMessage}</p></article>
       </section>
 
@@ -387,7 +398,7 @@ export default function App() {
         <button className="icon-btn" onClick={toggleAllDebtors}><Icon label="☑" />Seleccionar todos los visibles</button>
         <button className="icon-btn" onClick={clearSelection}><Icon label="⌫" />Limpiar selección</button></div>
 
-      {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <table><thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Actividad</th><th>Cuota</th><th>Instructor</th><th>Hoja</th><th>Estado</th><th>Contacto</th></tr></thead><tbody>{filtered.map(m => { const recent = contactedRecent.byMemberId[m.id]; return <tr key={m.id} className={recent ? 'recent-contact-row' : ''}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota ? formatArPeso(m.cuota) : '-'}</td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td><td>{recent ? <span className="recent-contact-badge" title="Mensaje enviado en los últimos 30 días">📩 Contactado: {new Date(recent.lastSentAt).toLocaleDateString('es-AR')}</span> : '-'}</td></tr>; })}</tbody></table>}
+      {filtered.length === 0 ? <p>No hay resultados con los filtros actuales.</p> : <div className="members-table-wrap"><table className="members-table"><thead><tr><th></th><th>Nombre</th><th>Teléfono</th><th>Actividad</th><th>Cuota</th><th>Último pago</th><th>Instructor</th><th>Hoja</th><th>Estado</th><th>Contacto</th></tr></thead><tbody>{filtered.map(m => { const recent = contactedRecent.byMemberId[m.id]; return <tr key={m.id} className={recent ? 'recent-contact-row' : ''}><td><input type="checkbox" disabled={m.estado !== 'Adeudando'} checked={selected.includes(m.id)} onChange={() => setSelected(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} /></td><td>{m.nombre} {m.apellido}</td><td>{m.telefono}</td><td>{m.actividad ?? '-'}</td><td>{m.cuota ? formatArPeso(m.cuota) : '-'}</td><td><span className={m.lastPaymentAt ? 'last-payment-badge' : 'last-payment-badge last-payment-badge--empty'} title={m.lastPaymentConcept ? `Concepto: ${m.lastPaymentConcept}` : undefined}>{formatLastPayment(m)}</span></td><td>{m.instructor ?? '-'}</td><td>{m.sourceSheet}</td><td>{m.estado}</td><td>{recent ? <span className="recent-contact-badge" title="Mensaje enviado en los últimos 30 días">📩 Contactado: {new Date(recent.lastSentAt).toLocaleDateString('es-AR')}</span> : '-'}</td></tr>; })}</tbody></table></div>}
 
       <section className="composer"><select onChange={(e) => handleTemplateChange(e.target.value)} value={selectedTemplateId}>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <input value={templateName} onChange={(e) => { setTemplateName(e.target.value); setTemplateStatus('dirty'); }} placeholder="Nombre de plantilla" />
