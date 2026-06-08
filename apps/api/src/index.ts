@@ -117,14 +117,6 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
 };
 
 
-const TEST_PHONE_OVERRIDE = process.env.TEST_PHONE_OVERRIDE?.trim();
-
-const resolvePhoneForMode = (memberPhone: string, mode: "test" | "real"): string => {
-  const normalizedMemberPhone = normalizeArPhone(memberPhone);
-  if (mode === "test" && TEST_PHONE_OVERRIDE) return normalizeArPhone(TEST_PHONE_OVERRIDE);
-  return normalizedMemberPhone;
-};
-
 const unresolvedTemplateVariables = (message: string): string[] => {
   const variables = message.match(/\{\w+\}/g) ?? [];
 
@@ -186,7 +178,7 @@ const seedDefaultTemplates = async () => {
   }
 };
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api", testPhoneOverride: TEST_PHONE_OVERRIDE ?? null }));
+app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
@@ -407,7 +399,6 @@ app.get("/contacted-recent", async (_req, res) => {
 
 app.post("/prepare-messages/validate", async (req, res) => {
   const body = req.body as Partial<PrepareMessagesRequest>;
-  const mode = body.mode === "real" ? "real" : "test";
   if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) return jsonError(res, 400, "memberIds debe ser un array no vacío.");
   if (typeof body.message !== "string" || body.message.trim().length === 0) return jsonError(res, 400, "message debe ser un string no vacío.");
   const { members } = await getMembersSource();
@@ -419,13 +410,12 @@ app.post("/prepare-messages/validate", async (req, res) => {
   const seen = new Set<string>();
   const duplicates = duplicateRows.filter((r) => { if (seen.has(r.memberId)) return false; seen.add(r.memberId); return true; });
   const sample = selected[0] ? interpolateTemplate(body.message, selected[0]) : body.message;
-  const response: PrepareMessagesValidation = { selectedCount: selected.length, selectedPreview: placeholders, missingPhoneMembers, unresolvedVariables, duplicates, sampleMessage: sample, mode, testPhoneOverride: TEST_PHONE_OVERRIDE };
+  const response: PrepareMessagesValidation = { selectedCount: selected.length, selectedPreview: placeholders, missingPhoneMembers, unresolvedVariables, duplicates, sampleMessage: sample };
   res.json(response);
 });
 
 app.post("/prepare-messages", async (req, res) => {
   const body = req.body as Partial<PrepareMessagesRequest>;
-  const mode = body.mode === "real" ? "real" : "test";
 
   if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) {
     return jsonError(res, 400, "memberIds debe ser un array no vacío.");
@@ -457,7 +447,7 @@ app.post("/prepare-messages", async (req, res) => {
     for (const member of selected) {
       if (existingPreparedSet.has(member.id)) continue;
       const message = interpolateTemplate(body.message, member);
-      const phone = resolvePhoneForMode(member.telefono, mode);
+      const phone = normalizeArPhone(member.telefono);
       if (!phone) continue;
       const waLink = buildWaLink(phone, message);
       const createdAt = new Date().toISOString();
@@ -473,7 +463,7 @@ app.post("/prepare-messages", async (req, res) => {
         );
       });
 
-      prepared.push({ historyId: historyInsert, memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, note: mode === "test" ? "Modo prueba activo" : null });
+      prepared.push({ historyId: historyInsert, memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt });
     }
 
     res.json(prepared);

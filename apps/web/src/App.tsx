@@ -197,7 +197,6 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [testMode, setTestMode] = useState(true);
   const [templateStatus, setTemplateStatus] = useState<'idle' | 'dirty' | 'saved'>('idle');
 
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
@@ -402,7 +401,7 @@ export default function App() {
       const validationRes = await fetch(`${API}/prepare-messages/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberIds: selected, message, mode: testMode ? 'test' : 'real', templateName: selectedTemplate?.name ?? templateName })
+        body: JSON.stringify({ memberIds: selected, message, templateName: selectedTemplate?.name ?? templateName })
       });
       if (!validationRes.ok) {
         const payload = (await validationRes.json()) as ApiError;
@@ -417,14 +416,14 @@ export default function App() {
       }
       const previewClients = validation.selectedPreview.map((c) => c.nombre).join(', ');
       const duplicateWarning = validation.duplicates.length > 0 ? `\nAviso: ${validation.duplicates.length} clientes tienen mensajes recientes.` : '';
-      const realWarning = validation.mode === 'real' && validation.selectedCount > 1 ? '\n⚠ Estás en modo real con más de 1 mensaje.' : '';
-      const confirmText = `Confirmar preparación\nCantidad: ${validation.selectedCount}\nPrimeros clientes: ${previewClients}\nActividad: ${validation.selectedPreview[0]?.actividad ?? '-'}\nCuota: ${validation.selectedPreview[0]?.cuota ?? '-'}\nMensaje ejemplo: ${validation.sampleMessage}${duplicateWarning}${realWarning}`;
+      const batchWarning = validation.selectedCount > 1 ? `\n⚠ Vas a preparar ${validation.selectedCount} mensajes. Revisá antes de abrir WhatsApp.` : '';
+      const confirmText = `Confirmar preparación\nCantidad: ${validation.selectedCount}\nPrimeros clientes: ${previewClients}\nActividad: ${validation.selectedPreview[0]?.actividad ?? '-'}\nCuota: ${validation.selectedPreview[0]?.cuota ?? '-'}\nMensaje ejemplo: ${validation.sampleMessage}${duplicateWarning}${batchWarning}`;
       if (!window.confirm(confirmText)) return;
 
       const res = await fetch(`${API}/prepare-messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberIds: selected, message, mode: testMode ? 'test' : 'real', templateName: selectedTemplate?.name ?? templateName })
+        body: JSON.stringify({ memberIds: selected, message, templateName: selectedTemplate?.name ?? templateName })
       });
       if (!res.ok) {
         const payload = (await res.json()) as ApiError;
@@ -499,10 +498,6 @@ export default function App() {
           <p>Gestión de cobranzas y mensajes por WhatsApp</p>
         </div>
       </header>
-      <div className="actions-row">
-        <span className={`status-chip ${testMode ? 'status-chip--prepared' : 'status-chip--sent'}`}>{testMode ? 'Modo prueba activo' : 'Modo real activo'}</span>
-        <label><input type="checkbox" checked={!testMode} onChange={(e) => setTestMode(!e.target.checked)} /> Envío real</label>
-      </div>
       <button className="icon-btn" onClick={sync} disabled={syncing}><Icon label="↻" />{syncing ? 'Sincronizando...' : 'Sincronizar'}</button>
       {error && <p className="error-msg">Error: {error}</p>}
 
@@ -592,7 +587,6 @@ export default function App() {
                   <span className={`status-chip ${getStatusClass(p.status)}`}><Icon label={getStatusIcon(p.status)} />{getStatusLabel(p.status)}</span>
                 </div>
                 <p className="prepared-meta"><strong>Teléfono destino:</strong> {p.phone}</p>
-                {testMode && <p className="prepared-meta"><strong>Cliente real:</strong> {(members.find((m) => m.id === p.memberId)?.telefono) ?? '-'}</p>}
                 <p className="prepared-meta"><strong>Actividad:</strong> {p.actividad ?? '-'}</p>
                 <div className="actions-row prepared-actions">
                   <button className="icon-btn" onClick={() => void openWhatsApp(p)}><Icon label="↗" />Abrir WhatsApp</button>
