@@ -282,7 +282,7 @@ export default function HomeModule({ onOpenModule }) {
     const operationalBalanceLines = [
         { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
         { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
-        { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar), highlight: 'red', iconBefore: '⚠️' },
+        { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar) },
         { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'primarySoft', iconBefore: '📈' }
     ];
     const incomeBySectorLines = financeSummary?.incomeBySector.length
