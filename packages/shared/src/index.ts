@@ -1,4 +1,4 @@
-export type SourceSheet = "FITNESS" | "SALON" | "AULA" | "LOCAL_1" | "ADMINISTRACION";
+export type SourceSheet = "FITNESS" | "SALON" | "AULA" | "LOCAL_1" | "CANTINA" | "ADMINISTRACION";
 
 export type OperationalStatusKey = "al_dia" | "nuevo_inscripto" | "adeudando" | "abandonado" | "otro";
 
@@ -91,4 +91,63 @@ export interface ContactedRecentResponse {
   since: string;
   memberIds: string[];
   byMemberId: Record<string, ContactedRecentMemberInfo>;
+}
+
+
+export interface AdminMovement {
+  id: string;
+  fecha?: string;
+  tipo: string;
+  categoria: string;
+  concepto: string;
+  contraparte?: string;
+  sector: string;
+  monto: number;
+  impuestos?: number;
+  estado: string;
+  medioPago?: string;
+}
+
+export interface FinancialSummary {
+  liquidity: number;
+  cash: number;
+  bank: number;
+  dollars: number;
+}
+
+export interface SectorBalance {
+  sector: string;
+  amount: number;
+}
+
+export interface SectorAmountBreakdown {
+  name: string;
+  amount: number;
+}
+
+export interface CategoryAmountBreakdown {
+  name: string;
+  amount: number;
+}
+
+export interface ClubOperationsSummary extends FinancialSummary {
+  pendingIncome: number;
+  pendingExpenses: number;
+  pendingNetBalance: number;
+  cuotasAdeudadas: number;
+  saldosAPagar: number;
+  projectedBalance: number;
+  sectorBalances: SectorBalance[];
+  incomeBySector: SectorAmountBreakdown[];
+  expenseBySector: SectorAmountBreakdown[];
+  incomeByCategory: CategoryAmountBreakdown[];
+  expenseByCategory: CategoryAmountBreakdown[];
+  totalIncomeSectors: number;
+  remainingIncomeSectors: number;
+  totalExpenseSectors: number;
+  remainingExpenseSectors: number;
+  totalIncomeCategories: number;
+  remainingIncomeCategories: number;
+  totalExpenseCategories: number;
+  remainingExpenseCategories: number;
 }

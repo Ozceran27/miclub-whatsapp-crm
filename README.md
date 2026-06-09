@@ -62,6 +62,14 @@ Configurar:
 GOOGLE_SHEETS_ENABLED=false
 ```
 
+### 6) Rangos financieros globales
+La primera integración global de datos operativos usa estos rangos y celdas:
+- Movimientos: `ADMINISTRACIÓN!B12:AB3000` (encabezados en fila 12, datos desde fila 13).
+- Saldos líquidos: `ADMINISTRACIÓN!AD12:AG14` (`AD12` liquidez, `AG12` caja, `AG13` banco, `AG14` dólares).
+- Saldos a pagar/liquidar por sector: `FITNESS!X3`, `SALON!X3`, `AULA!X3`, `LOCAL 1!X3`, `CANTINA!X3`.
+
+La app calcula ingresos/egresos pendientes, saldo pendiente neto, saldos a pagar, saldo proyectado e ingresos/egresos por sector y categoría.
+
 
 ## Envío manual por WhatsApp Web
 La aplicación trabaja únicamente con datos reales y genera enlaces `wa.me` con el teléfono normalizado de cada miembro.
@@ -92,6 +100,9 @@ npm run test -w @miclub/api
 ```
 
 ## Endpoints principales
+- `GET /admin-movements`: movimientos parseados desde `ADMINISTRACIÓN!B12:AB3000`.
+- `GET /club-finance-summary`: primera integración global de datos operativos/financieros desde `ADMINISTRACIÓN` y celdas sectoriales `X3`; alimenta las tarjetas financieras de INICIO.
+- `GET /club-finance-debug`: diagnóstico financiero con conteos por tipo, estado, sector, categoría, celdas de liquidez y saldos sectoriales.
 - `GET /members-debug`: miembros sin filtrar por estado (Google Sheets o mock, con fallback).
 - `GET /debtors`: deudores filtrados por estado normalizado `Adeudando` (Google Sheets o mock, con fallback).
 - `GET /sync-status`: estado de sincronización `{ source, enabled, sheets, lastSyncAt?, error? }`.
