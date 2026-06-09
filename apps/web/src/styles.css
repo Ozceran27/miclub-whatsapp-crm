@@ -492,8 +492,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   gap: 8px;
 }
 
-.status-breakdown-grid span,
-.finance-lines span {
+.status-breakdown-grid > span,
+.finance-lines > span {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -506,17 +506,43 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   background: rgba(8, 18, 34, 0.48);
 }
 
-.status-breakdown-grid span:first-child {
-  border-color: rgba(118, 240, 195, 0.42);
-  background: rgba(31, 122, 97, 0.16);
-}
-
 .status-breakdown-grid strong,
 .finance-lines strong {
   min-width: 0;
   color: #9fb4d8;
   font-size: 12px;
   font-weight: 800;
+}
+
+.metric-row--highlight {
+  border-color: rgba(143, 216, 255, 0.46) !important;
+  background: linear-gradient(135deg, rgba(57, 113, 171, 0.24), rgba(29, 54, 92, 0.22)) !important;
+}
+
+.metric-row--highlight-green {
+  border-color: rgba(118, 240, 195, 0.46) !important;
+  background: linear-gradient(135deg, rgba(31, 122, 97, 0.22), rgba(18, 74, 60, 0.18)) !important;
+}
+
+.metric-row--highlight-red {
+  border-color: rgba(255, 135, 135, 0.42) !important;
+  background: linear-gradient(135deg, rgba(128, 45, 55, 0.24), rgba(73, 35, 48, 0.18)) !important;
+}
+
+.metric-row--highlight .metric-row__label,
+.metric-row--highlight .metric-row__value,
+.metric-row--highlight-green .metric-row__label,
+.metric-row--highlight-green .metric-row__value,
+.metric-row--highlight-red .metric-row__label,
+.metric-row--highlight-red .metric-row__value {
+  font-size: 13px;
+}
+
+.metric-row--highlight .metric-row__value,
+.metric-row--highlight-green .metric-row__value,
+.metric-row--highlight-red .metric-row__value {
+  color: #f4fbff;
+  font-weight: 900;
 }
 
 .activity-breakdown-list,
@@ -541,6 +567,19 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   border-radius: 12px;
   padding: 8px 10px;
   background: rgba(8, 18, 34, 0.42);
+}
+
+.activity-breakdown-item--highlight {
+  border-color: rgba(143, 216, 255, 0.44);
+  background: linear-gradient(135deg, rgba(57, 113, 171, 0.2), rgba(31, 122, 97, 0.14));
+}
+
+.activity-breakdown-item--highlight .activity-breakdown-row {
+  font-size: 14px;
+}
+
+.activity-breakdown-item--highlight .activity-breakdown-row strong {
+  font-size: 16px;
 }
 
 .debtor-activity-panel {
@@ -623,7 +662,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   margin-top: 0;
 }
 
-.finance-lines--compact span {
+.finance-lines--compact > span {
   min-height: 36px;
   padding: 7px 9px;
 }
