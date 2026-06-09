@@ -362,7 +362,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .home-dashboard-row--primary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, .95fr);
 }
 
 .home-dashboard-row--secondary {
@@ -384,6 +384,51 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .home-kpi-card--finance {
   background: linear-gradient(180deg, rgba(18, 30, 51, 0.78), rgba(12, 22, 39, 0.7));
+  border-color: rgba(73, 102, 151, 0.58);
+}
+
+.home-hero {
+  align-items: flex-start;
+}
+
+.home-hero__copy {
+  flex: 1 1 360px;
+}
+
+.home-sync-badges {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 1 1 280px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.home-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid rgba(118, 240, 195, 0.34);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #dffcf4;
+  background: rgba(31, 122, 97, 0.18);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.home-sync-badge--muted {
+  border-color: rgba(143, 216, 255, 0.28);
+  color: #c7dcff;
+  background: rgba(57, 113, 171, 0.18);
+}
+
+.home-sync-badge--warning {
+  border-color: rgba(255, 196, 87, 0.44);
+  color: #ffe6ad;
+  background: rgba(143, 95, 20, 0.24);
 }
 
 .home-card-heading {
@@ -411,6 +456,18 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   line-height: 1;
 }
 
+.enrollment-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.enrollment-summary span {
+  color: #9fb4d8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .home-secondary-value {
   margin: 0;
   color: #f4fbff;
@@ -421,9 +478,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .status-breakdown-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-top: auto;
 }
 
 .status-breakdown-grid span,
@@ -441,7 +497,6 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .status-breakdown-grid span:first-child {
-  grid-column: 1 / -1;
   border-color: rgba(118, 240, 195, 0.42);
   background: rgba(31, 122, 97, 0.16);
 }
@@ -465,6 +520,10 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   margin-top: 0;
 }
 
+.activity-breakdown-list--compact {
+  gap: 6px;
+}
+
 .activity-breakdown-item {
   display: grid;
   gap: 6px;
@@ -472,6 +531,33 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   border-radius: 12px;
   padding: 8px 10px;
   background: rgba(8, 18, 34, 0.42);
+}
+
+.debtor-activity-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(73, 102, 151, 0.46);
+  padding-top: 10px;
+}
+
+.debtor-activity-panel__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  color: #e2ecff;
+}
+
+.debtor-activity-panel__heading strong {
+  font-size: 13px;
+}
+
+.debtor-activity-panel__heading span {
+  color: #8fd8ff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .activity-breakdown-row {
@@ -599,7 +685,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   .home-dashboard-row--primary,
   .home-dashboard-row--secondary,
   .status-breakdown-grid { grid-template-columns: 1fr; }
-  .status-breakdown-grid span:first-child { grid-column: auto; }
+  .home-sync-badges { justify-content: flex-start; }
+  .home-sync-badge { white-space: normal; }
   .prepared-grid { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr; }
 }
