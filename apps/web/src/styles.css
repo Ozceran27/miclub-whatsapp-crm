@@ -601,18 +601,18 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   background: linear-gradient(135deg, rgba(171, 126, 32, 0.22), rgba(65, 50, 25, 0.2));
 }
 
-.activity-breakdown-item--highlight .activity-breakdown-row,
-.activity-breakdown-item--warning .activity-breakdown-row {
+.activity-breakdown-item--highlight .activity-breakdown-row {
   font-size: 14px;
 }
 
-.activity-breakdown-item--highlight .activity-breakdown-row strong,
-.activity-breakdown-item--warning .activity-breakdown-row strong {
+.activity-breakdown-item--highlight .activity-breakdown-row strong {
   font-size: 16px;
 }
 
-.activity-breakdown-item--warning .activity-breakdown-row span {
-  color: #ffe09a;
+.activity-breakdown-item--warning .activity-breakdown-row,
+.activity-breakdown-item--warning .activity-breakdown-row span,
+.activity-breakdown-item--warning .activity-breakdown-row strong {
+  color: #f4fbff;
 }
 
 .activity-breakdown-item--warning .activity-breakdown-track {
@@ -706,6 +706,10 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .finance-lines--compact > span {
   min-height: 36px;
   padding: 7px 9px;
+}
+
+.finance-lines .metric-row:not(.metric-row--highlight):not(.metric-row--highlight-green):not(.metric-row--highlight-red):not(.metric-row--highlight-soft) .metric-row__value {
+  font-weight: 500;
 }
 
 .integration-note--future {
