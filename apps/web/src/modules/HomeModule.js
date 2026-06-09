@@ -271,6 +271,7 @@ export default function HomeModule({ onOpenModule }) {
     const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
     const unavailableLabel = financeError ? 'No disponible' : '—';
     const formatFinanceMoney = (value) => financeSummary ? formatArPeso(value) : unavailableLabel;
+    const formatPayableObligation = (value) => financeSummary ? `-${formatArPeso(Math.abs(value ?? 0))}` : unavailableLabel;
     const formatUsd = (value) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
     const financialSummaryLines = [
         { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'primarySoft', iconBefore: '💰' },
@@ -281,7 +282,7 @@ export default function HomeModule({ onOpenModule }) {
     const operationalBalanceLines = [
         { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
         { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
-        { label: 'Saldos a Pagar', value: formatFinanceMoney(financeSummary?.saldosAPagar) },
+        { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar), highlight: 'red', iconBefore: '⚠️' },
         { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'primarySoft', iconBefore: '📈' }
     ];
     const incomeBySectorLines = financeSummary?.incomeBySector.length

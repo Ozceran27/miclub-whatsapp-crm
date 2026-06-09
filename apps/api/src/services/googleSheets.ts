@@ -53,6 +53,12 @@ export interface ClubFinanceDebugInfo {
   parsedBank: number;
   parsedDollars: number;
   sectorBalanceCells: Record<string, unknown>;
+  liquidity: number;
+  cuotasAdeudadas: number;
+  pendingNetBalance: number;
+  saldosAPagar: number;
+  projectedBalance: number;
+  formula: string;
 }
 
 const MOVEMENT_HEADER_RANGES: Record<OperationalSheetName, string> = {
@@ -571,6 +577,20 @@ const countBy = (movements: AdminMovement[], getter: (movement: AdminMovement) =
     return acc;
   }, {});
 
+export const PROJECTED_BALANCE_FORMULA = "liquidity + cuotasAdeudadas + pendingNetBalance - saldosAPagar";
+
+export const calculateProjectedBalance = ({
+  liquidity,
+  cuotasAdeudadas,
+  pendingNetBalance,
+  saldosAPagar
+}: {
+  liquidity: number;
+  cuotasAdeudadas: number;
+  pendingNetBalance: number;
+  saldosAPagar: number;
+}): number => liquidity + cuotasAdeudadas + pendingNetBalance - saldosAPagar;
+
 const buildEmptyClubOperationsSummary = (cuotasAdeudadas = 0): ClubOperationsSummary => ({
   liquidity: 0,
   cash: 0,
@@ -581,7 +601,7 @@ const buildEmptyClubOperationsSummary = (cuotasAdeudadas = 0): ClubOperationsSum
   pendingNetBalance: 0,
   cuotasAdeudadas,
   saldosAPagar: 0,
-  projectedBalance: cuotasAdeudadas,
+  projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasAdeudadas, pendingNetBalance: 0, saldosAPagar: 0 }),
   sectorBalances: [],
   incomeBySector: [],
   expenseBySector: [],
@@ -632,7 +652,7 @@ const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unk
     pendingNetBalance,
     cuotasAdeudadas,
     saldosAPagar,
-    projectedBalance: liquidity + cuotasAdeudadas + pendingNetBalance + saldosAPagar,
+    projectedBalance: calculateProjectedBalance({ liquidity, cuotasAdeudadas, pendingNetBalance, saldosAPagar }),
     sectorBalances,
     incomeBySector: allIncomeBySector.slice(0, 4),
     expenseBySector: allExpenseBySector.slice(0, 4),
@@ -694,7 +714,7 @@ export const getClubOperationsSummaryFromGoogleSheets = async (cuotasAdeudadas =
   return buildClubOperationsSummary(parseAdminMovementsFromValues(movementValues), balanceRows, sectorBalances, cuotasAdeudadas);
 };
 
-export const getClubFinanceDebugFromGoogleSheets = async (): Promise<ClubFinanceDebugInfo> => {
+export const getClubFinanceDebugFromGoogleSheets = async (cuotasAdeudadas = 0): Promise<ClubFinanceDebugInfo> => {
   const config = getGoogleSheetsConfig();
   if (!config.enabled) {
     return {
@@ -709,14 +729,30 @@ export const getClubFinanceDebugFromGoogleSheets = async (): Promise<ClubFinance
       parsedCash: 0,
       parsedBank: 0,
       parsedDollars: 0,
-      sectorBalanceCells: {}
+      sectorBalanceCells: {},
+      liquidity: 0,
+      cuotasAdeudadas,
+      pendingNetBalance: 0,
+      saldosAPagar: 0,
+      projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasAdeudadas, pendingNetBalance: 0, saldosAPagar: 0 }),
+      formula: PROJECTED_BALANCE_FORMULA
     };
   }
   ensureGoogleSheetsEnabled(config);
 
-  const { movementValues, balanceRows, sectorBalanceCells } = await readClubFinanceRanges(config);
+  const { movementValues, balanceRows, sectorBalances, sectorBalanceCells } = await readClubFinanceRanges(config);
   const movements = parseAdminMovementsFromValues(movementValues);
   const { liquidity: parsedLiquidity, cash: parsedCash, bank: parsedBank, dollars: parsedDollars } = parseLiquidityBalances(balanceRows);
+  const pendingMovements = movements.filter((movement) => isPending(movement.estado));
+  const pendingIncome = pendingMovements
+    .filter((movement) => isIncome(movement.tipo))
+    .reduce((sum, movement) => sum + movement.monto, 0);
+  const pendingExpenses = pendingMovements
+    .filter((movement) => isExpense(movement.tipo))
+    .reduce((sum, movement) => sum + movement.monto, 0);
+  const pendingNetBalance = pendingIncome - pendingExpenses;
+  const saldosAPagar = sectorBalances.reduce((sum, balance) => sum + balance.amount, 0);
+  const projectedBalance = calculateProjectedBalance({ liquidity: parsedLiquidity, cuotasAdeudadas, pendingNetBalance, saldosAPagar });
   return {
     totalMovementsRead: Math.max(movementValues.length - 1, 0),
     validMovements: movements.length,
@@ -729,6 +765,12 @@ export const getClubFinanceDebugFromGoogleSheets = async (): Promise<ClubFinance
     parsedCash,
     parsedBank,
     parsedDollars,
-    sectorBalanceCells
+    sectorBalanceCells,
+    liquidity: parsedLiquidity,
+    cuotasAdeudadas,
+    pendingNetBalance,
+    saldosAPagar,
+    projectedBalance,
+    formula: PROJECTED_BALANCE_FORMULA
   };
 };
