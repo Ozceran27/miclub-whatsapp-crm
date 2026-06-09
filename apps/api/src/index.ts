@@ -132,8 +132,7 @@ const unresolvedTemplateVariables = (message: string): string[] => {
 const RECENT_STATUSES = ["prepared", "opened", "sent_manual"] as const;
 const normalizeFeeToArs = (fee: number | undefined): number => {
   if (typeof fee !== "number" || Number.isNaN(fee)) return 0;
-  if (fee === 0) return 0;
-  return Math.abs(fee) < 1000 ? fee * 1000 : fee;
+  return fee;
 };
 
 const byKey = (members: Member[], getter: (m: Member) => string): Record<string, number> =>
