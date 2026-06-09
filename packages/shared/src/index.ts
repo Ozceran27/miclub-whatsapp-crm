@@ -1,6 +1,18 @@
 export type SourceSheet = "FITNESS" | "SALON" | "AULA" | "LOCAL_1" | "ADMINISTRACION";
 
-export type DebtorStatus = "Adeudando" | "Al día" | "Pendiente" | "Desconocido";
+export type OperationalStatusKey = "al_dia" | "nuevo_inscripto" | "adeudando" | "abandonado" | "otro";
+
+export type DebtorStatus = "Adeudando" | "Al día" | "Nuevo Inscripto" | "Abandonado" | "Pendiente" | "Desconocido";
+
+export interface StatusBreakdown {
+  total: number;
+  active: number;
+  alDia: number;
+  nuevoInscripto: number;
+  adeudando: number;
+  abandonado: number;
+  otros: number;
+}
 
 export interface Member {
   id: string;

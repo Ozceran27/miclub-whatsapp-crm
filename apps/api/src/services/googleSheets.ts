@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import type { DebtorStatus, Member } from "@miclub/shared";
+import type { DebtorStatus, Member, OperationalStatusKey } from "@miclub/shared";
 
 export const SHEET_NAMES = ["FITNESS", "SALON", "AULA"] as const;
 
@@ -58,12 +58,36 @@ export const normalizeDni = (value: unknown): string => String(value ?? "").repl
 
 const normalizeComparableText = (value: unknown): string => normalizeText(value).toLowerCase().replace(/\s+/g, " ");
 
-const normalizeStatus = (value: unknown): DebtorStatus => {
-  const normalized = normalizeComparableText(value);
-  if (normalized.includes("adeudando") || normalized.includes("deuda")) return "Adeudando";
-  if (normalized.includes("al dia") || normalized.includes("aldia")) return "Al día";
-  if (normalized.includes("pendiente")) return "Pendiente";
-  return "Desconocido";
+export const normalizeOperationalStatus = (value: unknown): OperationalStatusKey => {
+  const normalized = normalizeComparableText(value)
+    .replace(/[-–—_/]+/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const compact = normalized.replace(/\s/g, "");
+
+  if (!normalized) return "otro";
+  if (normalized.includes("nuevo") && (normalized.includes("inscripto") || normalized.includes("inscrito"))) return "nuevo_inscripto";
+  if (normalized.includes("abandon")) return "abandonado";
+  if (normalized.includes("adeudando") || normalized.includes("adeud") || normalized.includes("deuda")) return "adeudando";
+  if (normalized.includes("al dia") || compact.includes("aldia")) return "al_dia";
+
+  return "otro";
+};
+
+export const toMemberStatus = (value: unknown): DebtorStatus => {
+  switch (normalizeOperationalStatus(value)) {
+    case "adeudando":
+      return "Adeudando";
+    case "al_dia":
+      return "Al día";
+    case "nuevo_inscripto":
+      return "Nuevo Inscripto";
+    case "abandonado":
+      return "Abandonado";
+    default:
+      return normalizeComparableText(value).includes("pendiente") ? "Pendiente" : "Desconocido";
+  }
 };
 
 const normalizeFee = (value: unknown): number | undefined => {
@@ -112,6 +136,20 @@ export const parseGoogleSheetDate = (value: unknown): string | undefined => {
 };
 
 const valueAt = (row: unknown[], relativeIdx: number): string => String(row[relativeIdx] ?? "").trim();
+
+const MEMBER_COLUMN_INDEXES = {
+  // Índices relativos a los rangos AB:AY de inscriptos. AV es el índice 20 dentro de AB:AY.
+  id: 0,
+  nombre: 4,
+  apellido: 7,
+  dni: 10,
+  telefono: 12,
+  actividad: 14,
+  modalidad: 16,
+  cuota: 18,
+  estado: 20,
+  instructor: 23
+} as const;
 
 const sheetNameFromRange = (range: string): OperationalSheetName | undefined => {
   const sheetName = (range.split("!")[0] ?? "").replace(/'/g, "");
@@ -359,21 +397,21 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
     const sheetName = (range.split("!")[0] ?? "").replace(/'/g, "") as Member["sourceSheet"];
 
     for (const row of valueRange.values ?? []) {
-      const nombre = valueAt(row, 4);
-      const telefono = valueAt(row, 12);
+      const nombre = valueAt(row, MEMBER_COLUMN_INDEXES.nombre);
+      const telefono = valueAt(row, MEMBER_COLUMN_INDEXES.telefono);
       if (!nombre || !telefono) continue;
 
       const member: Member = {
-        id: valueAt(row, 0) || `${sheetName}-${members.length + 1}`,
+        id: valueAt(row, MEMBER_COLUMN_INDEXES.id) || `${sheetName}-${members.length + 1}`,
         nombre,
-        apellido: valueAt(row, 7),
-        dni: valueAt(row, 10) || undefined,
+        apellido: valueAt(row, MEMBER_COLUMN_INDEXES.apellido),
+        dni: valueAt(row, MEMBER_COLUMN_INDEXES.dni) || undefined,
         telefono,
-        actividad: valueAt(row, 14) || undefined,
-        modalidad: valueAt(row, 16) || undefined,
-        cuota: normalizeFee(valueAt(row, 18)),
-        estado: normalizeStatus(valueAt(row, 20)),
-        instructor: valueAt(row, 23) || undefined,
+        actividad: valueAt(row, MEMBER_COLUMN_INDEXES.actividad) || undefined,
+        modalidad: valueAt(row, MEMBER_COLUMN_INDEXES.modalidad) || undefined,
+        cuota: normalizeFee(valueAt(row, MEMBER_COLUMN_INDEXES.cuota)),
+        estado: toMemberStatus(valueAt(row, MEMBER_COLUMN_INDEXES.estado)),
+        instructor: valueAt(row, MEMBER_COLUMN_INDEXES.instructor) || undefined,
         sourceSheet: sheetName
       };
 
