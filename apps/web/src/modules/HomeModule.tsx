@@ -31,8 +31,35 @@ type ActivityBreakdownItem = {
   count: number;
 };
 
-const ACTIVE_STATUSES = new Set(['al dia', 'nuevo inscripto', 'adeudando']);
-const ABANDONED_STATUS = 'abandonado';
+type StatusBreakdown = {
+  total: number;
+  active: number;
+  current: number;
+  newEnrollment: number;
+  debtor: number;
+  abandoned: number;
+};
+
+const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'abandoned'> = {
+  'al dia': 'current',
+  aldia: 'current',
+  activo: 'current',
+  activos: 'current',
+  'nuevo inscripto': 'newEnrollment',
+  nuevoinscripto: 'newEnrollment',
+  'nuevo inscrito': 'newEnrollment',
+  nuevoinscrito: 'newEnrollment',
+  nuevo: 'newEnrollment',
+  adeudando: 'debtor',
+  deudor: 'debtor',
+  deudores: 'debtor',
+  deuda: 'debtor',
+  abandonado: 'abandoned',
+  abandonada: 'abandoned',
+  abandono: 'abandoned',
+  inactivo: 'abandoned',
+  inactivos: 'abandoned'
+};
 
 const AREA_CARDS: Array<{ title: string; moduleId: ModuleId; sheetKeys: string[]; description: string }> = [
   { title: 'Espacio Fitness', moduleId: 'fitness', sheetKeys: ['FITNESS', 'Espacio Fitness'], description: 'Inscriptos, cuotas, pagos y actividades.' },
@@ -69,11 +96,46 @@ const formatDateTime = (value?: string) => {
   return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
-const getMemberStatus = (member: Member) => normalizeText(member.estado);
+const normalizeStatus = (status?: string) => {
+  const normalized = normalizeText(status);
+  const compact = normalized.replace(/[ _-]/g, '');
+  return STATUS_ALIASES[normalized] ? normalized : compact;
+};
 
-const isDebtor = (member: Member) => getMemberStatus(member) === 'adeudando';
+const getMemberStatus = (member: Member) => normalizeStatus(String(member.estado ?? ''));
+
+const getStatusBucket = (member: Member) => STATUS_ALIASES[getMemberStatus(member)];
+
+const isActiveMember = (member: Member) => {
+  const bucket = getStatusBucket(member);
+  return bucket === 'current' || bucket === 'newEnrollment' || bucket === 'debtor';
+};
+
+const isDebtor = (member: Member) => getStatusBucket(member) === 'debtor';
 
 const getActivityName = (member: Member) => member.actividad?.trim() || member.modalidad?.trim() || 'Sin actividad asignada';
+
+const buildStatusBreakdown = (records: Member[], fallbackTotal?: number): StatusBreakdown => {
+  const breakdown: StatusBreakdown = {
+    total: records.length || fallbackTotal || 0,
+    active: 0,
+    current: 0,
+    newEnrollment: 0,
+    debtor: 0,
+    abandoned: 0
+  };
+
+  records.forEach((member) => {
+    const bucket = getStatusBucket(member);
+    if (bucket === 'current') breakdown.current += 1;
+    if (bucket === 'newEnrollment') breakdown.newEnrollment += 1;
+    if (bucket === 'debtor') breakdown.debtor += 1;
+    if (bucket === 'abandoned') breakdown.abandoned += 1;
+  });
+
+  breakdown.active = breakdown.current + breakdown.newEnrollment + breakdown.debtor;
+  return breakdown;
+};
 
 const buildActivityBreakdown = (records: Member[]): ActivityBreakdownItem[] => {
   const counts = new Map<string, number>();
@@ -86,6 +148,10 @@ const buildActivityBreakdown = (records: Member[]): ActivityBreakdownItem[] => {
     .map(([activity, count]) => ({ activity, count }))
     .sort((a, b) => b.count - a.count || a.activity.localeCompare(b.activity, 'es'));
 };
+
+const buildActiveActivityBreakdown = (records: Member[]) => buildActivityBreakdown(records.filter(isActiveMember));
+
+const buildDebtorActivityBreakdown = (records: Member[]) => buildActivityBreakdown(records.filter(isDebtor));
 
 export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -140,36 +206,26 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         ? 'Google Sheets conectado'
         : 'Datos mock/locales';
 
-  const enrollmentStats = useMemo(() => {
-    const active = members.filter((member) => ACTIVE_STATUSES.has(getMemberStatus(member))).length;
-    const abandoned = members.filter((member) => getMemberStatus(member) === ABANDONED_STATUS).length;
-
-    return {
-      total: summary?.totalMembers ?? members.length,
-      active,
-      abandoned
-    };
-  }, [members, summary?.totalMembers]);
+  const enrollmentStats = useMemo(
+    () => buildStatusBreakdown(members, summary?.totalMembers),
+    [members, summary?.totalMembers]
+  );
 
   const debtorRecords = useMemo(() => {
-    if (debtors.length > 0) return debtors;
-    return members.filter(isDebtor);
+    if (members.length > 0) return members;
+    return debtors;
   }, [debtors, members]);
 
-  const debtorBreakdown = useMemo(() => buildActivityBreakdown(debtorRecords), [debtorRecords]);
-  const mainDebtorBreakdown = debtorBreakdown.slice(0, 4);
+  const debtorBreakdown = useMemo(() => buildDebtorActivityBreakdown(debtorRecords), [debtorRecords]);
+  const mainDebtorBreakdown = debtorBreakdown.slice(0, 5);
   const remainingDebtorActivities = Math.max(debtorBreakdown.length - mainDebtorBreakdown.length, 0);
+  const totalDebtors = debtorBreakdown.reduce((total, item) => total + item.count, 0);
+  const maxDebtorActivityCount = mainDebtorBreakdown[0]?.count ?? 0;
 
-  const activeActivities = useMemo(() => {
-    const activities = new Set(
-      members
-        .filter((member) => ACTIVE_STATUSES.has(getMemberStatus(member)))
-        .map(getActivityName)
-        .filter((activity) => activity !== 'Sin actividad asignada')
-    );
-
-    return activities.size;
-  }, [members]);
+  const activeActivityBreakdown = useMemo(() => buildActiveActivityBreakdown(members), [members]);
+  const mainActiveActivityBreakdown = activeActivityBreakdown.slice(0, 5);
+  const remainingActiveActivities = Math.max(activeActivityBreakdown.length - mainActiveActivityBreakdown.length, 0);
+  const maxActiveActivityCount = mainActiveActivityBreakdown[0]?.count ?? 0;
 
   const areaCards = useMemo(() => AREA_CARDS.map((area) => ({
     ...area,
@@ -197,51 +253,109 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       {error && <p className="error-msg">Error: {error}</p>}
       {loading && <p className="section-note">Cargando métricas del club...</p>}
 
-      <section className="dashboard home-dashboard">
-        <article className="card home-kpi-card">
-          <h4>👥 Total de inscriptos</h4>
-          <p>{enrollmentStats.total}</p>
-          <div className="metric-list metric-list--compact">
-            <span><strong>Activos</strong>{enrollmentStats.active}</span>
-            <span><strong>Abandonados</strong>{enrollmentStats.abandoned}</span>
-          </div>
-        </article>
+      <section className="home-dashboard-stack" aria-label="Resumen operativo del club">
+        <div className="home-dashboard-row home-dashboard-row--primary">
+          <article className="card home-kpi-card home-kpi-card--enrollment">
+            <div className="home-card-heading">
+              <h4>👥 Total de inscriptos</h4>
+              <p>Estados operativos actuales</p>
+            </div>
+            <p className="home-kpi-value">{enrollmentStats.total}</p>
+            <div className="status-breakdown-grid">
+              <span><strong>Activos</strong>{enrollmentStats.active}</span>
+              <span><strong>Al día</strong>{enrollmentStats.current}</span>
+              <span><strong>Nuevos inscriptos</strong>{enrollmentStats.newEnrollment}</span>
+              <span><strong>Adeudando</strong>{enrollmentStats.debtor}</span>
+              <span><strong>Abandonados</strong>{enrollmentStats.abandoned}</span>
+            </div>
+          </article>
 
-        <article className="card home-kpi-card">
-          <h4>💳 Adeudando</h4>
-          <p>{summary?.totalDebtors ?? debtorRecords.length}</p>
-          <div className="metric-list">
-            {mainDebtorBreakdown.length > 0 ? mainDebtorBreakdown.map((item) => (
-              <span key={item.activity}><strong>{item.activity}</strong>{item.count}</span>
-            )) : <span><strong>Sin deudores registrados</strong>0</span>}
-            {remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}
-          </div>
-        </article>
+          <article className="card home-kpi-card">
+            <div className="home-card-heading">
+              <h4>💳 Adeudando</h4>
+              <p>Deudores por actividad</p>
+            </div>
+            <p className="home-kpi-value">{totalDebtors}</p>
+            <div className="activity-breakdown-list">
+              {mainDebtorBreakdown.length > 0 ? mainDebtorBreakdown.map((item) => (
+                <div className="activity-breakdown-item" key={item.activity}>
+                  <div className="activity-breakdown-row">
+                    <span>{item.activity}</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                  <div className="activity-breakdown-track" aria-hidden="true">
+                    <span style={{ width: `${Math.max((item.count / maxDebtorActivityCount) * 100, 8)}%` }} />
+                  </div>
+                </div>
+              )) : <p className="empty-card-note">Sin deudores registrados</p>}
+              {remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}
+            </div>
+          </article>
 
-        <article className="card home-kpi-card">
-          <h4>🏦 Saldos operativos</h4>
-          <div className="finance-lines">
-            <span><strong>Saldo adeudado</strong>{hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—'}</span>
-            <span><strong>Movimientos pendientes</strong>—</span>
-            <span><strong>Saldo total</strong>—</span>
-          </div>
-          <small className="integration-note">Se integrará desde la hoja ADMINISTRACIÓN.</small>
-        </article>
+          <article className="card home-kpi-card">
+            <div className="home-card-heading">
+              <h4>🏷️ Inscriptos por actividad</h4>
+              <p>Solo inscriptos activos</p>
+            </div>
+            <div className="activity-breakdown-list activity-breakdown-list--featured">
+              {mainActiveActivityBreakdown.length > 0 ? mainActiveActivityBreakdown.map((item) => (
+                <div className="activity-breakdown-item" key={item.activity}>
+                  <div className="activity-breakdown-row">
+                    <span>{item.activity}</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                  <div className="activity-breakdown-track" aria-hidden="true">
+                    <span style={{ width: `${Math.max((item.count / maxActiveActivityCount) * 100, 8)}%` }} />
+                  </div>
+                </div>
+              )) : <p className="empty-card-note">Sin actividades activas registradas</p>}
+              {remainingActiveActivities > 0 && <small>+ {remainingActiveActivities} actividades</small>}
+            </div>
+          </article>
+        </div>
 
-        <article className="card home-kpi-card">
-          <h4>📊 Resumen financiero</h4>
-          <div className="finance-lines">
-            <span><strong>Caja</strong>—</span>
-            <span><strong>Bancos</strong>—</span>
-            <span><strong>Saldo proyectado</strong>—</span>
-            <span><strong>Pendientes</strong>—</span>
-          </div>
-          <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
-        </article>
+        <div className="home-dashboard-row home-dashboard-row--secondary">
+          <article className="card home-kpi-card home-kpi-card--compact">
+            <div className="home-card-heading">
+              <h4>🔄 Estado de sincronización</h4>
+              <p>Origen de datos</p>
+            </div>
+            <p className="home-secondary-value">{syncLabel}</p>
+            {syncStatus?.error && <small className="integration-note">{syncStatus.error}</small>}
+          </article>
 
-        <article className="card home-kpi-card"><h4>🔄 Estado de sincronización</h4><p>{syncLabel}</p></article>
-        <article className="card home-kpi-card"><h4>🕒 Última sincronización</h4><p>{formatDateTime(syncStatus?.lastSyncAt)}</p></article>
-        <article className="card home-kpi-card"><h4>🏷️ Actividades activas detectadas</h4><p>{activeActivities}</p></article>
+          <article className="card home-kpi-card home-kpi-card--compact">
+            <div className="home-card-heading">
+              <h4>🕒 Última sincronización</h4>
+              <p>Actualización registrada</p>
+            </div>
+            <p className="home-secondary-value">{formatDateTime(syncStatus?.lastSyncAt)}</p>
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>🏦 Saldos operativos</h4>
+              <p>Estructura futura</p>
+            </div>
+            <div className="finance-lines finance-lines--compact">
+              <span><strong>Saldo adeudado</strong>{hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—'}</span>
+              <span><strong>Movimientos pendientes</strong>—</span>
+            </div>
+            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>📊 Resumen financiero</h4>
+              <p>Estructura futura</p>
+            </div>
+            <div className="finance-lines finance-lines--compact">
+              <span><strong>Caja / bancos</strong>—</span>
+              <span><strong>Saldo proyectado</strong>—</span>
+            </div>
+            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+          </article>
+        </div>
       </section>
 
       <section className="section-panel">
