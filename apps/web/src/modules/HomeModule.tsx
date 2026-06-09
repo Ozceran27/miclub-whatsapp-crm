@@ -31,6 +31,11 @@ type ActivityBreakdownItem = {
   count: number;
 };
 
+type FinancialPlaceholderLine = {
+  label: string;
+  value: string;
+};
+
 type StatusBreakdown = {
   total: number;
   active: number;
@@ -115,7 +120,7 @@ const isDebtor = (member: Member) => getStatusBucket(member) === 'debtor';
 
 const getActivityName = (member: Member) => member.actividad?.trim() || member.modalidad?.trim() || 'Sin actividad asignada';
 
-const buildStatusBreakdown = (records: Member[], fallbackTotal?: number): StatusBreakdown => {
+const getEnrollmentStatusBreakdown = (records: Member[], fallbackTotal?: number): StatusBreakdown => {
   const breakdown: StatusBreakdown = {
     total: records.length || fallbackTotal || 0,
     active: 0,
@@ -152,6 +157,28 @@ const buildActivityBreakdown = (records: Member[]): ActivityBreakdownItem[] => {
 const buildActiveActivityBreakdown = (records: Member[]) => buildActivityBreakdown(records.filter(isActiveMember));
 
 const buildDebtorActivityBreakdown = (records: Member[]) => buildActivityBreakdown(records.filter(isDebtor));
+
+const renderActivityBreakdown = (items: ActivityBreakdownItem[], maxCount: number, emptyLabel: string) => (
+  items.length > 0 ? items.map((item) => (
+    <div className="activity-breakdown-item" key={item.activity}>
+      <div className="activity-breakdown-row">
+        <span>{item.activity}</span>
+        <strong>{item.count}</strong>
+      </div>
+      <div className="activity-breakdown-track" aria-hidden="true">
+        <span style={{ width: `${Math.max((item.count / maxCount) * 100, 8)}%` }} />
+      </div>
+    </div>
+  )) : <p className="empty-card-note">{emptyLabel}</p>
+);
+
+const renderFinanceLines = (lines: FinancialPlaceholderLine[]) => (
+  <div className="finance-lines finance-lines--compact">
+    {lines.map((line) => (
+      <span key={line.label}><strong>{line.label}</strong>{line.value}</span>
+    ))}
+  </div>
+);
 
 export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -207,7 +234,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         : 'Datos mock/locales';
 
   const enrollmentStats = useMemo(
-    () => buildStatusBreakdown(members, summary?.totalMembers),
+    () => getEnrollmentStatusBreakdown(members, summary?.totalMembers),
     [members, summary?.totalMembers]
   );
 
@@ -217,7 +244,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   }, [debtors, members]);
 
   const debtorBreakdown = useMemo(() => buildDebtorActivityBreakdown(debtorRecords), [debtorRecords]);
-  const mainDebtorBreakdown = debtorBreakdown.slice(0, 5);
+  const mainDebtorBreakdown = debtorBreakdown.slice(0, 3);
   const remainingDebtorActivities = Math.max(debtorBreakdown.length - mainDebtorBreakdown.length, 0);
   const totalDebtors = debtorBreakdown.reduce((total, item) => total + item.count, 0);
   const maxDebtorActivityCount = mainDebtorBreakdown[0]?.count ?? 0;
@@ -239,14 +266,36 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
 
   const estimatedDebt = summary?.totalEstimatedDebt;
   const hasEstimatedDebt = typeof estimatedDebt === 'number' && estimatedDebt > 0;
+  const syncBadgeLabel = syncLabel;
+  const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
+  const operationalBalanceLines: FinancialPlaceholderLine[] = [
+    { label: 'Saldo adeudado', value: hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—' },
+    { label: 'Movimientos pendientes', value: '—' },
+    { label: 'Saldo total', value: '—' }
+  ];
+  const financialSummaryLines: FinancialPlaceholderLine[] = [
+    { label: 'Caja / bancos', value: '—' },
+    { label: 'Saldo proyectado', value: '—' },
+    { label: 'Pendientes', value: '—' }
+  ];
+  const administrationCategoryPlaceholderLines: FinancialPlaceholderLine[] = [
+    { label: 'Sector', value: '—' },
+    { label: 'Categoría', value: '—' },
+    { label: 'Monto', value: '—' }
+  ];
 
   return (
     <main className="module-content">
       <section className="module-hero home-hero">
-        <div>
+        <div className="home-hero__copy">
           <p className="eyebrow">Inicio</p>
           <h2>Panel operativo de miClub</h2>
           <p>Resumen ejecutivo con indicadores generales, sincronización y datos reales disponibles por sector.</p>
+        </div>
+        <div className="home-sync-badges" aria-label="Sincronización del inicio">
+          <span className={syncStatus?.error ? 'home-sync-badge home-sync-badge--warning' : 'home-sync-badge'}>{syncBadgeLabel}</span>
+          <span className="home-sync-badge home-sync-badge--muted">{lastSyncLabel}</span>
+          {syncStatus?.error && <span className="home-sync-badge home-sync-badge--warning">{syncStatus.error}</span>}
         </div>
       </section>
 
@@ -257,10 +306,13 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         <div className="home-dashboard-row home-dashboard-row--primary">
           <article className="card home-kpi-card home-kpi-card--enrollment">
             <div className="home-card-heading">
-              <h4>👥 Total de inscriptos</h4>
+              <h4>👥 Inscriptos</h4>
               <p>Estados operativos actuales</p>
             </div>
-            <p className="home-kpi-value">{enrollmentStats.total}</p>
+            <div className="enrollment-summary">
+              <p className="home-kpi-value">{enrollmentStats.total}</p>
+              <span>Total de inscriptos</span>
+            </div>
             <div className="status-breakdown-grid">
               <span><strong>Activos</strong>{enrollmentStats.active}</span>
               <span><strong>Al día</strong>{enrollmentStats.current}</span>
@@ -268,27 +320,15 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <span><strong>Adeudando</strong>{enrollmentStats.debtor}</span>
               <span><strong>Abandonados</strong>{enrollmentStats.abandoned}</span>
             </div>
-          </article>
-
-          <article className="card home-kpi-card">
-            <div className="home-card-heading">
-              <h4>💳 Adeudando</h4>
-              <p>Deudores por actividad</p>
-            </div>
-            <p className="home-kpi-value">{totalDebtors}</p>
-            <div className="activity-breakdown-list">
-              {mainDebtorBreakdown.length > 0 ? mainDebtorBreakdown.map((item) => (
-                <div className="activity-breakdown-item" key={item.activity}>
-                  <div className="activity-breakdown-row">
-                    <span>{item.activity}</span>
-                    <strong>{item.count}</strong>
-                  </div>
-                  <div className="activity-breakdown-track" aria-hidden="true">
-                    <span style={{ width: `${Math.max((item.count / maxDebtorActivityCount) * 100, 8)}%` }} />
-                  </div>
-                </div>
-              )) : <p className="empty-card-note">Sin deudores registrados</p>}
-              {remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}
+            <div className="debtor-activity-panel">
+              <div className="debtor-activity-panel__heading">
+                <strong>Adeudados por actividad</strong>
+                <span>{totalDebtors} deudores</span>
+              </div>
+              <div className="activity-breakdown-list activity-breakdown-list--compact">
+                {renderActivityBreakdown(mainDebtorBreakdown, maxDebtorActivityCount, 'Sin deudores registrados')}
+                {remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}
+              </div>
             </div>
           </article>
 
@@ -298,62 +338,47 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <p>Solo inscriptos activos</p>
             </div>
             <div className="activity-breakdown-list activity-breakdown-list--featured">
-              {mainActiveActivityBreakdown.length > 0 ? mainActiveActivityBreakdown.map((item) => (
-                <div className="activity-breakdown-item" key={item.activity}>
-                  <div className="activity-breakdown-row">
-                    <span>{item.activity}</span>
-                    <strong>{item.count}</strong>
-                  </div>
-                  <div className="activity-breakdown-track" aria-hidden="true">
-                    <span style={{ width: `${Math.max((item.count / maxActiveActivityCount) * 100, 8)}%` }} />
-                  </div>
-                </div>
-              )) : <p className="empty-card-note">Sin actividades activas registradas</p>}
+              {renderActivityBreakdown(mainActiveActivityBreakdown, maxActiveActivityCount, 'Sin actividades activas registradas')}
               {remainingActiveActivities > 0 && <small>+ {remainingActiveActivities} actividades</small>}
             </div>
           </article>
         </div>
 
         <div className="home-dashboard-row home-dashboard-row--secondary">
-          <article className="card home-kpi-card home-kpi-card--compact">
-            <div className="home-card-heading">
-              <h4>🔄 Estado de sincronización</h4>
-              <p>Origen de datos</p>
-            </div>
-            <p className="home-secondary-value">{syncLabel}</p>
-            {syncStatus?.error && <small className="integration-note">{syncStatus.error}</small>}
-          </article>
-
-          <article className="card home-kpi-card home-kpi-card--compact">
-            <div className="home-card-heading">
-              <h4>🕒 Última sincronización</h4>
-              <p>Actualización registrada</p>
-            </div>
-            <p className="home-secondary-value">{formatDateTime(syncStatus?.lastSyncAt)}</p>
-          </article>
-
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
             <div className="home-card-heading">
               <h4>🏦 Saldos operativos</h4>
-              <p>Estructura futura</p>
+              <p>Base preparada para ADMINISTRACIÓN</p>
             </div>
-            <div className="finance-lines finance-lines--compact">
-              <span><strong>Saldo adeudado</strong>{hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—'}</span>
-              <span><strong>Movimientos pendientes</strong>—</span>
-            </div>
+            {renderFinanceLines(operationalBalanceLines)}
             <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
           </article>
 
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
             <div className="home-card-heading">
               <h4>📊 Resumen financiero</h4>
-              <p>Estructura futura</p>
+              <p>Indicadores compactos futuros</p>
             </div>
-            <div className="finance-lines finance-lines--compact">
-              <span><strong>Caja / bancos</strong>—</span>
-              <span><strong>Saldo proyectado</strong>—</span>
-            </div>
+            {renderFinanceLines(financialSummaryLines)}
             <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>📥 Ingresos por sector y categoría</h4>
+              <p>Sector · categoría · monto</p>
+            </div>
+            {renderFinanceLines(administrationCategoryPlaceholderLines)}
+            <small className="integration-note">Se integrará desde ADMINISTRACIÓN.</small>
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>📤 Egresos por sector y categoría</h4>
+              <p>Sector · categoría · monto</p>
+            </div>
+            {renderFinanceLines(administrationCategoryPlaceholderLines)}
+            <small className="integration-note">Se integrará desde ADMINISTRACIÓN.</small>
           </article>
         </div>
       </section>
