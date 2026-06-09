@@ -48,6 +48,10 @@ export interface ClubFinanceDebugInfo {
   bySector: Record<string, number>;
   byCategoria: Record<string, number>;
   rawLiquidityCells: unknown[][];
+  parsedLiquidity: number;
+  parsedCash: number;
+  parsedBank: number;
+  parsedDollars: number;
   sectorBalanceCells: Record<string, unknown>;
 }
 
@@ -105,29 +109,48 @@ export const toMemberStatus = (value: unknown): DebtorStatus => {
   }
 };
 
+const countOccurrences = (value: string, character: string): number => value.split(character).length - 1;
+
+const parseSingleSeparatorNumber = (value: string, separator: "," | "."): string => {
+  const separatorIndex = value.indexOf(separator);
+  const integerPart = value.slice(0, separatorIndex);
+  const fractionalPart = value.slice(separatorIndex + 1);
+
+  if (fractionalPart.length === 3 && /^\d{1,3}$/.test(integerPart)) return `${integerPart}${fractionalPart}`;
+  if (fractionalPart.length >= 1 && fractionalPart.length <= 2) return `${integerPart}.${fractionalPart}`;
+
+  return `${integerPart}${fractionalPart}`;
+};
+
 export const normalizeMoney = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
   const raw = String(value ?? "").trim();
   if (!raw) return 0;
 
-  let cleaned = raw.replace(/[^\d,.-]/g, "");
-  if (!cleaned || cleaned === "-" || cleaned === "," || cleaned === ".") return 0;
+  const isNegative = /[-−–—]/.test(raw) || /^\s*\(.*\)\s*$/.test(raw);
+  let cleaned = raw.replace(/[−–—]/g, "-").replace(/[^\d,.-]/g, "").replace(/-/g, "");
+  if (!/\d/.test(cleaned)) return 0;
 
-  const lastComma = cleaned.lastIndexOf(",");
-  const lastDot = cleaned.lastIndexOf(".");
-  if (lastComma >= 0 && lastDot >= 0) {
-    const decimalSeparator = lastComma > lastDot ? "," : ".";
-    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
-    cleaned = cleaned.split(thousandsSeparator).join("").replace(decimalSeparator, ".");
-  } else if (lastComma >= 0) {
-    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
-  } else {
-    cleaned = cleaned.replace(/\.(?=\d{3}(?:\D|$))/g, "");
+  const commaCount = countOccurrences(cleaned, ",");
+  const dotCount = countOccurrences(cleaned, ".");
+
+  if (commaCount > 0 && dotCount > 0) {
+    cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+  } else if (dotCount > 1) {
+    cleaned = cleaned.replace(/\./g, "");
+  } else if (commaCount > 1) {
+    cleaned = cleaned.replace(/,/g, "");
+  } else if (dotCount === 1) {
+    cleaned = parseSingleSeparatorNumber(cleaned, ".");
+  } else if (commaCount === 1) {
+    cleaned = parseSingleSeparatorNumber(cleaned, ",");
   }
 
-  const parsed = Number(cleaned.replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed = Number(cleaned);
+  if (!Number.isFinite(parsed)) return 0;
+
+  return isNegative && parsed !== 0 ? -parsed : parsed;
 };
 
 const normalizeFee = (value: unknown): number | undefined => {
@@ -574,11 +597,15 @@ const buildEmptyClubOperationsSummary = (cuotasAdeudadas = 0): ClubOperationsSum
   remainingExpenseCategories: 0
 });
 
+const parseLiquidityBalances = (balanceRows: unknown[][]) => ({
+  liquidity: normalizeMoney(balanceRows[0]?.[0]),
+  cash: normalizeMoney(balanceRows[0]?.[3]),
+  bank: normalizeMoney(balanceRows[1]?.[3]),
+  dollars: normalizeMoney(balanceRows[2]?.[3])
+});
+
 const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unknown[][], sectorBalances: SectorBalance[], cuotasAdeudadas = 0): ClubOperationsSummary => {
-  const liquidity = normalizeMoney(balanceRows[0]?.[0]);
-  const cash = normalizeMoney(balanceRows[0]?.[3]);
-  const bank = normalizeMoney(balanceRows[1]?.[3]);
-  const dollars = normalizeMoney(balanceRows[2]?.[3]);
+  const { liquidity, cash, bank, dollars } = parseLiquidityBalances(balanceRows);
   const pendingMovements = movements.filter((movement) => isPending(movement.estado));
   const pendingIncome = pendingMovements
     .filter((movement) => isIncome(movement.tipo))
@@ -670,12 +697,26 @@ export const getClubOperationsSummaryFromGoogleSheets = async (cuotasAdeudadas =
 export const getClubFinanceDebugFromGoogleSheets = async (): Promise<ClubFinanceDebugInfo> => {
   const config = getGoogleSheetsConfig();
   if (!config.enabled) {
-    return { totalMovementsRead: 0, validMovements: 0, byTipo: {}, byEstado: {}, bySector: {}, byCategoria: {}, rawLiquidityCells: [], sectorBalanceCells: {} };
+    return {
+      totalMovementsRead: 0,
+      validMovements: 0,
+      byTipo: {},
+      byEstado: {},
+      bySector: {},
+      byCategoria: {},
+      rawLiquidityCells: [],
+      parsedLiquidity: 0,
+      parsedCash: 0,
+      parsedBank: 0,
+      parsedDollars: 0,
+      sectorBalanceCells: {}
+    };
   }
   ensureGoogleSheetsEnabled(config);
 
   const { movementValues, balanceRows, sectorBalanceCells } = await readClubFinanceRanges(config);
   const movements = parseAdminMovementsFromValues(movementValues);
+  const { liquidity: parsedLiquidity, cash: parsedCash, bank: parsedBank, dollars: parsedDollars } = parseLiquidityBalances(balanceRows);
   return {
     totalMovementsRead: Math.max(movementValues.length - 1, 0),
     validMovements: movements.length,
@@ -684,6 +725,10 @@ export const getClubFinanceDebugFromGoogleSheets = async (): Promise<ClubFinance
     bySector: countBy(movements, (movement) => movement.sector),
     byCategoria: countBy(movements, (movement) => movement.categoria),
     rawLiquidityCells: balanceRows,
+    parsedLiquidity,
+    parsedCash,
+    parsedBank,
+    parsedDollars,
     sectorBalanceCells
   };
 };
