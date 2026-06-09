@@ -81,10 +81,7 @@ const getStatusBucketFromRawStatus = (status) => {
 };
 const getMemberStatus = (member) => normalizeStatus(String(member.estado ?? ''));
 const getStatusBucket = (member) => getStatusBucketFromRawStatus(getMemberStatus(member));
-const isActiveMember = (member) => {
-    const bucket = getStatusBucket(member);
-    return bucket === 'current' || bucket === 'newEnrollment' || bucket === 'debtor';
-};
+const isActiveMember = (member) => getStatusBucket(member) !== 'abandoned';
 const isDebtor = (member) => getStatusBucket(member) === 'debtor';
 const getActivityName = (member) => member.actividad?.trim() || member.modalidad?.trim() || 'Sin actividad asignada';
 const getEnrollmentStatusBreakdown = (records, fallbackTotal) => {
@@ -94,7 +91,8 @@ const getEnrollmentStatusBreakdown = (records, fallbackTotal) => {
         current: 0,
         newEnrollment: 0,
         debtor: 0,
-        abandoned: 0
+        abandoned: 0,
+        others: 0
     };
     records.forEach((member) => {
         const bucket = getStatusBucket(member);
@@ -106,9 +104,24 @@ const getEnrollmentStatusBreakdown = (records, fallbackTotal) => {
             breakdown.debtor += 1;
         if (bucket === 'abandoned')
             breakdown.abandoned += 1;
+        if (!bucket)
+            breakdown.others += 1;
     });
-    breakdown.active = breakdown.current + breakdown.newEnrollment + breakdown.debtor;
+    breakdown.active = breakdown.total - breakdown.abandoned;
     return breakdown;
+};
+const mapSummaryStatusBreakdown = (statusBreakdown) => {
+    if (!statusBreakdown)
+        return undefined;
+    return {
+        total: statusBreakdown.total,
+        active: statusBreakdown.active,
+        current: statusBreakdown.alDia,
+        newEnrollment: statusBreakdown.nuevoInscripto,
+        debtor: statusBreakdown.adeudando,
+        abandoned: statusBreakdown.abandonado,
+        others: statusBreakdown.otros
+    };
 };
 const buildActivityBreakdown = (records) => {
     const counts = new Map();
@@ -172,7 +185,7 @@ export default function HomeModule({ onOpenModule }) {
             : syncStatus.source === 'google_sheets'
                 ? 'Google Sheets conectado'
                 : 'Datos mock/locales';
-    const enrollmentStats = useMemo(() => getEnrollmentStatusBreakdown(members, summary?.totalMembers), [members, summary?.totalMembers]);
+    const enrollmentStats = useMemo(() => mapSummaryStatusBreakdown(summary?.statusBreakdown) ?? getEnrollmentStatusBreakdown(members, summary?.totalMembers), [members, summary?.statusBreakdown, summary?.totalMembers]);
     const debtorRecords = useMemo(() => {
         if (members.length > 0)
             return members;

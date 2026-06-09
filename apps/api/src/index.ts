@@ -40,11 +40,11 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 import express from "express";
 import cors from "cors";
 import { randomUUID } from "node:crypto";
-import type { ContactedRecentResponse, Member, MessageTemplate, PaginatedHistoryResponse, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
+import type { ContactedRecentResponse, Member, MessageTemplate, OperationalStatusKey, PaginatedHistoryResponse, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation, StatusBreakdown } from "@miclub/shared";
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
-import { getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
+import { getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -143,6 +143,43 @@ const byKey = (members: Member[], getter: (m: Member) => string): Record<string,
     return acc;
   }, {});
 
+const statusBreakdownKeys: Record<OperationalStatusKey, keyof Omit<StatusBreakdown, "total" | "active">> = {
+  al_dia: "alDia",
+  nuevo_inscripto: "nuevoInscripto",
+  adeudando: "adeudando",
+  abandonado: "abandonado",
+  otro: "otros"
+};
+
+const buildRawStatusBreakdown = (members: Member[]): Record<string, number> =>
+  members.reduce<Record<string, number>>((acc, member) => {
+    const key = String(member.estado ?? "").trim() || "(vacío)";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+const buildStatusBreakdown = (members: Member[]): StatusBreakdown => {
+  const breakdown: StatusBreakdown = {
+    total: members.length,
+    active: 0,
+    alDia: 0,
+    nuevoInscripto: 0,
+    adeudando: 0,
+    abandonado: 0,
+    otros: 0
+  };
+
+  for (const member of members) {
+    const normalizedStatus = normalizeOperationalStatus(member.estado);
+    breakdown[statusBreakdownKeys[normalizedStatus]] += 1;
+  }
+
+  breakdown.active = breakdown.total - breakdown.abandonado;
+  return breakdown;
+};
+
+const isDebtorMember = (member: Member): boolean => normalizeOperationalStatus(member.estado) === "adeudando";
+
 const ALLOWED_TEMPLATE_VARIABLES = new Set(["{nombre}", "{apellido}", "{actividad}", "{cuota}", "{modalidad}", "{instructor}"]);
 
 const validateTemplateInput = (name: unknown, body: unknown): string | null => {
@@ -191,7 +228,7 @@ app.get("/members", async (_req, res) => {
 app.get("/debtors", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
-    res.json(members.filter((m) => m.estado === "Adeudando"));
+    res.json(members.filter(isDebtorMember));
   } catch {
     jsonError(res, 500, "No se pudo obtener la lista de deudores.");
   }
@@ -200,7 +237,9 @@ app.get("/debtors", async (_req, res) => {
 app.get("/summary", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
-    const debtors = members.filter((m) => m.estado === "Adeudando");
+    const debtors = members.filter(isDebtorMember);
+    const statusBreakdown = buildStatusBreakdown(members);
+    const rawStatusBreakdown = buildRawStatusBreakdown(members);
     res.json({
       totalMembers: members.length,
       totalDebtors: debtors.length,
@@ -209,10 +248,34 @@ app.get("/summary", async (_req, res) => {
       totalByActivity: byKey(members, (m) => m.actividad ?? "Sin actividad"),
       debtorsByActivity: byKey(debtors, (m) => m.actividad ?? "Sin actividad"),
       debtorsWithoutPayments: debtors.filter((d) => !d.lastPaymentAt).length,
-      totalEstimatedDebt: debtors.reduce((sum, d) => sum + normalizeFeeToArs(d.cuota), 0)
+      totalEstimatedDebt: debtors.reduce((sum, d) => sum + normalizeFeeToArs(d.cuota), 0),
+      statusBreakdown,
+      rawStatusBreakdown
     });
   } catch {
     jsonError(res, 500, "No se pudo obtener el resumen.");
+  }
+});
+
+app.get("/status-debug", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    const normalizedStatusBreakdown = buildStatusBreakdown(members);
+    res.json({
+      totalMembers: members.length,
+      rawStatusBreakdown: buildRawStatusBreakdown(members),
+      normalizedStatusBreakdown,
+      samples: members.slice(0, 50).map((member) => ({
+        id: member.id,
+        nombre: member.nombre,
+        apellido: member.apellido,
+        sourceSheet: member.sourceSheet,
+        rawEstado: member.estado,
+        normalizedEstado: normalizeOperationalStatus(member.estado)
+      }))
+    });
+  } catch {
+    jsonError(res, 500, "No se pudo obtener el debug de estados.");
   }
 });
 
@@ -427,7 +490,7 @@ app.post("/prepare-messages", async (req, res) => {
 
   const { members } = await getMembersSource();
   const selected = members.filter((m) => body.memberIds?.includes(m.id));
-  const nonDebtors = selected.filter((m) => m.estado !== "Adeudando");
+  const nonDebtors = selected.filter((m) => !isDebtorMember(m));
 
   if (selected.length === 0) {
     return jsonError(res, 400, "No se encontraron miembros válidos para preparar mensajes.");

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Member } from '@miclub/shared';
+import type { Member, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
 import { formatArPeso } from '../utils';
 import type { ModuleId } from './ModuleNav';
 
@@ -20,6 +20,8 @@ type Summary = {
   debtorsWithoutPayments?: number;
   totalBySheet?: Record<string, number>;
   debtorsBySheet?: Record<string, number>;
+  statusBreakdown?: ApiStatusBreakdown;
+  rawStatusBreakdown?: Record<string, number>;
 };
 
 type HomeModuleProps = {
@@ -44,6 +46,7 @@ type StatusBreakdown = {
   newEnrollment: number;
   debtor: number;
   abandoned: number;
+  others: number;
 };
 
 const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'abandoned'> = {
@@ -126,10 +129,7 @@ const getMemberStatus = (member: Member) => normalizeStatus(String(member.estado
 
 const getStatusBucket = (member: Member) => getStatusBucketFromRawStatus(getMemberStatus(member));
 
-const isActiveMember = (member: Member) => {
-  const bucket = getStatusBucket(member);
-  return bucket === 'current' || bucket === 'newEnrollment' || bucket === 'debtor';
-};
+const isActiveMember = (member: Member) => getStatusBucket(member) !== 'abandoned';
 
 const isDebtor = (member: Member) => getStatusBucket(member) === 'debtor';
 
@@ -142,7 +142,8 @@ const getEnrollmentStatusBreakdown = (records: Member[], fallbackTotal?: number)
     current: 0,
     newEnrollment: 0,
     debtor: 0,
-    abandoned: 0
+    abandoned: 0,
+    others: 0
   };
 
   records.forEach((member) => {
@@ -151,10 +152,24 @@ const getEnrollmentStatusBreakdown = (records: Member[], fallbackTotal?: number)
     if (bucket === 'newEnrollment') breakdown.newEnrollment += 1;
     if (bucket === 'debtor') breakdown.debtor += 1;
     if (bucket === 'abandoned') breakdown.abandoned += 1;
+    if (!bucket) breakdown.others += 1;
   });
 
-  breakdown.active = breakdown.current + breakdown.newEnrollment + breakdown.debtor;
+  breakdown.active = breakdown.total - breakdown.abandoned;
   return breakdown;
+};
+
+const mapSummaryStatusBreakdown = (statusBreakdown?: ApiStatusBreakdown): StatusBreakdown | undefined => {
+  if (!statusBreakdown) return undefined;
+  return {
+    total: statusBreakdown.total,
+    active: statusBreakdown.active,
+    current: statusBreakdown.alDia,
+    newEnrollment: statusBreakdown.nuevoInscripto,
+    debtor: statusBreakdown.adeudando,
+    abandoned: statusBreakdown.abandonado,
+    others: statusBreakdown.otros
+  };
 };
 
 const buildActivityBreakdown = (records: Member[]): ActivityBreakdownItem[] => {
@@ -249,8 +264,8 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         : 'Datos mock/locales';
 
   const enrollmentStats = useMemo(
-    () => getEnrollmentStatusBreakdown(members, summary?.totalMembers),
-    [members, summary?.totalMembers]
+    () => mapSummaryStatusBreakdown(summary?.statusBreakdown) ?? getEnrollmentStatusBreakdown(members, summary?.totalMembers),
+    [members, summary?.statusBreakdown, summary?.totalMembers]
   );
 
   const debtorRecords = useMemo(() => {
