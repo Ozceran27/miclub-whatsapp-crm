@@ -37,7 +37,7 @@ type FinancialLine = {
   id?: string;
   label: string;
   value: string;
-  highlight?: 'default' | 'green' | 'red';
+  highlight?: 'default' | 'green' | 'red' | 'primarySoft';
   iconBefore?: string;
   iconAfter?: string;
 };
@@ -211,13 +211,27 @@ const buildActiveActivityBreakdown = (records: Member[]) => buildActivityBreakdo
 
 const buildDebtorActivityBreakdown = (records: Member[]) => buildActivityBreakdown(records.filter(isDebtor));
 
-const renderActivityBreakdown = (items: ActivityBreakdownItem[], maxCount: number, emptyLabel: string, highlightFirst = false) => (
+const renderActivityBreakdown = (
+  items: ActivityBreakdownItem[],
+  maxCount: number,
+  emptyLabel: string,
+  highlightFirst: false | 'featured' | 'warning' = false
+) => (
   items.length > 0 ? items.map((item, index) => {
-    const isHighlighted = highlightFirst && index === 0;
+    const isHighlighted = Boolean(highlightFirst) && index === 0;
+    const highlightClass = highlightFirst === 'warning'
+      ? 'activity-breakdown-item--warning'
+      : 'activity-breakdown-item--highlight';
+    const className = isHighlighted
+      ? `activity-breakdown-item ${highlightClass}`
+      : 'activity-breakdown-item';
+    const marker = isHighlighted && highlightFirst === 'warning' ? '⚠ ' : '';
+    const suffix = highlightFirst === 'featured' ? ' ⭐' : '';
+
     return (
-      <div className={isHighlighted ? 'activity-breakdown-item activity-breakdown-item--highlight' : 'activity-breakdown-item'} key={item.activity}>
+      <div className={className} key={item.activity}>
         <div className="activity-breakdown-row">
-          <span>{item.activity}{isHighlighted ? ' ⭐' : ''}</span>
+          <span>{marker}{item.activity}{isHighlighted ? suffix : ''}</span>
           <strong>{item.count}</strong>
         </div>
         <div className="activity-breakdown-track" aria-hidden="true">
@@ -231,6 +245,7 @@ const renderActivityBreakdown = (items: ActivityBreakdownItem[], maxCount: numbe
 const getMetricRowClassName = (highlight?: FinancialLine['highlight']) => {
   if (highlight === 'green') return 'metric-row metric-row--highlight-green';
   if (highlight === 'red') return 'metric-row metric-row--highlight-red';
+  if (highlight === 'primarySoft') return 'metric-row metric-row--highlight-soft';
   if (highlight === 'default') return 'metric-row metric-row--highlight';
   return 'metric-row';
 };
@@ -355,7 +370,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const formatFinanceMoney = (value: number | undefined) => financeSummary ? formatArPeso(value) : unavailableLabel;
   const formatUsd = (value: number | undefined) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
   const financialSummaryLines: FinancialLine[] = [
-    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'default', iconBefore: '🪙' },
+    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'primarySoft', iconBefore: '💰' },
     { label: 'Caja', value: formatFinanceMoney(financeSummary?.cash) },
     { label: 'Banco', value: formatFinanceMoney(financeSummary?.bank) },
     { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
@@ -364,7 +379,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
     { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
     { label: 'Saldos a Pagar', value: formatFinanceMoney(financeSummary?.saldosAPagar) },
-    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'default', iconBefore: '📈' }
+    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'primarySoft', iconBefore: '📈' }
   ];
   const incomeBySectorLines: FinancialLine[] = financeSummary?.incomeBySector.length
     ? financeSummary.incomeBySector.map((item, index) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'green' : undefined, iconAfter: index === 0 ? '⭐' : undefined }))
@@ -383,12 +398,12 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         </div>
         <div className="home-sync-badges" aria-label="Sincronización del inicio">
           <span
-            className={syncStatus?.error ? 'home-sync-badge home-sync-badge--warning' : 'home-sync-badge'}
+            className={syncStatus?.error ? 'home-sync-badge hero-sync-badge--compact home-sync-badge--warning' : 'home-sync-badge hero-sync-badge--compact'}
             title={syncStatus?.error}
           >
             {syncBadgeLabel}
           </span>
-          <span className="home-sync-badge home-sync-badge--muted">{lastSyncLabel}</span>
+          <span className="home-sync-badge hero-sync-badge--compact home-sync-badge--muted">{lastSyncLabel}</span>
           <button className="icon-btn home-sync-button" onClick={() => void loadHome()} disabled={loading}>Sincronizar</button>
         </div>
       </section>
@@ -413,7 +428,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <span className="metric-row"><strong className="metric-row__label">Nuevos inscriptos</strong><span className="metric-row__value">{enrollmentStats.newEnrollment}</span></span>
               <span className="metric-row"><strong className="metric-row__label">Adeudando</strong><span className="metric-row__value">{enrollmentStats.debtor}</span></span>
               <span className="metric-row"><strong className="metric-row__label">Abandonados</strong><span className="metric-row__value">{enrollmentStats.abandoned}</span></span>
-              <span className="metric-row metric-row--highlight"><strong className="metric-row__label">Ingreso prom. ponderado</strong><span className="metric-row__value">{weightedAverageFeeLabel}</span></span>
+              <span className="metric-row"><strong className="metric-row__label">Cuota Promedio</strong><span className="metric-row__value">{weightedAverageFeeLabel}</span></span>
             </div>
             <div className="debtor-activity-panel">
               <div className="debtor-activity-panel__heading">
@@ -421,7 +436,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
                 <span>{totalDebtors} deudores</span>
               </div>
               <div className="activity-breakdown-list activity-breakdown-list--compact">
-                {renderActivityBreakdown(mainDebtorBreakdown, maxDebtorActivityCount, 'Sin deudores registrados')}
+                {renderActivityBreakdown(mainDebtorBreakdown, maxDebtorActivityCount, 'Sin deudores registrados', 'warning')}
                 {remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}
               </div>
             </div>
@@ -433,7 +448,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <p>Solo inscriptos activos</p>
             </div>
             <div className="activity-breakdown-list activity-breakdown-list--featured">
-              {renderActivityBreakdown(mainActiveActivityBreakdown, maxActiveActivityCount, 'Sin actividades activas registradas', true)}
+              {renderActivityBreakdown(mainActiveActivityBreakdown, maxActiveActivityCount, 'Sin actividades activas registradas', 'featured')}
               {remainingActiveActivities > 0 && <small>+ {remainingActiveActivities} actividades</small>}
             </div>
           </article>
