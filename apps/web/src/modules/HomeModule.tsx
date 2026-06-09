@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ContactedRecentResponse, Member } from '@miclub/shared';
+import type { Member } from '@miclub/shared';
 import { formatArPeso } from '../utils';
 import type { ModuleId } from './ModuleNav';
 
@@ -26,6 +26,14 @@ type HomeModuleProps = {
   onOpenModule: (moduleId: ModuleId) => void;
 };
 
+type ActivityBreakdownItem = {
+  activity: string;
+  count: number;
+};
+
+const ACTIVE_STATUSES = new Set(['al dia', 'nuevo inscripto', 'adeudando']);
+const ABANDONED_STATUS = 'abandonado';
+
 const AREA_CARDS: Array<{ title: string; moduleId: ModuleId; sheetKeys: string[]; description: string }> = [
   { title: 'Espacio Fitness', moduleId: 'fitness', sheetKeys: ['FITNESS', 'Espacio Fitness'], description: 'Inscriptos, cuotas, pagos y actividades.' },
   { title: 'Salón', moduleId: 'salon', sheetKeys: ['SALON', 'SALÓN', 'Salon'], description: 'Actividades, inscriptos y eventos futuros.' },
@@ -35,14 +43,21 @@ const AREA_CARDS: Array<{ title: string; moduleId: ModuleId; sheetKeys: string[]
   { title: 'CRM', moduleId: 'crm', sheetKeys: ['FITNESS', 'SALON', 'AULA', 'LOCAL_1', 'CANTINA', 'ADMINISTRACION'], description: 'Cobranzas y contacto manual por WhatsApp.' }
 ];
 
+const normalizeText = (value?: string) => (value ?? '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .trim()
+  .replace(/\s+/g, ' ')
+  .toLowerCase();
+
 const findSheetValue = (source: Record<string, number> | undefined, keys: string[]) => {
   if (!source) return undefined;
   for (const key of keys) {
     if (source[key] !== undefined) return source[key];
   }
-  const normalizedEntries = Object.entries(source).map(([key, value]) => [key.toLowerCase().replace(/[ _-]/g, ''), value] as const);
+  const normalizedEntries = Object.entries(source).map(([key, value]) => [normalizeText(key).replace(/[ _-]/g, ''), value] as const);
   for (const key of keys) {
-    const normalizedKey = key.toLowerCase().replace(/[ _-]/g, '');
+    const normalizedKey = normalizeText(key).replace(/[ _-]/g, '');
     const match = normalizedEntries.find(([entryKey]) => entryKey === normalizedKey);
     if (match) return match[1];
   }
@@ -54,12 +69,29 @@ const formatDateTime = (value?: string) => {
   return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
+const getMemberStatus = (member: Member) => normalizeText(member.estado);
+
+const isDebtor = (member: Member) => getMemberStatus(member) === 'adeudando';
+
+const getActivityName = (member: Member) => member.actividad?.trim() || member.modalidad?.trim() || 'Sin actividad asignada';
+
+const buildActivityBreakdown = (records: Member[]): ActivityBreakdownItem[] => {
+  const counts = new Map<string, number>();
+  records.forEach((member) => {
+    const activity = getActivityName(member);
+    counts.set(activity, (counts.get(activity) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([activity, count]) => ({ activity, count }))
+    .sort((a, b) => b.count - a.count || a.activity.localeCompare(b.activity, 'es'));
+};
+
 export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [debtors, setDebtors] = useState<Member[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [contactedRecent, setContactedRecent] = useState<ContactedRecentResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,31 +99,28 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, membersRes, debtorsRes, syncRes, contactedRes] = await Promise.all([
+      const [summaryRes, membersRes, debtorsRes, syncRes] = await Promise.all([
         fetch(`${API}/summary`),
         fetch(`${API}/members`),
         fetch(`${API}/debtors`),
-        fetch(`${API}/sync-status`),
-        fetch(`${API}/contacted-recent`)
+        fetch(`${API}/sync-status`)
       ]);
 
-      if (!summaryRes.ok || !membersRes.ok || !debtorsRes.ok || !syncRes.ok || !contactedRes.ok) {
+      if (!summaryRes.ok || !membersRes.ok || !debtorsRes.ok || !syncRes.ok) {
         throw new Error('No se pudo cargar el inicio operativo.');
       }
 
-      const [summaryPayload, membersPayload, debtorsPayload, syncPayload, contactedPayload] = await Promise.all([
+      const [summaryPayload, membersPayload, debtorsPayload, syncPayload] = await Promise.all([
         summaryRes.json(),
         membersRes.json(),
         debtorsRes.json(),
-        syncRes.json(),
-        contactedRes.json()
+        syncRes.json()
       ]);
 
       setSummary(summaryPayload as Summary);
       setMembers(membersPayload as Member[]);
       setDebtors(debtorsPayload as Member[]);
       setSyncStatus(syncPayload as SyncStatus);
-      setContactedRecent(contactedPayload as ContactedRecentResponse);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido al cargar el inicio.');
     } finally {
@@ -111,6 +140,37 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         ? 'Google Sheets conectado'
         : 'Datos mock/locales';
 
+  const enrollmentStats = useMemo(() => {
+    const active = members.filter((member) => ACTIVE_STATUSES.has(getMemberStatus(member))).length;
+    const abandoned = members.filter((member) => getMemberStatus(member) === ABANDONED_STATUS).length;
+
+    return {
+      total: summary?.totalMembers ?? members.length,
+      active,
+      abandoned
+    };
+  }, [members, summary?.totalMembers]);
+
+  const debtorRecords = useMemo(() => {
+    if (debtors.length > 0) return debtors;
+    return members.filter(isDebtor);
+  }, [debtors, members]);
+
+  const debtorBreakdown = useMemo(() => buildActivityBreakdown(debtorRecords), [debtorRecords]);
+  const mainDebtorBreakdown = debtorBreakdown.slice(0, 4);
+  const remainingDebtorActivities = Math.max(debtorBreakdown.length - mainDebtorBreakdown.length, 0);
+
+  const activeActivities = useMemo(() => {
+    const activities = new Set(
+      members
+        .filter((member) => ACTIVE_STATUSES.has(getMemberStatus(member)))
+        .map(getActivityName)
+        .filter((activity) => activity !== 'Sin actividad asignada')
+    );
+
+    return activities.size;
+  }, [members]);
+
   const areaCards = useMemo(() => AREA_CARDS.map((area) => ({
     ...area,
     membersCount: area.moduleId === 'crm'
@@ -121,34 +181,74 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       : findSheetValue(summary?.debtorsBySheet, area.sheetKeys)
   })), [summary, members.length, debtors.length]);
 
+  const estimatedDebt = summary?.totalEstimatedDebt;
+  const hasEstimatedDebt = typeof estimatedDebt === 'number' && estimatedDebt > 0;
+
   return (
     <main className="module-content">
       <section className="module-hero home-hero">
         <div>
           <p className="eyebrow">Inicio</p>
           <h2>Panel operativo de miClub</h2>
-          <p>Resumen inicial con datos reales disponibles y accesos rápidos a los módulos de gestión.</p>
+          <p>Resumen ejecutivo con indicadores generales, sincronización y datos reales disponibles por sector.</p>
         </div>
-        <button className="icon-btn" onClick={() => onOpenModule('crm')}>Abrir módulo CRM</button>
       </section>
 
       {error && <p className="error-msg">Error: {error}</p>}
       {loading && <p className="section-note">Cargando métricas del club...</p>}
 
       <section className="dashboard home-dashboard">
-        <article className="card"><h4>👥 Total de inscriptos</h4><p>{summary?.totalMembers ?? members.length}</p></article>
-        <article className="card"><h4>💳 Total adeudando</h4><p>{summary?.totalDebtors ?? debtors.length}</p></article>
-        <article className="card"><h4>$ Deuda estimada</h4><p>{formatArPeso(summary?.totalEstimatedDebt ?? 0)}</p></article>
-        <article className="card"><h4>📩 Contactados últimos 30 días</h4><p>{contactedRecent?.memberIds.length ?? 0}</p></article>
-        <article className="card"><h4>🔄 Estado de sincronización</h4><p>{syncLabel}</p></article>
-        <article className="card"><h4>🕒 Última sincronización</h4><p>{formatDateTime(syncStatus?.lastSyncAt)}</p></article>
+        <article className="card home-kpi-card">
+          <h4>👥 Total de inscriptos</h4>
+          <p>{enrollmentStats.total}</p>
+          <div className="metric-list metric-list--compact">
+            <span><strong>Activos</strong>{enrollmentStats.active}</span>
+            <span><strong>Abandonados</strong>{enrollmentStats.abandoned}</span>
+          </div>
+        </article>
+
+        <article className="card home-kpi-card">
+          <h4>💳 Adeudando</h4>
+          <p>{summary?.totalDebtors ?? debtorRecords.length}</p>
+          <div className="metric-list">
+            {mainDebtorBreakdown.length > 0 ? mainDebtorBreakdown.map((item) => (
+              <span key={item.activity}><strong>{item.activity}</strong>{item.count}</span>
+            )) : <span><strong>Sin deudores registrados</strong>0</span>}
+            {remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}
+          </div>
+        </article>
+
+        <article className="card home-kpi-card">
+          <h4>🏦 Saldos operativos</h4>
+          <div className="finance-lines">
+            <span><strong>Saldo adeudado</strong>{hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—'}</span>
+            <span><strong>Movimientos pendientes</strong>—</span>
+            <span><strong>Saldo total</strong>—</span>
+          </div>
+          <small className="integration-note">Se integrará desde la hoja ADMINISTRACIÓN.</small>
+        </article>
+
+        <article className="card home-kpi-card">
+          <h4>📊 Resumen financiero</h4>
+          <div className="finance-lines">
+            <span><strong>Caja</strong>—</span>
+            <span><strong>Bancos</strong>—</span>
+            <span><strong>Saldo proyectado</strong>—</span>
+            <span><strong>Pendientes</strong>—</span>
+          </div>
+          <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+        </article>
+
+        <article className="card home-kpi-card"><h4>🔄 Estado de sincronización</h4><p>{syncLabel}</p></article>
+        <article className="card home-kpi-card"><h4>🕒 Última sincronización</h4><p>{formatDateTime(syncStatus?.lastSyncAt)}</p></article>
+        <article className="card home-kpi-card"><h4>🏷️ Actividades activas detectadas</h4><p>{activeActivities}</p></article>
       </section>
 
       <section className="section-panel">
         <div className="section-header">
           <div>
-            <h3>Resumen por área</h3>
-            <p>Base inicial para los futuros tableros por hoja/sector.</p>
+            <h3>Distribución operativa por sector</h3>
+            <p>Inscriptos y deudores detectados desde las hojas disponibles.</p>
           </div>
           <button className="icon-btn ghost-btn" onClick={() => void loadHome()}>Actualizar inicio</button>
         </div>
