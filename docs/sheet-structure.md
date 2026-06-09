@@ -86,6 +86,6 @@ Desde movimientos completados de `ADMINISTRACIÓN` se calculan:
 
 ### Saldo proyectado
 
-`saldoProyectado = liquidez + cuotasAdeudadas + saldoPendienteNeto + saldosAPagar`
+`saldoProyectado = liquidez + cuotasAdeudadas + saldoPendienteNeto - saldosAPagar`
 
 `cuotasAdeudadas` reutiliza la deuda estimada calculada desde los deudores del CRM.

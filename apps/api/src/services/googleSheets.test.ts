@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isCompleted, isExpense, isIncome, isPending, normalizeMoney, normalizeOperationalStatus, normalizeSheetText } from './googleSheets.js';
+import { calculateProjectedBalance, isCompleted, isExpense, isIncome, isPending, normalizeMoney, normalizeOperationalStatus, normalizeSheetText } from './googleSheets.js';
 
 test('normalizeOperationalStatus normaliza estados operativos conocidos', () => {
   assert.equal(normalizeOperationalStatus('Al Día'), 'al_dia');
@@ -44,4 +44,17 @@ test('helpers financieros normalizan texto, moneda y estados de ADMINISTRACIÓN'
   assert.equal(isPending('PENDIENTE'), true);
   assert.equal(isIncome('ingresos'), true);
   assert.equal(isExpense('EGRESOS'), true);
+});
+
+
+test('calculateProjectedBalance resta saldosAPagar como obligación futura', () => {
+  assert.equal(
+    calculateProjectedBalance({
+      liquidity: 1000000,
+      cuotasAdeudadas: 500000,
+      pendingNetBalance: 100000,
+      saldosAPagar: 200000
+    }),
+    1400000
+  );
 });
