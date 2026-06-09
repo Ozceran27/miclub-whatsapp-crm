@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Member, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
+import type { ClubOperationsSummary, Member, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
 import { formatArPeso } from '../utils';
 import type { ModuleId } from './ModuleNav';
 
@@ -33,7 +33,7 @@ type ActivityBreakdownItem = {
   count: number;
 };
 
-type FinancialPlaceholderLine = {
+type FinancialLine = {
   id?: string;
   label: string;
   value: string;
@@ -202,7 +202,7 @@ const renderActivityBreakdown = (items: ActivityBreakdownItem[], maxCount: numbe
   )) : <p className="empty-card-note">{emptyLabel}</p>
 );
 
-const renderFinanceLines = (lines: FinancialPlaceholderLine[]) => (
+const renderFinanceLines = (lines: FinancialLine[]) => (
   <div className="finance-lines finance-lines--compact">
     {lines.map((line) => (
       <span key={line.id ?? line.label}><strong>{line.label}</strong>{line.value}</span>
@@ -215,18 +215,32 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [debtors, setDebtors] = useState<Member[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [financeSummary, setFinanceSummary] = useState<ClubOperationsSummary | null>(null);
+  const [financeError, setFinanceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadHome = async () => {
     setLoading(true);
     setError(null);
+    setFinanceError(null);
     try {
-      const [summaryRes, membersRes, debtorsRes, syncRes] = await Promise.all([
+      const financePromise = fetch(`${API}/club-finance-summary`)
+        .then(async (response) => {
+          if (!response.ok) throw new Error('No se pudo cargar el resumen financiero.');
+          return response.json() as Promise<ClubOperationsSummary>;
+        })
+        .catch((financeLoadError) => {
+          setFinanceError(financeLoadError instanceof Error ? financeLoadError.message : 'Resumen financiero no disponible.');
+          return null;
+        });
+
+      const [summaryRes, membersRes, debtorsRes, syncRes, financePayload] = await Promise.all([
         fetch(`${API}/summary`),
         fetch(`${API}/members`),
         fetch(`${API}/debtors`),
-        fetch(`${API}/sync-status`)
+        fetch(`${API}/sync-status`),
+        financePromise
       ]);
 
       if (!summaryRes.ok || !membersRes.ok || !debtorsRes.ok || !syncRes.ok) {
@@ -244,6 +258,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       setMembers(membersPayload as Member[]);
       setDebtors(debtorsPayload as Member[]);
       setSyncStatus(syncPayload as SyncStatus);
+      setFinanceSummary(financePayload);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido al cargar el inicio.');
     } finally {
@@ -294,27 +309,30 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       : findSheetValue(summary?.debtorsBySheet, area.sheetKeys)
   })), [summary, members.length, debtors.length]);
 
-  const estimatedDebt = summary?.totalEstimatedDebt;
-  const hasEstimatedDebt = typeof estimatedDebt === 'number' && estimatedDebt > 0;
+  const estimatedDebt = financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt;
   const syncBadgeLabel = syncLabel;
   const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
-  const financialSummaryLines: FinancialPlaceholderLine[] = [
-    { label: 'Liquidez', value: '—' },
-    { label: 'Caja', value: '—' },
-    { label: 'Banco', value: '—' },
-    { label: 'Dólares', value: '—' }
+  const unavailableLabel = financeError ? 'No disponible' : '—';
+  const formatFinanceMoney = (value: number | undefined) => financeSummary ? formatArPeso(value) : unavailableLabel;
+  const formatUsd = (value: number | undefined) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
+  const financialSummaryLines: FinancialLine[] = [
+    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity) },
+    { label: 'Caja', value: formatFinanceMoney(financeSummary?.cash) },
+    { label: 'Banco', value: formatFinanceMoney(financeSummary?.bank) },
+    { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
   ];
-  const operationalBalanceLines: FinancialPlaceholderLine[] = [
-    { label: 'Cuotas Adeudadas', value: hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—' },
-    { label: 'Saldos Pendientes', value: '—' },
-    { label: 'Saldos a Pagar', value: '—' },
-    { label: 'Saldo proyectado', value: '—' }
+  const operationalBalanceLines: FinancialLine[] = [
+    { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
+    { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
+    { label: 'Saldos a Pagar', value: formatFinanceMoney(financeSummary?.saldosAPagar) },
+    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance) }
   ];
-  const sectorPlaceholderLines: FinancialPlaceholderLine[] = Array.from({ length: 4 }, (_, index) => ({
-    id: `sector-placeholder-${index + 1}`,
-    label: 'Sector',
-    value: '—'
-  }));
+  const incomeBySectorLines: FinancialLine[] = financeSummary?.incomeBySector.length
+    ? financeSummary.incomeBySector.map((item) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount) }))
+    : [{ id: 'income-unavailable', label: 'Ingresos', value: unavailableLabel }];
+  const expenseBySectorLines: FinancialLine[] = financeSummary?.expenseBySector.length
+    ? financeSummary.expenseBySector.map((item) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount) }))
+    : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
 
   return (
     <main className="module-content">
@@ -388,7 +406,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <p>Indicadores económicos futuros</p>
             </div>
             {renderFinanceLines(financialSummaryLines)}
-            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+            {financeError && <small className="integration-note">{financeError}</small>}
           </article>
 
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
@@ -397,7 +415,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <p>Base preparada para ADMINISTRACIÓN</p>
             </div>
             {renderFinanceLines(operationalBalanceLines)}
-            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+            {financeError && <small className="integration-note">Pendiente de integración</small>}
           </article>
 
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
@@ -405,9 +423,9 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <h4>📥 Ingresos por sector</h4>
               <p>Sector · monto</p>
             </div>
-            {renderFinanceLines(sectorPlaceholderLines)}
-            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
-            <small className="integration-note integration-note--future">Preparado para listar + sectores.</small>
+            {renderFinanceLines(incomeBySectorLines)}
+            {financeSummary && financeSummary.remainingIncomeSectors > 0 && <small className="integration-note integration-note--future">+ {financeSummary.remainingIncomeSectors} sectores</small>}
+            {financeError && <small className="integration-note">No disponible</small>}
           </article>
 
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
@@ -415,9 +433,9 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <h4>📤 Egresos por sector</h4>
               <p>Sector · monto</p>
             </div>
-            {renderFinanceLines(sectorPlaceholderLines)}
-            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
-            <small className="integration-note integration-note--future">Preparado para listar + sectores.</small>
+            {renderFinanceLines(expenseBySectorLines)}
+            {financeSummary && financeSummary.remainingExpenseSectors > 0 && <small className="integration-note integration-note--future">+ {financeSummary.remainingExpenseSectors} sectores</small>}
+            {financeError && <small className="integration-note">No disponible</small>}
           </article>
         </div>
       </section>

@@ -44,7 +44,7 @@ import type { ContactedRecentResponse, Member, MessageTemplate, OperationalStatu
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
-import { getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
+import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -254,6 +254,37 @@ app.get("/summary", async (_req, res) => {
     });
   } catch {
     jsonError(res, 500, "No se pudo obtener el resumen.");
+  }
+});
+
+
+app.get("/admin-movements", async (_req, res) => {
+  try {
+    res.json(await getAdminMovementsFromGoogleSheets());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudieron leer los movimientos de ADMINISTRACIÓN.";
+    jsonError(res, 500, message);
+  }
+});
+
+app.get("/club-finance-summary", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    const debtors = members.filter(isDebtorMember);
+    const cuotasAdeudadas = debtors.reduce((sum, debtor) => sum + normalizeFeeToArs(debtor.cuota), 0);
+    res.json(await getClubOperationsSummaryFromGoogleSheets(cuotasAdeudadas));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo obtener el resumen financiero del club.";
+    jsonError(res, 500, message);
+  }
+});
+
+app.get("/club-finance-debug", async (_req, res) => {
+  try {
+    res.json(await getClubFinanceDebugFromGoogleSheets());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
+    jsonError(res, 500, message);
   }
 });
 

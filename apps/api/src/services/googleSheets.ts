@@ -1,10 +1,12 @@
 import { google } from "googleapis";
-import type { DebtorStatus, Member, OperationalStatusKey } from "@miclub/shared";
+import type { AdminMovement, ClubOperationsSummary, DebtorStatus, Member, OperationalStatusKey, SectorBalance } from "@miclub/shared";
 
 export const SHEET_NAMES = ["FITNESS", "SALON", "AULA"] as const;
+export const SECTOR_BALANCE_SHEET_NAMES = ["FITNESS", "SALON", "AULA", "LOCAL 1", "CANTINA"] as const;
 
 type OperationalSheetName = (typeof SHEET_NAMES)[number];
 type SourceType = "mock" | "google_sheets";
+type SectorBalanceSheetName = (typeof SECTOR_BALANCE_SHEET_NAMES)[number];
 
 type MovementColumnKey = "fecha" | "tipo" | "categoria" | "contraparte" | "monto" | "estadoFinan" | "estado" | "concepto";
 
@@ -38,6 +40,17 @@ export interface SyncStatus {
   error?: string;
 }
 
+export interface ClubFinanceDebugInfo {
+  totalMovementsRead: number;
+  validMovements: number;
+  byTipo: Record<string, number>;
+  byEstado: Record<string, number>;
+  bySector: Record<string, number>;
+  byCategoria: Record<string, number>;
+  rawLiquidityCells: unknown[][];
+  sectorBalanceCells: Record<string, unknown>;
+}
+
 const MOVEMENT_HEADER_RANGES: Record<OperationalSheetName, string> = {
   FITNESS: "FITNESS!B19:AB19",
   SALON: "SALON!B33:AB33",
@@ -46,17 +59,19 @@ const MOVEMENT_HEADER_RANGES: Record<OperationalSheetName, string> = {
 
 const toBool = (value: string | undefined): boolean => value?.toLowerCase() === "true";
 
-const normalizeText = (value: unknown): string =>
+export const normalizeSheetText = (value: unknown): string =>
   String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 
-const normalizeHeader = (value: unknown): string => normalizeText(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+const normalizeText = normalizeSheetText;
+
+const normalizeHeader = (value: unknown): string => normalizeSheetText(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export const normalizeDni = (value: unknown): string => String(value ?? "").replace(/\D/g, "");
 
-const normalizeComparableText = (value: unknown): string => normalizeText(value).toLowerCase().replace(/\s+/g, " ");
+const normalizeComparableText = (value: unknown): string => normalizeSheetText(value).toLowerCase().replace(/\s+/g, " ");
 
 export const normalizeOperationalStatus = (value: unknown): OperationalStatusKey => {
   const normalized = normalizeComparableText(value)
@@ -90,20 +105,37 @@ export const toMemberStatus = (value: unknown): DebtorStatus => {
   }
 };
 
-const normalizeFee = (value: unknown): number | undefined => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return undefined;
-  const cleaned = raw.replace(/[^\d,.-]/g, "");
-  if (!cleaned) return undefined;
+export const normalizeMoney = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
 
-  const withoutThousandsSeparators = cleaned.includes(",")
-    ? cleaned.replace(/\./g, "").replace(",", ".")
-    : cleaned.replace(/\.(?=\d{3}(?:\D|$))/g, "");
-  const parsed = Number(withoutThousandsSeparators.replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : undefined;
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+
+  let cleaned = raw.replace(/[^\d,.-]/g, "");
+  if (!cleaned || cleaned === "-" || cleaned === "," || cleaned === ".") return 0;
+
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimalSeparator = lastComma > lastDot ? "," : ".";
+    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
+    cleaned = cleaned.split(thousandsSeparator).join("").replace(decimalSeparator, ".");
+  } else if (lastComma >= 0) {
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else {
+    cleaned = cleaned.replace(/\.(?=\d{3}(?:\D|$))/g, "");
+  }
+
+  const parsed = Number(cleaned.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const parseGoogleSheetDate = (value: unknown): string | undefined => {
+const normalizeFee = (value: unknown): number | undefined => {
+  const normalized = normalizeMoney(value);
+  return normalized === 0 && String(value ?? "").trim() === "" ? undefined : normalized;
+};
+
+export const normalizeDate = (value: unknown): string | undefined => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
 
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -134,6 +166,8 @@ export const parseGoogleSheetDate = (value: unknown): string | undefined => {
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 };
+
+export const parseGoogleSheetDate = normalizeDate;
 
 const valueAt = (row: unknown[], relativeIdx: number): string => String(row[relativeIdx] ?? "").trim();
 
@@ -293,6 +327,15 @@ export const getGoogleSheetsConfig = () => {
     sheetRanges,
     movementRanges,
     movementHeaderRanges: MOVEMENT_HEADER_RANGES,
+    adminMovementsRange: process.env.GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE?.trim() || "ADMINISTRACIÓN!B12:AB3000",
+    adminBalancesRange: process.env.GOOGLE_SHEETS_ADMIN_BALANCES_RANGE?.trim() || "ADMINISTRACIÓN!AD12:AG14",
+    sectorBalanceRanges: {
+      FITNESS: "FITNESS!X3",
+      SALON: "SALON!X3",
+      AULA: "AULA!X3",
+      "LOCAL 1": "'LOCAL 1'!X3",
+      CANTINA: "CANTINA!X3"
+    } satisfies Record<SectorBalanceSheetName, string>,
     credentialsPresent: Boolean(sheetId && serviceAccountEmail && privateKey)
   };
 };
@@ -421,4 +464,226 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
 
   const { lastPaymentByDni } = await readLastPaymentsFromGoogleSheets(config);
   return enrichMembersWithLastPayments(members, lastPaymentByDni);
+};
+
+const ADMIN_MOVEMENT_INDEXES = {
+  id: 0,
+  fecha: 1,
+  tipo: 3,
+  categoria: 6,
+  concepto: 9,
+  contraparte: 14,
+  sector: 17,
+  monto: 19,
+  impuestos: 22,
+  estado: 24,
+  medioPago: 26
+} as const;
+
+const normalizedEquals = (value: unknown, expected: string): boolean => normalizeComparableText(value) === normalizeComparableText(expected);
+
+export const isCompleted = (value: unknown): boolean => normalizedEquals(value, "COMPLETADO");
+export const isPending = (value: unknown): boolean => normalizedEquals(value, "PENDIENTE");
+export const isIncome = (value: unknown): boolean => normalizedEquals(value, "INGRESOS") || normalizeComparableText(value).startsWith("ingreso");
+export const isExpense = (value: unknown): boolean => normalizedEquals(value, "EGRESOS") || normalizeComparableText(value).startsWith("egreso");
+
+const adminValueAt = (row: unknown[], index: number): string => String(row[index] ?? "").trim();
+
+const isEmptyRow = (row: unknown[]): boolean => row.every((cell) => String(cell ?? "").trim() === "");
+
+const parseAdminMovementRow = (row: unknown[], rowNumber: number): AdminMovement | null => {
+  if (isEmptyRow(row)) return null;
+
+  const id = adminValueAt(row, ADMIN_MOVEMENT_INDEXES.id) || `ADMINISTRACION-${rowNumber}`;
+  const tipo = adminValueAt(row, ADMIN_MOVEMENT_INDEXES.tipo);
+  const categoria = adminValueAt(row, ADMIN_MOVEMENT_INDEXES.categoria);
+  const concepto = adminValueAt(row, ADMIN_MOVEMENT_INDEXES.concepto);
+  const sector = adminValueAt(row, ADMIN_MOVEMENT_INDEXES.sector) || "Sin sector";
+  const estado = adminValueAt(row, ADMIN_MOVEMENT_INDEXES.estado);
+  const monto = normalizeMoney(row[ADMIN_MOVEMENT_INDEXES.monto]);
+  const impuestos = normalizeMoney(row[ADMIN_MOVEMENT_INDEXES.impuestos]);
+
+  if (!tipo && !categoria && !concepto && monto === 0 && !estado) return null;
+
+  return {
+    id,
+    fecha: normalizeDate(row[ADMIN_MOVEMENT_INDEXES.fecha]) ?? (adminValueAt(row, ADMIN_MOVEMENT_INDEXES.fecha) || undefined),
+    tipo,
+    categoria: categoria || "Sin categoría",
+    concepto,
+    contraparte: adminValueAt(row, ADMIN_MOVEMENT_INDEXES.contraparte) || undefined,
+    sector,
+    monto,
+    impuestos: impuestos || undefined,
+    estado,
+    medioPago: adminValueAt(row, ADMIN_MOVEMENT_INDEXES.medioPago) || undefined
+  };
+};
+
+const parseAdminMovementsFromValues = (values: unknown[][]): AdminMovement[] => {
+  const rows = values.slice(1);
+  return rows
+    .map((row, index) => parseAdminMovementRow(row, index + 13))
+    .filter((movement): movement is AdminMovement => movement !== null);
+};
+
+const buildBreakdown = <T extends { name: string; amount: number }>(movements: AdminMovement[], key: "sector" | "categoria", predicate: (movement: AdminMovement) => boolean): T[] => {
+  const totals = new Map<string, number>();
+
+  for (const movement of movements) {
+    if (!predicate(movement)) continue;
+    const name = (key === "sector" ? movement.sector : movement.categoria).trim() || "Sin datos";
+    totals.set(name, (totals.get(name) ?? 0) + movement.monto);
+  }
+
+  return Array.from(totals.entries())
+    .map(([name, amount]) => ({ name, amount }) as T)
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, "es"));
+};
+
+const countBy = (movements: AdminMovement[], getter: (movement: AdminMovement) => string): Record<string, number> =>
+  movements.reduce<Record<string, number>>((acc, movement) => {
+    const key = getter(movement).trim() || "(vacío)";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+const buildEmptyClubOperationsSummary = (cuotasAdeudadas = 0): ClubOperationsSummary => ({
+  liquidity: 0,
+  cash: 0,
+  bank: 0,
+  dollars: 0,
+  pendingIncome: 0,
+  pendingExpenses: 0,
+  pendingNetBalance: 0,
+  cuotasAdeudadas,
+  saldosAPagar: 0,
+  projectedBalance: cuotasAdeudadas,
+  sectorBalances: [],
+  incomeBySector: [],
+  expenseBySector: [],
+  incomeByCategory: [],
+  expenseByCategory: [],
+  totalIncomeSectors: 0,
+  remainingIncomeSectors: 0,
+  totalExpenseSectors: 0,
+  remainingExpenseSectors: 0,
+  totalIncomeCategories: 0,
+  remainingIncomeCategories: 0,
+  totalExpenseCategories: 0,
+  remainingExpenseCategories: 0
+});
+
+const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unknown[][], sectorBalances: SectorBalance[], cuotasAdeudadas = 0): ClubOperationsSummary => {
+  const liquidity = normalizeMoney(balanceRows[0]?.[0]);
+  const cash = normalizeMoney(balanceRows[0]?.[3]);
+  const bank = normalizeMoney(balanceRows[1]?.[3]);
+  const dollars = normalizeMoney(balanceRows[2]?.[3]);
+  const pendingMovements = movements.filter((movement) => isPending(movement.estado));
+  const pendingIncome = pendingMovements
+    .filter((movement) => isIncome(movement.tipo))
+    .reduce((sum, movement) => sum + movement.monto, 0);
+  const pendingExpenses = pendingMovements
+    .filter((movement) => isExpense(movement.tipo))
+    .reduce((sum, movement) => sum + movement.monto, 0);
+  const pendingNetBalance = pendingIncome - pendingExpenses;
+  const saldosAPagar = sectorBalances.reduce((sum, balance) => sum + balance.amount, 0);
+  const completedIncome = (movement: AdminMovement) => isIncome(movement.tipo) && isCompleted(movement.estado);
+  const completedExpense = (movement: AdminMovement) => isExpense(movement.tipo) && isCompleted(movement.estado);
+  const allIncomeBySector = buildBreakdown(movements, "sector", completedIncome);
+  const allExpenseBySector = buildBreakdown(movements, "sector", completedExpense);
+  const allIncomeByCategory = buildBreakdown(movements, "categoria", completedIncome);
+  const allExpenseByCategory = buildBreakdown(movements, "categoria", completedExpense);
+
+  return {
+    liquidity,
+    cash,
+    bank,
+    dollars,
+    pendingIncome,
+    pendingExpenses,
+    pendingNetBalance,
+    cuotasAdeudadas,
+    saldosAPagar,
+    projectedBalance: liquidity + cuotasAdeudadas + pendingNetBalance + saldosAPagar,
+    sectorBalances,
+    incomeBySector: allIncomeBySector.slice(0, 4),
+    expenseBySector: allExpenseBySector.slice(0, 4),
+    incomeByCategory: allIncomeByCategory.slice(0, 4),
+    expenseByCategory: allExpenseByCategory.slice(0, 4),
+    totalIncomeSectors: allIncomeBySector.length,
+    remainingIncomeSectors: Math.max(allIncomeBySector.length - 4, 0),
+    totalExpenseSectors: allExpenseBySector.length,
+    remainingExpenseSectors: Math.max(allExpenseBySector.length - 4, 0),
+    totalIncomeCategories: allIncomeByCategory.length,
+    remainingIncomeCategories: Math.max(allIncomeByCategory.length - 4, 0),
+    totalExpenseCategories: allExpenseByCategory.length,
+    remainingExpenseCategories: Math.max(allExpenseByCategory.length - 4, 0)
+  };
+};
+
+const ensureGoogleSheetsEnabled = (config: ReturnType<typeof getGoogleSheetsConfig>) => {
+  if (!config.credentialsPresent) {
+    throw new Error("Faltan credenciales de Google Sheets (GOOGLE_SHEET_ID/GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY).");
+  }
+};
+
+const readClubFinanceRanges = async (config: ReturnType<typeof getGoogleSheetsConfig>) => {
+  const sheetsClient = getSheetsClient(config);
+  const response = await sheetsClient.spreadsheets.values.batchGet({
+    spreadsheetId: config.sheetId,
+    ranges: [config.adminMovementsRange, config.adminBalancesRange, ...SECTOR_BALANCE_SHEET_NAMES.map((sheet) => config.sectorBalanceRanges[sheet])],
+    majorDimension: "ROWS"
+  });
+
+  const valueRanges = response.data.valueRanges ?? [];
+  const movementValues = valueRanges[0]?.values ?? [];
+  const balanceRows = valueRanges[1]?.values ?? [];
+  const sectorBalanceCells: Record<string, unknown> = {};
+  const sectorBalances = SECTOR_BALANCE_SHEET_NAMES.map((sector, index) => {
+    const rawValue = valueRanges[index + 2]?.values?.[0]?.[0] ?? "";
+    sectorBalanceCells[sector] = rawValue;
+    return { sector, amount: normalizeMoney(rawValue) };
+  });
+
+  return { movementValues, balanceRows, sectorBalances, sectorBalanceCells };
+};
+
+export const getAdminMovementsFromGoogleSheets = async (): Promise<AdminMovement[]> => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return [];
+  ensureGoogleSheetsEnabled(config);
+
+  const { movementValues } = await readClubFinanceRanges(config);
+  return parseAdminMovementsFromValues(movementValues);
+};
+
+export const getClubOperationsSummaryFromGoogleSheets = async (cuotasAdeudadas = 0): Promise<ClubOperationsSummary> => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return buildEmptyClubOperationsSummary(cuotasAdeudadas);
+  ensureGoogleSheetsEnabled(config);
+
+  const { movementValues, balanceRows, sectorBalances } = await readClubFinanceRanges(config);
+  return buildClubOperationsSummary(parseAdminMovementsFromValues(movementValues), balanceRows, sectorBalances, cuotasAdeudadas);
+};
+
+export const getClubFinanceDebugFromGoogleSheets = async (): Promise<ClubFinanceDebugInfo> => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) {
+    return { totalMovementsRead: 0, validMovements: 0, byTipo: {}, byEstado: {}, bySector: {}, byCategoria: {}, rawLiquidityCells: [], sectorBalanceCells: {} };
+  }
+  ensureGoogleSheetsEnabled(config);
+
+  const { movementValues, balanceRows, sectorBalanceCells } = await readClubFinanceRanges(config);
+  const movements = parseAdminMovementsFromValues(movementValues);
+  return {
+    totalMovementsRead: Math.max(movementValues.length - 1, 0),
+    validMovements: movements.length,
+    byTipo: countBy(movements, (movement) => movement.tipo),
+    byEstado: countBy(movements, (movement) => movement.estado),
+    bySector: countBy(movements, (movement) => movement.sector),
+    byCategoria: countBy(movements, (movement) => movement.categoria),
+    rawLiquidityCells: balanceRows,
+    sectorBalanceCells
+  };
 };
