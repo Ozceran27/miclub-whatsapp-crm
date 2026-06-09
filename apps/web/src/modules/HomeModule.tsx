@@ -32,6 +32,7 @@ type ActivityBreakdownItem = {
 };
 
 type FinancialPlaceholderLine = {
+  id?: string;
   label: string;
   value: string;
 };
@@ -101,15 +102,29 @@ const formatDateTime = (value?: string) => {
   return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
-const normalizeStatus = (status?: string) => {
-  const normalized = normalizeText(status);
-  const compact = normalized.replace(/[ _-]/g, '');
-  return STATUS_ALIASES[normalized] ? normalized : compact;
+const normalizeStatus = (status?: string) => normalizeText(status)
+  .replace(/[-–—_/]+/g, ' ')
+  .replace(/[^a-z0-9ñ\s]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const getStatusBucketFromRawStatus = (status?: string) => {
+  const normalized = normalizeStatus(status);
+  const compact = normalized.replace(/\s/g, '');
+
+  if (STATUS_ALIASES[normalized]) return STATUS_ALIASES[normalized];
+  if (STATUS_ALIASES[compact]) return STATUS_ALIASES[compact];
+  if (normalized.includes('nuevo') && (normalized.includes('inscripto') || normalized.includes('inscrito'))) return 'newEnrollment';
+  if (normalized.includes('abandon')) return 'abandoned';
+  if (normalized.includes('adeud') || normalized.includes('deud')) return 'debtor';
+  if (normalized.includes('al dia') || compact.includes('aldia')) return 'current';
+
+  return undefined;
 };
 
 const getMemberStatus = (member: Member) => normalizeStatus(String(member.estado ?? ''));
 
-const getStatusBucket = (member: Member) => STATUS_ALIASES[getMemberStatus(member)];
+const getStatusBucket = (member: Member) => getStatusBucketFromRawStatus(getMemberStatus(member));
 
 const isActiveMember = (member: Member) => {
   const bucket = getStatusBucket(member);
@@ -175,7 +190,7 @@ const renderActivityBreakdown = (items: ActivityBreakdownItem[], maxCount: numbe
 const renderFinanceLines = (lines: FinancialPlaceholderLine[]) => (
   <div className="finance-lines finance-lines--compact">
     {lines.map((line) => (
-      <span key={line.label}><strong>{line.label}</strong>{line.value}</span>
+      <span key={line.id ?? line.label}><strong>{line.label}</strong>{line.value}</span>
     ))}
   </div>
 );
@@ -250,7 +265,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const maxDebtorActivityCount = mainDebtorBreakdown[0]?.count ?? 0;
 
   const activeActivityBreakdown = useMemo(() => buildActiveActivityBreakdown(members), [members]);
-  const mainActiveActivityBreakdown = activeActivityBreakdown.slice(0, 5);
+  const mainActiveActivityBreakdown = activeActivityBreakdown.slice(0, 6);
   const remainingActiveActivities = Math.max(activeActivityBreakdown.length - mainActiveActivityBreakdown.length, 0);
   const maxActiveActivityCount = mainActiveActivityBreakdown[0]?.count ?? 0;
 
@@ -268,21 +283,23 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const hasEstimatedDebt = typeof estimatedDebt === 'number' && estimatedDebt > 0;
   const syncBadgeLabel = syncLabel;
   const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
-  const operationalBalanceLines: FinancialPlaceholderLine[] = [
-    { label: 'Saldo adeudado', value: hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—' },
-    { label: 'Movimientos pendientes', value: '—' },
-    { label: 'Saldo total', value: '—' }
-  ];
   const financialSummaryLines: FinancialPlaceholderLine[] = [
-    { label: 'Caja / bancos', value: '—' },
-    { label: 'Saldo proyectado', value: '—' },
-    { label: 'Pendientes', value: '—' }
+    { label: 'Liquidez', value: '—' },
+    { label: 'Caja', value: '—' },
+    { label: 'Banco', value: '—' },
+    { label: 'Dólares', value: '—' }
   ];
-  const administrationCategoryPlaceholderLines: FinancialPlaceholderLine[] = [
-    { label: 'Sector', value: '—' },
-    { label: 'Categoría', value: '—' },
-    { label: 'Monto', value: '—' }
+  const operationalBalanceLines: FinancialPlaceholderLine[] = [
+    { label: 'Cuotas Adeudadas', value: hasEstimatedDebt ? formatArPeso(estimatedDebt) : '—' },
+    { label: 'Saldos Pendientes', value: '—' },
+    { label: 'Saldos a Pagar', value: '—' },
+    { label: 'Saldo proyectado', value: '—' }
   ];
+  const sectorPlaceholderLines: FinancialPlaceholderLine[] = Array.from({ length: 4 }, (_, index) => ({
+    id: `sector-placeholder-${index + 1}`,
+    label: 'Sector',
+    value: '—'
+  }));
 
   return (
     <main className="module-content">
@@ -290,12 +307,17 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         <div className="home-hero__copy">
           <p className="eyebrow">Inicio</p>
           <h2>Panel operativo de miClub</h2>
-          <p>Resumen ejecutivo con indicadores generales, sincronización y datos reales disponibles por sector.</p>
+          <p>Resumen ejecutivo e indicadores generales.</p>
         </div>
         <div className="home-sync-badges" aria-label="Sincronización del inicio">
-          <span className={syncStatus?.error ? 'home-sync-badge home-sync-badge--warning' : 'home-sync-badge'}>{syncBadgeLabel}</span>
+          <span
+            className={syncStatus?.error ? 'home-sync-badge home-sync-badge--warning' : 'home-sync-badge'}
+            title={syncStatus?.error}
+          >
+            {syncBadgeLabel}
+          </span>
           <span className="home-sync-badge home-sync-badge--muted">{lastSyncLabel}</span>
-          {syncStatus?.error && <span className="home-sync-badge home-sync-badge--warning">{syncStatus.error}</span>}
+          <button className="icon-btn home-sync-button" onClick={() => void loadHome()} disabled={loading}>Sincronizar</button>
         </div>
       </section>
 
@@ -347,6 +369,15 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         <div className="home-dashboard-row home-dashboard-row--secondary">
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
             <div className="home-card-heading">
+              <h4>📊 Resumen financiero</h4>
+              <p>Indicadores económicos futuros</p>
+            </div>
+            {renderFinanceLines(financialSummaryLines)}
+            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
               <h4>🏦 Saldos operativos</h4>
               <p>Base preparada para ADMINISTRACIÓN</p>
             </div>
@@ -356,29 +387,22 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
 
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
             <div className="home-card-heading">
-              <h4>📊 Resumen financiero</h4>
-              <p>Indicadores compactos futuros</p>
+              <h4>📥 Ingresos por sector</h4>
+              <p>Sector · monto</p>
             </div>
-            {renderFinanceLines(financialSummaryLines)}
+            {renderFinanceLines(sectorPlaceholderLines)}
             <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+            <small className="integration-note integration-note--future">Preparado para listar + sectores.</small>
           </article>
 
           <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
             <div className="home-card-heading">
-              <h4>📥 Ingresos por sector y categoría</h4>
-              <p>Sector · categoría · monto</p>
+              <h4>📤 Egresos por sector</h4>
+              <p>Sector · monto</p>
             </div>
-            {renderFinanceLines(administrationCategoryPlaceholderLines)}
-            <small className="integration-note">Se integrará desde ADMINISTRACIÓN.</small>
-          </article>
-
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
-              <h4>📤 Egresos por sector y categoría</h4>
-              <p>Sector · categoría · monto</p>
-            </div>
-            {renderFinanceLines(administrationCategoryPlaceholderLines)}
-            <small className="integration-note">Se integrará desde ADMINISTRACIÓN.</small>
+            {renderFinanceLines(sectorPlaceholderLines)}
+            <small className="integration-note">Pendiente de integración con ADMINISTRACIÓN.</small>
+            <small className="integration-note integration-note--future">Preparado para listar + sectores.</small>
           </article>
         </div>
       </section>

@@ -383,6 +383,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .home-kpi-card--finance {
+  min-height: 260px;
   background: linear-gradient(180deg, rgba(18, 30, 51, 0.78), rgba(12, 22, 39, 0.7));
   border-color: rgba(73, 102, 151, 0.58);
 }
@@ -397,10 +398,10 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .home-sync-badges {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  flex: 1 1 280px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-end;
+  flex: 0 1 320px;
   gap: 8px;
   margin-left: auto;
 }
@@ -408,6 +409,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .home-sync-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 30px;
   border: 1px solid rgba(118, 240, 195, 0.34);
   border-radius: 999px;
@@ -416,7 +418,15 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   background: rgba(31, 122, 97, 0.18);
   font-size: 12px;
   font-weight: 800;
+  text-align: right;
   white-space: nowrap;
+}
+
+.home-sync-button {
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
 }
 
 .home-sync-badge--muted {
@@ -614,7 +624,13 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .finance-lines--compact span {
+  min-height: 36px;
   padding: 7px 9px;
+}
+
+.integration-note--future {
+  margin-top: -4px;
+  color: #6f86aa;
 }
 
 .area-grid {
@@ -685,8 +701,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   .home-dashboard-row--primary,
   .home-dashboard-row--secondary,
   .status-breakdown-grid { grid-template-columns: 1fr; }
-  .home-sync-badges { justify-content: flex-start; }
-  .home-sync-badge { white-space: normal; }
+  .home-sync-badges { align-items: flex-start; justify-content: flex-start; margin-left: 0; }
+  .home-sync-badge { text-align: left; white-space: normal; }
   .prepared-grid { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr; }
 }
