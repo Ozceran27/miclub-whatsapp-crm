@@ -413,6 +413,46 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       {loading && <p className="section-note">Cargando métricas del club...</p>}
 
       <section className="home-dashboard-stack" aria-label="Resumen operativo del club">
+        <div className="home-dashboard-row home-dashboard-row--secondary">
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>📊 Resumen financiero</h4>
+              <p>Indicadores económicos futuros</p>
+            </div>
+            {renderFinanceLines(financialSummaryLines)}
+            {financeError && <small className="integration-note">{financeError}</small>}
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>🏦 Saldos operativos</h4>
+              <p>Base preparada para ADMINISTRACIÓN</p>
+            </div>
+            {renderFinanceLines(operationalBalanceLines)}
+            {financeError && <small className="integration-note">Pendiente de integración</small>}
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>📥 Ingresos por sector</h4>
+              <p>Sector · monto</p>
+            </div>
+            {renderFinanceLines(incomeBySectorLines)}
+            {financeSummary && financeSummary.remainingIncomeSectors > 0 && <small className="integration-note integration-note--future">+ {financeSummary.remainingIncomeSectors} sectores</small>}
+            {financeError && <small className="integration-note">No disponible</small>}
+          </article>
+
+          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
+            <div className="home-card-heading">
+              <h4>📤 Egresos por sector</h4>
+              <p>Sector · monto</p>
+            </div>
+            {renderFinanceLines(expenseBySectorLines)}
+            {financeSummary && financeSummary.remainingExpenseSectors > 0 && <small className="integration-note integration-note--future">+ {financeSummary.remainingExpenseSectors} sectores</small>}
+            {financeError && <small className="integration-note">No disponible</small>}
+          </article>
+        </div>
+
         <div className="home-dashboard-row home-dashboard-row--primary">
           <article className="card home-kpi-card home-kpi-card--enrollment">
             <div className="home-card-heading">
@@ -452,46 +492,6 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               {renderActivityBreakdown(mainActiveActivityBreakdown, maxActiveActivityCount, 'Sin actividades activas registradas', 'featured')}
               {remainingActiveActivities > 0 && <small>+ {remainingActiveActivities} actividades</small>}
             </div>
-          </article>
-        </div>
-
-        <div className="home-dashboard-row home-dashboard-row--secondary">
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
-              <h4>📊 Resumen financiero</h4>
-              <p>Indicadores económicos futuros</p>
-            </div>
-            {renderFinanceLines(financialSummaryLines)}
-            {financeError && <small className="integration-note">{financeError}</small>}
-          </article>
-
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
-              <h4>🏦 Saldos operativos</h4>
-              <p>Base preparada para ADMINISTRACIÓN</p>
-            </div>
-            {renderFinanceLines(operationalBalanceLines)}
-            {financeError && <small className="integration-note">Pendiente de integración</small>}
-          </article>
-
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
-              <h4>📥 Ingresos por sector</h4>
-              <p>Sector · monto</p>
-            </div>
-            {renderFinanceLines(incomeBySectorLines)}
-            {financeSummary && financeSummary.remainingIncomeSectors > 0 && <small className="integration-note integration-note--future">+ {financeSummary.remainingIncomeSectors} sectores</small>}
-            {financeError && <small className="integration-note">No disponible</small>}
-          </article>
-
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
-              <h4>📤 Egresos por sector</h4>
-              <p>Sector · monto</p>
-            </div>
-            {renderFinanceLines(expenseBySectorLines)}
-            {financeSummary && financeSummary.remainingExpenseSectors > 0 && <small className="integration-note integration-note--future">+ {financeSummary.remainingExpenseSectors} sectores</small>}
-            {financeError && <small className="integration-note">No disponible</small>}
           </article>
         </div>
       </section>
