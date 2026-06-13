@@ -130,18 +130,21 @@ export interface SectorOperationalSummary {
     totalProfitability: number;
     currentMonthProfitability: number;
     averageCommission: number | null;
+    mostPopularActivity: SectorActivityStat | null;
   };
   local1: {
     totalRelevantIncomeMovements: number;
     last30DaysRelevantIncomeMovements: number;
     totalProfitability: number;
     currentMonthProfitability: number;
+    settlementBalance: number;
     highlightedIncome: HighlightedIncome | null;
   };
   cantina: {
     kioskIncome: number;
     drinksIncome: number;
     cmv: number;
+    totalProfitability: number;
   };
   crm: {
     totalMembers: number;

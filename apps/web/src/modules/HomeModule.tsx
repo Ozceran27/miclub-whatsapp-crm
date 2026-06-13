@@ -65,6 +65,10 @@ type SectorCardConfig = {
   featuredMetric?: SectorFeaturedMetric;
 };
 
+const MONTH_NAMES_ES_UPPER = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'] as const;
+
+const getCurrentSpanishMonthUpper = () => MONTH_NAMES_ES_UPPER[new Date().getMonth()];
+
 type StatusBreakdown = {
   total: number;
   active: number;
@@ -405,7 +409,8 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleDateString('es-AR');
   };
-  const formatActivityHighlight = (name?: string, count?: number) => name ? `${name} · ${formatOptionalNumber(count)}` : '—';
+  const formatActivityHighlight = (name?: string, count?: number, featured = false) => name ? `${featured ? '⭐ ' : ''}${name} · ${formatOptionalNumber(count)}` : '—';
+  const currentMonthProfitabilityLabel = `RENTABILIDAD ${getCurrentSpanishMonthUpper()}`;
   const highlightedLocalIncome = sectorSummary?.local1.highlightedIncome;
   const sectorCards: SectorCardConfig[] = [
     {
@@ -415,14 +420,14 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Membresías y liquidación',
       icon: '🏋️',
       accent: 'fitness',
-      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.fitness.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.fitness.totalProfitability) },
       secondaryMetrics: [
-        { label: 'Total', value: formatOptionalNumber(sectorSummary?.fitness.totalMembers) },
-        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.fitness.activeMembers) },
-        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.fitness.currentMonthProfitability) },
-        { label: 'Adeudados', value: formatOptionalNumber(sectorSummary?.fitness.totalDebtors) },
-        { label: 'Deuda', value: formatOptionalMoney(sectorSummary?.fitness.totalDebtAmount) },
-        { label: 'Saldo liq.', value: formatOptionalMoney(sectorSummary?.fitness.settlementBalance) }
+        { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.fitness.totalMembers) },
+        { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.fitness.activeMembers) },
+        { label: 'ADEUDADOS', value: formatOptionalNumber(sectorSummary?.fitness.totalDebtors) },
+        { label: 'MONTO ADEUDADOS', value: formatOptionalMoney(sectorSummary?.fitness.totalDebtAmount) },
+        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.fitness.currentMonthProfitability) },
+        { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sectorSummary?.fitness.settlementBalance) }
       ]
     },
     {
@@ -432,14 +437,14 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Actividades EC',
       icon: '🎭',
       accent: 'salon',
-      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.salon.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.salon.totalProfitability) },
       secondaryMetrics: [
-        { label: 'Total', value: formatOptionalNumber(sectorSummary?.salon.totalMembers) },
-        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.salon.activeMembers) },
-        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability) },
-        { label: 'Más popular', value: formatActivityHighlight(sectorSummary?.salon.mostPopularActivity?.name, sectorSummary?.salon.mostPopularActivity?.members) }
+        { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.salon.totalMembers) },
+        { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.salon.activeMembers) },
+        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability) },
+        { label: 'MENOS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members) }
       ],
-      featuredMetric: { label: 'Menos popular', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members) }
+      featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.mostPopularActivity?.name, sectorSummary?.salon.mostPopularActivity?.members, true) }
     },
     {
       key: 'aula',
@@ -448,13 +453,14 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Talleres y comisiones',
       icon: '🎓',
       accent: 'aula',
-      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.aula.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.aula.totalProfitability) },
       secondaryMetrics: [
-        { label: 'Total', value: formatOptionalNumber(sectorSummary?.aula.totalMembers) },
-        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.aula.activeMembers) },
-        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.aula.currentMonthProfitability) },
+        { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.aula.totalMembers) },
+        { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.aula.activeMembers) },
+        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.aula.currentMonthProfitability) },
         { label: 'Comisión prom.', value: formatOptionalPercent(sectorSummary?.aula.averageCommission) }
-      ]
+      ],
+      featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.aula.mostPopularActivity?.name, sectorSummary?.aula.mostPopularActivity?.members, true) }
     },
     {
       key: 'local1',
@@ -463,11 +469,12 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Ingresos relevantes',
       icon: '🏪',
       accent: 'local1',
-      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.local1.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.local1.totalProfitability) },
       secondaryMetrics: [
-        { label: 'Mov. hist.', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) },
+        { label: 'TOTAL VENTAS', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) },
         { label: 'Últ. 30 días', value: formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements) },
-        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability) }
+        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability) },
+        { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sectorSummary?.local1.settlementBalance) }
       ],
       featuredMetric: highlightedLocalIncome
         ? { label: 'Ingreso destacado', value: formatOptionalMoney(highlightedLocalIncome.amount), detail: `${highlightedLocalIncome.concept} · ${formatArDate(highlightedLocalIncome.date)}` }
@@ -480,9 +487,10 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Ventas y CMV',
       icon: '☕',
       accent: 'cantina',
-      mainMetric: { label: 'Kiosco', value: formatOptionalMoney(sectorSummary?.cantina.kioskIncome) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.cantina.totalProfitability) },
       secondaryMetrics: [
-        { label: 'Bebidas', value: formatOptionalMoney(sectorSummary?.cantina.drinksIncome) },
+        { label: 'KIOSCO', value: formatOptionalMoney(sectorSummary?.cantina.kioskIncome) },
+        { label: 'BEBIDAS', value: formatOptionalMoney(sectorSummary?.cantina.drinksIncome) },
         { label: 'CMV', value: formatOptionalMoney(sectorSummary?.cantina.cmv) }
       ]
     },
