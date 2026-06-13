@@ -376,7 +376,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const formatPayableObligation = (value: number | undefined) => financeSummary ? `-${formatArPeso(Math.abs(value ?? 0))}` : unavailableLabel;
   const formatUsd = (value: number | undefined) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
   const financialSummaryLines: FinancialLine[] = [
-    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'primarySoft', iconBefore: '💰' },
+    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'green', iconBefore: '💰' },
     { label: 'Caja', value: formatFinanceMoney(financeSummary?.cash) },
     { label: 'Banco', value: formatFinanceMoney(financeSummary?.bank) },
     { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
@@ -385,13 +385,13 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
     { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
     { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar) },
-    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'primarySoft', iconBefore: '📈' }
+    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'green', iconBefore: '📈' }
   ];
   const incomeBySectorLines: FinancialLine[] = financeSummary?.incomeBySector.length
     ? financeSummary.incomeBySector.map((item, index) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'green' : undefined, iconAfter: index === 0 ? '⭐' : undefined }))
     : [{ id: 'income-unavailable', label: 'Ingresos', value: unavailableLabel }];
   const expenseBySectorLines: FinancialLine[] = financeSummary?.expenseBySector.length
-    ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'red' : undefined, iconAfter: index === 0 ? '📌' : undefined }))
+    ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'red' : undefined, iconAfter: index === 0 ? '🔻' : undefined }))
     : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
 
   const formatOptionalNumber = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('es-AR') : '—';
@@ -528,7 +528,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
           <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--summary">
             <div className="home-card-heading finance-card__header">
               <h4>📊 Resumen financiero</h4>
-              <p>Indicadores económicos futuros</p>
+              <p>Indicadores económicos actuales</p>
             </div>
             {renderFinanceLines(financialSummaryLines)}
             {financeError && <small className="integration-note">{financeError}</small>}
@@ -537,7 +537,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
           <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--balance">
             <div className="home-card-heading finance-card__header">
               <h4>🏦 Saldos operativos</h4>
-              <p>Base preparada para ADMINISTRACIÓN</p>
+              <p>Saldos y proyección operativa</p>
             </div>
             {renderFinanceLines(operationalBalanceLines)}
             {financeError && <small className="integration-note">Pendiente de integración</small>}
