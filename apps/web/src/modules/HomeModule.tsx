@@ -37,7 +37,7 @@ type FinancialLine = {
   id?: string;
   label: string;
   value: string;
-  highlight?: 'default' | 'green' | 'red' | 'primarySoft' | 'featured' | 'featuredGreen' | 'featuredRed';
+  highlight?: 'default' | 'green' | 'red' | 'primarySoft';
   iconBefore?: string;
   iconAfter?: string;
 };
@@ -243,9 +243,6 @@ const renderActivityBreakdown = (
 );
 
 const getMetricRowClassName = (highlight?: FinancialLine['highlight']) => {
-  if (highlight === 'featuredGreen') return 'finance-metric-row finance-metric-row--featured finance-metric-row--featured-green';
-  if (highlight === 'featuredRed') return 'finance-metric-row finance-metric-row--featured finance-metric-row--featured-red';
-  if (highlight === 'featured') return 'finance-metric-row finance-metric-row--featured';
   if (highlight === 'green') return 'finance-metric-row finance-metric-row--highlight-green';
   if (highlight === 'red') return 'finance-metric-row finance-metric-row--highlight-red';
   if (highlight === 'primarySoft') return 'finance-metric-row finance-metric-row--highlight-soft';
@@ -379,7 +376,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const formatPayableObligation = (value: number | undefined) => financeSummary ? `-${formatArPeso(Math.abs(value ?? 0))}` : unavailableLabel;
   const formatUsd = (value: number | undefined) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
   const financialSummaryLines: FinancialLine[] = [
-    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'featuredGreen', iconBefore: '💰' },
+    { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'green', iconBefore: '💰' },
     { label: 'Caja', value: formatFinanceMoney(financeSummary?.cash) },
     { label: 'Banco', value: formatFinanceMoney(financeSummary?.bank) },
     { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
@@ -388,13 +385,13 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
     { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
     { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar) },
-    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'featuredGreen', iconBefore: '📈' }
+    { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'green', iconBefore: '📈' }
   ];
   const incomeBySectorLines: FinancialLine[] = financeSummary?.incomeBySector.length
-    ? financeSummary.incomeBySector.map((item, index) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'featuredGreen' : undefined, iconAfter: index === 0 ? '⭐' : undefined }))
+    ? financeSummary.incomeBySector.map((item, index) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'green' : undefined, iconAfter: index === 0 ? '⭐' : undefined }))
     : [{ id: 'income-unavailable', label: 'Ingresos', value: unavailableLabel }];
   const expenseBySectorLines: FinancialLine[] = financeSummary?.expenseBySector.length
-    ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'featuredRed' : undefined, iconAfter: index === 0 ? '🔻' : undefined }))
+    ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'red' : undefined, iconAfter: index === 0 ? '🔻' : undefined }))
     : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
 
   const formatOptionalNumber = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('es-AR') : '—';
