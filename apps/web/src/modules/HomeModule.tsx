@@ -45,6 +45,7 @@ type FinancialLine = {
 type SectorMetric = {
   label: string;
   value: string;
+  className?: string;
 };
 
 type SectorFeaturedMetric = {
@@ -431,6 +432,24 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       ]
     },
     {
+      key: 'local1',
+      title: 'Local 1',
+      moduleId: 'local1',
+      subtitle: 'Ingresos relevantes',
+      icon: '🏪',
+      accent: 'local1',
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.local1.totalProfitability) },
+      secondaryMetrics: [
+        { label: 'TOTAL VENTAS', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) },
+        { label: 'Últ. 30 días', value: formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements) },
+        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability) },
+        { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sectorSummary?.local1.settlementBalance) }
+      ],
+      featuredMetric: highlightedLocalIncome
+        ? { label: 'Ingreso destacado', value: formatOptionalMoney(highlightedLocalIncome.amount), detail: `${highlightedLocalIncome.concept} · ${formatArDate(highlightedLocalIncome.date)}` }
+        : { label: 'Ingreso destacado', value: '—' }
+    },
+    {
       key: 'salon',
       title: 'Salón',
       moduleId: 'salon',
@@ -442,7 +461,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.salon.totalMembers) },
         { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.salon.activeMembers) },
         { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability) },
-        { label: 'MENOS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members) }
+        { label: 'MENOS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members), className: 'area-card__metric--subtle-alert' }
       ],
       featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.mostPopularActivity?.name, sectorSummary?.salon.mostPopularActivity?.members, true) }
     },
@@ -461,24 +480,6 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         { label: 'Comisión prom.', value: formatOptionalPercent(sectorSummary?.aula.averageCommission) }
       ],
       featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.aula.mostPopularActivity?.name, sectorSummary?.aula.mostPopularActivity?.members, true) }
-    },
-    {
-      key: 'local1',
-      title: 'Local 1',
-      moduleId: 'local1',
-      subtitle: 'Ingresos relevantes',
-      icon: '🏪',
-      accent: 'local1',
-      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.local1.totalProfitability) },
-      secondaryMetrics: [
-        { label: 'TOTAL VENTAS', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) },
-        { label: 'Últ. 30 días', value: formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements) },
-        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability) },
-        { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sectorSummary?.local1.settlementBalance) }
-      ],
-      featuredMetric: highlightedLocalIncome
-        ? { label: 'Ingreso destacado', value: formatOptionalMoney(highlightedLocalIncome.amount), detail: `${highlightedLocalIncome.concept} · ${formatArDate(highlightedLocalIncome.date)}` }
-        : { label: 'Ingreso destacado', value: '—' }
     },
     {
       key: 'cantina',
@@ -646,7 +647,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
 
               <dl className="area-card__metrics">
                 {area.secondaryMetrics.map((metric) => (
-                  <div className="area-card__metric" key={metric.label}>
+                  <div className={`area-card__metric${metric.className ? ` ${metric.className}` : ''}`} key={metric.label}>
                     <dt>{metric.label}</dt>
                     <dd>{metric.value}</dd>
                   </div>
