@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ClubOperationsSummary, Member, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
+import type { ClubOperationsSummary, Member, SectorOperationalSummary, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
 import { formatArPeso } from '../utils';
 import type { ModuleId } from './ModuleNav';
 
@@ -73,35 +73,12 @@ const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'a
   inactivos: 'abandoned'
 };
 
-const AREA_CARDS: Array<{ title: string; moduleId: ModuleId; sheetKeys: string[]; description: string }> = [
-  { title: 'Espacio Fitness', moduleId: 'fitness', sheetKeys: ['FITNESS', 'Espacio Fitness'], description: 'Inscriptos, cuotas, pagos y actividades.' },
-  { title: 'Salón', moduleId: 'salon', sheetKeys: ['SALON', 'SALÓN', 'Salon'], description: 'Actividades, inscriptos y eventos futuros.' },
-  { title: 'Aula', moduleId: 'aula', sheetKeys: ['AULA'], description: 'Talleres, cursos e ingresos asociados.' },
-  { title: 'Local 1', moduleId: 'local1', sheetKeys: ['LOCAL_1', 'LOCAL 1', 'Local 1'], description: 'Movimientos, comisiones y saldos.' },
-  { title: 'Cantina', moduleId: 'cantina', sheetKeys: ['CANTINA'], description: 'Ventas, liquidación y movimientos.' },
-  { title: 'CRM', moduleId: 'crm', sheetKeys: ['FITNESS', 'SALON', 'AULA', 'LOCAL_1', 'CANTINA', 'ADMINISTRACION'], description: 'Cobranzas y contacto manual por WhatsApp.' }
-];
-
 const normalizeText = (value?: string) => (value ?? '')
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
   .trim()
   .replace(/\s+/g, ' ')
   .toLowerCase();
-
-const findSheetValue = (source: Record<string, number> | undefined, keys: string[]) => {
-  if (!source) return undefined;
-  for (const key of keys) {
-    if (source[key] !== undefined) return source[key];
-  }
-  const normalizedEntries = Object.entries(source).map(([key, value]) => [normalizeText(key).replace(/[ _-]/g, ''), value] as const);
-  for (const key of keys) {
-    const normalizedKey = normalizeText(key).replace(/[ _-]/g, '');
-    const match = normalizedEntries.find(([entryKey]) => entryKey === normalizedKey);
-    if (match) return match[1];
-  }
-  return undefined;
-};
 
 const formatDateTime = (value?: string) => {
   if (!value) return 'Sin sincronización registrada';
@@ -267,7 +244,9 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const [debtors, setDebtors] = useState<Member[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [financeSummary, setFinanceSummary] = useState<ClubOperationsSummary | null>(null);
+  const [sectorSummary, setSectorSummary] = useState<SectorOperationalSummary | null>(null);
   const [financeError, setFinanceError] = useState<string | null>(null);
+  const [sectorError, setSectorError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -275,6 +254,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     setLoading(true);
     setError(null);
     setFinanceError(null);
+    setSectorError(null);
     try {
       const financePromise = fetch(`${API}/club-finance-summary`)
         .then(async (response) => {
@@ -286,12 +266,23 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
           return null;
         });
 
-      const [summaryRes, membersRes, debtorsRes, syncRes, financePayload] = await Promise.all([
+      const sectorPromise = fetch(`${API}/sector-operational-summary`)
+        .then(async (response) => {
+          if (!response.ok) throw new Error('No se pudo cargar el resumen operativo por sector.');
+          return response.json() as Promise<SectorOperationalSummary>;
+        })
+        .catch((sectorLoadError) => {
+          setSectorError(sectorLoadError instanceof Error ? sectorLoadError.message : 'Resumen operativo por sector no disponible.');
+          return null;
+        });
+
+      const [summaryRes, membersRes, debtorsRes, syncRes, financePayload, sectorPayload] = await Promise.all([
         fetch(`${API}/summary`),
         fetch(`${API}/members`),
         fetch(`${API}/debtors`),
         fetch(`${API}/sync-status`),
-        financePromise
+        financePromise,
+        sectorPromise
       ]);
 
       if (!summaryRes.ok || !membersRes.ok || !debtorsRes.ok || !syncRes.ok) {
@@ -310,6 +301,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       setDebtors(debtorsPayload as Member[]);
       setSyncStatus(syncPayload as SyncStatus);
       setFinanceSummary(financePayload);
+      setSectorSummary(sectorPayload);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido al cargar el inicio.');
     } finally {
@@ -353,16 +345,6 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const weightedAverageFee = useMemo(() => calculateWeightedAverageFee(members), [members]);
   const weightedAverageFeeLabel = weightedAverageFee === undefined ? '—' : formatArPeso(weightedAverageFee);
 
-  const areaCards = useMemo(() => AREA_CARDS.map((area) => ({
-    ...area,
-    membersCount: area.moduleId === 'crm'
-      ? (summary?.totalMembers ?? members.length)
-      : findSheetValue(summary?.totalBySheet, area.sheetKeys),
-    debtorsCount: area.moduleId === 'crm'
-      ? (summary?.totalDebtors ?? debtors.length)
-      : findSheetValue(summary?.debtorsBySheet, area.sheetKeys)
-  })), [summary, members.length, debtors.length]);
-
   const estimatedDebt = financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt;
   const syncBadgeLabel = syncLabel;
   const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
@@ -388,6 +370,71 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const expenseBySectorLines: FinancialLine[] = financeSummary?.expenseBySector.length
     ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'red' : undefined, iconAfter: index === 0 ? '📌' : undefined }))
     : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
+
+  const formatOptionalNumber = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('es-AR') : '—';
+  const formatOptionalMoney = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? formatArPeso(value) : '—';
+  const formatOptionalPercent = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 2 }).format(value > 1 ? value / 100 : value) : '—';
+  const formatArDate = (value?: string) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('es-AR');
+  };
+  const sectorCards = [
+    {
+      key: 'fitness', title: 'Espacio Fitness', moduleId: 'fitness' as ModuleId, subtitle: 'Inscriptos, rentabilidad y liquidación.', metrics: [
+        ['Total inscriptos', formatOptionalNumber(sectorSummary?.fitness.totalMembers)],
+        ['Activos', formatOptionalNumber(sectorSummary?.fitness.activeMembers)],
+        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.fitness.totalProfitability)],
+        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.fitness.currentMonthProfitability)],
+        ['Adeudados', sectorSummary ? `${formatOptionalNumber(sectorSummary.fitness.totalDebtors)} · ${formatOptionalMoney(sectorSummary.fitness.totalDebtAmount)}` : '—'],
+        ['Saldo a liquidar', formatOptionalMoney(sectorSummary?.fitness.settlementBalance)]
+      ]
+    },
+    {
+      key: 'salon', title: 'Salón', moduleId: 'salon' as ModuleId, subtitle: 'Actividades EC e indicadores del sector.', metrics: [
+        ['Total inscriptos', formatOptionalNumber(sectorSummary?.salon.totalMembers)],
+        ['Activos', formatOptionalNumber(sectorSummary?.salon.activeMembers)],
+        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.salon.totalProfitability)],
+        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability)],
+        ['Más popular', sectorSummary?.salon.mostPopularActivity ? `${sectorSummary.salon.mostPopularActivity.name} · ${sectorSummary.salon.mostPopularActivity.members}` : '—'],
+        ['Menos popular', sectorSummary?.salon.leastPopularActivity ? `${sectorSummary.salon.leastPopularActivity.name} · ${sectorSummary.salon.leastPopularActivity.members}` : '—']
+      ]
+    },
+    {
+      key: 'aula', title: 'Aula', moduleId: 'aula' as ModuleId, subtitle: 'Talleres, rentabilidad y comisiones.', metrics: [
+        ['Total inscriptos', formatOptionalNumber(sectorSummary?.aula.totalMembers)],
+        ['Activos', formatOptionalNumber(sectorSummary?.aula.activeMembers)],
+        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.aula.totalProfitability)],
+        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.aula.currentMonthProfitability)],
+        ['Comisión promedio', formatOptionalPercent(sectorSummary?.aula.averageCommission)]
+      ]
+    },
+    {
+      key: 'local1', title: 'Local 1', moduleId: 'local1' as ModuleId, subtitle: 'Ingresos relevantes y rentabilidad.', metrics: [
+        ['Mov. ingreso históricos', formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements)],
+        ['Mov. ingreso últimos 30 días', formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements)],
+        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.local1.totalProfitability)],
+        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability)],
+        ['Ingreso destacado', sectorSummary?.local1.highlightedIncome ? `${formatOptionalMoney(sectorSummary.local1.highlightedIncome.amount)} · ${sectorSummary.local1.highlightedIncome.concept} · ${formatArDate(sectorSummary.local1.highlightedIncome.date)}` : '—']
+      ]
+    },
+    {
+      key: 'cantina', title: 'Cantina', moduleId: 'cantina' as ModuleId, subtitle: 'Ventas y costo de mercadería.', metrics: [
+        ['Ingresos por Kiosco', formatOptionalMoney(sectorSummary?.cantina.kioskIncome)],
+        ['Ingresos por Bebidas', formatOptionalMoney(sectorSummary?.cantina.drinksIncome)],
+        ['CMV', formatOptionalMoney(sectorSummary?.cantina.cmv)]
+      ]
+    },
+    {
+      key: 'crm', title: 'CRM', moduleId: 'crm' as ModuleId, subtitle: 'Base general de inscriptos y cobranzas.', metrics: [
+        ['Inscriptos totales', formatOptionalNumber(sectorSummary?.crm.totalMembers)],
+        ['Inscriptos activos', formatOptionalNumber(sectorSummary?.crm.activeMembers)],
+        ['Adeudados', formatOptionalNumber(sectorSummary?.crm.totalDebtors)],
+        ['Monto adeudado', formatOptionalMoney(sectorSummary?.crm.totalDebtAmount)]
+      ]
+    }
+  ];
 
   return (
     <main className="module-content">
@@ -500,31 +547,29 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         <div className="section-header">
           <div>
             <h3>Distribución operativa por sector</h3>
-            <p>Inscriptos y deudores detectados desde las hojas disponibles.</p>
+            <p>Resumen operativo real por sector con datos de gestión general.</p>
           </div>
           <button className="icon-btn ghost-btn" onClick={() => void loadHome()}>Actualizar inicio</button>
         </div>
+        {sectorError && <small className="integration-note">{sectorError}</small>}
         <div className="area-grid">
-          {areaCards.map((area) => {
-            const hasData = area.membersCount !== undefined || area.debtorsCount !== undefined;
-            return (
-              <article key={area.moduleId} className="area-card">
-                <div>
-                  <h4>{area.title}</h4>
-                  <p>{area.description}</p>
-                </div>
-                {hasData ? (
-                  <div className="area-card__metrics">
-                    <span><strong>{area.membersCount ?? 0}</strong> inscriptos</span>
-                    <span><strong>{area.debtorsCount ?? 0}</strong> deudores</span>
+          {sectorCards.map((area) => (
+            <article key={area.key} className="area-card">
+              <div className="area-card__heading">
+                <h4>{area.title}</h4>
+                <p>{area.subtitle}</p>
+              </div>
+              <dl className="area-card__metrics">
+                {area.metrics.map(([label, value]) => (
+                  <div className="area-card__metric" key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
                   </div>
-                ) : (
-                  <p className="muted">Sin datos disponibles todavía</p>
-                )}
-                <button className="icon-btn ghost-btn" onClick={() => onOpenModule(area.moduleId)}>Ver módulo</button>
-              </article>
-            );
-          })}
+                ))}
+              </dl>
+              <button className="icon-btn ghost-btn" onClick={() => onOpenModule(area.moduleId)}>Ver módulo</button>
+            </article>
+          ))}
         </div>
       </section>
     </main>

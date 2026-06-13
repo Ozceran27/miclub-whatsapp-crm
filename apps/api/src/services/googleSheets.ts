@@ -774,3 +774,248 @@ export const getClubFinanceDebugFromGoogleSheets = async (cuotasAdeudadas = 0): 
     formula: PROJECTED_BALANCE_FORMULA
   };
 };
+
+const MONTH_NAMES_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"] as const;
+
+export interface SectorOperationalDebugInfo {
+  source: SourceType;
+  monthUsed: string;
+  rawRanges: Record<string, unknown[][]>;
+  parsedBalances: Record<string, number>;
+  currentMonthUtilities: Record<string, { value: number; warning?: string }>;
+  movementCounts: Record<string, number>;
+  categoryCounts: Record<string, number>;
+  salonActivitiesSample: Array<{ type: string; name: string; members: number }>;
+  aulaActivitiesSample: Array<{ type: string; name: string; commission: number }>;
+  warnings: string[];
+}
+
+export const normalizeStatus = normalizeOperationalStatus;
+export const isActiveMember = (member: Pick<Member, "estado">): boolean => normalizeOperationalStatus(member.estado) !== "abandonado";
+export const isCategory = (value: unknown, expected: string): boolean => normalizedEquals(value, expected);
+export const isSector = (value: unknown, expected: string): boolean => normalizedEquals(value, expected);
+
+export const isWithinLastDays = (dateValue: unknown, days: number): boolean => {
+  const normalizedDate = parseGoogleSheetDate(dateValue);
+  if (!normalizedDate) return false;
+  const dateTime = new Date(normalizedDate).getTime();
+  if (!Number.isFinite(dateTime)) return false;
+  return Date.now() - dateTime <= days * 24 * 60 * 60 * 1000 && dateTime <= Date.now();
+};
+
+const getCurrentSpanishMonth = () => MONTH_NAMES_ES[new Date().getMonth()];
+
+const getRangeKey = (sheetName: string, range: string) => `${sheetName}!${range}`;
+const quoteSheetName = (sheetName: string) => sheetName.includes(" ") ? `'${sheetName}'` : sheetName;
+const buildRange = (sheetName: string, range: string) => `${quoteSheetName(sheetName)}!${range}`;
+
+const getSectorMembers = (members: Member[], sheet: string) => members.filter((member) => isSector(member.sourceSheet, sheet));
+const sumDebt = (members: Member[]) => members.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando").reduce((sum, member) => sum + (member.cuota ?? 0), 0);
+
+const getCellNumber = (ranges: Record<string, unknown[][]>, sheetName: string, cell: string) => normalizeMoney(ranges[getRangeKey(sheetName, cell)]?.[0]?.[0]);
+
+const parseCurrentMonthUtility = (rows: unknown[][], monthName = getCurrentSpanishMonth()): { value: number; warning?: string } => {
+  const normalizedMonth = normalizeComparableText(monthName);
+  for (const row of rows) {
+    const monthIndex = row.findIndex((cell) => normalizeComparableText(cell) === normalizedMonth);
+    if (monthIndex < 0) continue;
+    for (let index = monthIndex + 1; index < row.length; index += 1) {
+      const raw = String(row[index] ?? "").trim();
+      if (!raw) continue;
+      const value = normalizeMoney(raw);
+      if (value !== 0 || /0/.test(raw)) return { value };
+    }
+    return { value: 0, warning: `Se encontró ${monthName}, pero no un valor numérico asociado.` };
+  }
+  return { value: 0, warning: `No se encontró el mes ${monthName} en el rango de utilidad.` };
+};
+
+export const getSectorBalance = async (sheetName: string, cell: string): Promise<number> => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return 0;
+  ensureGoogleSheetsEnabled(config);
+  const sheetsClient = getSheetsClient(config);
+  const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: buildRange(sheetName, cell) });
+  return normalizeMoney(response.data.values?.[0]?.[0]);
+};
+
+export const getCurrentMonthUtility = async (sheetName: string, range: string): Promise<number> => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return 0;
+  ensureGoogleSheetsEnabled(config);
+  const sheetsClient = getSheetsClient(config);
+  const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: buildRange(sheetName, range), majorDimension: "ROWS" });
+  return parseCurrentMonthUtility(response.data.values ?? []).value;
+};
+
+const parseSalonActivityStats = (rows: unknown[][]) => {
+  const activities = rows
+    .filter((row) => isCategory(row[0], "EC"))
+    .map((row) => ({ name: String(row[1] ?? "").trim(), members: normalizeMoney(row[14]) }))
+    .filter((activity) => activity.name);
+  const sortedDesc = [...activities].sort((a, b) => b.members - a.members || a.name.localeCompare(b.name, "es"));
+  const positive = activities.filter((activity) => activity.members > 0);
+  const leastSource = positive.length ? positive : activities;
+  const sortedAsc = [...leastSource].sort((a, b) => a.members - b.members || a.name.localeCompare(b.name, "es"));
+  return { mostPopularActivity: sortedDesc[0] ?? null, leastPopularActivity: sortedAsc[0] ?? null, activities };
+};
+
+const parseAulaCommissionAverage = (rows: unknown[][]) => {
+  const commissions = rows
+    .filter((row) => isCategory(row[0], "EC"))
+    .map((row) => ({ raw: String(row[10] ?? "").trim(), value: normalizeMoney(row[10]) }))
+    .filter((commission) => commission.raw !== "" && /\d/.test(commission.raw) && Number.isFinite(commission.value))
+    .map((commission) => commission.value);
+  return commissions.length ? commissions.reduce((sum, value) => sum + value, 0) / commissions.length : null;
+};
+
+export const getSalonActivityStats = async () => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return { mostPopularActivity: null, leastPopularActivity: null };
+  ensureGoogleSheetsEnabled(config);
+  const sheetsClient = getSheetsClient(config);
+  const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "SALON!B18:V30" });
+  const { activities: _activities, ...stats } = parseSalonActivityStats(response.data.values ?? []);
+  return stats;
+};
+
+export const getAulaCommissionAverage = async (): Promise<number | null> => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return null;
+  ensureGoogleSheetsEnabled(config);
+  const sheetsClient = getSheetsClient(config);
+  const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "AULA!B18:V30" });
+  return parseAulaCommissionAverage(response.data.values ?? []);
+};
+
+const isRelevantLocalIncome = (movement: AdminMovement) => isSector(movement.sector, "LOCAL 1") && isIncome(movement.tipo) && (isCategory(movement.categoria, "COMISIÓN") || isCategory(movement.categoria, "VENTAS"));
+
+export const getLocal1Stats = (movements: AdminMovement[]) => {
+  const relevant = movements.filter(isRelevantLocalIncome);
+  const highlighted = [...relevant].sort((a, b) => b.monto - a.monto)[0];
+  return {
+    totalRelevantIncomeMovements: relevant.length,
+    last30DaysRelevantIncomeMovements: relevant.filter((movement) => isWithinLastDays(movement.fecha, 30)).length,
+    highlightedIncome: highlighted ? { amount: highlighted.monto, concept: highlighted.concepto || highlighted.categoria, date: highlighted.fecha ?? "" } : null
+  };
+};
+
+export const getCantinaStatsFromAdminMovements = (movements: AdminMovement[]) => ({
+  kioskIncome: movements.filter((movement) => isSector(movement.sector, "CANTINA") && isIncome(movement.tipo) && isCategory(movement.categoria, "KIOSCO")).reduce((sum, movement) => sum + movement.monto, 0),
+  drinksIncome: movements.filter((movement) => isSector(movement.sector, "CANTINA") && isIncome(movement.tipo) && isCategory(movement.categoria, "BEBIDAS")).reduce((sum, movement) => sum + movement.monto, 0),
+  cmv: movements.filter((movement) => isSector(movement.sector, "CANTINA") && isExpense(movement.tipo) && isCategory(movement.categoria, "CMV")).reduce((sum, movement) => sum + movement.monto, 0)
+});
+
+const OPERATIONAL_RANGES = [
+  "FITNESS!AN3", "FITNESS!AR9:AY14", "FITNESS!X3",
+  "SALON!AW29", "SALON!AN24:AU29", "SALON!B18:V30",
+  "AULA!AW29", "AULA!AN24:AU29", "AULA!B18:V30",
+  "'LOCAL 1'!AN3", "'LOCAL 1'!AB19:AI24",
+  "ADMINISTRACIÓN!B12:AB3000"
+];
+
+const readSectorOperationalRanges = async (config: ReturnType<typeof getGoogleSheetsConfig>) => {
+  const sheetsClient = getSheetsClient(config);
+  const response = await sheetsClient.spreadsheets.values.batchGet({ spreadsheetId: config.sheetId, ranges: OPERATIONAL_RANGES, majorDimension: "ROWS" });
+  const rawRanges: Record<string, unknown[][]> = {};
+  response.data.valueRanges?.forEach((valueRange, index) => {
+    const configured = OPERATIONAL_RANGES[index].replace(/'/g, "");
+    rawRanges[configured] = valueRange.values ?? [];
+  });
+  return rawRanges;
+};
+
+const buildSectorOperationalSummary = (members: Member[], rawRanges: Record<string, unknown[][]>, movements: AdminMovement[]) => {
+  const fitnessMembers = getSectorMembers(members, "FITNESS");
+  const salonMembers = getSectorMembers(members, "SALON");
+  const aulaMembers = getSectorMembers(members, "AULA");
+  const fitnessDebtors = fitnessMembers.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando");
+  const allDebtors = members.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando");
+  const salonActivityStats = parseSalonActivityStats(rawRanges["SALON!B18:V30"] ?? []);
+  const local1Stats = getLocal1Stats(movements);
+
+  return {
+    fitness: {
+      totalMembers: fitnessMembers.length,
+      activeMembers: fitnessMembers.filter(isActiveMember).length,
+      totalProfitability: getCellNumber(rawRanges, "FITNESS", "AN3"),
+      currentMonthProfitability: parseCurrentMonthUtility(rawRanges["FITNESS!AR9:AY14"] ?? []).value,
+      totalDebtors: fitnessDebtors.length,
+      totalDebtAmount: sumDebt(fitnessDebtors),
+      settlementBalance: getCellNumber(rawRanges, "FITNESS", "X3")
+    },
+    salon: {
+      totalMembers: salonMembers.length,
+      activeMembers: salonMembers.filter(isActiveMember).length,
+      totalProfitability: getCellNumber(rawRanges, "SALON", "AW29"),
+      currentMonthProfitability: parseCurrentMonthUtility(rawRanges["SALON!AN24:AU29"] ?? []).value,
+      mostPopularActivity: salonActivityStats.mostPopularActivity,
+      leastPopularActivity: salonActivityStats.leastPopularActivity
+    },
+    aula: {
+      totalMembers: aulaMembers.length,
+      activeMembers: aulaMembers.filter(isActiveMember).length,
+      totalProfitability: getCellNumber(rawRanges, "AULA", "AW29"),
+      currentMonthProfitability: parseCurrentMonthUtility(rawRanges["AULA!AN24:AU29"] ?? []).value,
+      averageCommission: parseAulaCommissionAverage(rawRanges["AULA!B18:V30"] ?? [])
+    },
+    local1: {
+      ...local1Stats,
+      totalProfitability: getCellNumber(rawRanges, "LOCAL 1", "AN3"),
+      currentMonthProfitability: parseCurrentMonthUtility(rawRanges["LOCAL 1!AB19:AI24"] ?? []).value
+    },
+    cantina: getCantinaStatsFromAdminMovements(movements),
+    crm: {
+      totalMembers: members.length,
+      activeMembers: members.filter(isActiveMember).length,
+      totalDebtors: allDebtors.length,
+      totalDebtAmount: sumDebt(allDebtors)
+    }
+  };
+};
+
+export const getSectorOperationalSummary = async (members: Member[]) => {
+  const config = getGoogleSheetsConfig();
+  if (!config.enabled) return buildSectorOperationalSummary(members, {}, []);
+  ensureGoogleSheetsEnabled(config);
+  const rawRanges = await readSectorOperationalRanges(config);
+  const movements = parseAdminMovementsFromValues(rawRanges["ADMINISTRACIÓN!B12:AB3000"] ?? []);
+  return buildSectorOperationalSummary(members, rawRanges, movements);
+};
+
+export const getSectorOperationalDebug = async (members: Member[]): Promise<SectorOperationalDebugInfo> => {
+  const config = getGoogleSheetsConfig();
+  const monthUsed = getCurrentSpanishMonth();
+  if (!config.enabled) {
+    return { source: "mock", monthUsed, rawRanges: {}, parsedBalances: {}, currentMonthUtilities: {}, movementCounts: {}, categoryCounts: {}, salonActivitiesSample: [], aulaActivitiesSample: [], warnings: ["Google Sheets desactivado: usando datos mock/locales."] };
+  }
+  ensureGoogleSheetsEnabled(config);
+  const rawRanges = await readSectorOperationalRanges(config);
+  const movements = parseAdminMovementsFromValues(rawRanges["ADMINISTRACIÓN!B12:AB3000"] ?? []);
+  const utilities = {
+    fitness: parseCurrentMonthUtility(rawRanges["FITNESS!AR9:AY14"] ?? [], monthUsed),
+    salon: parseCurrentMonthUtility(rawRanges["SALON!AN24:AU29"] ?? [], monthUsed),
+    aula: parseCurrentMonthUtility(rawRanges["AULA!AN24:AU29"] ?? [], monthUsed),
+    local1: parseCurrentMonthUtility(rawRanges["LOCAL 1!AB19:AI24"] ?? [], monthUsed)
+  };
+  const salonActivities = parseSalonActivityStats(rawRanges["SALON!B18:V30"] ?? []).activities;
+  const warnings = Object.entries(utilities).flatMap(([sector, utility]) => utility.warning ? [`${sector}: ${utility.warning}`] : []);
+  return {
+    source: "google_sheets",
+    monthUsed,
+    rawRanges: Object.fromEntries(Object.entries(rawRanges).map(([key, rows]) => [key, rows.slice(0, 5)])),
+    parsedBalances: {
+      fitness: getCellNumber(rawRanges, "FITNESS", "AN3"),
+      fitnessSettlement: getCellNumber(rawRanges, "FITNESS", "X3"),
+      salon: getCellNumber(rawRanges, "SALON", "AW29"),
+      aula: getCellNumber(rawRanges, "AULA", "AW29"),
+      local1: getCellNumber(rawRanges, "LOCAL 1", "AN3")
+    },
+    currentMonthUtilities: utilities,
+    movementCounts: countBy(movements, (movement) => movement.sector),
+    categoryCounts: countBy(movements, (movement) => `${movement.sector} · ${movement.categoria}`),
+    salonActivitiesSample: salonActivities.slice(0, 10).map((activity) => ({ type: "EC", name: activity.name, members: activity.members })),
+    aulaActivitiesSample: (rawRanges["AULA!B18:V30"] ?? []).filter((row) => isCategory(row[0], "EC")).slice(0, 10).map((row) => ({ type: String(row[0] ?? ""), name: String(row[1] ?? ""), commission: normalizeMoney(row[10]) })),
+    warnings
+  };
+};
