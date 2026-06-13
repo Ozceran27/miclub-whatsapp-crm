@@ -142,6 +142,10 @@ const renderActivityBreakdown = (items, maxCount, emptyLabel, highlightFirst = f
     return (_jsxs("div", { className: className, children: [_jsxs("div", { className: "activity-breakdown-row", children: [_jsxs("span", { children: [marker, item.activity, isHighlighted ? suffix : ''] }), _jsx("strong", { children: item.count })] }), _jsx("div", { className: "activity-breakdown-track", "aria-hidden": "true", children: _jsx("span", { style: { width: `${Math.max((item.count / maxCount) * 100, 8)}%` } }) })] }, item.activity));
 }) : _jsx("p", { className: "empty-card-note", children: emptyLabel }));
 const getMetricRowClassName = (highlight) => {
+    if (highlight === 'positiveCritical')
+        return 'finance-metric-row finance-metric-row--highlight-critical finance-metric-row--highlight-positive-critical';
+    if (highlight === 'negativeCritical')
+        return 'finance-metric-row finance-metric-row--highlight-critical finance-metric-row--highlight-negative-critical';
     if (highlight === 'green')
         return 'finance-metric-row finance-metric-row--highlight-green';
     if (highlight === 'red')
@@ -256,7 +260,7 @@ export default function HomeModule({ onOpenModule }) {
     const formatPayableObligation = (value) => financeSummary ? `-${formatArPeso(Math.abs(value ?? 0))}` : unavailableLabel;
     const formatUsd = (value) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
     const financialSummaryLines = [
-        { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'green', iconBefore: '💰' },
+        { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'positiveCritical', iconBefore: '💰' },
         { label: 'Caja', value: formatFinanceMoney(financeSummary?.cash) },
         { label: 'Banco', value: formatFinanceMoney(financeSummary?.bank) },
         { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
@@ -265,13 +269,13 @@ export default function HomeModule({ onOpenModule }) {
         { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
         { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
         { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar) },
-        { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'green', iconBefore: '📈' }
+        { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'positiveCritical', iconBefore: '📈' }
     ];
     const incomeBySectorLines = financeSummary?.incomeBySector.length
-        ? financeSummary.incomeBySector.map((item, index) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'green' : undefined, iconAfter: index === 0 ? '⭐' : undefined }))
+        ? financeSummary.incomeBySector.map((item, index) => ({ id: `income-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'positiveCritical' : undefined, iconAfter: index === 0 ? '⭐' : undefined }))
         : [{ id: 'income-unavailable', label: 'Ingresos', value: unavailableLabel }];
     const expenseBySectorLines = financeSummary?.expenseBySector.length
-        ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'red' : undefined, iconAfter: index === 0 ? '🔻' : undefined }))
+        ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'negativeCritical' : undefined, iconAfter: index === 0 ? '🔻' : undefined }))
         : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
     const formatOptionalNumber = (value) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('es-AR') : '—';
     const formatOptionalMoney = (value) => typeof value === 'number' && Number.isFinite(value) ? formatArPeso(value) : '—';
