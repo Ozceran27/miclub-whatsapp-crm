@@ -786,7 +786,9 @@ export interface SectorOperationalDebugInfo {
   movementCounts: Record<string, number>;
   categoryCounts: Record<string, number>;
   salonActivitiesSample: Array<{ type: string; name: string; members: number }>;
-  aulaActivitiesSample: Array<{ type: string; name: string; commission: number }>;
+  aulaActivitiesSample: Array<{ type: string; name: string; members?: number; commission: number }>;
+  aulaPopularity?: { mostPopularActivity: { name: string; members: number } | null; rawRange: unknown[][] };
+  cantina?: { kioskIncome: number; drinksIncome: number; cmv: number; totalProfitability: number; cmvSource: string; totalProfitabilityFormula: string };
   warnings: string[];
 }
 
@@ -860,6 +862,15 @@ const parseSalonActivityStats = (rows: unknown[][]) => {
   return { mostPopularActivity: sortedDesc[0] ?? null, leastPopularActivity: sortedAsc[0] ?? null, activities };
 };
 
+const parseAulaActivityStats = (rows: unknown[][]) => {
+  const activities = rows
+    .filter((row) => isCategory(row[0], "EC"))
+    .map((row) => ({ name: String(row[1] ?? "").trim(), members: normalizeMoney(row[14]) }))
+    .filter((activity) => activity.name);
+  const sortedDesc = [...activities].sort((a, b) => b.members - a.members || a.name.localeCompare(b.name, "es"));
+  return { mostPopularActivity: sortedDesc[0] ?? null, activities };
+};
+
 const parseAulaCommissionAverage = (rows: unknown[][]) => {
   const commissions = rows
     .filter((row) => isCategory(row[0], "EC"))
@@ -900,17 +911,18 @@ export const getLocal1Stats = (movements: AdminMovement[]) => {
   };
 };
 
-export const getCantinaStatsFromAdminMovements = (movements: AdminMovement[]) => ({
-  kioskIncome: movements.filter((movement) => isSector(movement.sector, "CANTINA") && isIncome(movement.tipo) && isCategory(movement.categoria, "KIOSCO")).reduce((sum, movement) => sum + movement.monto, 0),
-  drinksIncome: movements.filter((movement) => isSector(movement.sector, "CANTINA") && isIncome(movement.tipo) && isCategory(movement.categoria, "BEBIDAS")).reduce((sum, movement) => sum + movement.monto, 0),
-  cmv: movements.filter((movement) => isSector(movement.sector, "CANTINA") && isExpense(movement.tipo) && isCategory(movement.categoria, "CMV")).reduce((sum, movement) => sum + movement.monto, 0)
-});
+export const getCantinaStatsFromAdminMovements = (movements: AdminMovement[]) => {
+  const kioskIncome = movements.filter((movement) => isSector(movement.sector, "CANTINA") && isIncome(movement.tipo) && isCategory(movement.categoria, "KIOSCO")).reduce((sum, movement) => sum + movement.monto, 0);
+  const drinksIncome = movements.filter((movement) => isSector(movement.sector, "CANTINA") && isIncome(movement.tipo) && isCategory(movement.categoria, "BEBIDAS")).reduce((sum, movement) => sum + movement.monto, 0);
+  const cmv = movements.filter((movement) => isSector(movement.sector, "CANTINA") && isExpense(movement.tipo) && isCategory(movement.categoria, "BEBIDAS")).reduce((sum, movement) => sum + movement.monto, 0);
+  return { kioskIncome, drinksIncome, cmv, totalProfitability: kioskIncome + drinksIncome - cmv };
+};
 
 const OPERATIONAL_RANGES = [
   "FITNESS!AN3", "FITNESS!AR9:AY14", "FITNESS!X3",
   "SALON!AW29", "SALON!AN24:AU29", "SALON!B18:V30",
   "AULA!AW29", "AULA!AN24:AU29", "AULA!B18:V30",
-  "'LOCAL 1'!AN3", "'LOCAL 1'!AB19:AI24",
+  "'LOCAL 1'!AN3", "'LOCAL 1'!AB19:AI24", "'LOCAL 1'!X3",
   "ADMINISTRACIÓN!B12:AB3000"
 ];
 
@@ -932,6 +944,7 @@ const buildSectorOperationalSummary = (members: Member[], rawRanges: Record<stri
   const fitnessDebtors = fitnessMembers.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando");
   const allDebtors = members.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando");
   const salonActivityStats = parseSalonActivityStats(rawRanges["SALON!B18:V30"] ?? []);
+  const aulaActivityStats = parseAulaActivityStats(rawRanges["AULA!B18:V30"] ?? []);
   const local1Stats = getLocal1Stats(movements);
 
   return {
@@ -957,12 +970,14 @@ const buildSectorOperationalSummary = (members: Member[], rawRanges: Record<stri
       activeMembers: aulaMembers.filter(isActiveMember).length,
       totalProfitability: getCellNumber(rawRanges, "AULA", "AW29"),
       currentMonthProfitability: parseCurrentMonthUtility(rawRanges["AULA!AN24:AU29"] ?? []).value,
-      averageCommission: parseAulaCommissionAverage(rawRanges["AULA!B18:V30"] ?? [])
+      averageCommission: parseAulaCommissionAverage(rawRanges["AULA!B18:V30"] ?? []),
+      mostPopularActivity: aulaActivityStats.mostPopularActivity
     },
     local1: {
       ...local1Stats,
       totalProfitability: getCellNumber(rawRanges, "LOCAL 1", "AN3"),
-      currentMonthProfitability: parseCurrentMonthUtility(rawRanges["LOCAL 1!AB19:AI24"] ?? []).value
+      currentMonthProfitability: parseCurrentMonthUtility(rawRanges["LOCAL 1!AB19:AI24"] ?? []).value,
+      settlementBalance: getCellNumber(rawRanges, "LOCAL 1", "X3")
     },
     cantina: getCantinaStatsFromAdminMovements(movements),
     crm: {
@@ -999,6 +1014,8 @@ export const getSectorOperationalDebug = async (members: Member[]): Promise<Sect
     local1: parseCurrentMonthUtility(rawRanges["LOCAL 1!AB19:AI24"] ?? [], monthUsed)
   };
   const salonActivities = parseSalonActivityStats(rawRanges["SALON!B18:V30"] ?? []).activities;
+  const aulaActivityStats = parseAulaActivityStats(rawRanges["AULA!B18:V30"] ?? []);
+  const cantinaStats = getCantinaStatsFromAdminMovements(movements);
   const warnings = Object.entries(utilities).flatMap(([sector, utility]) => utility.warning ? [`${sector}: ${utility.warning}`] : []);
   return {
     source: "google_sheets",
@@ -1009,13 +1026,16 @@ export const getSectorOperationalDebug = async (members: Member[]): Promise<Sect
       fitnessSettlement: getCellNumber(rawRanges, "FITNESS", "X3"),
       salon: getCellNumber(rawRanges, "SALON", "AW29"),
       aula: getCellNumber(rawRanges, "AULA", "AW29"),
-      local1: getCellNumber(rawRanges, "LOCAL 1", "AN3")
+      local1: getCellNumber(rawRanges, "LOCAL 1", "AN3"),
+      local1Settlement: getCellNumber(rawRanges, "LOCAL 1", "X3")
     },
     currentMonthUtilities: utilities,
     movementCounts: countBy(movements, (movement) => movement.sector),
     categoryCounts: countBy(movements, (movement) => `${movement.sector} · ${movement.categoria}`),
     salonActivitiesSample: salonActivities.slice(0, 10).map((activity) => ({ type: "EC", name: activity.name, members: activity.members })),
-    aulaActivitiesSample: (rawRanges["AULA!B18:V30"] ?? []).filter((row) => isCategory(row[0], "EC")).slice(0, 10).map((row) => ({ type: String(row[0] ?? ""), name: String(row[1] ?? ""), commission: normalizeMoney(row[10]) })),
+    aulaActivitiesSample: aulaActivityStats.activities.slice(0, 10).map((activity) => ({ type: "EC", name: activity.name, members: activity.members, commission: normalizeMoney((rawRanges["AULA!B18:V30"] ?? []).find((row) => String(row[1] ?? "").trim() === activity.name)?.[10]) })),
+    aulaPopularity: { mostPopularActivity: aulaActivityStats.mostPopularActivity, rawRange: rawRanges["AULA!B18:V30"] ?? [] },
+    cantina: { ...cantinaStats, cmvSource: "EGRESOS / BEBIDAS / CANTINA", totalProfitabilityFormula: "KIOSCO + BEBIDAS - CMV" },
     warnings
   };
 };
