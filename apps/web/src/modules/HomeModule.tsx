@@ -567,7 +567,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         </div>
 
         <div className="home-dashboard-row home-dashboard-row--primary">
-          <article className="card home-kpi-card home-kpi-card--enrollment">
+          <article className="card home-kpi-card home-kpi-card--modern home-kpi-card--enrollment">
             <div className="home-card-heading">
               <h4>👥 Inscriptos</h4>
               <p>Estados operativos actuales</p>
@@ -596,7 +596,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
             </div>
           </article>
 
-          <article className="card home-kpi-card">
+          <article className="card home-kpi-card home-kpi-card--modern home-kpi-card--activity">
             <div className="home-card-heading">
               <h4>🏷️ Inscriptos por actividad</h4>
               <p>Solo inscriptos activos</p>
