@@ -44,7 +44,7 @@ import type { ContactedRecentResponse, Member, MessageTemplate, OperationalStatu
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
-import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
+import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -286,6 +286,27 @@ app.get("/club-finance-debug", async (_req, res) => {
     res.json(await getClubFinanceDebugFromGoogleSheets(cuotasAdeudadas));
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
+    jsonError(res, 500, message);
+  }
+});
+
+
+app.get("/sector-operational-summary", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    res.json(await getSectorOperationalSummary(members));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo obtener el resumen operativo por sector.";
+    jsonError(res, 500, message);
+  }
+});
+
+app.get("/sector-operational-debug", async (_req, res) => {
+  try {
+    const { members } = await getMembersSource();
+    res.json(await getSectorOperationalDebug(members));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo leer el debug operativo por sector.";
     jsonError(res, 500, message);
   }
 });
@@ -617,6 +638,10 @@ if (isProduction) {
       req.path.startsWith("/members") ||
       req.path.startsWith("/debtors") ||
       req.path.startsWith("/summary") ||
+      req.path.startsWith("/sector-operational") ||
+      req.path.startsWith("/club-finance") ||
+      req.path.startsWith("/admin-movements") ||
+      req.path.startsWith("/payments-debug") ||
       req.path.startsWith("/templates") ||
       req.path.startsWith("/history") ||
       req.path.startsWith("/sync-status") ||

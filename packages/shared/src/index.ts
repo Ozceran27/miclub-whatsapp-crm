@@ -94,6 +94,63 @@ export interface ContactedRecentResponse {
 }
 
 
+
+export interface SectorActivityStat {
+  name: string;
+  members: number;
+}
+
+export interface HighlightedIncome {
+  amount: number;
+  concept: string;
+  date: string;
+}
+
+export interface SectorOperationalSummary {
+  fitness: {
+    totalMembers: number;
+    activeMembers: number;
+    totalProfitability: number;
+    currentMonthProfitability: number;
+    totalDebtors: number;
+    totalDebtAmount: number;
+    settlementBalance: number;
+  };
+  salon: {
+    totalMembers: number;
+    activeMembers: number;
+    totalProfitability: number;
+    currentMonthProfitability: number;
+    mostPopularActivity: SectorActivityStat | null;
+    leastPopularActivity: SectorActivityStat | null;
+  };
+  aula: {
+    totalMembers: number;
+    activeMembers: number;
+    totalProfitability: number;
+    currentMonthProfitability: number;
+    averageCommission: number | null;
+  };
+  local1: {
+    totalRelevantIncomeMovements: number;
+    last30DaysRelevantIncomeMovements: number;
+    totalProfitability: number;
+    currentMonthProfitability: number;
+    highlightedIncome: HighlightedIncome | null;
+  };
+  cantina: {
+    kioskIncome: number;
+    drinksIncome: number;
+    cmv: number;
+  };
+  crm: {
+    totalMembers: number;
+    activeMembers: number;
+    totalDebtors: number;
+    totalDebtAmount: number;
+  };
+}
+
 export interface AdminMovement {
   id: string;
   fecha?: string;
