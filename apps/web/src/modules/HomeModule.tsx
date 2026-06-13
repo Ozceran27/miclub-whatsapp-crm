@@ -243,19 +243,19 @@ const renderActivityBreakdown = (
 );
 
 const getMetricRowClassName = (highlight?: FinancialLine['highlight']) => {
-  if (highlight === 'green') return 'metric-row metric-row--highlight-green';
-  if (highlight === 'red') return 'metric-row metric-row--highlight-red';
-  if (highlight === 'primarySoft') return 'metric-row metric-row--highlight-soft';
-  if (highlight === 'default') return 'metric-row metric-row--highlight';
-  return 'metric-row';
+  if (highlight === 'green') return 'finance-metric-row finance-metric-row--highlight-green';
+  if (highlight === 'red') return 'finance-metric-row finance-metric-row--highlight-red';
+  if (highlight === 'primarySoft') return 'finance-metric-row finance-metric-row--highlight-soft';
+  if (highlight === 'default') return 'finance-metric-row finance-metric-row--highlight';
+  return 'finance-metric-row';
 };
 
 const renderFinanceLines = (lines: FinancialLine[]) => (
   <div className="finance-lines finance-lines--compact">
     {lines.map((line) => (
       <span key={line.id ?? line.label} className={getMetricRowClassName(line.highlight)}>
-        <strong className="metric-row__label">{line.iconBefore ? `${line.iconBefore} ` : ''}{line.label}{line.iconAfter ? ` ${line.iconAfter}` : ''}</strong>
-        <span className="metric-row__value">{line.value}</span>
+        <strong className="finance-metric-row__label">{line.iconBefore ? `${line.iconBefore} ` : ''}{line.label}{line.iconAfter ? ` ${line.iconAfter}` : ''}</strong>
+        <span className="finance-metric-row__value">{line.value}</span>
       </span>
     ))}
   </div>
@@ -525,8 +525,8 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
 
       <section className="home-dashboard-stack" aria-label="Resumen operativo del club">
         <div className="home-dashboard-row home-dashboard-row--secondary">
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
+          <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--summary">
+            <div className="home-card-heading finance-card__header">
               <h4>📊 Resumen financiero</h4>
               <p>Indicadores económicos futuros</p>
             </div>
@@ -534,8 +534,8 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
             {financeError && <small className="integration-note">{financeError}</small>}
           </article>
 
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
+          <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--balance">
+            <div className="home-card-heading finance-card__header">
               <h4>🏦 Saldos operativos</h4>
               <p>Base preparada para ADMINISTRACIÓN</p>
             </div>
@@ -543,8 +543,8 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
             {financeError && <small className="integration-note">Pendiente de integración</small>}
           </article>
 
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
+          <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--income">
+            <div className="home-card-heading finance-card__header">
               <h4>📥 Ingresos por sector</h4>
               <p>Sector · monto</p>
             </div>
@@ -553,8 +553,8 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
             {financeError && <small className="integration-note">No disponible</small>}
           </article>
 
-          <article className="card home-kpi-card home-kpi-card--compact home-kpi-card--finance">
-            <div className="home-card-heading">
+          <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--expense">
+            <div className="home-card-heading finance-card__header">
               <h4>📤 Egresos por sector</h4>
               <p>Sector · monto</p>
             </div>
