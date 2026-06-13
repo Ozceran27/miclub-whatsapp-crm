@@ -42,6 +42,29 @@ type FinancialLine = {
   iconAfter?: string;
 };
 
+type SectorMetric = {
+  label: string;
+  value: string;
+};
+
+type SectorFeaturedMetric = {
+  label: string;
+  value: string;
+  detail?: string;
+};
+
+type SectorCardConfig = {
+  key: string;
+  title: string;
+  moduleId: ModuleId;
+  subtitle: string;
+  icon: string;
+  accent: 'fitness' | 'salon' | 'aula' | 'local1' | 'cantina' | 'crm';
+  mainMetric: SectorMetric;
+  secondaryMetrics: SectorMetric[];
+  featuredMetric?: SectorFeaturedMetric;
+};
+
 type StatusBreakdown = {
   total: number;
   active: number;
@@ -380,58 +403,99 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleDateString('es-AR');
   };
-  const sectorCards = [
+  const formatActivityHighlight = (name?: string, count?: number) => name ? `${name} · ${formatOptionalNumber(count)}` : '—';
+  const highlightedLocalIncome = sectorSummary?.local1.highlightedIncome;
+  const sectorCards: SectorCardConfig[] = [
     {
-      key: 'fitness', title: 'Espacio Fitness', moduleId: 'fitness' as ModuleId, subtitle: 'Inscriptos, rentabilidad y liquidación.', metrics: [
-        ['Total inscriptos', formatOptionalNumber(sectorSummary?.fitness.totalMembers)],
-        ['Activos', formatOptionalNumber(sectorSummary?.fitness.activeMembers)],
-        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.fitness.totalProfitability)],
-        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.fitness.currentMonthProfitability)],
-        ['Adeudados', sectorSummary ? `${formatOptionalNumber(sectorSummary.fitness.totalDebtors)} · ${formatOptionalMoney(sectorSummary.fitness.totalDebtAmount)}` : '—'],
-        ['Saldo a liquidar', formatOptionalMoney(sectorSummary?.fitness.settlementBalance)]
+      key: 'fitness',
+      title: 'Espacio Fitness',
+      moduleId: 'fitness',
+      subtitle: 'Membresías y liquidación',
+      icon: '🏋️',
+      accent: 'fitness',
+      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.fitness.totalProfitability) },
+      secondaryMetrics: [
+        { label: 'Total', value: formatOptionalNumber(sectorSummary?.fitness.totalMembers) },
+        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.fitness.activeMembers) },
+        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.fitness.currentMonthProfitability) },
+        { label: 'Adeudados', value: formatOptionalNumber(sectorSummary?.fitness.totalDebtors) },
+        { label: 'Deuda', value: formatOptionalMoney(sectorSummary?.fitness.totalDebtAmount) },
+        { label: 'Saldo liq.', value: formatOptionalMoney(sectorSummary?.fitness.settlementBalance) }
       ]
     },
     {
-      key: 'salon', title: 'Salón', moduleId: 'salon' as ModuleId, subtitle: 'Actividades EC e indicadores del sector.', metrics: [
-        ['Total inscriptos', formatOptionalNumber(sectorSummary?.salon.totalMembers)],
-        ['Activos', formatOptionalNumber(sectorSummary?.salon.activeMembers)],
-        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.salon.totalProfitability)],
-        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability)],
-        ['Más popular', sectorSummary?.salon.mostPopularActivity ? `${sectorSummary.salon.mostPopularActivity.name} · ${sectorSummary.salon.mostPopularActivity.members}` : '—'],
-        ['Menos popular', sectorSummary?.salon.leastPopularActivity ? `${sectorSummary.salon.leastPopularActivity.name} · ${sectorSummary.salon.leastPopularActivity.members}` : '—']
+      key: 'salon',
+      title: 'Salón',
+      moduleId: 'salon',
+      subtitle: 'Actividades EC',
+      icon: '🎭',
+      accent: 'salon',
+      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.salon.totalProfitability) },
+      secondaryMetrics: [
+        { label: 'Total', value: formatOptionalNumber(sectorSummary?.salon.totalMembers) },
+        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.salon.activeMembers) },
+        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability) },
+        { label: 'Más popular', value: formatActivityHighlight(sectorSummary?.salon.mostPopularActivity?.name, sectorSummary?.salon.mostPopularActivity?.members) }
+      ],
+      featuredMetric: { label: 'Menos popular', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members) }
+    },
+    {
+      key: 'aula',
+      title: 'Aula',
+      moduleId: 'aula',
+      subtitle: 'Talleres y comisiones',
+      icon: '🎓',
+      accent: 'aula',
+      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.aula.totalProfitability) },
+      secondaryMetrics: [
+        { label: 'Total', value: formatOptionalNumber(sectorSummary?.aula.totalMembers) },
+        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.aula.activeMembers) },
+        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.aula.currentMonthProfitability) },
+        { label: 'Comisión prom.', value: formatOptionalPercent(sectorSummary?.aula.averageCommission) }
       ]
     },
     {
-      key: 'aula', title: 'Aula', moduleId: 'aula' as ModuleId, subtitle: 'Talleres, rentabilidad y comisiones.', metrics: [
-        ['Total inscriptos', formatOptionalNumber(sectorSummary?.aula.totalMembers)],
-        ['Activos', formatOptionalNumber(sectorSummary?.aula.activeMembers)],
-        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.aula.totalProfitability)],
-        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.aula.currentMonthProfitability)],
-        ['Comisión promedio', formatOptionalPercent(sectorSummary?.aula.averageCommission)]
+      key: 'local1',
+      title: 'Local 1',
+      moduleId: 'local1',
+      subtitle: 'Ingresos relevantes',
+      icon: '🏪',
+      accent: 'local1',
+      mainMetric: { label: 'Rent. total', value: formatOptionalMoney(sectorSummary?.local1.totalProfitability) },
+      secondaryMetrics: [
+        { label: 'Mov. hist.', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) },
+        { label: 'Últ. 30 días', value: formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements) },
+        { label: 'Rent. mes', value: formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability) }
+      ],
+      featuredMetric: highlightedLocalIncome
+        ? { label: 'Ingreso destacado', value: formatOptionalMoney(highlightedLocalIncome.amount), detail: `${highlightedLocalIncome.concept} · ${formatArDate(highlightedLocalIncome.date)}` }
+        : { label: 'Ingreso destacado', value: '—' }
+    },
+    {
+      key: 'cantina',
+      title: 'Cantina',
+      moduleId: 'cantina',
+      subtitle: 'Ventas y CMV',
+      icon: '☕',
+      accent: 'cantina',
+      mainMetric: { label: 'Kiosco', value: formatOptionalMoney(sectorSummary?.cantina.kioskIncome) },
+      secondaryMetrics: [
+        { label: 'Bebidas', value: formatOptionalMoney(sectorSummary?.cantina.drinksIncome) },
+        { label: 'CMV', value: formatOptionalMoney(sectorSummary?.cantina.cmv) }
       ]
     },
     {
-      key: 'local1', title: 'Local 1', moduleId: 'local1' as ModuleId, subtitle: 'Ingresos relevantes y rentabilidad.', metrics: [
-        ['Mov. ingreso históricos', formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements)],
-        ['Mov. ingreso últimos 30 días', formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements)],
-        ['Rentabilidad total', formatOptionalMoney(sectorSummary?.local1.totalProfitability)],
-        ['Rentabilidad mes actual', formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability)],
-        ['Ingreso destacado', sectorSummary?.local1.highlightedIncome ? `${formatOptionalMoney(sectorSummary.local1.highlightedIncome.amount)} · ${sectorSummary.local1.highlightedIncome.concept} · ${formatArDate(sectorSummary.local1.highlightedIncome.date)}` : '—']
-      ]
-    },
-    {
-      key: 'cantina', title: 'Cantina', moduleId: 'cantina' as ModuleId, subtitle: 'Ventas y costo de mercadería.', metrics: [
-        ['Ingresos por Kiosco', formatOptionalMoney(sectorSummary?.cantina.kioskIncome)],
-        ['Ingresos por Bebidas', formatOptionalMoney(sectorSummary?.cantina.drinksIncome)],
-        ['CMV', formatOptionalMoney(sectorSummary?.cantina.cmv)]
-      ]
-    },
-    {
-      key: 'crm', title: 'CRM', moduleId: 'crm' as ModuleId, subtitle: 'Base general de inscriptos y cobranzas.', metrics: [
-        ['Inscriptos totales', formatOptionalNumber(sectorSummary?.crm.totalMembers)],
-        ['Inscriptos activos', formatOptionalNumber(sectorSummary?.crm.activeMembers)],
-        ['Adeudados', formatOptionalNumber(sectorSummary?.crm.totalDebtors)],
-        ['Monto adeudado', formatOptionalMoney(sectorSummary?.crm.totalDebtAmount)]
+      key: 'crm',
+      title: 'CRM',
+      moduleId: 'crm',
+      subtitle: 'Inscriptos y cobranzas',
+      icon: '💬',
+      accent: 'crm',
+      mainMetric: { label: 'Inscriptos', value: formatOptionalNumber(sectorSummary?.crm.totalMembers) },
+      secondaryMetrics: [
+        { label: 'Activos', value: formatOptionalNumber(sectorSummary?.crm.activeMembers) },
+        { label: 'Adeudados', value: formatOptionalNumber(sectorSummary?.crm.totalDebtors) },
+        { label: 'Monto adeudado', value: formatOptionalMoney(sectorSummary?.crm.totalDebtAmount) }
       ]
     }
   ];
@@ -554,20 +618,38 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         {sectorError && <small className="integration-note">{sectorError}</small>}
         <div className="area-grid">
           {sectorCards.map((area) => (
-            <article key={area.key} className="area-card">
+            <article key={area.key} className={`area-card area-card--${area.accent}`}>
+              <div className="area-card__topline" aria-hidden="true" />
               <div className="area-card__heading">
-                <h4>{area.title}</h4>
-                <p>{area.subtitle}</p>
+                <span className="area-card__icon" aria-hidden="true">{area.icon}</span>
+                <div className="area-card__title-block">
+                  <h4>{area.title}</h4>
+                  <p>{area.subtitle}</p>
+                </div>
+                <button className="area-card__module-link" onClick={() => onOpenModule(area.moduleId)}>Ver módulo</button>
               </div>
+
+              <div className="area-card__primary-metric">
+                <span>{area.mainMetric.label}</span>
+                <strong>{area.mainMetric.value}</strong>
+              </div>
+
               <dl className="area-card__metrics">
-                {area.metrics.map(([label, value]) => (
-                  <div className="area-card__metric" key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
+                {area.secondaryMetrics.map((metric) => (
+                  <div className="area-card__metric" key={metric.label}>
+                    <dt>{metric.label}</dt>
+                    <dd>{metric.value}</dd>
                   </div>
                 ))}
               </dl>
-              <button className="icon-btn ghost-btn" onClick={() => onOpenModule(area.moduleId)}>Ver módulo</button>
+
+              {area.featuredMetric && (
+                <div className="area-card__featured-metric">
+                  <span>{area.featuredMetric.label}</span>
+                  <strong>{area.featuredMetric.value}</strong>
+                  {area.featuredMetric.detail && <small>{area.featuredMetric.detail}</small>}
+                </div>
+              )}
             </article>
           ))}
         </div>
