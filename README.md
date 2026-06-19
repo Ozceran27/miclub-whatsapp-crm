@@ -158,3 +158,41 @@ Para crear un acceso directo:
 2. Clic derecho → **Crear acceso directo**.
 3. Mover el acceso directo al Escritorio.
 4. Ejecutar el acceso directo para iniciar la app local.
+
+## Acceso remoto y autenticación
+
+Antes de publicar miClub Gestión con Cloudflare Tunnel, activá el login local con cookie `httpOnly` desde variables de entorno. No se usa base de datos de usuarios ni servicios externos.
+
+Variables disponibles en `.env`:
+
+- `AUTH_ENABLED`: usá `false` para mantener el acceso directo local de siempre. Usá `true` para exigir login en toda la aplicación.
+- `AUTH_USER`: usuario local permitido cuando `AUTH_ENABLED=true`.
+- `AUTH_PASSWORD`: contraseña local permitida cuando `AUTH_ENABLED=true`. Evitá contraseñas simples o reutilizadas.
+- `SESSION_SECRET`: secreto largo y aleatorio para firmar la cookie de sesión. Es obligatorio si `AUTH_ENABLED=true`.
+- `PUBLIC_APP_URL`: URL pública de la app; por ejemplo, la URL `https://...` del Cloudflare Tunnel. Ayuda a configurar cookies seguras detrás de HTTPS.
+
+Ejemplo para probar localmente:
+
+```env
+AUTH_ENABLED=true
+AUTH_USER=admin
+AUTH_PASSWORD=una-clave-larga-y-unica
+SESSION_SECRET=un-secreto-largo-aleatorio-de-al-menos-32-caracteres
+PUBLIC_APP_URL=http://localhost:4000
+```
+
+Luego ejecutá:
+
+```bash
+npm run build
+npm run start
+```
+
+Abrí `http://localhost:4000`. Con `AUTH_ENABLED=true` debe aparecer la pantalla de login; con credenciales correctas se ingresa al panel y el botón **Cerrar sesión** vuelve al login. Con `AUTH_ENABLED=false`, la app entra directamente como antes.
+
+Recomendaciones para acceso remoto:
+
+- Activá `AUTH_ENABLED=true` antes de exponer la app con Cloudflare Tunnel.
+- Usá una contraseña fuerte y un `SESSION_SECRET` largo, único y privado.
+- No compartas ni subas el archivo `.env` real.
+- Si usás una URL HTTPS del túnel, configurá `PUBLIC_APP_URL` con esa URL pública.

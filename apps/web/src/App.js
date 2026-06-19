@@ -1,9 +1,11 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import CrmModule from './modules/CrmModule';
 import HomeModule from './modules/HomeModule';
 import ModuleNav from './modules/ModuleNav';
 import PlaceholderModule from './modules/PlaceholderModule';
+import LoginScreen from './LoginScreen';
+const API = import.meta.env.VITE_API_URL ?? '';
 const MODULES = [
     { id: 'home', label: 'INICIO' },
     { id: 'economy', label: 'ECONOMÍA CLUB' },
@@ -48,6 +50,54 @@ const PLACEHOLDERS = {
 };
 export default function App() {
     const [currentModule, setCurrentModule] = useState('home');
+    const [isAuthChecking, setIsAuthChecking] = useState(true);
+    const [authEnabled, setAuthEnabled] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [username, setUsername] = useState(null);
+    useEffect(() => {
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = async (input, init = {}) => {
+            const response = await originalFetch(input, { credentials: 'include', ...init });
+            const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+            if (response.status === 401 && !url.includes('/auth/')) {
+                setIsAuthenticated(false);
+                setAuthEnabled(true);
+            }
+            return response;
+        };
+        return () => {
+            window.fetch = originalFetch;
+        };
+    }, []);
+    useEffect(() => {
+        const checkSession = async () => {
+            try {
+                const response = await fetch(`${API}/auth/me`, { credentials: 'include' });
+                const payload = await response.json();
+                setAuthEnabled(Boolean(payload.authEnabled));
+                setIsAuthenticated(payload.authenticated);
+                setUsername(payload.username ?? null);
+            }
+            catch {
+                setAuthEnabled(false);
+                setIsAuthenticated(true);
+            }
+            finally {
+                setIsAuthChecking(false);
+            }
+        };
+        void checkSession();
+    }, []);
+    const handleLogout = async () => {
+        await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
+        setIsAuthenticated(false);
+        setUsername(null);
+        setCurrentModule('home');
+    };
+    const handleAuthenticated = (loggedUsername) => {
+        setIsAuthenticated(true);
+        setUsername(loggedUsername);
+    };
     const renderModule = () => {
         if (currentModule === 'home')
             return _jsx(HomeModule, { onOpenModule: setCurrentModule });
@@ -56,5 +106,11 @@ export default function App() {
         const placeholder = PLACEHOLDERS[currentModule];
         return _jsx(PlaceholderModule, { ...placeholder });
     };
-    return (_jsxs("div", { className: "container app-shell", children: [_jsxs("header", { className: "app-header", children: [_jsx("img", { src: "/logo/miClub - Logo trans.png", alt: "miClub", className: "club-logo" }), _jsxs("div", { children: [_jsx("h1", { children: "miClub Gesti\u00F3n" }), _jsx("p", { children: "Panel operativo y CRM del club" })] })] }), _jsx(ModuleNav, { modules: MODULES, currentModule: currentModule, onSelect: setCurrentModule }), renderModule()] }));
+    if (isAuthChecking) {
+        return _jsx("div", { className: "auth-loading", children: "Cargando acceso seguro\u2026" });
+    }
+    if (authEnabled && !isAuthenticated) {
+        return _jsx(LoginScreen, { onAuthenticated: handleAuthenticated });
+    }
+    return (_jsxs("div", { className: "container app-shell", children: [_jsxs("header", { className: "app-header", children: [_jsx("img", { src: "/logo/miClub - Logo trans.png", alt: "miClub", className: "club-logo" }), _jsxs("div", { children: [_jsx("h1", { children: "miClub Gesti\u00F3n" }), _jsx("p", { children: "Panel operativo y CRM del club" })] }), authEnabled && (_jsxs("button", { className: "ghost-btn logout-btn", type: "button", onClick: handleLogout, children: ["Cerrar sesi\u00F3n", username ? ` · ${username}` : ''] }))] }), _jsx(ModuleNav, { modules: MODULES, currentModule: currentModule, onSelect: setCurrentModule }), renderModule()] }));
 }
