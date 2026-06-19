@@ -55,10 +55,19 @@ export interface ClubFinanceDebugInfo {
   sectorBalanceCells: Record<string, unknown>;
   liquidity: number;
   cuotasAdeudadas: number;
+  cuotasACobrar: number;
   pendingNetBalance: number;
   saldosAPagar: number;
   projectedBalance: number;
   formula: string;
+  aulaCommissionMap: Record<string, number>;
+  receivableDebtorsSamples: Array<{ id: string; nombre: string; actividad?: string; sourceSheet: string; cuota: number; commissionRate: number; receivableFee: number }>;
+  totalReceivableFromDebtors: number;
+  futureReceivablesUntilMonthEnd: number;
+  pendingNetBalanceFromMovements: number;
+  pendingNetBalanceFinal: number;
+  projectedBalanceFormula: string;
+  missingAulaCommissions: string[];
 }
 
 const MOVEMENT_HEADER_RANGES: Record<OperationalSheetName, string> = {
@@ -211,6 +220,7 @@ const MEMBER_COLUMN_INDEXES = {
   modalidad: 16,
   cuota: 18,
   estado: 20,
+  vence: 21,
   instructor: 23
 } as const;
 
@@ -484,6 +494,7 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
         cuota: normalizeFee(valueAt(row, MEMBER_COLUMN_INDEXES.cuota)),
         estado: toMemberStatus(valueAt(row, MEMBER_COLUMN_INDEXES.estado)),
         instructor: valueAt(row, MEMBER_COLUMN_INDEXES.instructor) || undefined,
+        vence: normalizeDate(valueAt(row, MEMBER_COLUMN_INDEXES.vence)),
         sourceSheet: sheetName
       };
 
@@ -577,31 +588,106 @@ const countBy = (movements: AdminMovement[], getter: (movement: AdminMovement) =
     return acc;
   }, {});
 
-export const PROJECTED_BALANCE_FORMULA = "liquidity + cuotasAdeudadas + pendingNetBalance - saldosAPagar";
+
+export const normalizeActivityName = (value: unknown): string =>
+  normalizeSheetText(value)
+    .toLowerCase()
+    .replace(/[-–—_/]+/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export const parseCommissionRate = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value > 1 ? value / 100 : value;
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const parsed = normalizeMoney(raw.replace("%", ""));
+  if (!Number.isFinite(parsed)) return 0;
+  return raw.includes("%") || parsed > 1 ? parsed / 100 : parsed;
+};
+
+export const parseAulaCommissionMap = (rows: unknown[][]): Record<string, number> => {
+  const map: Record<string, number> = {};
+  for (const row of rows) {
+    if (normalizeSheetText(row[0]).toUpperCase() !== "EC") continue;
+    const activityKey = normalizeActivityName(row[1]);
+    if (!activityKey) continue;
+    map[activityKey] = parseCommissionRate(row[10]);
+  }
+  return map;
+};
+
+export const getReceivableCommissionRate = (member: Member, aulaCommissionMap: Record<string, number>): number => {
+  const sourceSheet = normalizeSheetText(member.sourceSheet).toUpperCase();
+  if (sourceSheet === "FITNESS") return 0.5;
+  if (sourceSheet === "SALON") return 0;
+  if (sourceSheet === "AULA") return aulaCommissionMap[normalizeActivityName(member.actividad)] ?? 0;
+  return 0;
+};
+
+export const calculateReceivableFee = (member: Member, aulaCommissionMap: Record<string, number>): number => {
+  const fee = normalizeMoney(member.cuota);
+  if (fee <= 0) return 0;
+  return fee * getReceivableCommissionRate(member, aulaCommissionMap);
+};
+
+const addDays = (date: Date, days: number): Date => {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+};
+
+export const getMemberDueDate = (member: Member): Date | undefined => {
+  const directDate = normalizeDate(member.vence ?? member.expirationDate ?? member.dueDate);
+  if (directDate) return new Date(directDate);
+  if (member.lastPaymentAt) return addDays(new Date(member.lastPaymentAt), 31);
+  return undefined;
+};
+
+export const calculateFutureReceivableFeesUntilMonthEnd = (members: Member[], aulaCommissionMap: Record<string, number>, today = new Date()): number => {
+  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  return members
+    .filter((member) => normalizeOperationalStatus(member.estado) === "al_dia")
+    .reduce((sum, member) => {
+      const dueDate = getMemberDueDate(member);
+      if (!dueDate || dueDate < start || dueDate > end) return sum;
+      return sum + calculateReceivableFee(member, aulaCommissionMap);
+    }, 0);
+};
+
+export const calculateReceivableFeesFromDebtors = (members: Member[], aulaCommissionMap: Record<string, number>): number =>
+  members
+    .filter((member) => normalizeOperationalStatus(member.estado) === "adeudando")
+    .reduce((sum, member) => sum + calculateReceivableFee(member, aulaCommissionMap), 0);
+
+export const PROJECTED_BALANCE_FORMULA = "liquidity + cuotasACobrar + pendingNetBalance - saldosAPagar";
 
 export const calculateProjectedBalance = ({
   liquidity,
-  cuotasAdeudadas,
+  cuotasACobrar,
   pendingNetBalance,
   saldosAPagar
 }: {
   liquidity: number;
-  cuotasAdeudadas: number;
+  cuotasACobrar: number;
   pendingNetBalance: number;
   saldosAPagar: number;
-}): number => liquidity + cuotasAdeudadas + pendingNetBalance - saldosAPagar;
+}): number => liquidity + cuotasACobrar + pendingNetBalance - saldosAPagar;
 
-const buildEmptyClubOperationsSummary = (cuotasAdeudadas = 0): ClubOperationsSummary => ({
+const buildEmptyClubOperationsSummary = (cuotasACobrar = 0, futureReceivableFeesUntilMonthEnd = 0): ClubOperationsSummary => ({
   liquidity: 0,
   cash: 0,
   bank: 0,
   dollars: 0,
   pendingIncome: 0,
   pendingExpenses: 0,
-  pendingNetBalance: 0,
-  cuotasAdeudadas,
+  pendingNetBalance: futureReceivableFeesUntilMonthEnd,
+  cuotasAdeudadas: cuotasACobrar,
+  cuotasACobrar,
+  futureReceivableFeesUntilMonthEnd,
   saldosAPagar: 0,
-  projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasAdeudadas, pendingNetBalance: 0, saldosAPagar: 0 }),
+  projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasACobrar, pendingNetBalance: futureReceivableFeesUntilMonthEnd, saldosAPagar: 0 }),
   sectorBalances: [],
   incomeBySector: [],
   expenseBySector: [],
@@ -624,7 +710,7 @@ const parseLiquidityBalances = (balanceRows: unknown[][]) => ({
   dollars: normalizeMoney(balanceRows[2]?.[3])
 });
 
-const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unknown[][], sectorBalances: SectorBalance[], cuotasAdeudadas = 0): ClubOperationsSummary => {
+const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unknown[][], sectorBalances: SectorBalance[], cuotasACobrar = 0, futureReceivableFeesUntilMonthEnd = 0): ClubOperationsSummary => {
   const { liquidity, cash, bank, dollars } = parseLiquidityBalances(balanceRows);
   const pendingMovements = movements.filter((movement) => isPending(movement.estado));
   const pendingIncome = pendingMovements
@@ -633,7 +719,8 @@ const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unk
   const pendingExpenses = pendingMovements
     .filter((movement) => isExpense(movement.tipo))
     .reduce((sum, movement) => sum + movement.monto, 0);
-  const pendingNetBalance = pendingIncome - pendingExpenses;
+  const pendingNetBalanceFromMovements = pendingIncome - pendingExpenses;
+  const pendingNetBalance = pendingNetBalanceFromMovements + futureReceivableFeesUntilMonthEnd;
   const saldosAPagar = sectorBalances.reduce((sum, balance) => sum + balance.amount, 0);
   const completedIncome = (movement: AdminMovement) => isIncome(movement.tipo) && isCompleted(movement.estado);
   const completedExpense = (movement: AdminMovement) => isExpense(movement.tipo) && isCompleted(movement.estado);
@@ -650,9 +737,11 @@ const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unk
     pendingIncome,
     pendingExpenses,
     pendingNetBalance,
-    cuotasAdeudadas,
+    cuotasAdeudadas: cuotasACobrar,
+    cuotasACobrar,
+    futureReceivableFeesUntilMonthEnd,
     saldosAPagar,
-    projectedBalance: calculateProjectedBalance({ liquidity, cuotasAdeudadas, pendingNetBalance, saldosAPagar }),
+    projectedBalance: calculateProjectedBalance({ liquidity, cuotasACobrar, pendingNetBalance, saldosAPagar }),
     sectorBalances,
     incomeBySector: allIncomeBySector.slice(0, 4),
     expenseBySector: allExpenseBySector.slice(0, 4),
@@ -679,7 +768,7 @@ const readClubFinanceRanges = async (config: ReturnType<typeof getGoogleSheetsCo
   const sheetsClient = getSheetsClient(config);
   const response = await sheetsClient.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
-    ranges: [config.adminMovementsRange, config.adminBalancesRange, ...SECTOR_BALANCE_SHEET_NAMES.map((sheet) => config.sectorBalanceRanges[sheet])],
+    ranges: [config.adminMovementsRange, config.adminBalancesRange, ...SECTOR_BALANCE_SHEET_NAMES.map((sheet) => config.sectorBalanceRanges[sheet]), "AULA!B18:V30"],
     majorDimension: "ROWS"
   });
 
@@ -693,7 +782,9 @@ const readClubFinanceRanges = async (config: ReturnType<typeof getGoogleSheetsCo
     return { sector, amount: normalizeMoney(rawValue) };
   });
 
-  return { movementValues, balanceRows, sectorBalances, sectorBalanceCells };
+  const aulaCommissionRows = valueRanges[SECTOR_BALANCE_SHEET_NAMES.length + 2]?.values ?? [];
+
+  return { movementValues, balanceRows, sectorBalances, sectorBalanceCells, aulaCommissionRows };
 };
 
 export const getAdminMovementsFromGoogleSheets = async (): Promise<AdminMovement[]> => {
@@ -705,17 +796,24 @@ export const getAdminMovementsFromGoogleSheets = async (): Promise<AdminMovement
   return parseAdminMovementsFromValues(movementValues);
 };
 
-export const getClubOperationsSummaryFromGoogleSheets = async (cuotasAdeudadas = 0): Promise<ClubOperationsSummary> => {
+export const getClubOperationsSummaryFromGoogleSheets = async (members: Member[] = []): Promise<ClubOperationsSummary> => {
   const config = getGoogleSheetsConfig();
-  if (!config.enabled) return buildEmptyClubOperationsSummary(cuotasAdeudadas);
+  if (!config.enabled) return buildEmptyClubOperationsSummary(calculateReceivableFeesFromDebtors(members, {}), calculateFutureReceivableFeesUntilMonthEnd(members, {}));
   ensureGoogleSheetsEnabled(config);
 
-  const { movementValues, balanceRows, sectorBalances } = await readClubFinanceRanges(config);
-  return buildClubOperationsSummary(parseAdminMovementsFromValues(movementValues), balanceRows, sectorBalances, cuotasAdeudadas);
+  const { movementValues, balanceRows, sectorBalances, aulaCommissionRows } = await readClubFinanceRanges(config);
+  const aulaCommissionMap = parseAulaCommissionMap(aulaCommissionRows);
+  const cuotasACobrar = calculateReceivableFeesFromDebtors(members, aulaCommissionMap);
+  const futureReceivableFeesUntilMonthEnd = calculateFutureReceivableFeesUntilMonthEnd(members, aulaCommissionMap);
+  return buildClubOperationsSummary(parseAdminMovementsFromValues(movementValues), balanceRows, sectorBalances, cuotasACobrar, futureReceivableFeesUntilMonthEnd);
 };
 
-export const getClubFinanceDebugFromGoogleSheets = async (cuotasAdeudadas = 0): Promise<ClubFinanceDebugInfo> => {
+export const getClubFinanceDebugFromGoogleSheets = async (members: Member[] = []): Promise<ClubFinanceDebugInfo> => {
   const config = getGoogleSheetsConfig();
+  const emptyAulaCommissionMap: Record<string, number> = {};
+  const emptyCuotasACobrar = calculateReceivableFeesFromDebtors(members, emptyAulaCommissionMap);
+  const emptyFutureReceivables = calculateFutureReceivableFeesUntilMonthEnd(members, emptyAulaCommissionMap);
+
   if (!config.enabled) {
     return {
       totalMovementsRead: 0,
@@ -731,17 +829,29 @@ export const getClubFinanceDebugFromGoogleSheets = async (cuotasAdeudadas = 0): 
       parsedDollars: 0,
       sectorBalanceCells: {},
       liquidity: 0,
-      cuotasAdeudadas,
-      pendingNetBalance: 0,
+      cuotasAdeudadas: emptyCuotasACobrar,
+      cuotasACobrar: emptyCuotasACobrar,
+      pendingNetBalance: emptyFutureReceivables,
       saldosAPagar: 0,
-      projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasAdeudadas, pendingNetBalance: 0, saldosAPagar: 0 }),
-      formula: PROJECTED_BALANCE_FORMULA
+      projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasACobrar: emptyCuotasACobrar, pendingNetBalance: emptyFutureReceivables, saldosAPagar: 0 }),
+      formula: PROJECTED_BALANCE_FORMULA,
+      aulaCommissionMap: emptyAulaCommissionMap,
+      receivableDebtorsSamples: [],
+      totalReceivableFromDebtors: emptyCuotasACobrar,
+      futureReceivablesUntilMonthEnd: emptyFutureReceivables,
+      pendingNetBalanceFromMovements: 0,
+      pendingNetBalanceFinal: emptyFutureReceivables,
+      projectedBalanceFormula: PROJECTED_BALANCE_FORMULA,
+      missingAulaCommissions: []
     };
   }
   ensureGoogleSheetsEnabled(config);
 
-  const { movementValues, balanceRows, sectorBalances, sectorBalanceCells } = await readClubFinanceRanges(config);
+  const { movementValues, balanceRows, sectorBalances, sectorBalanceCells, aulaCommissionRows } = await readClubFinanceRanges(config);
   const movements = parseAdminMovementsFromValues(movementValues);
+  const aulaCommissionMap = parseAulaCommissionMap(aulaCommissionRows);
+  const cuotasACobrar = calculateReceivableFeesFromDebtors(members, aulaCommissionMap);
+  const futureReceivablesUntilMonthEnd = calculateFutureReceivableFeesUntilMonthEnd(members, aulaCommissionMap);
   const { liquidity: parsedLiquidity, cash: parsedCash, bank: parsedBank, dollars: parsedDollars } = parseLiquidityBalances(balanceRows);
   const pendingMovements = movements.filter((movement) => isPending(movement.estado));
   const pendingIncome = pendingMovements
@@ -750,9 +860,20 @@ export const getClubFinanceDebugFromGoogleSheets = async (cuotasAdeudadas = 0): 
   const pendingExpenses = pendingMovements
     .filter((movement) => isExpense(movement.tipo))
     .reduce((sum, movement) => sum + movement.monto, 0);
-  const pendingNetBalance = pendingIncome - pendingExpenses;
+  const pendingNetBalanceFromMovements = pendingIncome - pendingExpenses;
+  const pendingNetBalance = pendingNetBalanceFromMovements + futureReceivablesUntilMonthEnd;
   const saldosAPagar = sectorBalances.reduce((sum, balance) => sum + balance.amount, 0);
-  const projectedBalance = calculateProjectedBalance({ liquidity: parsedLiquidity, cuotasAdeudadas, pendingNetBalance, saldosAPagar });
+  const projectedBalance = calculateProjectedBalance({ liquidity: parsedLiquidity, cuotasACobrar, pendingNetBalance, saldosAPagar });
+  const missingAulaCommissions = Array.from(
+    new Set(
+      members
+        .filter((member) => normalizeSheetText(member.sourceSheet).toUpperCase() === "AULA")
+        .filter((member) => normalizeMoney(member.cuota) > 0)
+        .filter((member) => aulaCommissionMap[normalizeActivityName(member.actividad)] === undefined)
+        .map((member) => member.actividad ?? "Sin actividad")
+    )
+  );
+
   return {
     totalMovementsRead: Math.max(movementValues.length - 1, 0),
     validMovements: movements.length,
@@ -767,11 +888,31 @@ export const getClubFinanceDebugFromGoogleSheets = async (cuotasAdeudadas = 0): 
     parsedDollars,
     sectorBalanceCells,
     liquidity: parsedLiquidity,
-    cuotasAdeudadas,
+    cuotasAdeudadas: cuotasACobrar,
+    cuotasACobrar,
     pendingNetBalance,
     saldosAPagar,
     projectedBalance,
-    formula: PROJECTED_BALANCE_FORMULA
+    formula: PROJECTED_BALANCE_FORMULA,
+    aulaCommissionMap,
+    receivableDebtorsSamples: members
+      .filter((member) => normalizeOperationalStatus(member.estado) === "adeudando")
+      .slice(0, 10)
+      .map((member) => ({
+        id: member.id,
+        nombre: `${member.nombre} ${member.apellido}`.trim(),
+        actividad: member.actividad,
+        sourceSheet: member.sourceSheet,
+        cuota: normalizeMoney(member.cuota),
+        commissionRate: getReceivableCommissionRate(member, aulaCommissionMap),
+        receivableFee: calculateReceivableFee(member, aulaCommissionMap)
+      })),
+    totalReceivableFromDebtors: cuotasACobrar,
+    futureReceivablesUntilMonthEnd,
+    pendingNetBalanceFromMovements,
+    pendingNetBalanceFinal: pendingNetBalance,
+    projectedBalanceFormula: PROJECTED_BALANCE_FORMULA,
+    missingAulaCommissions
   };
 };
 

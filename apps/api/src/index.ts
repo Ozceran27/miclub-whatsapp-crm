@@ -269,9 +269,7 @@ app.get("/admin-movements", async (_req, res) => {
 app.get("/club-finance-summary", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
-    const debtors = members.filter(isDebtorMember);
-    const cuotasAdeudadas = debtors.reduce((sum, debtor) => sum + normalizeFeeToArs(debtor.cuota), 0);
-    res.json(await getClubOperationsSummaryFromGoogleSheets(cuotasAdeudadas));
+    res.json(await getClubOperationsSummaryFromGoogleSheets(members));
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo obtener el resumen financiero del club.";
     jsonError(res, 500, message);
@@ -281,9 +279,7 @@ app.get("/club-finance-summary", async (_req, res) => {
 app.get("/club-finance-debug", async (_req, res) => {
   try {
     const { members } = await getMembersSource();
-    const debtors = members.filter(isDebtorMember);
-    const cuotasAdeudadas = debtors.reduce((sum, debtor) => sum + normalizeFeeToArs(debtor.cuota), 0);
-    res.json(await getClubFinanceDebugFromGoogleSheets(cuotasAdeudadas));
+    res.json(await getClubFinanceDebugFromGoogleSheets(members));
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
     jsonError(res, 500, message);

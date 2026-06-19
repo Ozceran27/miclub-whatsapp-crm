@@ -29,6 +29,9 @@ export interface Member {
   lastPaymentAmount?: number;
   lastPaymentSourceSheet?: string;
   lastPaymentConcept?: string;
+  vence?: string;
+  expirationDate?: string;
+  dueDate?: string;
   sourceSheet: SourceSheet;
 }
 
@@ -195,6 +198,8 @@ export interface ClubOperationsSummary extends FinancialSummary {
   pendingExpenses: number;
   pendingNetBalance: number;
   cuotasAdeudadas: number;
+  cuotasACobrar: number;
+  futureReceivableFeesUntilMonthEnd: number;
   saldosAPagar: number;
   projectedBalance: number;
   sectorBalances: SectorBalance[];
