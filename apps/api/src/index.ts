@@ -39,7 +39,7 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
 import cors from "cors";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ContactedRecentResponse, Member, MessageTemplate, OperationalStatusKey, PaginatedHistoryResponse, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation, StatusBreakdown } from "@miclub/shared";
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
@@ -48,7 +48,24 @@ import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets,
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
-app.use(cors());
+const authEnabled = process.env.AUTH_ENABLED === "true";
+const authUser = process.env.AUTH_USER ?? "";
+const authPassword = process.env.AUTH_PASSWORD ?? "";
+const sessionSecret = process.env.SESSION_SECRET ?? "";
+const publicAppUrl = process.env.PUBLIC_APP_URL ?? "";
+const sessionCookieName = "miclub_session";
+const sessionMaxAgeMs = 12 * 60 * 60 * 1000;
+
+if (authEnabled && !sessionSecret) {
+  throw new Error("SESSION_SECRET es obligatorio cuando AUTH_ENABLED=true.");
+}
+
+if (authEnabled && (!authUser || !authPassword)) {
+  throw new Error("AUTH_USER y AUTH_PASSWORD son obligatorios cuando AUTH_ENABLED=true.");
+}
+
+app.set("trust proxy", true);
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 if (isProduction) {
@@ -57,6 +74,114 @@ if (isProduction) {
 
 const jsonError = (res: express.Response, status: number, message: string) =>
   res.status(status).json({ error: true, message });
+
+type SessionPayload = {
+  username: string;
+  expiresAt: number;
+};
+
+const base64UrlEncode = (value: string): string => Buffer.from(value, "utf8").toString("base64url");
+const base64UrlDecode = (value: string): string => Buffer.from(value, "base64url").toString("utf8");
+
+const signSessionPayload = (payload: string): string =>
+  createHmac("sha256", sessionSecret).update(payload).digest("base64url");
+
+const createSessionCookieValue = (username: string): string => {
+  const payload = base64UrlEncode(JSON.stringify({ username, expiresAt: Date.now() + sessionMaxAgeMs } satisfies SessionPayload));
+  return `${payload}.${signSessionPayload(payload)}`;
+};
+
+const safeEqual = (a: string, b: string): boolean => {
+  const aBuffer = Buffer.from(a);
+  const bBuffer = Buffer.from(b);
+  return aBuffer.length === bBuffer.length && timingSafeEqual(aBuffer, bBuffer);
+};
+
+const parseCookies = (cookieHeader: string | undefined): Record<string, string> => {
+  if (!cookieHeader) return {};
+  return Object.fromEntries(
+    cookieHeader
+      .split(";")
+      .map((cookie) => cookie.trim())
+      .filter(Boolean)
+      .map((cookie) => {
+        const separatorIndex = cookie.indexOf("=");
+        if (separatorIndex === -1) return [cookie, ""];
+        return [cookie.slice(0, separatorIndex), decodeURIComponent(cookie.slice(separatorIndex + 1))];
+      })
+  );
+};
+
+const getSession = (req: express.Request): SessionPayload | null => {
+  if (!authEnabled || !sessionSecret) return null;
+  const cookieValue = parseCookies(req.headers.cookie)[sessionCookieName];
+  if (!cookieValue) return null;
+
+  const [payload, signature] = cookieValue.split(".");
+  if (!payload || !signature || !safeEqual(signature, signSessionPayload(payload))) return null;
+
+  try {
+    const session = JSON.parse(base64UrlDecode(payload)) as Partial<SessionPayload>;
+    if (typeof session.username !== "string" || typeof session.expiresAt !== "number") return null;
+    if (session.expiresAt <= Date.now()) return null;
+    return { username: session.username, expiresAt: session.expiresAt };
+  } catch {
+    return null;
+  }
+};
+
+const shouldUseSecureCookie = (req: express.Request): boolean =>
+  req.secure || req.get("x-forwarded-proto") === "https" || publicAppUrl.startsWith("https://");
+
+const setSessionCookie = (req: express.Request, res: express.Response, username: string) => {
+  res.cookie(sessionCookieName, createSessionCookieValue(username), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: shouldUseSecureCookie(req),
+    maxAge: sessionMaxAgeMs,
+    path: "/"
+  });
+};
+
+const clearSessionCookie = (req: express.Request, res: express.Response) => {
+  res.clearCookie(sessionCookieName, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: shouldUseSecureCookie(req),
+    path: "/"
+  });
+};
+
+const protectedApiPrefixes = [
+  "/members",
+  "/debtors",
+  "/summary",
+  "/admin-movements",
+  "/club-finance",
+  "/sector-operational",
+  "/status-debug",
+  "/sync-status",
+  "/payments-debug",
+  "/templates",
+  "/history",
+  "/contacted-recent",
+  "/prepare-messages"
+];
+
+const isProtectedApiPath = (pathName: string): boolean =>
+  protectedApiPrefixes.some((prefix) => pathName === prefix || pathName.startsWith(`${prefix}/`));
+
+const isFrontendNavigation = (req: express.Request): boolean =>
+  isProduction && req.method === "GET" && Boolean(req.accepts("html")) && !req.path.includes(".") && !isProtectedApiPath(req.path);
+
+const authProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!authEnabled) return next();
+  if (req.path.startsWith("/auth/") || req.path === "/health") return next();
+  if (getSession(req)) return next();
+
+  if (isFrontendNavigation(req)) return next();
+  return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
+};
 
 const runDb = (query: string, params: unknown[] = []): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -213,6 +338,37 @@ const seedDefaultTemplates = async () => {
     );
   }
 };
+
+app.post("/auth/login", (req, res) => {
+  if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
+
+  const body = req.body as { username?: unknown; password?: unknown };
+  const username = typeof body.username === "string" ? body.username : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  const validCredentials = safeEqual(username, authUser) && safeEqual(password, authPassword);
+
+  if (!validCredentials) {
+    return res.status(401).json({ authenticated: false, message: "Credenciales inválidas" });
+  }
+
+  setSessionCookie(req, res, authUser);
+  return res.json({ authenticated: true, username: authUser });
+});
+
+app.post("/auth/logout", (req, res) => {
+  clearSessionCookie(req, res);
+  return res.json({ authenticated: false });
+});
+
+app.get("/auth/me", (req, res) => {
+  if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
+
+  const session = getSession(req);
+  if (!session) return res.json({ authenticated: false, authEnabled: true });
+  return res.json({ authenticated: true, authEnabled: true, username: session.username });
+});
+
+app.use(authProtection);
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {
