@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateProjectedBalance, isCompleted, isExpense, isIncome, isPending, normalizeMoney, normalizeOperationalStatus, normalizeSheetText } from './googleSheets.js';
+import { calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate } from './googleSheets.js';
 
 test('normalizeOperationalStatus normaliza estados operativos conocidos', () => {
   assert.equal(normalizeOperationalStatus('Al Día'), 'al_dia');
@@ -51,10 +51,53 @@ test('calculateProjectedBalance resta saldosAPagar como obligación futura', () 
   assert.equal(
     calculateProjectedBalance({
       liquidity: 1000000,
-      cuotasAdeudadas: 500000,
+      cuotasACobrar: 500000,
       pendingNetBalance: 100000,
       saldosAPagar: 200000
     }),
     1400000
   );
+});
+
+
+test('calculateReceivableFee aplica comisiones por sector y actividad', () => {
+  const aulaCommissionMap = { 'arte ninos': 0.4 };
+  assert.equal(calculateReceivableFee({ id: '1', nombre: 'Fit', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 30000, sourceSheet: 'FITNESS' }, aulaCommissionMap), 15000);
+  assert.equal(calculateReceivableFee({ id: '2', nombre: 'Salon', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 30000, sourceSheet: 'SALON' }, aulaCommissionMap), 0);
+  assert.equal(calculateReceivableFee({ id: '3', nombre: 'Aula', apellido: '', telefono: '1', estado: 'Adeudando', actividad: 'Arte - Niños', cuota: 30000, sourceSheet: 'AULA' }, aulaCommissionMap), 12000);
+});
+
+test('parseCommissionRate interpreta porcentajes y decimales de AULA', () => {
+  assert.equal(parseCommissionRate('40%'), 0.4);
+  assert.equal(parseCommissionRate('0,4'), 0.4);
+  assert.equal(parseCommissionRate(0.4), 0.4);
+  assert.equal(parseCommissionRate('40'), 0.4);
+});
+
+test('parseAulaCommissionMap usa solo actividades EC y normaliza nombres', () => {
+  const map = parseAulaCommissionMap([
+    ['EC', 'Arte - Niños', '', '', '', '', '', '', '', '', '40%'],
+    ['BAJA', 'Karate', '', '', '', '', '', '', '', '', '50%']
+  ]);
+  assert.equal(map['arte ninos'], 0.4);
+  assert.equal(map.karate, undefined);
+});
+
+test('calculateReceivableFee no cuenta abandonados indirectamente ni cuotas cero', () => {
+  const aulaCommissionMap = { yoga: 0.4 };
+  assert.equal(calculateReceivableFee({ id: '1', nombre: 'Cero', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 0, sourceSheet: 'FITNESS' }, aulaCommissionMap), 0);
+  assert.equal(getReceivableCommissionRate({ id: '2', nombre: 'Ab', apellido: '', telefono: '1', estado: 'Abandonado', cuota: 30000, sourceSheet: 'SALON' }, aulaCommissionMap), 0);
+  assert.equal(calculateReceivableFeesFromDebtors([{ id: '3', nombre: 'Ab', apellido: '', telefono: '1', estado: 'Abandonado', cuota: 30000, sourceSheet: 'FITNESS' }], aulaCommissionMap), 0);
+});
+
+test('calculateFutureReceivableFeesUntilMonthEnd suma vencimientos al día del mes actual', () => {
+  const members: import('@miclub/shared').Member[] = [
+    { id: '1', nombre: 'Fit', apellido: '', telefono: '1', estado: 'Al día', cuota: 30000, vence: '2026-06-24T00:00:00.000Z', sourceSheet: 'FITNESS' as const },
+    { id: '2', nombre: 'Salon', apellido: '', telefono: '1', estado: 'Al día', cuota: 20000, vence: '2026-06-24T00:00:00.000Z', sourceSheet: 'SALON' as const },
+    { id: '3', nombre: 'Aula', apellido: '', telefono: '1', estado: 'Al día', actividad: 'Arte - Niños', cuota: 30000, vence: '2026-06-24T00:00:00.000Z', sourceSheet: 'AULA' as const },
+    { id: '4', nombre: 'Next', apellido: '', telefono: '1', estado: 'Al día', cuota: 30000, vence: '2026-07-01T00:00:00.000Z', sourceSheet: 'FITNESS' as const },
+    { id: '5', nombre: 'Debt', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 30000, vence: '2026-06-24T00:00:00.000Z', sourceSheet: 'FITNESS' as const }
+  ];
+  assert.equal(calculateFutureReceivableFeesUntilMonthEnd(members, { 'arte ninos': 0.4 }, new Date('2026-06-18T12:00:00.000Z')), 27000);
+  assert.equal(100000 + calculateFutureReceivableFeesUntilMonthEnd(members, { 'arte ninos': 0.4 }, new Date('2026-06-18T12:00:00.000Z')), 127000);
 });

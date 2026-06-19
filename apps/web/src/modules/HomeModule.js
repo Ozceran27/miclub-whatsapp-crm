@@ -254,7 +254,7 @@ export default function HomeModule({ onOpenModule }) {
     const maxActiveActivityCount = mainActiveActivityBreakdown[0]?.count ?? 0;
     const weightedAverageFee = useMemo(() => calculateWeightedAverageFee(members), [members]);
     const weightedAverageFeeLabel = weightedAverageFee === undefined ? '—' : formatArPeso(weightedAverageFee);
-    const estimatedDebt = financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt;
+    const estimatedDebt = financeSummary?.cuotasACobrar ?? financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt;
     const syncBadgeLabel = syncLabel;
     const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
     const unavailableLabel = financeError ? 'No disponible' : '—';
@@ -268,7 +268,7 @@ export default function HomeModule({ onOpenModule }) {
         { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
     ];
     const operationalBalanceLines = [
-        { label: 'Cuotas Adeudadas', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
+        { label: 'Cuotas a cobrar', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
         { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
         { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar) },
         { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'positiveCritical', iconBefore: '📈' }
