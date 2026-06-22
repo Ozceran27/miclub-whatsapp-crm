@@ -707,14 +707,9 @@ app.post("/prepare-messages", async (req, res) => {
   }
 
   try {
-    const existingPrepared = await allDb<{ memberId: string }>(
-      "SELECT DISTINCT memberId FROM message_history WHERE COALESCE(status, estado) = 'prepared'"
-    );
-    const existingPreparedSet = new Set(existingPrepared.map((row) => row.memberId));
     const prepared: PreparedMessage[] = [];
 
     for (const member of selected) {
-      if (existingPreparedSet.has(member.id)) continue;
       const message = interpolateTemplate(body.message, member);
       const phone = normalizeArPhone(member.telefono);
       if (!phone) continue;
@@ -806,14 +801,20 @@ if (isProduction) {
   });
 }
 
-const startServer = async () => {
+export const startServer = async () => {
   await seedDefaultTemplates();
   app.listen(port, () => {
     console.log(`API running at http://localhost:${port}`);
   });
 };
 
-startServer().catch((error) => {
-  console.error("No se pudo iniciar la API", error);
-  process.exit(1);
-});
+export { app };
+
+const isDirectRun = process.argv[1] ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+
+if (isDirectRun) {
+  startServer().catch((error) => {
+    console.error("No se pudo iniciar la API", error);
+    process.exit(1);
+  });
+}
