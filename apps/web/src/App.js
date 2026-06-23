@@ -5,7 +5,7 @@ import HomeModule from './modules/HomeModule';
 import ModuleNav from './modules/ModuleNav';
 import PlaceholderModule from './modules/PlaceholderModule';
 import LoginScreen from './LoginScreen';
-const API = import.meta.env.VITE_API_URL ?? '';
+import { apiUrl } from './api';
 const MODULES = [
     { id: 'home', label: 'INICIO' },
     { id: 'economy', label: 'ECONOMÍA CLUB' },
@@ -72,7 +72,7 @@ export default function App() {
     useEffect(() => {
         const checkSession = async () => {
             try {
-                const response = await fetch(`${API}/auth/me`, { credentials: 'include' });
+                const response = await fetch(apiUrl('/auth/me'), { credentials: 'include' });
                 const payload = await response.json();
                 setAuthEnabled(Boolean(payload.authEnabled));
                 setIsAuthenticated(payload.authenticated);
@@ -89,7 +89,7 @@ export default function App() {
         void checkSession();
     }, []);
     const handleLogout = async () => {
-        await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
+        await fetch(apiUrl('/auth/logout'), { method: 'POST', credentials: 'include' });
         setIsAuthenticated(false);
         setUsername(null);
         setCurrentModule('home');

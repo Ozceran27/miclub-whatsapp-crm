@@ -4,8 +4,8 @@ import HomeModule from './modules/HomeModule';
 import ModuleNav, { type ModuleDefinition, type ModuleId } from './modules/ModuleNav';
 import PlaceholderModule from './modules/PlaceholderModule';
 import LoginScreen from './LoginScreen';
+import { apiUrl } from './api';
 
-const API = import.meta.env.VITE_API_URL ?? '';
 
 const MODULES: ModuleDefinition[] = [
   { id: 'home', label: 'INICIO' },
@@ -78,7 +78,7 @@ export default function App() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch(`${API}/auth/me`, { credentials: 'include' });
+        const response = await fetch(apiUrl('/auth/me'), { credentials: 'include' });
         const payload = await response.json() as { authenticated: boolean; authEnabled?: boolean; username?: string | null };
         setAuthEnabled(Boolean(payload.authEnabled));
         setIsAuthenticated(payload.authenticated);
@@ -95,7 +95,7 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
+    await fetch(apiUrl('/auth/logout'), { method: 'POST', credentials: 'include' });
     setIsAuthenticated(false);
     setUsername(null);
     setCurrentModule('home');

@@ -1,8 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from 'react';
 import { formatArPeso } from '../utils';
+import { apiUrl } from '../api';
 const Icon = ({ label }) => _jsx("span", { "aria-hidden": "true", className: "mini-icon", children: label });
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 const DEFAULT_SORT_BY = 'lastPaymentAt';
 const DEFAULT_SORT_DIRECTION = 'asc';
 const SORT_OPTIONS = [
@@ -155,7 +155,7 @@ export default function CrmModule() {
     const [templateStatus, setTemplateStatus] = useState('idle');
     const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
     const loadHistory = async (page = 1) => {
-        const res = await fetch(`${API}/history?page=${page}&pageSize=20`);
+        const res = await fetch(apiUrl(`/history?page=${page}&pageSize=20`));
         if (!res.ok) {
             const payload = (await res.json());
             throw new Error(payload.message ?? 'No se pudo cargar el historial.');
@@ -170,13 +170,13 @@ export default function CrmModule() {
         setError(null);
         try {
             const [mRes, dRes, tRes, sRes, sumRes, hRes, cRes] = await Promise.all([
-                fetch(`${API}/members`),
-                fetch(`${API}/debtors`),
-                fetch(`${API}/templates`),
-                fetch(`${API}/sync-status`),
-                fetch(`${API}/summary`),
-                fetch(`${API}/history?page=1&pageSize=20`),
-                fetch(`${API}/contacted-recent`)
+                fetch(apiUrl('/members')),
+                fetch(apiUrl('/debtors')),
+                fetch(apiUrl('/templates')),
+                fetch(apiUrl('/sync-status')),
+                fetch(apiUrl('/summary')),
+                fetch(apiUrl('/history?page=1&pageSize=20')),
+                fetch(apiUrl('/contacted-recent'))
             ]);
             if (!mRes.ok || !dRes.ok || !tRes.ok || !sRes.ok || !sumRes.ok || !hRes.ok || !cRes.ok) {
                 throw new Error('No se pudo sincronizar la información.');
@@ -229,7 +229,7 @@ export default function CrmModule() {
     const saveTemplate = async () => {
         if (!selectedTemplate)
             return;
-        const res = await fetch(`${API}/templates/${selectedTemplate.id}`, {
+        const res = await fetch(apiUrl(`/templates/${selectedTemplate.id}`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: templateName, body: message })
@@ -251,7 +251,7 @@ export default function CrmModule() {
         const name = window.prompt('Nombre de la nueva plantilla:');
         if (!name?.trim())
             return;
-        const res = await fetch(`${API}/templates`, {
+        const res = await fetch(apiUrl('/templates'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name.trim(), body: message || 'Hola {nombre}, ' })
@@ -268,7 +268,7 @@ export default function CrmModule() {
     const duplicateTemplate = async () => {
         if (!selectedTemplate)
             return;
-        const res = await fetch(`${API}/templates`, {
+        const res = await fetch(apiUrl('/templates'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: `${templateName} (copia)`, body: message })
@@ -285,7 +285,7 @@ export default function CrmModule() {
             return;
         if (!window.confirm('¿Eliminar plantilla seleccionada?'))
             return;
-        const res = await fetch(`${API}/templates/${selectedTemplate.id}`, { method: 'DELETE' });
+        const res = await fetch(apiUrl(`/templates/${selectedTemplate.id}`), { method: 'DELETE' });
         if (!res.ok)
             throw new Error('No se pudo eliminar la plantilla.');
         const remaining = templates.filter((template) => template.id !== selectedTemplate.id);
@@ -296,7 +296,7 @@ export default function CrmModule() {
     const resetDefaultTemplates = async () => {
         if (!window.confirm('Esto restaurará las plantillas predeterminadas y quitará las personalizadas.'))
             return;
-        const res = await fetch(`${API}/templates/reset-defaults`, { method: 'POST' });
+        const res = await fetch(apiUrl('/templates/reset-defaults'), { method: 'POST' });
         if (!res.ok)
             throw new Error('No se pudieron restaurar plantillas.');
         const restored = (await res.json());
@@ -342,7 +342,7 @@ export default function CrmModule() {
         setPreparing(true);
         setError(null);
         try {
-            const validationRes = await fetch(`${API}/prepare-messages/validate`, {
+            const validationRes = await fetch(apiUrl('/prepare-messages/validate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ memberIds: selected, message, templateName: selectedTemplate?.name ?? templateName })
@@ -364,7 +364,7 @@ export default function CrmModule() {
             const confirmText = `Confirmar preparación\nCantidad: ${validation.selectedCount}\nPrimeros clientes: ${previewClients}\nActividad: ${validation.selectedPreview[0]?.actividad ?? '-'}\nCuota: ${validation.selectedPreview[0]?.cuota ?? '-'}\nMensaje ejemplo: ${validation.sampleMessage}${duplicateWarning}${batchWarning}`;
             if (!window.confirm(confirmText))
                 return;
-            const res = await fetch(`${API}/prepare-messages`, {
+            const res = await fetch(apiUrl('/prepare-messages'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ memberIds: selected, message, templateName: selectedTemplate?.name ?? templateName })
@@ -386,7 +386,7 @@ export default function CrmModule() {
     const updatePreparedStatus = async (historyId, status) => {
         if (!historyId)
             return;
-        const res = await fetch(`${API}/history/${historyId}/status`, {
+        const res = await fetch(apiUrl(`/history/${historyId}/status`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })

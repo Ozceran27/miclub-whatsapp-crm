@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ClubOperationsSummary, Member, SectorOperationalSummary, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
 import { formatArPeso } from '../utils';
 import type { ModuleId } from './ModuleNav';
+import { apiUrl } from '../api';
 
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 type SyncStatus = {
   source: 'mock' | 'google_sheets';
@@ -286,7 +286,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     setFinanceError(null);
     setSectorError(null);
     try {
-      const financePromise = fetch(`${API}/club-finance-summary`)
+      const financePromise = fetch(apiUrl('/club-finance-summary'))
         .then(async (response) => {
           if (!response.ok) throw new Error('No se pudo cargar el resumen financiero.');
           return response.json() as Promise<ClubOperationsSummary>;
@@ -296,7 +296,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
           return null;
         });
 
-      const sectorPromise = fetch(`${API}/sector-operational-summary`)
+      const sectorPromise = fetch(apiUrl('/sector-operational-summary'))
         .then(async (response) => {
           if (!response.ok) throw new Error('No se pudo cargar el resumen operativo por sector.');
           return response.json() as Promise<SectorOperationalSummary>;
@@ -307,10 +307,10 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
         });
 
       const [summaryRes, membersRes, debtorsRes, syncRes, financePayload, sectorPayload] = await Promise.all([
-        fetch(`${API}/summary`),
-        fetch(`${API}/members`),
-        fetch(`${API}/debtors`),
-        fetch(`${API}/sync-status`),
+        fetch(apiUrl('/summary')),
+        fetch(apiUrl('/members')),
+        fetch(apiUrl('/debtors')),
+        fetch(apiUrl('/sync-status')),
         financePromise,
         sectorPromise
       ]);

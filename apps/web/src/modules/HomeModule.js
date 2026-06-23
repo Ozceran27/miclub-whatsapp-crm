@@ -1,7 +1,7 @@
 import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from 'react';
 import { formatArPeso } from '../utils';
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+import { apiUrl } from '../api';
 const MONTH_NAMES_ES_UPPER = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 const getCurrentSpanishMonthUpper = () => MONTH_NAMES_ES_UPPER[new Date().getMonth()];
 const STATUS_ALIASES = {
@@ -176,7 +176,7 @@ export default function HomeModule({ onOpenModule }) {
         setFinanceError(null);
         setSectorError(null);
         try {
-            const financePromise = fetch(`${API}/club-finance-summary`)
+            const financePromise = fetch(apiUrl('/club-finance-summary'))
                 .then(async (response) => {
                 if (!response.ok)
                     throw new Error('No se pudo cargar el resumen financiero.');
@@ -186,7 +186,7 @@ export default function HomeModule({ onOpenModule }) {
                 setFinanceError(financeLoadError instanceof Error ? financeLoadError.message : 'Resumen financiero no disponible.');
                 return null;
             });
-            const sectorPromise = fetch(`${API}/sector-operational-summary`)
+            const sectorPromise = fetch(apiUrl('/sector-operational-summary'))
                 .then(async (response) => {
                 if (!response.ok)
                     throw new Error('No se pudo cargar el resumen operativo por sector.');
@@ -197,10 +197,10 @@ export default function HomeModule({ onOpenModule }) {
                 return null;
             });
             const [summaryRes, membersRes, debtorsRes, syncRes, financePayload, sectorPayload] = await Promise.all([
-                fetch(`${API}/summary`),
-                fetch(`${API}/members`),
-                fetch(`${API}/debtors`),
-                fetch(`${API}/sync-status`),
+                fetch(apiUrl('/summary')),
+                fetch(apiUrl('/members')),
+                fetch(apiUrl('/debtors')),
+                fetch(apiUrl('/sync-status')),
                 financePromise,
                 sectorPromise
             ]);
