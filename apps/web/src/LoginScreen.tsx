@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { apiUrl } from './api';
 
-const API = import.meta.env.VITE_API_URL ?? '';
 
 type LoginScreenProps = {
   onAuthenticated: (username: string | null) => void;
@@ -18,7 +18,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API}/auth/login`, {
+      const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

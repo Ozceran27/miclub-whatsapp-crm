@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
-const API = import.meta.env.VITE_API_URL ?? '';
+import { apiUrl } from './api';
 export default function LoginScreen({ onAuthenticated }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -11,7 +11,7 @@ export default function LoginScreen({ onAuthenticated }) {
         setError('');
         setIsLoading(true);
         try {
-            const response = await fetch(`${API}/auth/login`, {
+            const response = await fetch(apiUrl('/auth/login'), {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
