@@ -44,6 +44,7 @@ import type { ContactedRecentResponse, Member, MessageTemplate, OperationalStatu
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
+import dbRoutes from "./routes/dbRoutes.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
 const app = express();
@@ -67,6 +68,7 @@ if (authEnabled && (!authUser || !authPassword)) {
 app.set("trust proxy", true);
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use("/api/db", dbRoutes);
 
 if (isProduction) {
   app.use(express.static(webDistPath));
@@ -782,6 +784,7 @@ if (isProduction) {
   app.get("*", (req, res, next) => {
     if (
       req.path.startsWith("/health") ||
+      req.path.startsWith("/api/db") ||
       req.path.startsWith("/members") ||
       req.path.startsWith("/debtors") ||
       req.path.startsWith("/summary") ||
