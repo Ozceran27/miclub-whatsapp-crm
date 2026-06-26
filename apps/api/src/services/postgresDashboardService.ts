@@ -130,3 +130,53 @@ export const getPostgresSectorOperationalSummary = async (): Promise<SectorOpera
     crm: { totalMembers: members.length, activeMembers: members.filter((member) => normalizeOperationalStatus(member.estado) !== "abandonado").length, totalDebtors: debtors.length, totalDebtAmount: debtors.reduce((sum, member) => sum + (member.cuota ?? 0), 0) }
   };
 };
+
+export const emptyPostgresSummary = () => ({
+  totalMembers: 0,
+  totalDebtors: 0,
+  totalBySheet: {},
+  debtorsBySheet: {},
+  totalByActivity: {},
+  debtorsByActivity: {},
+  debtorsWithoutPayments: 0,
+  totalEstimatedDebt: 0,
+  statusBreakdown: { total: 0, active: 0, alDia: 0, nuevoInscripto: 0, adeudando: 0, abandonado: 0, otros: 0 },
+  rawStatusBreakdown: {}
+});
+
+export const emptyPostgresClubFinanceSummary = (): ClubOperationsSummary => ({
+  liquidity: 0,
+  cash: 0,
+  bank: 0,
+  dollars: 0,
+  pendingIncome: 0,
+  pendingExpenses: 0,
+  pendingNetBalance: 0,
+  cuotasAdeudadas: 0,
+  cuotasACobrar: 0,
+  futureReceivableFeesUntilMonthEnd: 0,
+  saldosAPagar: 0,
+  projectedBalance: 0,
+  sectorBalances: [],
+  incomeBySector: [],
+  expenseBySector: [],
+  incomeByCategory: [],
+  expenseByCategory: [],
+  totalIncomeSectors: 0,
+  remainingIncomeSectors: 0,
+  totalExpenseSectors: 0,
+  remainingExpenseSectors: 0,
+  totalIncomeCategories: 0,
+  remainingIncomeCategories: 0,
+  totalExpenseCategories: 0,
+  remainingExpenseCategories: 0
+});
+
+export const emptyPostgresSectorOperationalSummary = (): SectorOperationalSummary => ({
+  fitness: { totalMembers: 0, activeMembers: 0, totalProfitability: 0, currentMonthProfitability: 0, totalDebtors: 0, totalDebtAmount: 0, settlementBalance: 0 },
+  salon: { totalMembers: 0, activeMembers: 0, totalProfitability: 0, currentMonthProfitability: 0, mostPopularActivity: null, leastPopularActivity: null },
+  aula: { totalMembers: 0, activeMembers: 0, totalProfitability: 0, currentMonthProfitability: 0, averageCommission: null, mostPopularActivity: null },
+  local1: { totalRelevantIncomeMovements: 0, last30DaysRelevantIncomeMovements: 0, totalProfitability: 0, currentMonthProfitability: 0, settlementBalance: 0, highlightedIncome: null },
+  cantina: { kioskIncome: 0, drinksIncome: 0, cmv: 0, totalProfitability: 0 },
+  crm: { totalMembers: 0, activeMembers: 0, totalDebtors: 0, totalDebtAmount: 0 }
+});

@@ -55,7 +55,9 @@ import moduleRoutes from "./routes/moduleRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 import { shouldUsePostgresDataSource } from "./services/dataSourceService.js";
-import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "./services/postgresDashboardService.js";
+import { emptyPostgresClubFinanceSummary, emptyPostgresSectorOperationalSummary, emptyPostgresSummary, getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "./services/postgresDashboardService.js";
+import { getPostgresHealth } from "./db/health.js";
+import { validatePostgresEnv } from "./config/env.js";
 import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "./services/comparisonService.js";
 
 const app = express();
@@ -256,6 +258,32 @@ const getDb = <T>(query: string, params: unknown[] = []): Promise<T | undefined>
 let lastSyncAt: string | undefined;
 let lastSyncError: string | undefined;
 
+const postgresFallback = <T>(operation: string, fallback: T, error: unknown): T & { dataSourceError: string } => {
+  const message = error instanceof Error ? error.message : `Error desconocido al consultar ${operation}.`;
+  lastSyncError = `PostgreSQL no disponible para ${operation}: ${message}`;
+  console.error(lastSyncError, error);
+  return Object.assign(fallback as object, { dataSourceError: lastSyncError }) as T & { dataSourceError: string };
+};
+
+const getPostgresSyncStatus = async (): Promise<SyncStatus & { ok: boolean; warnings?: string[] }> => {
+  const warnings = validatePostgresEnv();
+  if (warnings.length > 0) {
+    lastSyncError = warnings.join(" ");
+    return { source: "postgres", enabled: true, ok: false, sheets: [], lastSyncAt, error: lastSyncError, warnings };
+  }
+
+  try {
+    await getPostgresHealth();
+    lastSyncAt = new Date().toISOString();
+    lastSyncError = undefined;
+    return { source: "postgres", enabled: true, ok: true, sheets: [], lastSyncAt };
+  } catch (error) {
+    lastSyncError = error instanceof Error ? error.message : "No se pudo consultar PostgreSQL.";
+    console.error("PostgreSQL health check falló:", error);
+    return { source: "postgres", enabled: true, ok: false, sheets: [], lastSyncAt, error: lastSyncError };
+  }
+};
+
 const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: SyncStatus }> => {
   if (shouldUsePostgresDataSource()) {
     const members = await getPostgresMembers();
@@ -441,7 +469,13 @@ app.use("/api", dashboardRoutes);
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {
   try {
-    if (shouldUsePostgresDataSource()) return res.json(await getPostgresMembers());
+    if (shouldUsePostgresDataSource()) {
+      try {
+        return res.json(await getPostgresMembers());
+      } catch (error) {
+        return res.json(postgresFallback("miembros", [], error));
+      }
+    }
     const { members } = await getMembersSource();
     res.json(members);
   } catch {
@@ -451,7 +485,13 @@ app.get("/members", async (_req, res) => {
 
 app.get("/debtors", async (_req, res) => {
   try {
-    if (shouldUsePostgresDataSource()) return res.json(await getPostgresDebtors());
+    if (shouldUsePostgresDataSource()) {
+      try {
+        return res.json(await getPostgresDebtors());
+      } catch (error) {
+        return res.json(postgresFallback("deudores", [], error));
+      }
+    }
     const { members } = await getMembersSource();
     res.json(members.filter(isDebtorMember));
   } catch {
@@ -461,7 +501,13 @@ app.get("/debtors", async (_req, res) => {
 
 app.get("/summary", async (_req, res) => {
   try {
-    if (shouldUsePostgresDataSource()) return res.json(await getPostgresSummary());
+    if (shouldUsePostgresDataSource()) {
+      try {
+        return res.json(await getPostgresSummary());
+      } catch (error) {
+        return res.json(postgresFallback("resumen", emptyPostgresSummary(), error));
+      }
+    }
     const { members } = await getMembersSource();
     const debtors = members.filter(isDebtorMember);
     const statusBreakdown = buildStatusBreakdown(members);
@@ -495,7 +541,13 @@ app.get("/admin-movements", async (_req, res) => {
 
 app.get("/club-finance-summary", async (_req, res) => {
   try {
-    if (shouldUsePostgresDataSource()) return res.json(await getPostgresClubFinanceSummary());
+    if (shouldUsePostgresDataSource()) {
+      try {
+        return res.json(await getPostgresClubFinanceSummary());
+      } catch (error) {
+        return res.json(postgresFallback("resumen financiero", emptyPostgresClubFinanceSummary(), error));
+      }
+    }
     const { members } = await getMembersSource();
     res.json(await getClubOperationsSummaryFromGoogleSheets(members));
   } catch (error) {
@@ -519,7 +571,13 @@ if (debugEndpointsEnabled) {
 
 app.get("/sector-operational-summary", async (_req, res) => {
   try {
-    if (shouldUsePostgresDataSource()) return res.json(await getPostgresSectorOperationalSummary());
+    if (shouldUsePostgresDataSource()) {
+      try {
+        return res.json(await getPostgresSectorOperationalSummary());
+      } catch (error) {
+        return res.json(postgresFallback("resumen operativo por sector", emptyPostgresSectorOperationalSummary(), error));
+      }
+    }
     const { members } = await getMembersSource();
     res.json(await getSectorOperationalSummary(members));
   } catch (error) {
@@ -583,6 +641,7 @@ if (debugEndpointsEnabled) {
 
 app.get("/sync-status", async (_req, res) => {
   try {
+    if (shouldUsePostgresDataSource()) return res.json(await getPostgresSyncStatus());
     const { syncStatus } = await getMembersSource();
     res.json(syncStatus);
   } catch {
