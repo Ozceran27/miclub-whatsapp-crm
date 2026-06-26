@@ -44,6 +44,7 @@ import type { ContactedRecentResponse, Member, MessageTemplate, OperationalStatu
 import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
+import { auditSqliteCrmData, createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, insertCrmHistory, listCrmTemplates, migrateCrmToPostgres, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "./services/crmService.js";
 import dbRoutes from "./routes/dbRoutes.js";
 import catalogRoutes from "./routes/catalogRoutes.js";
 import peopleRoutes from "./routes/peopleRoutes.js";
@@ -79,6 +80,26 @@ app.set("trust proxy", true);
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use("/api/db", dbRoutes);
+app.get("/api/db/crm/audit", async (_req, res) => {
+  try {
+    res.json(await auditSqliteCrmData());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo auditar CRM legacy.";
+    jsonError(res, 500, message);
+  }
+});
+
+app.post("/api/db/crm/migrate", async (req, res) => {
+  const dryRun = req.body?.dryRun !== false;
+  const phase = ["templates", "history", "all"].includes(req.body?.phase) ? req.body.phase : "all";
+  try {
+    res.json(await migrateCrmToPostgres({ dryRun, phase }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo migrar CRM a PostgreSQL.";
+    jsonError(res, 500, message);
+  }
+});
+
 
 if (isProduction) {
   app.use(express.static(webDistPath));
@@ -579,10 +600,7 @@ if (debugEndpointsEnabled) {
 
 app.get("/templates", async (_req, res) => {
   try {
-    const rows = await allDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
-      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates ORDER BY isDefault DESC, datetime(createdAt) ASC"
-    );
-    res.json(rows.map(mapTemplateRow));
+    res.json(await listCrmTemplates());
   } catch {
     jsonError(res, 500, "No se pudieron obtener las plantillas.");
   }
@@ -595,15 +613,8 @@ app.post("/templates", async (req, res) => {
   const now = new Date().toISOString();
   const id = randomUUID();
   try {
-    await runDb(
-      "INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, 0, ?, ?)",
-      [id, body.name?.trim(), body.body?.trim(), now, now]
-    );
-    const created = await getDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
-      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates WHERE id = ?",
-      [id]
-    );
-    res.status(201).json(created ? mapTemplateRow(created) : null);
+    const created = await createCrmTemplate(body.name?.trim() ?? "", body.body?.trim() ?? "", id, now);
+    res.status(201).json(created);
   } catch {
     jsonError(res, 500, "No se pudo crear la plantilla.");
   }
@@ -615,15 +626,10 @@ app.patch("/templates/:id", async (req, res) => {
   const validationError = validateTemplateInput(body.name, body.body);
   if (validationError) return jsonError(res, 400, validationError);
   try {
-    const existing = await getDb<{ id: string }>("SELECT id FROM message_templates WHERE id = ?", [id]);
-    if (!existing) return jsonError(res, 404, "Plantilla no encontrada.");
     const now = new Date().toISOString();
-    await runDb("UPDATE message_templates SET name = ?, body = ?, updatedAt = ? WHERE id = ?", [body.name?.trim(), body.body?.trim(), now, id]);
-    const updated = await getDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
-      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates WHERE id = ?",
-      [id]
-    );
-    res.json(updated ? mapTemplateRow(updated) : null);
+    const updated = await updateCrmTemplate(id, body.name?.trim() ?? "", body.body?.trim() ?? "", now);
+    if (!updated) return jsonError(res, 404, "Plantilla no encontrada.");
+    res.json(updated);
   } catch {
     jsonError(res, 500, "No se pudo actualizar la plantilla.");
   }
@@ -632,10 +638,9 @@ app.patch("/templates/:id", async (req, res) => {
 app.delete("/templates/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const existing = await getDb<{ id: string; isDefault: number }>("SELECT id, isDefault FROM message_templates WHERE id = ?", [id]);
-    if (!existing) return jsonError(res, 404, "Plantilla no encontrada.");
-    if (existing.isDefault === 1) return jsonError(res, 400, "No se pueden eliminar plantillas predeterminadas.");
-    await runDb("DELETE FROM message_templates WHERE id = ?", [id]);
+    const deleteResult = await deleteCrmTemplate(id);
+    if (deleteResult === "missing") return jsonError(res, 404, "Plantilla no encontrada.");
+    if (deleteResult === "default") return jsonError(res, 400, "No se pueden eliminar plantillas predeterminadas.");
     res.status(204).send();
   } catch {
     jsonError(res, 500, "No se pudo eliminar la plantilla.");
@@ -645,17 +650,7 @@ app.delete("/templates/:id", async (req, res) => {
 app.post("/templates/reset-defaults", async (_req, res) => {
   const now = new Date().toISOString();
   try {
-    await runDb("DELETE FROM message_templates");
-    for (const template of templates) {
-      await runDb(
-        "INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)",
-        [template.id, template.name, template.body, now, now]
-      );
-    }
-    const rows = await allDb<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>(
-      "SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates ORDER BY datetime(createdAt) ASC"
-    );
-    res.json(rows.map(mapTemplateRow));
+    res.json(await replaceCrmDefaultTemplates(templates, now));
   } catch {
     jsonError(res, 500, "No se pudieron restaurar las plantillas predeterminadas.");
   }
@@ -668,33 +663,7 @@ app.get("/history", async (req, res) => {
   const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(pageSizeRaw, 20) : 20;
 
   try {
-    const [{ total }] = await allDb<{ total: number }>(
-      `SELECT COUNT(*) as total FROM (
-        SELECT id
-        FROM message_history
-        ORDER BY datetime(createdAt) DESC
-        LIMIT 200
-      )`
-    );
-
-    const offset = (page - 1) * pageSize;
-    const rows = await allDb<PreparedMessage>(
-      `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
-        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note, templateName
-      FROM (
-        SELECT *
-        FROM message_history
-        ORDER BY datetime(createdAt) DESC
-        LIMIT 200
-      )
-      ORDER BY datetime(createdAt) DESC
-      LIMIT ? OFFSET ?`,
-      [pageSize, offset]
-    );
-
-    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
-    const payload: PaginatedHistoryResponse = { items: rows, page, pageSize, total, totalPages };
-    res.json(payload);
+    res.json(await getCrmHistory(page, pageSize));
   } catch {
     jsonError(res, 500, "No se pudo obtener el historial.");
   }
@@ -707,34 +676,7 @@ app.get("/contacted-recent", async (_req, res) => {
   const since = sinceDate.toISOString();
 
   try {
-    const rows = await allDb<{ memberId: string; eventAt: string }>(
-      `SELECT memberId, COALESCE(sentAt, createdAt) as eventAt
-      FROM message_history
-      WHERE COALESCE(status, estado) = 'sent_manual'
-      AND datetime(COALESCE(sentAt, createdAt)) >= datetime(?)
-      ORDER BY datetime(COALESCE(sentAt, createdAt)) DESC`,
-      [since]
-    );
-
-    const byMemberId: ContactedRecentResponse["byMemberId"] = {};
-    for (const row of rows) {
-      if (!row.memberId) continue;
-      const existing = byMemberId[row.memberId];
-      if (!existing) {
-        byMemberId[row.memberId] = { lastSentAt: row.eventAt, count: 1 };
-      } else {
-        existing.count += 1;
-      }
-    }
-
-    const payload: ContactedRecentResponse = {
-      windowDays,
-      since,
-      memberIds: Object.keys(byMemberId),
-      byMemberId
-    };
-
-    res.json(payload);
+    res.json(await getCrmContactedRecent(since, windowDays));
   } catch {
     jsonError(res, 500, "No se pudo obtener contactos recientes.");
   }
@@ -749,7 +691,7 @@ app.post("/prepare-messages/validate", async (req, res) => {
   const missingPhoneMembers = selected.filter((m) => normalizeArPhone(m.telefono).length === 0).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}` }));
   const unresolvedVariables = unresolvedTemplateVariables(body.message);
   const placeholders = selected.slice(0, 3).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}`, actividad: m.actividad, cuota: m.cuota, phone: m.telefono }));
-  const duplicateRows = selected.length === 0 ? [] : await allDb<{ memberId: string; nombre: string; status: string; createdAt: string }>(`SELECT memberId, nombre, COALESCE(status, estado, 'prepared') as status, createdAt FROM message_history WHERE memberId IN (${selected.map(()=>'?').join(',')}) AND COALESCE(status, estado) IN ('prepared','opened','sent_manual') ORDER BY datetime(createdAt) DESC`, selected.map(m=>m.id));
+  const duplicateRows = selected.length === 0 ? [] : await findCrmDuplicatePreparedMessages(selected.map((m) => m.id));
   const seen = new Set<string>();
   const duplicates = duplicateRows.filter((r) => { if (seen.has(r.memberId)) return false; seen.add(r.memberId); return true; });
   const sample = selected[0] ? interpolateTemplate(body.message, selected[0]) : body.message;
@@ -790,18 +732,9 @@ app.post("/prepare-messages", async (req, res) => {
       const waLink = buildWaLink(phone, message);
       const createdAt = new Date().toISOString();
 
-      const historyInsert = await new Promise<number>((resolve, reject) => {
-        db.run(
-          "INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt, templateName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [member.id, `${member.nombre} ${member.apellido}`, phone, message, waLink, "prepared", "prepared", createdAt, body.templateName?.trim() || null],
-          function onRun(err) {
-            if (err) return reject(err);
-            resolve(this.lastID);
-          }
-        );
-      });
+      const created = await insertCrmHistory({ memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, templateName: body.templateName?.trim() || null });
 
-      prepared.push({ historyId: historyInsert, memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt });
+      prepared.push(created);
     }
 
     res.json(prepared);
@@ -819,23 +752,8 @@ app.patch("/history/:id/status", async (req, res) => {
   if (!body.status || !validStatuses.has(body.status)) return jsonError(res, 400, "status inválido.");
 
   try {
-    const existing = await getDb<{ id: number }>("SELECT id FROM message_history WHERE id = ?", [id]);
-    if (!existing) return jsonError(res, 404, "Mensaje no encontrado.");
-
-    const now = new Date().toISOString();
-    const openedAt = body.status === "opened" ? now : null;
-    const sentAt = body.status === "sent_manual" ? now : null;
-    await runDb(
-      "UPDATE message_history SET status = ?, openedAt = COALESCE(?, openedAt), sentAt = COALESCE(?, sentAt), note = COALESCE(?, note) WHERE id = ?",
-      [body.status, openedAt, sentAt, body.note ?? null, id]
-    );
-
-    const updated = await getDb<PreparedMessage>(
-      `SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink,
-        COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note, templateName
-      FROM message_history WHERE id = ?`,
-      [id]
-    );
+    const updated = await updateCrmHistoryStatus(id, body.status, body.note ?? null);
+    if (!updated) return jsonError(res, 404, "Mensaje no encontrado.");
     res.json(updated);
   } catch {
     jsonError(res, 500, "No se pudo actualizar el estado del mensaje.");
