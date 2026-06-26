@@ -6,7 +6,8 @@ Herramienta interna para gestión de cobranzas y preparación manual de mensajes
 - Node.js + TypeScript
 - Express (API)
 - React + Vite (Web)
-- SQLite (historial local)
+- PostgreSQL (datos operativos y CRM en producción)
+- SQLite (historial CRM legacy/local hasta finalizar el corte)
 - Monorepo con workspaces npm
 
 ## Instalación
@@ -19,6 +20,9 @@ cp .env.example .env
 ```env
 PORT=4000
 SQLITE_DB_PATH=apps/api/data/miclub.sqlite
+POSTGRES_ENABLED=false
+DATA_SOURCE=legacy
+CRM_SOURCE=sqlite
 VITE_API_URL=http://localhost:4000
 GOOGLE_SHEETS_ENABLED=false
 GOOGLE_SHEET_ID=
@@ -70,6 +74,24 @@ La primera integración global de datos operativos usa estos rangos y celdas:
 
 La app calcula ingresos/egresos pendientes, saldo pendiente neto, saldos a pagar, saldo proyectado e ingresos/egresos por sector y categoría.
 
+
+
+## Operación PostgreSQL y retiro de legacy
+
+El corte productivo a PostgreSQL debe seguir el runbook de `docs/postgres-cutover-runbook.md`. En resumen:
+
+1. Confirmar que `DATA_SOURCE=postgres` está estable en producción durante el período acordado antes de retirar mocks o Google Sheets.
+2. Confirmar que `CRM_SOURCE=postgres` está estable y que el historial migrado coincide con SQLite antes de retirar SQLite.
+3. Exportar y verificar backups finales de SQLite y Google Sheets antes de eliminar cualquier dependencia legacy.
+4. Eliminar mocks, Google Sheets o SQLite solo cuando ningún endpoint productivo ni importador dependa de ellos.
+
+Variables clave:
+
+- `POSTGRES_ENABLED`: habilita conexión y health checks de PostgreSQL.
+- `DATA_SOURCE`: `legacy` usa Google Sheets/mocks; `postgres` usa repositorios PostgreSQL para datos operativos.
+- `CRM_SOURCE`: `sqlite` usa el archivo local; `postgres` usa tablas CRM en PostgreSQL.
+- `DEBUG_ENDPOINTS_ENABLED`: habilita endpoints de diagnóstico solo durante ventanas controladas.
+- `IMPORT_ENDPOINTS_ENABLED`: habilita endpoints de importación solo durante ventanas controladas.
 
 ## Envío manual por WhatsApp Web
 La aplicación trabaja únicamente con datos reales y genera enlaces `wa.me` con el teléfono normalizado de cada miembro.
