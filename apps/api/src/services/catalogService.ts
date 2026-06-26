@@ -26,3 +26,8 @@ export const getCatalog = async (catalog: CatalogName): Promise<CatalogResponse>
   const items = rows.map(normalizeCatalogRow);
   return { catalog, items, total: items.length };
 };
+
+export const getCatalogItems = async (catalog: CatalogName): Promise<NormalizedCatalogItem[]> => {
+  const response = await getCatalog(catalog);
+  return response.items;
+};

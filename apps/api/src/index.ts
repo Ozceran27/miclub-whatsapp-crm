@@ -46,6 +46,7 @@ import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/m
 import db from "./lib/sqlite.js";
 import dbRoutes from "./routes/dbRoutes.js";
 import catalogRoutes from "./routes/catalogRoutes.js";
+import peopleRoutes from "./routes/peopleRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
@@ -170,7 +171,17 @@ const protectedApiPrefixes = [
   "/history",
   "/contacted-recent",
   "/prepare-messages",
-  "/api/catalogs"
+  "/api/catalogs",
+  "/api/sectors",
+  "/api/activities",
+  "/api/instructors",
+  "/api/movement-categories",
+  "/api/payment-methods",
+  "/api/currencies",
+  "/api/system-months",
+  "/api/discount-rates",
+  "/api/salon-hour-prices",
+  "/api/people"
 ];
 
 const isProtectedApiPath = (pathName: string): boolean =>
@@ -374,7 +385,8 @@ app.get("/auth/me", (req, res) => {
 });
 
 app.use(authProtection);
-app.use("/api/catalogs", catalogRoutes);
+app.use("/api", catalogRoutes);
+app.use("/api", peopleRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {

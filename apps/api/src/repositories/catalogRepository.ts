@@ -1,6 +1,16 @@
 import { getPostgresPool } from "../db/postgres.js";
 
-export type CatalogName = "activities" | "currencies" | "discount-rates" | "payment-methods" | "roles" | "salon-hour-prices" | "sectors";
+export type CatalogName =
+  | "activities"
+  | "currencies"
+  | "discount-rates"
+  | "instructors"
+  | "movement-categories"
+  | "payment-methods"
+  | "roles"
+  | "salon-hour-prices"
+  | "sectors"
+  | "system-months";
 
 export type CatalogRow = Record<string, unknown>;
 
@@ -31,6 +41,20 @@ const catalogQueries: Record<CatalogName, CatalogQuery> = {
       order by percent asc, label asc nulls last
     `
   },
+  instructors: {
+    sql: `
+      select id, person_id, code, display_name, phone, email, is_active, notes, created_at, updated_at
+      from miclub.instructors
+      order by display_name asc, code asc
+    `
+  },
+  "movement-categories": {
+    sql: `
+      select id, code, name, direction, is_active, created_at
+      from miclub.movement_categories
+      order by direction asc, name asc
+    `
+  },
   "payment-methods": {
     sql: `
       select id, name, is_active, created_at
@@ -59,6 +83,13 @@ const catalogQueries: Record<CatalogName, CatalogQuery> = {
       from miclub.sectors
       order by name asc
     `
+  },
+  "system-months": {
+    sql: `
+      select id, year, month, label, starts_on, ends_on, is_closed, created_at, updated_at
+      from miclub.system_months
+      order by year desc, month desc
+    `
   }
 };
 
@@ -72,3 +103,13 @@ export const getCatalogRows = async (catalogName: CatalogName): Promise<CatalogR
   const result = await pool.query<CatalogRow>(catalogQueries[catalogName].sql);
   return result.rows;
 };
+
+export const getSectors = (): Promise<CatalogRow[]> => getCatalogRows("sectors");
+export const getActivities = (): Promise<CatalogRow[]> => getCatalogRows("activities");
+export const getInstructors = (): Promise<CatalogRow[]> => getCatalogRows("instructors");
+export const getMovementCategories = (): Promise<CatalogRow[]> => getCatalogRows("movement-categories");
+export const getPaymentMethods = (): Promise<CatalogRow[]> => getCatalogRows("payment-methods");
+export const getCurrencies = (): Promise<CatalogRow[]> => getCatalogRows("currencies");
+export const getSystemMonths = (): Promise<CatalogRow[]> => getCatalogRows("system-months");
+export const getDiscountRates = (): Promise<CatalogRow[]> => getCatalogRows("discount-rates");
+export const getSalonHourPrices = (): Promise<CatalogRow[]> => getCatalogRows("salon-hour-prices");
