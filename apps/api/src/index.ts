@@ -53,6 +53,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 import { shouldUsePostgresDataSource } from "./services/dataSourceService.js";
 import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "./services/postgresDashboardService.js";
+import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "./services/comparisonService.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -62,6 +63,7 @@ const authPassword = process.env.AUTH_PASSWORD ?? "";
 const sessionSecret = process.env.SESSION_SECRET ?? "";
 const publicAppUrl = process.env.PUBLIC_APP_URL ?? "";
 const sessionCookieName = "miclub_session";
+const debugEndpointsEnabled = process.env.DEBUG_ENDPOINTS_ENABLED === "true";
 const sessionMaxAgeMs = 12 * 60 * 60 * 1000;
 
 if (authEnabled && !sessionSecret) {
@@ -171,6 +173,7 @@ const protectedApiPrefixes = [
   "/status-debug",
   "/sync-status",
   "/payments-debug",
+  "/comparison-debug",
   "/templates",
   "/history",
   "/contacted-recent",
@@ -474,15 +477,17 @@ app.get("/club-finance-summary", async (_req, res) => {
   }
 });
 
-app.get("/club-finance-debug", async (_req, res) => {
-  try {
-    const { members } = await getMembersSource();
-    res.json(await getClubFinanceDebugFromGoogleSheets(members));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
-    jsonError(res, 500, message);
-  }
-});
+if (debugEndpointsEnabled) {
+  app.get("/club-finance-debug", async (_req, res) => {
+    try {
+      const { members } = await getMembersSource();
+      res.json(await getClubFinanceDebugFromGoogleSheets(members));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
+      jsonError(res, 500, message);
+    }
+  });
+}
 
 
 app.get("/sector-operational-summary", async (_req, res) => {
@@ -496,37 +501,58 @@ app.get("/sector-operational-summary", async (_req, res) => {
   }
 });
 
-app.get("/sector-operational-debug", async (_req, res) => {
-  try {
-    const { members } = await getMembersSource();
-    res.json(await getSectorOperationalDebug(members));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo leer el debug operativo por sector.";
-    jsonError(res, 500, message);
-  }
-});
+if (debugEndpointsEnabled) {
+  app.get("/sector-operational-debug", async (_req, res) => {
+    try {
+      const { members } = await getMembersSource();
+      res.json(await getSectorOperationalDebug(members));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo leer el debug operativo por sector.";
+      jsonError(res, 500, message);
+    }
+  });
 
-app.get("/status-debug", async (_req, res) => {
-  try {
-    const { members } = await getMembersSource();
-    const normalizedStatusBreakdown = buildStatusBreakdown(members);
-    res.json({
-      totalMembers: members.length,
-      rawStatusBreakdown: buildRawStatusBreakdown(members),
-      normalizedStatusBreakdown,
-      samples: members.slice(0, 50).map((member) => ({
-        id: member.id,
-        nombre: member.nombre,
-        apellido: member.apellido,
-        sourceSheet: member.sourceSheet,
-        rawEstado: member.estado,
-        normalizedEstado: normalizeOperationalStatus(member.estado)
-      }))
-    });
-  } catch {
-    jsonError(res, 500, "No se pudo obtener el debug de estados.");
-  }
-});
+  app.get("/status-debug", async (_req, res) => {
+    try {
+      const { members } = await getMembersSource();
+      const normalizedStatusBreakdown = buildStatusBreakdown(members);
+      res.json({
+        totalMembers: members.length,
+        rawStatusBreakdown: buildRawStatusBreakdown(members),
+        normalizedStatusBreakdown
+      });
+    } catch {
+      jsonError(res, 500, "No se pudo obtener el debug de estados.");
+    }
+  });
+
+  app.get("/comparison-debug", async (_req, res) => {
+    try {
+      res.json(await compareLegacyWithPostgres());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo comparar legacy contra PostgreSQL.";
+      jsonError(res, 500, message);
+    }
+  });
+
+  app.get("/comparison-debug/summary", async (_req, res) => {
+    try {
+      res.json(await compareLegacySummaryWithPostgresDashboard());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo comparar /summary legacy contra dashboard PostgreSQL.";
+      jsonError(res, 500, message);
+    }
+  });
+
+  app.get("/comparison-debug/members", async (_req, res) => {
+    try {
+      res.json(await compareLegacyMembersWithPostgresEnrollments());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo comparar miembros legacy contra enrollments/personas PostgreSQL.";
+      jsonError(res, 500, message);
+    }
+  });
+}
 
 app.get("/sync-status", async (_req, res) => {
   try {
@@ -537,14 +563,16 @@ app.get("/sync-status", async (_req, res) => {
   }
 });
 
-app.get("/payments-debug", async (_req, res) => {
-  try {
-    res.json(await getPaymentsDebugFromGoogleSheets());
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo leer el debug de pagos.";
-    jsonError(res, 500, message);
-  }
-});
+if (debugEndpointsEnabled) {
+  app.get("/payments-debug", async (_req, res) => {
+    try {
+      res.json(await getPaymentsDebugFromGoogleSheets());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo leer el debug de pagos.";
+      jsonError(res, 500, message);
+    }
+  });
+}
 
 app.get("/templates", async (_req, res) => {
   try {
@@ -836,6 +864,7 @@ if (isProduction) {
       req.path.startsWith("/club-finance") ||
       req.path.startsWith("/admin-movements") ||
       req.path.startsWith("/payments-debug") ||
+      req.path.startsWith("/comparison-debug") ||
       req.path.startsWith("/templates") ||
       req.path.startsWith("/history") ||
       req.path.startsWith("/sync-status") ||
