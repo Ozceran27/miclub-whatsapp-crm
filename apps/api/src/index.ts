@@ -47,6 +47,8 @@ import db from "./lib/sqlite.js";
 import dbRoutes from "./routes/dbRoutes.js";
 import catalogRoutes from "./routes/catalogRoutes.js";
 import peopleRoutes from "./routes/peopleRoutes.js";
+import financeRoutes from "./routes/financeRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
@@ -181,7 +183,14 @@ const protectedApiPrefixes = [
   "/api/system-months",
   "/api/discount-rates",
   "/api/salon-hour-prices",
-  "/api/people"
+  "/api/people",
+  "/api/movements",
+  "/api/receivables",
+  "/api/payments",
+  "/api/operational-balances",
+  "/api/sector-settlements",
+  "/api/dashboard",
+  "/api/sector-finance-summary"
 ];
 
 const isProtectedApiPath = (pathName: string): boolean =>
@@ -387,6 +396,8 @@ app.get("/auth/me", (req, res) => {
 app.use(authProtection);
 app.use("/api", catalogRoutes);
 app.use("/api", peopleRoutes);
+app.use("/api", financeRoutes);
+app.use("/api", dashboardRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {
