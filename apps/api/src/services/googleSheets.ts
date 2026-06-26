@@ -5,7 +5,7 @@ export const SHEET_NAMES = ["FITNESS", "SALON", "AULA"] as const;
 export const SECTOR_BALANCE_SHEET_NAMES = ["FITNESS", "SALON", "AULA", "LOCAL 1", "CANTINA"] as const;
 
 type OperationalSheetName = (typeof SHEET_NAMES)[number];
-type SourceType = "mock" | "google_sheets";
+type SourceType = "mock" | "google_sheets" | "postgres";
 type SectorBalanceSheetName = (typeof SECTOR_BALANCE_SHEET_NAMES)[number];
 
 type MovementColumnKey = "fecha" | "tipo" | "categoria" | "contraparte" | "monto" | "estadoFinan" | "estado" | "concepto";

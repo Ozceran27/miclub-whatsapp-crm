@@ -51,6 +51,8 @@ import financeRoutes from "./routes/financeRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
+import { shouldUsePostgresDataSource } from "./services/dataSourceService.js";
+import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "./services/postgresDashboardService.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -227,6 +229,13 @@ let lastSyncAt: string | undefined;
 let lastSyncError: string | undefined;
 
 const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: SyncStatus }> => {
+  if (shouldUsePostgresDataSource()) {
+    const members = await getPostgresMembers();
+    lastSyncAt = new Date().toISOString();
+    lastSyncError = undefined;
+    return { members, syncStatus: { source: "postgres", enabled: true, sheets: [], lastSyncAt } };
+  }
+
   const config = getGoogleSheetsConfig();
 
   if (!config.enabled) {
@@ -402,6 +411,7 @@ app.use("/api", dashboardRoutes);
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {
   try {
+    if (shouldUsePostgresDataSource()) return res.json(await getPostgresMembers());
     const { members } = await getMembersSource();
     res.json(members);
   } catch {
@@ -411,6 +421,7 @@ app.get("/members", async (_req, res) => {
 
 app.get("/debtors", async (_req, res) => {
   try {
+    if (shouldUsePostgresDataSource()) return res.json(await getPostgresDebtors());
     const { members } = await getMembersSource();
     res.json(members.filter(isDebtorMember));
   } catch {
@@ -420,6 +431,7 @@ app.get("/debtors", async (_req, res) => {
 
 app.get("/summary", async (_req, res) => {
   try {
+    if (shouldUsePostgresDataSource()) return res.json(await getPostgresSummary());
     const { members } = await getMembersSource();
     const debtors = members.filter(isDebtorMember);
     const statusBreakdown = buildStatusBreakdown(members);
@@ -453,6 +465,7 @@ app.get("/admin-movements", async (_req, res) => {
 
 app.get("/club-finance-summary", async (_req, res) => {
   try {
+    if (shouldUsePostgresDataSource()) return res.json(await getPostgresClubFinanceSummary());
     const { members } = await getMembersSource();
     res.json(await getClubOperationsSummaryFromGoogleSheets(members));
   } catch (error) {
@@ -474,6 +487,7 @@ app.get("/club-finance-debug", async (_req, res) => {
 
 app.get("/sector-operational-summary", async (_req, res) => {
   try {
+    if (shouldUsePostgresDataSource()) return res.json(await getPostgresSectorOperationalSummary());
     const { members } = await getMembersSource();
     res.json(await getSectorOperationalSummary(members));
   } catch (error) {
