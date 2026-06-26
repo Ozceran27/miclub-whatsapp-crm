@@ -49,6 +49,7 @@ import catalogRoutes from "./routes/catalogRoutes.js";
 import peopleRoutes from "./routes/peopleRoutes.js";
 import financeRoutes from "./routes/financeRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import importRoutes from "./routes/importRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 import { shouldUsePostgresDataSource } from "./services/dataSourceService.js";
@@ -195,7 +196,8 @@ const protectedApiPrefixes = [
   "/api/operational-balances",
   "/api/sector-settlements",
   "/api/dashboard",
-  "/api/sector-finance-summary"
+  "/api/sector-finance-summary",
+  "/api/import"
 ];
 
 const isProtectedApiPath = (pathName: string): boolean =>
@@ -406,6 +408,7 @@ app.get("/auth/me", (req, res) => {
 });
 
 app.use(authProtection);
+app.use("/api/import", importRoutes);
 app.use("/api", catalogRoutes);
 app.use("/api", peopleRoutes);
 app.use("/api", financeRoutes);
