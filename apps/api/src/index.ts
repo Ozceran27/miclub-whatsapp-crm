@@ -45,6 +45,8 @@ import { members as mockMembers, templates } from "./data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "./services/messages.js";
 import db from "./lib/sqlite.js";
 import dbRoutes from "./routes/dbRoutes.js";
+import catalogRoutes from "./routes/catalogRoutes.js";
+import errorHandler from "./middleware/errorHandler.js";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "./services/googleSheets.js";
 
 const app = express();
@@ -167,7 +169,8 @@ const protectedApiPrefixes = [
   "/templates",
   "/history",
   "/contacted-recent",
-  "/prepare-messages"
+  "/prepare-messages",
+  "/api/catalogs"
 ];
 
 const isProtectedApiPath = (pathName: string): boolean =>
@@ -371,6 +374,7 @@ app.get("/auth/me", (req, res) => {
 });
 
 app.use(authProtection);
+app.use("/api/catalogs", catalogRoutes);
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 app.get("/members", async (_req, res) => {
@@ -770,6 +774,8 @@ app.patch("/history/:id/status", async (req, res) => {
   }
 });
 
+app.use(errorHandler);
+
 if (isProduction) {
   const sendFrontendIndex = (res: express.Response) => {
     if (!fs.existsSync(webIndexPath)) {
@@ -785,6 +791,7 @@ if (isProduction) {
     if (
       req.path.startsWith("/health") ||
       req.path.startsWith("/api/db") ||
+      req.path.startsWith("/api/catalogs") ||
       req.path.startsWith("/members") ||
       req.path.startsWith("/debtors") ||
       req.path.startsWith("/summary") ||
