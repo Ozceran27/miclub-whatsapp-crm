@@ -6,7 +6,7 @@ import { apiUrl } from '../api';
 
 
 type SyncStatus = {
-  source: 'mock' | 'google_sheets';
+  source: 'mock' | 'google_sheets' | 'postgres';
   enabled: boolean;
   sheets: string[];
   lastSyncAt?: string;
