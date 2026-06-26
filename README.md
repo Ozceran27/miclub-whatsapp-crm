@@ -218,3 +218,19 @@ Recomendaciones para acceso remoto:
 - Usá una contraseña fuerte y un `SESSION_SECRET` largo, único y privado.
 - No compartas ni subas el archivo `.env` real.
 - Si usás una URL HTTPS del túnel, configurá `PUBLIC_APP_URL` con esa URL pública.
+
+## PostgreSQL schema migration for Google Sheets import
+
+Before running the Google Sheets dry-run importer, apply the versioned PostgreSQL migration that creates the `miclub` schema, required extensions, enums, tables, unique indexes used by importer `on conflict` clauses, and service views:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
+npm run import:sheets:dry
+```
+
+If you connect with discrete PostgreSQL variables instead of `DATABASE_URL`, pass the same host/database/user options you use for the API, for example:
+
+```bash
+psql -h "$PGHOST" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
+npm run import:sheets:dry
+```
