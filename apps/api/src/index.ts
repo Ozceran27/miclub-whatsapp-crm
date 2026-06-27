@@ -362,6 +362,7 @@ const statusBreakdownKeys: Record<OperationalStatusKey, keyof Omit<StatusBreakdo
   nuevo_inscripto: "nuevoInscripto",
   adeudando: "adeudando",
   abandonado: "abandonado",
+  cancelado: "cancelado",
   otro: "otros"
 };
 
@@ -380,6 +381,7 @@ const buildStatusBreakdown = (members: Member[]): StatusBreakdown => {
     nuevoInscripto: 0,
     adeudando: 0,
     abandonado: 0,
+    cancelado: 0,
     otros: 0
   };
 
@@ -388,7 +390,10 @@ const buildStatusBreakdown = (members: Member[]): StatusBreakdown => {
     breakdown[statusBreakdownKeys[normalizedStatus]] += 1;
   }
 
-  breakdown.active = breakdown.total - breakdown.abandonado;
+  breakdown.active = members.filter((member) => {
+    const status = normalizeOperationalStatus(member.estado);
+    return status !== "abandonado" && status !== "cancelado";
+  }).length;
   return breakdown;
 };
 

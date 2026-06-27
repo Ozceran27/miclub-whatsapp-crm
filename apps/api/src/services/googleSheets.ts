@@ -807,7 +807,10 @@ export interface SectorOperationalDebugInfo {
 }
 
 export const normalizeStatus = normalizeOperationalStatus;
-export const isActiveMember = (member: Pick<Member, "estado">): boolean => normalizeOperationalStatus(member.estado) !== "abandonado";
+export const isActiveMember = (member: Pick<Member, "estado">): boolean => {
+  const status = normalizeOperationalStatus(member.estado);
+  return status !== "abandonado" && status !== "cancelado";
+};
 export const isCategory = (value: unknown, expected: string): boolean => normalizedEquals(value, expected);
 export const isSector = (value: unknown, expected: string): boolean => normalizedEquals(value, expected);
 

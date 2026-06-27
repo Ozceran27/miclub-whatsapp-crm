@@ -77,10 +77,11 @@ type StatusBreakdown = {
   newEnrollment: number;
   debtor: number;
   abandoned: number;
+  cancelled: number;
   others: number;
 };
 
-const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'abandoned'> = {
+const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'abandoned' | 'cancelled'> = {
   'al dia': 'current',
   aldia: 'current',
   activo: 'current',
@@ -98,7 +99,10 @@ const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'a
   abandonada: 'abandoned',
   abandono: 'abandoned',
   inactivo: 'abandoned',
-  inactivos: 'abandoned'
+  inactivos: 'abandoned',
+  cancelado: 'cancelled',
+  cancelada: 'cancelled',
+  cancelacion: 'cancelled'
 };
 
 const normalizeText = (value?: string) => (value ?? '')
@@ -127,6 +131,7 @@ const getStatusBucketFromRawStatus = (status?: string) => {
   if (STATUS_ALIASES[compact]) return STATUS_ALIASES[compact];
   if (normalized.includes('nuevo') && (normalized.includes('inscripto') || normalized.includes('inscrito'))) return 'newEnrollment';
   if (normalized.includes('abandon')) return 'abandoned';
+  if (normalized.includes('cancel')) return 'cancelled';
   if (normalized.includes('adeud') || normalized.includes('deud')) return 'debtor';
   if (normalized.includes('al dia') || compact.includes('aldia')) return 'current';
 
@@ -137,7 +142,10 @@ const getMemberStatus = (member: Member) => normalizeStatus(String(member.estado
 
 const getStatusBucket = (member: Member) => getStatusBucketFromRawStatus(getMemberStatus(member));
 
-const isActiveMember = (member: Member) => getStatusBucket(member) !== 'abandoned';
+const isActiveMember = (member: Member) => {
+  const bucket = getStatusBucket(member);
+  return bucket !== 'abandoned' && bucket !== 'cancelled';
+};
 
 const parseMemberFee = (value: unknown) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -171,6 +179,7 @@ const getEnrollmentStatusBreakdown = (records: Member[], fallbackTotal?: number)
     newEnrollment: 0,
     debtor: 0,
     abandoned: 0,
+    cancelled: 0,
     others: 0
   };
 
@@ -180,10 +189,11 @@ const getEnrollmentStatusBreakdown = (records: Member[], fallbackTotal?: number)
     if (bucket === 'newEnrollment') breakdown.newEnrollment += 1;
     if (bucket === 'debtor') breakdown.debtor += 1;
     if (bucket === 'abandoned') breakdown.abandoned += 1;
+    if (bucket === 'cancelled') breakdown.cancelled += 1;
     if (!bucket) breakdown.others += 1;
   });
 
-  breakdown.active = breakdown.total - breakdown.abandoned;
+  breakdown.active = records.filter(isActiveMember).length;
   return breakdown;
 };
 
@@ -196,6 +206,7 @@ const mapSummaryStatusBreakdown = (statusBreakdown?: ApiStatusBreakdown): Status
     newEnrollment: statusBreakdown.nuevoInscripto,
     debtor: statusBreakdown.adeudando,
     abandoned: statusBreakdown.abandonado,
+    cancelled: statusBreakdown.cancelado,
     others: statusBreakdown.otros
   };
 };
@@ -591,6 +602,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               <span className="metric-row"><strong className="metric-row__label">Nuevos inscriptos</strong><span className="metric-row__value">{enrollmentStats.newEnrollment}</span></span>
               <span className="metric-row"><strong className="metric-row__label">Adeudando</strong><span className="metric-row__value">{enrollmentStats.debtor}</span></span>
               <span className="metric-row"><strong className="metric-row__label">Abandonados</strong><span className="metric-row__value">{enrollmentStats.abandoned}</span></span>
+              <span className="metric-row"><strong className="metric-row__label">Cancelados</strong><span className="metric-row__value">{enrollmentStats.cancelled}</span></span>
               <span className="metric-row"><strong className="metric-row__label">Cuota Promedio</strong><span className="metric-row__value">{weightedAverageFeeLabel}</span></span>
             </div>
             <div className="debtor-activity-panel">

@@ -1,8 +1,8 @@
 export type SourceSheet = "FITNESS" | "SALON" | "AULA" | "LOCAL_1" | "CANTINA" | "ADMINISTRACION";
 
-export type OperationalStatusKey = "al_dia" | "nuevo_inscripto" | "adeudando" | "abandonado" | "otro";
+export type OperationalStatusKey = "al_dia" | "nuevo_inscripto" | "adeudando" | "abandonado" | "cancelado" | "otro";
 
-export type DebtorStatus = "Adeudando" | "Al día" | "Nuevo Inscripto" | "Abandonado" | "Pendiente" | "Desconocido";
+export type DebtorStatus = "Adeudando" | "Al día" | "Nuevo Inscripto" | "Abandonado" | "Cancelado" | "Pendiente" | "Desconocido";
 
 export interface StatusBreakdown {
   total: number;
@@ -11,6 +11,7 @@ export interface StatusBreakdown {
   nuevoInscripto: number;
   adeudando: number;
   abandonado: number;
+  cancelado: number;
   otros: number;
 }
 
