@@ -8,7 +8,7 @@ export const createImportBatch = async (pool: Pool, input: { source: string; sou
     `insert into miclub.import_batches (source, source_file, status, notes)
      values ($1, $2, $3, $4)
      returning id`,
-    [input.source, input.sourceFile ?? null, input.dryRun ? "dry_run" : "running", input.notes ?? null]
+    [input.source, input.sourceFile ?? null, "running", input.notes ?? null]
   );
   return result.rows[0]?.id ?? "";
 };
