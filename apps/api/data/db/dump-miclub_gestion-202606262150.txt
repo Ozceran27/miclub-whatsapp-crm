@@ -1,0 +1,2309 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict CB401neeaNMQOKeS1thTTe5cZDm5xAu9LpeBk64jGXcxh1dFwsUEDJad7rKIKre
+
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
+
+-- Started on 2026-06-26 21:50:08
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 8 (class 2615 OID 16754)
+-- Name: miclub; Type: SCHEMA; Schema: -; Owner: miclub_app
+--
+
+CREATE SCHEMA miclub;
+
+
+ALTER SCHEMA miclub OWNER TO miclub_app;
+
+--
+-- TOC entry 987 (class 1247 OID 16832)
+-- Name: enrollment_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.enrollment_status AS ENUM (
+    'nuevo_inscripto',
+    'al_dia',
+    'adeudando',
+    'abandonado',
+    'suspendido',
+    'cancelado'
+);
+
+
+ALTER TYPE miclub.enrollment_status OWNER TO miclub_app;
+
+--
+-- TOC entry 969 (class 1247 OID 16756)
+-- Name: entity_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.entity_status AS ENUM (
+    'activa',
+    'pendiente',
+    'suspendida',
+    'cancelada'
+);
+
+
+ALTER TYPE miclub.entity_status OWNER TO miclub_app;
+
+--
+-- TOC entry 984 (class 1247 OID 16816)
+-- Name: financial_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.financial_status AS ENUM (
+    'sin_movimientos',
+    'pendiente',
+    'pagado',
+    'parcial',
+    'a_liquidar',
+    'liquidado',
+    'deuda'
+);
+
+
+ALTER TYPE miclub.financial_status OWNER TO miclub_app;
+
+--
+-- TOC entry 993 (class 1247 OID 16858)
+-- Name: message_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.message_status AS ENUM (
+    'prepared',
+    'opened',
+    'sent_manual',
+    'skipped',
+    'failed'
+);
+
+
+ALTER TYPE miclub.message_status OWNER TO miclub_app;
+
+--
+-- TOC entry 981 (class 1247 OID 16806)
+-- Name: movement_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.movement_status AS ENUM (
+    'COMPLETADO',
+    'PENDIENTE',
+    'ANULADO',
+    'CANCELADO'
+);
+
+
+ALTER TYPE miclub.movement_status OWNER TO miclub_app;
+
+--
+-- TOC entry 978 (class 1247 OID 16798)
+-- Name: movement_type; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.movement_type AS ENUM (
+    'INGRESOS',
+    'EGRESOS',
+    'CAPITAL'
+);
+
+
+ALTER TYPE miclub.movement_type OWNER TO miclub_app;
+
+--
+-- TOC entry 975 (class 1247 OID 16778)
+-- Name: person_kind; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.person_kind AS ENUM (
+    'alumno',
+    'proveedor',
+    'acreedor',
+    'empresa',
+    'empleado',
+    'encargado',
+    'instructor',
+    'cliente',
+    'otro'
+);
+
+
+ALTER TYPE miclub.person_kind OWNER TO miclub_app;
+
+--
+-- TOC entry 972 (class 1247 OID 16766)
+-- Name: person_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.person_status AS ENUM (
+    'activa',
+    'pendiente',
+    'suspendida',
+    'bloqueada',
+    'inactiva'
+);
+
+
+ALTER TYPE miclub.person_status OWNER TO miclub_app;
+
+--
+-- TOC entry 990 (class 1247 OID 16846)
+-- Name: receivable_status; Type: TYPE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TYPE miclub.receivable_status AS ENUM (
+    'pendiente',
+    'pagado',
+    'parcial',
+    'vencido',
+    'cancelado'
+);
+
+
+ALTER TYPE miclub.receivable_status OWNER TO miclub_app;
+
+--
+-- TOC entry 277 (class 1255 OID 17451)
+-- Name: touch_updated_at(); Type: FUNCTION; Schema: miclub; Owner: miclub_app
+--
+
+CREATE FUNCTION miclub.touch_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION miclub.touch_updated_at() OWNER TO miclub_app;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 227 (class 1259 OID 16976)
+-- Name: activities; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.activities (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sector_id uuid NOT NULL,
+    manager_person_id uuid,
+    code text,
+    name text NOT NULL,
+    modality text,
+    color text DEFAULT '#7DD3FC'::text NOT NULL,
+    monthly_fee numeric(14,2) DEFAULT 0 NOT NULL,
+    club_commission_percent numeric(6,2) DEFAULT 0 NOT NULL,
+    instructor_commission_percent numeric(6,2) DEFAULT 0 NOT NULL,
+    max_capacity integer,
+    status miclub.entity_status DEFAULT 'activa'::miclub.entity_status NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    instructor_id uuid NOT NULL
+);
+
+
+ALTER TABLE miclub.activities OWNER TO miclub_app;
+
+--
+-- TOC entry 228 (class 1259 OID 17017)
+-- Name: activity_schedules; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.activity_schedules (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    activity_id uuid NOT NULL,
+    weekday smallint NOT NULL,
+    start_time time without time zone NOT NULL,
+    end_time time without time zone NOT NULL,
+    room_label text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT activity_schedules_weekday_check CHECK (((weekday >= 0) AND (weekday <= 6)))
+);
+
+
+ALTER TABLE miclub.activity_schedules OWNER TO miclub_app;
+
+--
+-- TOC entry 223 (class 1259 OID 16884)
+-- Name: app_users; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.app_users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    role_id uuid,
+    email public.citext NOT NULL,
+    password_hash text NOT NULL,
+    display_name text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    last_login_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.app_users OWNER TO miclub_app;
+
+--
+-- TOC entry 243 (class 1259 OID 17433)
+-- Name: audit_log; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid,
+    action text NOT NULL,
+    entity_type text NOT NULL,
+    entity_id uuid,
+    old_data jsonb,
+    new_data jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.audit_log OWNER TO miclub_app;
+
+--
+-- TOC entry 240 (class 1259 OID 17366)
+-- Name: crm_message_history; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.crm_message_history (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    person_id uuid,
+    enrollment_id uuid,
+    template_id uuid,
+    phone text NOT NULL,
+    message text NOT NULL,
+    wa_link text NOT NULL,
+    status miclub.message_status DEFAULT 'prepared'::miclub.message_status NOT NULL,
+    opened_at timestamp with time zone,
+    sent_at timestamp with time zone,
+    note text,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.crm_message_history OWNER TO miclub_app;
+
+--
+-- TOC entry 239 (class 1259 OID 17344)
+-- Name: crm_message_templates; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.crm_message_templates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    body text NOT NULL,
+    is_default boolean DEFAULT false NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.crm_message_templates OWNER TO miclub_app;
+
+--
+-- TOC entry 232 (class 1259 OID 17106)
+-- Name: currencies; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.currencies (
+    code text NOT NULL,
+    name text NOT NULL,
+    symbol text NOT NULL
+);
+
+
+ALTER TABLE miclub.currencies OWNER TO miclub_app;
+
+--
+-- TOC entry 246 (class 1259 OID 17545)
+-- Name: discount_rates; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.discount_rates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    percent numeric(6,4) NOT NULL,
+    label text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.discount_rates OWNER TO miclub_app;
+
+--
+-- TOC entry 229 (class 1259 OID 17038)
+-- Name: enrollments; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.enrollments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    external_id text,
+    person_id uuid NOT NULL,
+    activity_id uuid NOT NULL,
+    start_date date DEFAULT CURRENT_DATE NOT NULL,
+    end_date date,
+    fee_amount numeric(14,2) DEFAULT 0 NOT NULL,
+    status miclub.enrollment_status DEFAULT 'nuevo_inscripto'::miclub.enrollment_status NOT NULL,
+    last_payment_at timestamp with time zone,
+    due_date date,
+    source text DEFAULT 'app'::text NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.enrollments OWNER TO miclub_app;
+
+--
+-- TOC entry 241 (class 1259 OID 17402)
+-- Name: import_batches; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.import_batches (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source text NOT NULL,
+    source_file text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone,
+    notes text
+);
+
+
+ALTER TABLE miclub.import_batches OWNER TO miclub_app;
+
+--
+-- TOC entry 242 (class 1259 OID 17416)
+-- Name: import_errors; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.import_errors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    batch_id uuid,
+    source_table text,
+    source_row text,
+    error_message text NOT NULL,
+    raw_payload jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.import_errors OWNER TO miclub_app;
+
+--
+-- TOC entry 244 (class 1259 OID 17508)
+-- Name: instructors; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.instructors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    person_id uuid NOT NULL,
+    display_name text NOT NULL,
+    status miclub.entity_status DEFAULT 'activa'::miclub.entity_status NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.instructors OWNER TO miclub_app;
+
+--
+-- TOC entry 230 (class 1259 OID 17073)
+-- Name: movement_categories; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.movement_categories (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.movement_categories OWNER TO miclub_app;
+
+--
+-- TOC entry 5475 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: TABLE movement_categories; Type: COMMENT; Schema: miclub; Owner: miclub_app
+--
+
+COMMENT ON TABLE miclub.movement_categories IS 'Catálogo único y neutro de categorías económicas. El tipo del movimiento se define exclusivamente en movements.movement_type.';
+
+
+--
+-- TOC entry 233 (class 1259 OID 17116)
+-- Name: movements; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.movements (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    external_id text,
+    movement_date timestamp with time zone DEFAULT now() NOT NULL,
+    movement_type miclub.movement_type NOT NULL,
+    category_id uuid,
+    sector_id uuid,
+    concept text NOT NULL,
+    counterparty_person_id uuid,
+    counterparty_text text,
+    amount numeric(14,2) NOT NULL,
+    taxes numeric(14,2) DEFAULT 0 NOT NULL,
+    currency_code text DEFAULT 'ARS'::text NOT NULL,
+    payment_method_id uuid,
+    financial_status miclub.financial_status,
+    operational_status miclub.movement_status DEFAULT 'COMPLETADO'::miclub.movement_status NOT NULL,
+    source text DEFAULT 'app'::text NOT NULL,
+    source_payload jsonb,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT movements_amount_check CHECK ((amount >= (0)::numeric))
+);
+
+
+ALTER TABLE miclub.movements OWNER TO miclub_app;
+
+--
+-- TOC entry 238 (class 1259 OID 17314)
+-- Name: operational_balances; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.operational_balances (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sector_id uuid,
+    label text NOT NULL,
+    amount numeric(14,2) DEFAULT 0 NOT NULL,
+    currency_code text DEFAULT 'ARS'::text NOT NULL,
+    balance_date date DEFAULT CURRENT_DATE NOT NULL,
+    source text DEFAULT 'app'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.operational_balances OWNER TO miclub_app;
+
+--
+-- TOC entry 236 (class 1259 OID 17254)
+-- Name: payment_allocations; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.payment_allocations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    payment_id uuid NOT NULL,
+    receivable_id uuid NOT NULL,
+    amount numeric(14,2) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT payment_allocations_amount_check CHECK ((amount >= (0)::numeric))
+);
+
+
+ALTER TABLE miclub.payment_allocations OWNER TO miclub_app;
+
+--
+-- TOC entry 231 (class 1259 OID 17090)
+-- Name: payment_methods; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.payment_methods (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.payment_methods OWNER TO miclub_app;
+
+--
+-- TOC entry 235 (class 1259 OID 17217)
+-- Name: payments; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.payments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    movement_id uuid,
+    person_id uuid,
+    payment_method_id uuid,
+    paid_at timestamp with time zone DEFAULT now() NOT NULL,
+    amount numeric(14,2) NOT NULL,
+    currency_code text DEFAULT 'ARS'::text NOT NULL,
+    note text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT payments_amount_check CHECK ((amount >= (0)::numeric))
+);
+
+
+ALTER TABLE miclub.payments OWNER TO miclub_app;
+
+--
+-- TOC entry 224 (class 1259 OID 16909)
+-- Name: people; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.people (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    first_name text NOT NULL,
+    last_name text NOT NULL,
+    dni text,
+    phone text,
+    normalized_phone text,
+    email public.citext,
+    status miclub.person_status DEFAULT 'activa'::miclub.person_status NOT NULL,
+    notes text,
+    birth_date date,
+    address text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.people OWNER TO miclub_app;
+
+--
+-- TOC entry 225 (class 1259 OID 16928)
+-- Name: person_kind_links; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.person_kind_links (
+    person_id uuid NOT NULL,
+    kind miclub.person_kind NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.person_kind_links OWNER TO miclub_app;
+
+--
+-- TOC entry 234 (class 1259 OID 17175)
+-- Name: receivables; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.receivables (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    person_id uuid NOT NULL,
+    enrollment_id uuid,
+    sector_id uuid,
+    activity_id uuid,
+    concept text NOT NULL,
+    period_month smallint,
+    period_year smallint,
+    due_date date,
+    amount numeric(14,2) NOT NULL,
+    club_amount numeric(14,2) DEFAULT 0 NOT NULL,
+    status miclub.receivable_status DEFAULT 'pendiente'::miclub.receivable_status NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT receivables_amount_check CHECK ((amount >= (0)::numeric)),
+    CONSTRAINT receivables_period_month_check CHECK (((period_month >= 1) AND (period_month <= 12)))
+);
+
+
+ALTER TABLE miclub.receivables OWNER TO miclub_app;
+
+--
+-- TOC entry 222 (class 1259 OID 16869)
+-- Name: roles; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.roles (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.roles OWNER TO miclub_app;
+
+--
+-- TOC entry 247 (class 1259 OID 17561)
+-- Name: salon_hour_prices; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.salon_hour_prices (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hours integer NOT NULL,
+    price numeric(14,2) DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.salon_hour_prices OWNER TO miclub_app;
+
+--
+-- TOC entry 237 (class 1259 OID 17279)
+-- Name: sector_settlements; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.sector_settlements (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sector_id uuid NOT NULL,
+    responsible_person_id uuid,
+    settlement_date date DEFAULT CURRENT_DATE NOT NULL,
+    period_month smallint,
+    period_year smallint,
+    gross_income numeric(14,2) DEFAULT 0 NOT NULL,
+    commissions numeric(14,2) DEFAULT 0 NOT NULL,
+    expenses numeric(14,2) DEFAULT 0 NOT NULL,
+    amount_to_pay numeric(14,2) DEFAULT 0 NOT NULL,
+    status miclub.financial_status DEFAULT 'pendiente'::miclub.financial_status NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT sector_settlements_period_month_check CHECK (((period_month >= 1) AND (period_month <= 12)))
+);
+
+
+ALTER TABLE miclub.sector_settlements OWNER TO miclub_app;
+
+--
+-- TOC entry 226 (class 1259 OID 16942)
+-- Name: sectors; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.sectors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    manager_person_id uuid,
+    code text NOT NULL,
+    name text NOT NULL,
+    color text DEFAULT '#7DD3FC'::text NOT NULL,
+    opening_time time without time zone,
+    closing_time time without time zone,
+    max_capacity integer,
+    municipal_status miclub.entity_status DEFAULT 'pendiente'::miclub.entity_status NOT NULL,
+    financial_status miclub.financial_status DEFAULT 'sin_movimientos'::miclub.financial_status NOT NULL,
+    operational_status miclub.entity_status DEFAULT 'activa'::miclub.entity_status NOT NULL,
+    uses_enrollments boolean DEFAULT false NOT NULL,
+    uses_activities boolean DEFAULT true NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE miclub.sectors OWNER TO miclub_app;
+
+--
+-- TOC entry 245 (class 1259 OID 17533)
+-- Name: system_months; Type: TABLE; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TABLE miclub.system_months (
+    month_number smallint NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT system_months_month_number_check CHECK (((month_number >= 1) AND (month_number <= 12)))
+);
+
+
+ALTER TABLE miclub.system_months OWNER TO miclub_app;
+
+--
+-- TOC entry 249 (class 1259 OID 17612)
+-- Name: v_current_enrollments; Type: VIEW; Schema: miclub; Owner: miclub_app
+--
+
+CREATE VIEW miclub.v_current_enrollments AS
+ SELECT e.id,
+    e.external_id,
+    p.first_name,
+    p.last_name,
+    p.dni,
+    p.phone,
+    s.code AS sector_code,
+    s.name AS sector_name,
+    a.name AS activity_name,
+    a.modality,
+    i.display_name AS instructor_name,
+    e.fee_amount,
+    e.status,
+    e.due_date,
+    e.last_payment_at
+   FROM ((((miclub.enrollments e
+     JOIN miclub.people p ON ((p.id = e.person_id)))
+     JOIN miclub.activities a ON ((a.id = e.activity_id)))
+     JOIN miclub.sectors s ON ((s.id = a.sector_id)))
+     JOIN miclub.instructors i ON ((i.id = a.instructor_id)))
+  WHERE (e.status <> 'cancelado'::miclub.enrollment_status);
+
+
+ALTER VIEW miclub.v_current_enrollments OWNER TO miclub_app;
+
+--
+-- TOC entry 251 (class 1259 OID 17622)
+-- Name: v_dashboard_basic; Type: VIEW; Schema: miclub; Owner: miclub_app
+--
+
+CREATE VIEW miclub.v_dashboard_basic AS
+ SELECT ( SELECT count(*) AS count
+           FROM miclub.people) AS total_people,
+    ( SELECT count(*) AS count
+           FROM miclub.enrollments
+          WHERE (enrollments.status <> ALL (ARRAY['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status]))) AS active_enrollments,
+    ( SELECT count(*) AS count
+           FROM miclub.enrollments
+          WHERE (enrollments.status = 'adeudando'::miclub.enrollment_status)) AS debtor_enrollments,
+    ( SELECT COALESCE(sum(receivables.amount), (0)::numeric) AS "coalesce"
+           FROM miclub.receivables
+          WHERE (receivables.status = ANY (ARRAY['pendiente'::miclub.receivable_status, 'parcial'::miclub.receivable_status, 'vencido'::miclub.receivable_status]))) AS receivables_total,
+    ( SELECT COALESCE(sum(movements.amount), (0)::numeric) AS "coalesce"
+           FROM miclub.movements
+          WHERE ((movements.movement_type = 'INGRESOS'::miclub.movement_type) AND (movements.operational_status = 'COMPLETADO'::miclub.movement_status))) AS total_income,
+    ( SELECT COALESCE(sum(movements.amount), (0)::numeric) AS "coalesce"
+           FROM miclub.movements
+          WHERE ((movements.movement_type = 'EGRESOS'::miclub.movement_type) AND (movements.operational_status = 'COMPLETADO'::miclub.movement_status))) AS total_expense;
+
+
+ALTER VIEW miclub.v_dashboard_basic OWNER TO miclub_app;
+
+--
+-- TOC entry 248 (class 1259 OID 17607)
+-- Name: v_movements_enriched; Type: VIEW; Schema: miclub; Owner: miclub_app
+--
+
+CREATE VIEW miclub.v_movements_enriched AS
+ SELECT m.id,
+    m.external_id,
+    m.movement_date,
+    m.movement_type,
+    c.name AS category,
+    s.code AS sector_code,
+    s.name AS sector_name,
+    m.concept,
+    p.first_name,
+    p.last_name,
+    p.dni,
+    m.counterparty_text,
+    m.amount,
+    m.taxes,
+    pm.name AS payment_method,
+    m.financial_status,
+    m.operational_status,
+    m.source,
+    m.created_at
+   FROM ((((miclub.movements m
+     LEFT JOIN miclub.movement_categories c ON ((c.id = m.category_id)))
+     LEFT JOIN miclub.sectors s ON ((s.id = m.sector_id)))
+     LEFT JOIN miclub.people p ON ((p.id = m.counterparty_person_id)))
+     LEFT JOIN miclub.payment_methods pm ON ((pm.id = m.payment_method_id)));
+
+
+ALTER VIEW miclub.v_movements_enriched OWNER TO miclub_app;
+
+--
+-- TOC entry 250 (class 1259 OID 17617)
+-- Name: v_sector_finance_summary; Type: VIEW; Schema: miclub; Owner: miclub_app
+--
+
+CREATE VIEW miclub.v_sector_finance_summary AS
+ SELECT s.id AS sector_id,
+    s.code AS sector_code,
+    s.name AS sector_name,
+    COALESCE(sum(
+        CASE
+            WHEN ((m.movement_type = 'INGRESOS'::miclub.movement_type) AND (m.operational_status = 'COMPLETADO'::miclub.movement_status)) THEN m.amount
+            ELSE (0)::numeric
+        END), (0)::numeric) AS total_income,
+    COALESCE(sum(
+        CASE
+            WHEN ((m.movement_type = 'EGRESOS'::miclub.movement_type) AND (m.operational_status = 'COMPLETADO'::miclub.movement_status)) THEN m.amount
+            ELSE (0)::numeric
+        END), (0)::numeric) AS total_expense,
+    (COALESCE(sum(
+        CASE
+            WHEN ((m.movement_type = 'INGRESOS'::miclub.movement_type) AND (m.operational_status = 'COMPLETADO'::miclub.movement_status)) THEN m.amount
+            ELSE (0)::numeric
+        END), (0)::numeric) - COALESCE(sum(
+        CASE
+            WHEN ((m.movement_type = 'EGRESOS'::miclub.movement_type) AND (m.operational_status = 'COMPLETADO'::miclub.movement_status)) THEN m.amount
+            ELSE (0)::numeric
+        END), (0)::numeric)) AS balance
+   FROM (miclub.sectors s
+     LEFT JOIN miclub.movements m ON ((m.sector_id = s.id)))
+  GROUP BY s.id, s.code, s.name;
+
+
+ALTER VIEW miclub.v_sector_finance_summary OWNER TO miclub_app;
+
+--
+-- TOC entry 5449 (class 0 OID 16976)
+-- Dependencies: 227
+-- Data for Name: activities; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.activities (id, sector_id, manager_person_id, code, name, modality, color, monthly_fee, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, created_at, updated_at, instructor_id) FROM stdin;
+ba89bf01-2cee-4a66-a79a-5d4f465bcc12	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Árabe	\N	#FBBF24	20000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	8eb54335-0862-4c61-9cbe-56cdf100e911
+2062e3f8-1436-4ea9-8527-e107cca76b32	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Jiu Jitsu	\N	#F97316	0.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	c262ff0d-dea4-4bb9-9f69-e3b7aeb6db37
+4f4a397c-c10f-483b-9740-8826c28e0d25	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Clases de Canto	\N	#A78BFA	0.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	e03c284e-0466-44e5-af26-3fc669717c0f
+9a4d52d3-0e3e-4b75-982b-dfb639a8b4be	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Iniciación a la Danza	\N	#FBBF24	20000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	3b55df90-2500-40fb-880a-477cb9ccc738
+b02d6aed-ff83-43d9-8315-9ed9c9dffacd	e9d07538-a10f-47e9-bc7b-69543ac240c5	\N	\N	Zumba	\N	#7DD3FC	20000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	cee0b6c9-9f65-4b09-8da5-5873c5246b18
+521d3db1-0f96-43d7-a919-9a9e962fda32	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Magia e Ilusionismo	\N	#A78BFA	15000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	10791750-5ff6-4f46-9309-28348416d525
+c2f0b33e-20b8-4d0e-bcd2-bf46fab06db8	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Contemporáneo	\N	#FBBF24	25000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	84191c35-9984-4b7c-8186-a91621a05250
+7f4b589a-f3ef-47b5-bb5b-0d2a77e6a0e0	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Taller de Fotografía	\N	#A78BFA	25000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	426d51bf-a787-400a-8df8-76d9c518d1da
+dab4c8a8-b452-4744-bdc4-da53b0f0a8c8	e9d07538-a10f-47e9-bc7b-69543ac240c5	\N	\N	Elongación	\N	#7DD3FC	27500.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	8857faa8-41b8-455e-a88f-99f02d9a267a
+fdc7a5ed-96d4-4414-aad8-1cb9a20b5dac	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Clases de música	\N	#A78BFA	0.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	2cf631f6-6c9f-4bc9-884b-a9437c858d13
+b4641176-5b07-4f37-834b-d369645a2463	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Jiu Jitsu KIDS	\N	#F97316	25000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	2cf631f6-6c9f-4bc9-884b-a9437c858d13
+3d4bcbc2-ca5b-4068-9f79-ce242e6287c9	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Yoga	\N	#A78BFA	20000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	13f59a44-334f-4f1b-bab4-649f92180401
+1e68c8f3-eefe-44bc-a04f-a1bb39c8fc26	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Arte - Adultos	\N	#A78BFA	35000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	6ec1b15d-41dc-4528-82ad-e6f70c3343e5
+853f021b-e55e-47c4-9b96-b8c19dc94386	dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	\N	Arte - niños	\N	#A78BFA	25000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	6ec1b15d-41dc-4528-82ad-e6f70c3343e5
+1601b896-16e4-4b29-819f-965cbc3fb56f	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Folklore	\N	#FBBF24	15000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	cfa0d0c6-0fde-47fd-9c6c-a16e2722b6cf
+99c03039-11e5-4cec-be15-09f0de8393ac	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Kickboxing	\N	#F97316	0.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	049b3091-efd4-47d3-9427-6cc49ae3e636
+10bf00c7-f380-4d82-90a7-8de0b6e84502	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Karate	\N	#F97316	20000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	27d64d9f-07b3-4a74-aa7e-87ebfb06df5a
+f151d32c-47c0-4b19-91d2-8ca5bd27e703	b7be5926-9696-4df3-8ef0-efd05c179413	\N	\N	Taekwon-do	\N	#F97316	20000.00	0.00	0.00	\N	activa	Creada desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03	4aaa618e-0b63-4cfc-b300-5c40b5924776
+\.
+
+
+--
+-- TOC entry 5450 (class 0 OID 17017)
+-- Dependencies: 228
+-- Data for Name: activity_schedules; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.activity_schedules (id, activity_id, weekday, start_time, end_time, room_label, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5445 (class 0 OID 16884)
+-- Dependencies: 223
+-- Data for Name: app_users; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.app_users (id, role_id, email, password_hash, display_name, is_active, last_login_at, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5465 (class 0 OID 17433)
+-- Dependencies: 243
+-- Data for Name: audit_log; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.audit_log (id, user_id, action, entity_type, entity_id, old_data, new_data, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5462 (class 0 OID 17366)
+-- Dependencies: 240
+-- Data for Name: crm_message_history; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.crm_message_history (id, person_id, enrollment_id, template_id, phone, message, wa_link, status, opened_at, sent_at, note, created_by, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5461 (class 0 OID 17344)
+-- Dependencies: 239
+-- Data for Name: crm_message_templates; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.crm_message_templates (id, name, body, is_default, created_by, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5454 (class 0 OID 17106)
+-- Dependencies: 232
+-- Data for Name: currencies; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.currencies (code, name, symbol) FROM stdin;
+ARS	Peso argentino	$
+USD	Dólar estadounidense	USD
+\.
+
+
+--
+-- TOC entry 5468 (class 0 OID 17545)
+-- Dependencies: 246
+-- Data for Name: discount_rates; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.discount_rates (id, percent, label, is_active, created_at) FROM stdin;
+e3859136-f486-4c61-a522-b3aa71c1aa1a	0.0000	0%	t	2026-06-25 22:27:59.967166-03
+fecb8a8e-fb05-44d7-8628-cd264eb52cdc	0.0500	5%	t	2026-06-25 22:27:59.967166-03
+43832c40-c1db-4b24-94d4-a435a25971c2	0.1000	10%	t	2026-06-25 22:27:59.967166-03
+7e45b6ad-dec2-4c37-8d4a-07d7e66e722f	0.1500	15%	t	2026-06-25 22:27:59.967166-03
+842e63da-2b73-49c0-9b6d-eb50522b6274	0.2000	20%	t	2026-06-25 22:27:59.967166-03
+cff11418-b830-4d1a-b483-bdff838e5a0a	0.2500	25%	t	2026-06-25 22:27:59.967166-03
+1dc96622-81ea-4b17-8a46-3039f8493c26	0.3000	30%	t	2026-06-25 22:27:59.967166-03
+bb1eda0a-aeb5-4595-bab6-fbaab741a6b8	0.4000	40%	t	2026-06-25 22:27:59.967166-03
+dc9dde43-5002-466b-b26f-1faee3d74c5c	0.5000	50%	t	2026-06-25 22:27:59.967166-03
+9035b54e-bf76-4232-b32b-e8a7b7b3c95d	0.6000	60%	t	2026-06-25 22:27:59.967166-03
+ab314a74-9294-4755-b52f-c6d60c66934f	0.7000	70%	t	2026-06-25 22:27:59.967166-03
+c1b80f2f-023c-4e74-b99e-07c954a4d497	0.7500	75%	t	2026-06-25 22:27:59.967166-03
+76aa33e8-8912-45ae-b343-974a1562fe8c	0.8000	80%	t	2026-06-25 22:27:59.967166-03
+502bc320-230d-4b4a-a9ad-405925fa1679	0.9000	90%	t	2026-06-25 22:27:59.967166-03
+d109b22a-c419-435f-88cf-0dadba2f8b49	1.0000	100%	t	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5451 (class 0 OID 17038)
+-- Dependencies: 229
+-- Data for Name: enrollments; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.enrollments (id, external_id, person_id, activity_id, start_date, end_date, fee_amount, status, last_payment_at, due_date, source, notes, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5463 (class 0 OID 17402)
+-- Dependencies: 241
+-- Data for Name: import_batches; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.import_batches (id, source, source_file, status, started_at, finished_at, notes) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5464 (class 0 OID 17416)
+-- Dependencies: 242
+-- Data for Name: import_errors; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.import_errors (id, batch_id, source_table, source_row, error_message, raw_payload, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5466 (class 0 OID 17508)
+-- Dependencies: 244
+-- Data for Name: instructors; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.instructors (id, person_id, display_name, status, notes, created_at, updated_at) FROM stdin;
+8eb54335-0862-4c61-9cbe-56cdf100e911	a74a7f0c-04de-4b8f-bef5-55bb451f3cfc	Letizia Lovera	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+c262ff0d-dea4-4bb9-9f69-e3b7aeb6db37	33693244-3b8d-44d5-b190-816e8a19236d	Andres Rodriguez	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+e03c284e-0466-44e5-af26-3fc669717c0f	17061c90-0f0b-4bd9-98a0-ea13876815e2	Leonardo Baigorria	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+3b55df90-2500-40fb-880a-477cb9ccc738	7e181ed0-5cd6-4e27-866a-c73b4fa711d9	Fiorela Correa	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+cee0b6c9-9f65-4b09-8da5-5873c5246b18	9ce6a014-1004-4de3-b3f2-893620066994	Alejandra Gonzalez	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+10791750-5ff6-4f46-9309-28348416d525	3eaf506b-6c0b-4f80-8a4b-169d95aa251a	Exequiel Florentin	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+84191c35-9984-4b7c-8186-a91621a05250	6e652072-b29a-4c29-b948-2b07c903a99a	Victoria Echavarria	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+426d51bf-a787-400a-8df8-76d9c518d1da	ae81dae4-a6ec-47f3-8f38-1d1ec25fa3be	Camila Alarcon	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+8857faa8-41b8-455e-a88f-99f02d9a267a	5e129bd2-d564-43fb-a8e7-dfc7e942fc10	Candela Tarnowski	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+2cf631f6-6c9f-4bc9-884b-a9437c858d13	e345d4e4-96d1-4580-8de0-3e24b6a334e4	Profesor/a a definir	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+13f59a44-334f-4f1b-bab4-649f92180401	b671cfea-d4b5-4a0d-930c-7b02613cd146	Estefanía Solis	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+6ec1b15d-41dc-4528-82ad-e6f70c3343e5	32a99d64-f1d2-4e78-a447-6936fe9c229e	Vanesa Rodriguez	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+cfa0d0c6-0fde-47fd-9c6c-a16e2722b6cf	9cdd2479-f7b5-4a58-bcfb-7f7fe74f6245	Lucrecia Duarte	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+049b3091-efd4-47d3-9427-6cc49ae3e636	fdbb7955-33ff-4324-b665-44c95ada9c8a	Natalia Ortiz	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+27d64d9f-07b3-4a74-aa7e-87ebfb06df5a	e70a92af-fa06-4b7b-b2a3-28cc835de449	Sergio Tabossi	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+4aaa618e-0b63-4cfc-b300-5c40b5924776	7c46f33b-8cb6-4b55-8cbe-a3c5a6a5db16	Luzmila Cinquetti	activa	Creado desde hoja System	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5452 (class 0 OID 17073)
+-- Dependencies: 230
+-- Data for Name: movement_categories; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.movement_categories (id, name, is_active, created_at) FROM stdin;
+6c997f2d-6f8f-4ccd-9318-ab025834a05a	CUOTA	t	2026-06-24 20:50:50.627536-03
+4f841f71-a6e4-44a5-89bd-f422ce7c7658	INSCRIPCIÓN	t	2026-06-24 20:50:50.627536-03
+e4dfad78-96ad-403d-9a01-2d0ccc1d14a3	VENTAS	t	2026-06-24 20:50:50.627536-03
+c411d788-668f-47d7-b747-7d349a0336b0	KIOSCO	t	2026-06-24 20:50:50.627536-03
+257c7796-c80b-40f5-8a46-e58ef724af5e	COMISIÓN	t	2026-06-24 20:50:50.627536-03
+19747199-aef4-455d-afb7-ecf7aff9304e	EVENTOS	t	2026-06-24 20:50:50.627536-03
+719fbb60-3a97-4f0c-86fd-533f8048413d	CMV	t	2026-06-24 20:50:50.627536-03
+47c6b5d4-6493-4e4c-9751-ed09f6107121	BEBIDAS	t	2026-06-24 20:50:50.627536-03
+978c31d3-1a26-43da-8d7b-62e6ce061af1	ALQUILER	t	2026-06-24 20:50:50.627536-03
+d7c74b31-72d2-463e-8158-3dd9ee238a36	SERVICIOS	t	2026-06-24 20:50:50.627536-03
+de27ca98-ff2b-46e0-8139-1fd0385717bd	SUELDOS	t	2026-06-24 20:50:50.627536-03
+3d84c411-9ec5-4504-87e8-d10525ae4076	PUBLICIDAD	t	2026-06-24 20:50:50.627536-03
+f465877d-6a28-4f30-ba05-f85613ba5786	REPARACIONES	t	2026-06-24 20:50:50.627536-03
+ee394638-07aa-4518-919f-9ef9bd3be314	IMPUESTOS	t	2026-06-24 20:50:50.627536-03
+d8f70977-00cb-4723-86ae-e0223846b970	CAPITAL INICIAL	t	2026-06-24 20:50:50.627536-03
+f4c3e0b9-e99c-41fe-9588-61b00f3bf14c	AGUA	t	2026-06-25 22:27:59.967166-03
+977bf73c-537b-4c0e-85e6-28b68561d00a	PÉRDIDA	t	2026-06-25 22:27:59.967166-03
+c9dfe6d1-8177-4ada-9962-6d83da123ddd	CURSOS	t	2026-06-25 22:27:59.967166-03
+38e39f39-ac0c-4f7e-a6bc-240fef1ae0c6	TURNOS	t	2026-06-25 22:27:59.967166-03
+7ed69420-dbf3-4a28-89d2-91ad0f5413e9	LUZ	t	2026-06-25 22:27:59.967166-03
+a957f626-519f-42cd-b74f-d1a6ae8065b2	SEGUROS	t	2026-06-25 22:27:59.967166-03
+0bed4a45-1ca1-4c2a-9e4e-51b30f479090	DEPÓSITOS	t	2026-06-25 22:27:59.967166-03
+56c6abae-cc1a-4ba0-8634-8b754a3bfc0d	LIBRERÍA	t	2026-06-25 22:27:59.967166-03
+8989c721-9fd6-4864-8326-3d1f93206673	SALARIOS	t	2026-06-25 22:27:59.967166-03
+e4fbf812-3459-4e76-8813-377043338164	INTERNET	t	2026-06-25 22:27:59.967166-03
+0f69a68d-97f4-47ac-bc13-b3fc54d8a48e	LIMPIEZA	t	2026-06-25 22:27:59.967166-03
+2e76bd54-6bb9-4f62-b8ec-d9ff73fdcc4a	GANANCIA	t	2026-06-25 22:27:59.967166-03
+d2295e07-44bc-413b-ada2-35eb60c9ba5e	VIÁTICOS	t	2026-06-25 22:27:59.967166-03
+1f39f87d-16c9-4eeb-8458-c503544fc00f	CLASES	t	2026-06-25 22:27:59.967166-03
+4e0c9ca8-c256-4f36-8400-aa1a1dad770b	DÓLARES	t	2026-06-25 22:27:59.967166-03
+9120a6c6-8fab-410e-9eef-24e88f1ca288	MANTENIM.	t	2026-06-25 22:27:59.967166-03
+d224a875-bf28-4523-9cf1-5056b44cf986	EXTRACCIONES	t	2026-06-25 22:27:59.967166-03
+7d53cda0-ccc0-4e14-bb8f-463e8f8901f5	OTROS	t	2026-06-25 22:27:59.967166-03
+d763c2a7-31e7-4c78-bd7c-66176bcf7701	DEUDA	t	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5455 (class 0 OID 17116)
+-- Dependencies: 233
+-- Data for Name: movements; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.movements (id, external_id, movement_date, movement_type, category_id, sector_id, concept, counterparty_person_id, counterparty_text, amount, taxes, currency_code, payment_method_id, financial_status, operational_status, source, source_payload, created_by, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5460 (class 0 OID 17314)
+-- Dependencies: 238
+-- Data for Name: operational_balances; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.operational_balances (id, sector_id, label, amount, currency_code, balance_date, source, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5458 (class 0 OID 17254)
+-- Dependencies: 236
+-- Data for Name: payment_allocations; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.payment_allocations (id, payment_id, receivable_id, amount, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5453 (class 0 OID 17090)
+-- Dependencies: 231
+-- Data for Name: payment_methods; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.payment_methods (id, name, is_active, created_at) FROM stdin;
+efe6f25e-1f00-4c90-9137-b81af7757a66	Efectivo	t	2026-06-24 20:50:50.619575-03
+70de66ef-a2a3-4a56-b286-3daf5a9f9757	Transferencia	t	2026-06-24 20:50:50.619575-03
+b54a39f0-7634-4f27-bab4-c64b41b5f932	Tarjeta	t	2026-06-24 20:50:50.619575-03
+eec02379-4fd8-4669-981e-630e3f186d39	Mercado Pago	t	2026-06-24 20:50:50.619575-03
+0e67bb38-ac55-40e3-a4de-a561a8fe3a99	Otro	t	2026-06-24 20:50:50.619575-03
+\.
+
+
+--
+-- TOC entry 5457 (class 0 OID 17217)
+-- Dependencies: 235
+-- Data for Name: payments; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.payments (id, movement_id, person_id, payment_method_id, paid_at, amount, currency_code, note, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5446 (class 0 OID 16909)
+-- Dependencies: 224
+-- Data for Name: people; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.people (id, first_name, last_name, dni, phone, normalized_phone, email, status, notes, birth_date, address, created_at, updated_at) FROM stdin;
+a74a7f0c-04de-4b8f-bef5-55bb451f3cfc	Letizia	Lovera	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+33693244-3b8d-44d5-b190-816e8a19236d	Andres	Rodriguez	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+17061c90-0f0b-4bd9-98a0-ea13876815e2	Leonardo	Baigorria	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+7e181ed0-5cd6-4e27-866a-c73b4fa711d9	Fiorela	Correa	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+9ce6a014-1004-4de3-b3f2-893620066994	Alejandra	Gonzalez	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+3eaf506b-6c0b-4f80-8a4b-169d95aa251a	Exequiel	Florentin	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+6e652072-b29a-4c29-b948-2b07c903a99a	Victoria	Echavarria	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+ae81dae4-a6ec-47f3-8f38-1d1ec25fa3be	Camila	Alarcon	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+5e129bd2-d564-43fb-a8e7-dfc7e942fc10	Candela	Tarnowski	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+e345d4e4-96d1-4580-8de0-3e24b6a334e4	Profesor/a	A definir	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+b671cfea-d4b5-4a0d-930c-7b02613cd146	Estefanía	Solis	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+32a99d64-f1d2-4e78-a447-6936fe9c229e	Vanesa	Rodriguez	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+9cdd2479-f7b5-4a58-bcfb-7f7fe74f6245	Lucrecia	Duarte	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+fdbb7955-33ff-4324-b665-44c95ada9c8a	Natalia	Ortiz	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+e70a92af-fa06-4b7b-b2a3-28cc835de449	Sergio	Tabossi	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+7c46f33b-8cb6-4b55-8cbe-a3c5a6a5db16	Luzmila	Cinquetti	\N	\N	\N	\N	activa	Creado desde hoja System	\N	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5447 (class 0 OID 16928)
+-- Dependencies: 225
+-- Data for Name: person_kind_links; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.person_kind_links (person_id, kind, created_at) FROM stdin;
+a74a7f0c-04de-4b8f-bef5-55bb451f3cfc	instructor	2026-06-25 22:27:59.967166-03
+33693244-3b8d-44d5-b190-816e8a19236d	instructor	2026-06-25 22:27:59.967166-03
+17061c90-0f0b-4bd9-98a0-ea13876815e2	instructor	2026-06-25 22:27:59.967166-03
+7e181ed0-5cd6-4e27-866a-c73b4fa711d9	instructor	2026-06-25 22:27:59.967166-03
+9ce6a014-1004-4de3-b3f2-893620066994	instructor	2026-06-25 22:27:59.967166-03
+3eaf506b-6c0b-4f80-8a4b-169d95aa251a	instructor	2026-06-25 22:27:59.967166-03
+6e652072-b29a-4c29-b948-2b07c903a99a	instructor	2026-06-25 22:27:59.967166-03
+ae81dae4-a6ec-47f3-8f38-1d1ec25fa3be	instructor	2026-06-25 22:27:59.967166-03
+5e129bd2-d564-43fb-a8e7-dfc7e942fc10	instructor	2026-06-25 22:27:59.967166-03
+e345d4e4-96d1-4580-8de0-3e24b6a334e4	instructor	2026-06-25 22:27:59.967166-03
+b671cfea-d4b5-4a0d-930c-7b02613cd146	instructor	2026-06-25 22:27:59.967166-03
+32a99d64-f1d2-4e78-a447-6936fe9c229e	instructor	2026-06-25 22:27:59.967166-03
+9cdd2479-f7b5-4a58-bcfb-7f7fe74f6245	instructor	2026-06-25 22:27:59.967166-03
+fdbb7955-33ff-4324-b665-44c95ada9c8a	instructor	2026-06-25 22:27:59.967166-03
+e70a92af-fa06-4b7b-b2a3-28cc835de449	instructor	2026-06-25 22:27:59.967166-03
+7c46f33b-8cb6-4b55-8cbe-a3c5a6a5db16	instructor	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5456 (class 0 OID 17175)
+-- Dependencies: 234
+-- Data for Name: receivables; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.receivables (id, person_id, enrollment_id, sector_id, activity_id, concept, period_month, period_year, due_date, amount, club_amount, status, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5444 (class 0 OID 16869)
+-- Dependencies: 222
+-- Data for Name: roles; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.roles (id, code, name, description, created_at) FROM stdin;
+b0cf34d8-0efc-44b0-989f-763adae5fdd3	admin	Administrador	Acceso total	2026-06-24 20:50:50.614612-03
+8434f36b-718f-4ad8-8647-c1051231774e	operator	Operador	Carga y gestión operativa	2026-06-24 20:50:50.614612-03
+61150310-6a75-43b4-9c69-b4bfc67409e3	viewer	Visualizador	Solo lectura	2026-06-24 20:50:50.614612-03
+\.
+
+
+--
+-- TOC entry 5469 (class 0 OID 17561)
+-- Dependencies: 247
+-- Data for Name: salon_hour_prices; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.salon_hour_prices (id, hours, price, is_active, created_at) FROM stdin;
+8e0f76a1-f61c-4fba-abc0-83652a4e56be	0	0.00	t	2026-06-25 22:27:59.967166-03
+53fbb99e-a87a-42e1-9f54-89a35e679980	1	60000.00	t	2026-06-25 22:27:59.967166-03
+33a46f72-2856-4711-b2cb-a5fb92acbde6	2	85000.00	t	2026-06-25 22:27:59.967166-03
+df21e402-7296-4a26-8b62-7bdc4193127b	3	110000.00	t	2026-06-25 22:27:59.967166-03
+71a79433-b911-4e2b-89d1-1bfb6bdc8569	4	120000.00	t	2026-06-25 22:27:59.967166-03
+797db9ab-59de-42d6-957e-4e1281c547f4	5	150000.00	t	2026-06-25 22:27:59.967166-03
+d6f1b680-19f9-4d83-82bc-e7fe02d91070	6	150000.00	t	2026-06-25 22:27:59.967166-03
+48388caf-7efd-4c11-804b-754af58461d4	7	210000.00	t	2026-06-25 22:27:59.967166-03
+3356fa97-d8d1-497e-b1d3-342060eb89e4	8	240000.00	t	2026-06-25 22:27:59.967166-03
+2e41c40d-9d88-41d3-b356-89f7e9adfaaf	9	280000.00	t	2026-06-25 22:27:59.967166-03
+5d8edc9b-c9f6-4983-8ce1-2d72cc728738	10	280000.00	t	2026-06-25 22:27:59.967166-03
+bda7356d-388f-445e-a37c-3a5ffbeeef0c	11	320000.00	t	2026-06-25 22:27:59.967166-03
+b569a7a2-99d1-40d0-a4c7-4e6211b9d14c	12	320000.00	t	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5459 (class 0 OID 17279)
+-- Dependencies: 237
+-- Data for Name: sector_settlements; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.sector_settlements (id, sector_id, responsible_person_id, settlement_date, period_month, period_year, gross_income, commissions, expenses, amount_to_pay, status, notes, created_at) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5448 (class 0 OID 16942)
+-- Dependencies: 226
+-- Data for Name: sectors; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.sectors (id, manager_person_id, code, name, color, opening_time, closing_time, max_capacity, municipal_status, financial_status, operational_status, uses_enrollments, uses_activities, notes, created_at, updated_at) FROM stdin;
+8ad5db75-2d5e-491a-8530-e6eab06801dd	\N	LOCAL_1	Local 1	#34D399	\N	\N	\N	pendiente	sin_movimientos	activa	f	f	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+d6ec0cb8-fa73-48dc-914f-08c1e720ab28	\N	LOCAL_2	Local 2	#22C55E	\N	\N	\N	pendiente	sin_movimientos	pendiente	f	f	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+ce9c46c1-aba2-4cc7-99b7-9885fa357b9a	\N	CANCHA_1	Cancha 1	#F97316	\N	\N	\N	pendiente	sin_movimientos	pendiente	f	f	\N	2026-06-25 22:27:59.967166-03	2026-06-25 22:27:59.967166-03
+e9d07538-a10f-47e9-bc7b-69543ac240c5	\N	FITNESS	Espacio Fitness	#7DD3FC	\N	\N	\N	pendiente	sin_movimientos	activa	t	t	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+76ecd037-a706-4bc4-b2d0-b3e2fa05834e	\N	CANTINA	Cantina	#F87171	\N	\N	\N	pendiente	sin_movimientos	activa	f	f	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+b7be5926-9696-4df3-8ef0-efd05c179413	\N	SALON	Salón	#FBBF24	\N	\N	\N	pendiente	sin_movimientos	activa	t	t	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+dbc7ae63-5f52-4e91-b7c2-39d84d8555dc	\N	AULA	Aula	#A78BFA	\N	\N	\N	pendiente	sin_movimientos	activa	t	t	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+8a0d7d10-b6fa-4ade-ac9c-f98bd14fa7ad	\N	TESORERIA	Tesorería	#60A5FA	\N	\N	\N	pendiente	sin_movimientos	activa	f	f	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+94e34a60-d07b-43b3-aca1-523d1d68e213	\N	OTROS	Otros	#94A3B8	\N	\N	\N	pendiente	sin_movimientos	activa	f	f	\N	2026-06-24 20:50:50.623138-03	2026-06-25 22:27:59.967166-03
+\.
+
+
+--
+-- TOC entry 5467 (class 0 OID 17533)
+-- Dependencies: 245
+-- Data for Name: system_months; Type: TABLE DATA; Schema: miclub; Owner: miclub_app
+--
+
+COPY miclub.system_months (month_number, name) FROM stdin;
+1	Enero
+2	Febrero
+3	Marzo
+4	Abril
+5	Mayo
+6	Junio
+7	Julio
+8	Agosto
+9	Septiembre
+10	Octubre
+11	Noviembre
+12	Diciembre
+\.
+
+
+--
+-- TOC entry 5162 (class 2606 OID 17000)
+-- Name: activities activities_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.activities
+    ADD CONSTRAINT activities_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5168 (class 2606 OID 17032)
+-- Name: activity_schedules activity_schedules_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.activity_schedules
+    ADD CONSTRAINT activity_schedules_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5144 (class 2606 OID 16903)
+-- Name: app_users app_users_email_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.app_users
+    ADD CONSTRAINT app_users_email_key UNIQUE (email);
+
+
+--
+-- TOC entry 5146 (class 2606 OID 16901)
+-- Name: app_users app_users_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.app_users
+    ADD CONSTRAINT app_users_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5227 (class 2606 OID 17445)
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5217 (class 2606 OID 17381)
+-- Name: crm_message_history crm_message_history_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_history
+    ADD CONSTRAINT crm_message_history_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5215 (class 2606 OID 17360)
+-- Name: crm_message_templates crm_message_templates_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_templates
+    ADD CONSTRAINT crm_message_templates_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5185 (class 2606 OID 17115)
+-- Name: currencies currencies_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.currencies
+    ADD CONSTRAINT currencies_pkey PRIMARY KEY (code);
+
+
+--
+-- TOC entry 5238 (class 2606 OID 17560)
+-- Name: discount_rates discount_rates_percent_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.discount_rates
+    ADD CONSTRAINT discount_rates_percent_key UNIQUE (percent);
+
+
+--
+-- TOC entry 5240 (class 2606 OID 17558)
+-- Name: discount_rates discount_rates_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.discount_rates
+    ADD CONSTRAINT discount_rates_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5170 (class 2606 OID 17062)
+-- Name: enrollments enrollments_external_id_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.enrollments
+    ADD CONSTRAINT enrollments_external_id_key UNIQUE (external_id);
+
+
+--
+-- TOC entry 5172 (class 2606 OID 17060)
+-- Name: enrollments enrollments_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.enrollments
+    ADD CONSTRAINT enrollments_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5223 (class 2606 OID 17415)
+-- Name: import_batches import_batches_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.import_batches
+    ADD CONSTRAINT import_batches_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5225 (class 2606 OID 17427)
+-- Name: import_errors import_errors_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.import_errors
+    ADD CONSTRAINT import_errors_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5230 (class 2606 OID 17526)
+-- Name: instructors instructors_person_id_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.instructors
+    ADD CONSTRAINT instructors_person_id_key UNIQUE (person_id);
+
+
+--
+-- TOC entry 5232 (class 2606 OID 17524)
+-- Name: instructors instructors_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.instructors
+    ADD CONSTRAINT instructors_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5178 (class 2606 OID 17087)
+-- Name: movement_categories movement_categories_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movement_categories
+    ADD CONSTRAINT movement_categories_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5193 (class 2606 OID 17144)
+-- Name: movements movements_external_id_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_external_id_key UNIQUE (external_id);
+
+
+--
+-- TOC entry 5195 (class 2606 OID 17142)
+-- Name: movements movements_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5213 (class 2606 OID 17333)
+-- Name: operational_balances operational_balances_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.operational_balances
+    ADD CONSTRAINT operational_balances_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5207 (class 2606 OID 17268)
+-- Name: payment_allocations payment_allocations_payment_id_receivable_id_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payment_allocations
+    ADD CONSTRAINT payment_allocations_payment_id_receivable_id_key UNIQUE (payment_id, receivable_id);
+
+
+--
+-- TOC entry 5209 (class 2606 OID 17266)
+-- Name: payment_allocations payment_allocations_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payment_allocations
+    ADD CONSTRAINT payment_allocations_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5181 (class 2606 OID 17105)
+-- Name: payment_methods payment_methods_name_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payment_methods
+    ADD CONSTRAINT payment_methods_name_key UNIQUE (name);
+
+
+--
+-- TOC entry 5183 (class 2606 OID 17103)
+-- Name: payment_methods payment_methods_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payment_methods
+    ADD CONSTRAINT payment_methods_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5205 (class 2606 OID 17233)
+-- Name: payments payments_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payments
+    ADD CONSTRAINT payments_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5151 (class 2606 OID 16927)
+-- Name: people people_dni_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.people
+    ADD CONSTRAINT people_dni_key UNIQUE (dni);
+
+
+--
+-- TOC entry 5153 (class 2606 OID 16925)
+-- Name: people people_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.people
+    ADD CONSTRAINT people_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5155 (class 2606 OID 16936)
+-- Name: person_kind_links person_kind_links_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.person_kind_links
+    ADD CONSTRAINT person_kind_links_pkey PRIMARY KEY (person_id, kind);
+
+
+--
+-- TOC entry 5201 (class 2606 OID 17196)
+-- Name: receivables receivables_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.receivables
+    ADD CONSTRAINT receivables_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5140 (class 2606 OID 16883)
+-- Name: roles roles_code_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.roles
+    ADD CONSTRAINT roles_code_key UNIQUE (code);
+
+
+--
+-- TOC entry 5142 (class 2606 OID 16881)
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5244 (class 2606 OID 17576)
+-- Name: salon_hour_prices salon_hour_prices_hours_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.salon_hour_prices
+    ADD CONSTRAINT salon_hour_prices_hours_key UNIQUE (hours);
+
+
+--
+-- TOC entry 5246 (class 2606 OID 17574)
+-- Name: salon_hour_prices salon_hour_prices_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.salon_hour_prices
+    ADD CONSTRAINT salon_hour_prices_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5211 (class 2606 OID 17303)
+-- Name: sector_settlements sector_settlements_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.sector_settlements
+    ADD CONSTRAINT sector_settlements_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5158 (class 2606 OID 16970)
+-- Name: sectors sectors_code_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.sectors
+    ADD CONSTRAINT sectors_code_key UNIQUE (code);
+
+
+--
+-- TOC entry 5160 (class 2606 OID 16968)
+-- Name: sectors sectors_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.sectors
+    ADD CONSTRAINT sectors_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 5234 (class 2606 OID 17544)
+-- Name: system_months system_months_name_key; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.system_months
+    ADD CONSTRAINT system_months_name_key UNIQUE (name);
+
+
+--
+-- TOC entry 5236 (class 2606 OID 17542)
+-- Name: system_months system_months_pkey; Type: CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.system_months
+    ADD CONSTRAINT system_months_pkey PRIMARY KEY (month_number);
+
+
+--
+-- TOC entry 5163 (class 1259 OID 17583)
+-- Name: idx_activities_instructor; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_activities_instructor ON miclub.activities USING btree (instructor_id);
+
+
+--
+-- TOC entry 5164 (class 1259 OID 17464)
+-- Name: idx_activities_sector; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_activities_sector ON miclub.activities USING btree (sector_id);
+
+
+--
+-- TOC entry 5165 (class 1259 OID 17465)
+-- Name: idx_activities_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_activities_status ON miclub.activities USING btree (status);
+
+
+--
+-- TOC entry 5218 (class 1259 OID 17485)
+-- Name: idx_crm_history_created_at; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_crm_history_created_at ON miclub.crm_message_history USING btree (created_at);
+
+
+--
+-- TOC entry 5219 (class 1259 OID 17482)
+-- Name: idx_crm_history_person; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_crm_history_person ON miclub.crm_message_history USING btree (person_id);
+
+
+--
+-- TOC entry 5220 (class 1259 OID 17483)
+-- Name: idx_crm_history_phone; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_crm_history_phone ON miclub.crm_message_history USING btree (phone);
+
+
+--
+-- TOC entry 5221 (class 1259 OID 17484)
+-- Name: idx_crm_history_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_crm_history_status ON miclub.crm_message_history USING btree (status);
+
+
+--
+-- TOC entry 5241 (class 1259 OID 17586)
+-- Name: idx_discount_rates_percent; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_discount_rates_percent ON miclub.discount_rates USING btree (percent);
+
+
+--
+-- TOC entry 5173 (class 1259 OID 17467)
+-- Name: idx_enrollments_activity; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_enrollments_activity ON miclub.enrollments USING btree (activity_id);
+
+
+--
+-- TOC entry 5174 (class 1259 OID 17469)
+-- Name: idx_enrollments_due_date; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_enrollments_due_date ON miclub.enrollments USING btree (due_date);
+
+
+--
+-- TOC entry 5175 (class 1259 OID 17466)
+-- Name: idx_enrollments_person; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_enrollments_person ON miclub.enrollments USING btree (person_id);
+
+
+--
+-- TOC entry 5176 (class 1259 OID 17468)
+-- Name: idx_enrollments_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_enrollments_status ON miclub.enrollments USING btree (status);
+
+
+--
+-- TOC entry 5228 (class 1259 OID 17584)
+-- Name: idx_instructors_display_name; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_instructors_display_name ON miclub.instructors USING btree (display_name);
+
+
+--
+-- TOC entry 5186 (class 1259 OID 17474)
+-- Name: idx_movements_category; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_movements_category ON miclub.movements USING btree (category_id);
+
+
+--
+-- TOC entry 5187 (class 1259 OID 17471)
+-- Name: idx_movements_date; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_movements_date ON miclub.movements USING btree (movement_date);
+
+
+--
+-- TOC entry 5188 (class 1259 OID 17470)
+-- Name: idx_movements_external_id; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_movements_external_id ON miclub.movements USING btree (external_id);
+
+
+--
+-- TOC entry 5189 (class 1259 OID 17473)
+-- Name: idx_movements_sector; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_movements_sector ON miclub.movements USING btree (sector_id);
+
+
+--
+-- TOC entry 5190 (class 1259 OID 17475)
+-- Name: idx_movements_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_movements_status ON miclub.movements USING btree (operational_status);
+
+
+--
+-- TOC entry 5191 (class 1259 OID 17472)
+-- Name: idx_movements_type; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_movements_type ON miclub.movements USING btree (movement_type);
+
+
+--
+-- TOC entry 5202 (class 1259 OID 17481)
+-- Name: idx_payments_paid_at; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_payments_paid_at ON miclub.payments USING btree (paid_at);
+
+
+--
+-- TOC entry 5203 (class 1259 OID 17480)
+-- Name: idx_payments_person; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_payments_person ON miclub.payments USING btree (person_id);
+
+
+--
+-- TOC entry 5147 (class 1259 OID 17460)
+-- Name: idx_people_dni; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_people_dni ON miclub.people USING btree (dni);
+
+
+--
+-- TOC entry 5148 (class 1259 OID 17461)
+-- Name: idx_people_phone; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_people_phone ON miclub.people USING btree (normalized_phone);
+
+
+--
+-- TOC entry 5149 (class 1259 OID 17462)
+-- Name: idx_people_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_people_status ON miclub.people USING btree (status);
+
+
+--
+-- TOC entry 5196 (class 1259 OID 17479)
+-- Name: idx_receivables_due_date; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_receivables_due_date ON miclub.receivables USING btree (due_date);
+
+
+--
+-- TOC entry 5197 (class 1259 OID 17477)
+-- Name: idx_receivables_enrollment; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_receivables_enrollment ON miclub.receivables USING btree (enrollment_id);
+
+
+--
+-- TOC entry 5198 (class 1259 OID 17476)
+-- Name: idx_receivables_person; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_receivables_person ON miclub.receivables USING btree (person_id);
+
+
+--
+-- TOC entry 5199 (class 1259 OID 17478)
+-- Name: idx_receivables_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_receivables_status ON miclub.receivables USING btree (status);
+
+
+--
+-- TOC entry 5242 (class 1259 OID 17585)
+-- Name: idx_salon_hour_prices_hours; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_salon_hour_prices_hours ON miclub.salon_hour_prices USING btree (hours);
+
+
+--
+-- TOC entry 5156 (class 1259 OID 17463)
+-- Name: idx_sectors_status; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE INDEX idx_sectors_status ON miclub.sectors USING btree (operational_status);
+
+
+--
+-- TOC entry 5166 (class 1259 OID 17016)
+-- Name: ux_activities_sector_name_modality; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE UNIQUE INDEX ux_activities_sector_name_modality ON miclub.activities USING btree (sector_id, name, COALESCE(modality, ''::text));
+
+
+--
+-- TOC entry 5179 (class 1259 OID 17507)
+-- Name: ux_movement_categories_name_neutral; Type: INDEX; Schema: miclub; Owner: miclub_app
+--
+
+CREATE UNIQUE INDEX ux_movement_categories_name_neutral ON miclub.movement_categories USING btree (upper(TRIM(BOTH FROM name)));
+
+
+--
+-- TOC entry 5287 (class 2620 OID 17455)
+-- Name: activities trg_activities_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_activities_updated_at BEFORE UPDATE ON miclub.activities FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5284 (class 2620 OID 17452)
+-- Name: app_users trg_app_users_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_app_users_updated_at BEFORE UPDATE ON miclub.app_users FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5291 (class 2620 OID 17459)
+-- Name: crm_message_templates trg_crm_templates_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_crm_templates_updated_at BEFORE UPDATE ON miclub.crm_message_templates FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5288 (class 2620 OID 17456)
+-- Name: enrollments trg_enrollments_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_enrollments_updated_at BEFORE UPDATE ON miclub.enrollments FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5292 (class 2620 OID 17532)
+-- Name: instructors trg_instructors_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_instructors_updated_at BEFORE UPDATE ON miclub.instructors FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5289 (class 2620 OID 17457)
+-- Name: movements trg_movements_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_movements_updated_at BEFORE UPDATE ON miclub.movements FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5285 (class 2620 OID 17453)
+-- Name: people trg_people_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_people_updated_at BEFORE UPDATE ON miclub.people FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5290 (class 2620 OID 17458)
+-- Name: receivables trg_receivables_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_receivables_updated_at BEFORE UPDATE ON miclub.receivables FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5286 (class 2620 OID 17454)
+-- Name: sectors trg_sectors_updated_at; Type: TRIGGER; Schema: miclub; Owner: miclub_app
+--
+
+CREATE TRIGGER trg_sectors_updated_at BEFORE UPDATE ON miclub.sectors FOR EACH ROW EXECUTE FUNCTION miclub.touch_updated_at();
+
+
+--
+-- TOC entry 5250 (class 2606 OID 17577)
+-- Name: activities activities_instructor_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.activities
+    ADD CONSTRAINT activities_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES miclub.instructors(id);
+
+
+--
+-- TOC entry 5251 (class 2606 OID 17006)
+-- Name: activities activities_manager_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.activities
+    ADD CONSTRAINT activities_manager_person_id_fkey FOREIGN KEY (manager_person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5252 (class 2606 OID 17001)
+-- Name: activities activities_sector_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.activities
+    ADD CONSTRAINT activities_sector_id_fkey FOREIGN KEY (sector_id) REFERENCES miclub.sectors(id);
+
+
+--
+-- TOC entry 5253 (class 2606 OID 17033)
+-- Name: activity_schedules activity_schedules_activity_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.activity_schedules
+    ADD CONSTRAINT activity_schedules_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES miclub.activities(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 5247 (class 2606 OID 16904)
+-- Name: app_users app_users_role_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.app_users
+    ADD CONSTRAINT app_users_role_id_fkey FOREIGN KEY (role_id) REFERENCES miclub.roles(id);
+
+
+--
+-- TOC entry 5282 (class 2606 OID 17446)
+-- Name: audit_log audit_log_user_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.audit_log
+    ADD CONSTRAINT audit_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES miclub.app_users(id);
+
+
+--
+-- TOC entry 5277 (class 2606 OID 17397)
+-- Name: crm_message_history crm_message_history_created_by_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_history
+    ADD CONSTRAINT crm_message_history_created_by_fkey FOREIGN KEY (created_by) REFERENCES miclub.app_users(id);
+
+
+--
+-- TOC entry 5278 (class 2606 OID 17387)
+-- Name: crm_message_history crm_message_history_enrollment_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_history
+    ADD CONSTRAINT crm_message_history_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES miclub.enrollments(id);
+
+
+--
+-- TOC entry 5279 (class 2606 OID 17382)
+-- Name: crm_message_history crm_message_history_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_history
+    ADD CONSTRAINT crm_message_history_person_id_fkey FOREIGN KEY (person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5280 (class 2606 OID 17392)
+-- Name: crm_message_history crm_message_history_template_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_history
+    ADD CONSTRAINT crm_message_history_template_id_fkey FOREIGN KEY (template_id) REFERENCES miclub.crm_message_templates(id);
+
+
+--
+-- TOC entry 5276 (class 2606 OID 17361)
+-- Name: crm_message_templates crm_message_templates_created_by_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.crm_message_templates
+    ADD CONSTRAINT crm_message_templates_created_by_fkey FOREIGN KEY (created_by) REFERENCES miclub.app_users(id);
+
+
+--
+-- TOC entry 5254 (class 2606 OID 17068)
+-- Name: enrollments enrollments_activity_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.enrollments
+    ADD CONSTRAINT enrollments_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES miclub.activities(id);
+
+
+--
+-- TOC entry 5255 (class 2606 OID 17063)
+-- Name: enrollments enrollments_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.enrollments
+    ADD CONSTRAINT enrollments_person_id_fkey FOREIGN KEY (person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5281 (class 2606 OID 17428)
+-- Name: import_errors import_errors_batch_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.import_errors
+    ADD CONSTRAINT import_errors_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES miclub.import_batches(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 5283 (class 2606 OID 17527)
+-- Name: instructors instructors_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.instructors
+    ADD CONSTRAINT instructors_person_id_fkey FOREIGN KEY (person_id) REFERENCES miclub.people(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 5256 (class 2606 OID 17145)
+-- Name: movements movements_category_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_category_id_fkey FOREIGN KEY (category_id) REFERENCES miclub.movement_categories(id);
+
+
+--
+-- TOC entry 5257 (class 2606 OID 17155)
+-- Name: movements movements_counterparty_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_counterparty_person_id_fkey FOREIGN KEY (counterparty_person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5258 (class 2606 OID 17170)
+-- Name: movements movements_created_by_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_created_by_fkey FOREIGN KEY (created_by) REFERENCES miclub.app_users(id);
+
+
+--
+-- TOC entry 5259 (class 2606 OID 17160)
+-- Name: movements movements_currency_code_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_currency_code_fkey FOREIGN KEY (currency_code) REFERENCES miclub.currencies(code);
+
+
+--
+-- TOC entry 5260 (class 2606 OID 17165)
+-- Name: movements movements_payment_method_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES miclub.payment_methods(id);
+
+
+--
+-- TOC entry 5261 (class 2606 OID 17150)
+-- Name: movements movements_sector_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.movements
+    ADD CONSTRAINT movements_sector_id_fkey FOREIGN KEY (sector_id) REFERENCES miclub.sectors(id);
+
+
+--
+-- TOC entry 5274 (class 2606 OID 17339)
+-- Name: operational_balances operational_balances_currency_code_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.operational_balances
+    ADD CONSTRAINT operational_balances_currency_code_fkey FOREIGN KEY (currency_code) REFERENCES miclub.currencies(code);
+
+
+--
+-- TOC entry 5275 (class 2606 OID 17334)
+-- Name: operational_balances operational_balances_sector_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.operational_balances
+    ADD CONSTRAINT operational_balances_sector_id_fkey FOREIGN KEY (sector_id) REFERENCES miclub.sectors(id);
+
+
+--
+-- TOC entry 5270 (class 2606 OID 17269)
+-- Name: payment_allocations payment_allocations_payment_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payment_allocations
+    ADD CONSTRAINT payment_allocations_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES miclub.payments(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 5271 (class 2606 OID 17274)
+-- Name: payment_allocations payment_allocations_receivable_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payment_allocations
+    ADD CONSTRAINT payment_allocations_receivable_id_fkey FOREIGN KEY (receivable_id) REFERENCES miclub.receivables(id);
+
+
+--
+-- TOC entry 5266 (class 2606 OID 17249)
+-- Name: payments payments_currency_code_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payments
+    ADD CONSTRAINT payments_currency_code_fkey FOREIGN KEY (currency_code) REFERENCES miclub.currencies(code);
+
+
+--
+-- TOC entry 5267 (class 2606 OID 17234)
+-- Name: payments payments_movement_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payments
+    ADD CONSTRAINT payments_movement_id_fkey FOREIGN KEY (movement_id) REFERENCES miclub.movements(id);
+
+
+--
+-- TOC entry 5268 (class 2606 OID 17244)
+-- Name: payments payments_payment_method_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payments
+    ADD CONSTRAINT payments_payment_method_id_fkey FOREIGN KEY (payment_method_id) REFERENCES miclub.payment_methods(id);
+
+
+--
+-- TOC entry 5269 (class 2606 OID 17239)
+-- Name: payments payments_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.payments
+    ADD CONSTRAINT payments_person_id_fkey FOREIGN KEY (person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5248 (class 2606 OID 16937)
+-- Name: person_kind_links person_kind_links_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.person_kind_links
+    ADD CONSTRAINT person_kind_links_person_id_fkey FOREIGN KEY (person_id) REFERENCES miclub.people(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 5262 (class 2606 OID 17212)
+-- Name: receivables receivables_activity_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.receivables
+    ADD CONSTRAINT receivables_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES miclub.activities(id);
+
+
+--
+-- TOC entry 5263 (class 2606 OID 17202)
+-- Name: receivables receivables_enrollment_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.receivables
+    ADD CONSTRAINT receivables_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES miclub.enrollments(id);
+
+
+--
+-- TOC entry 5264 (class 2606 OID 17197)
+-- Name: receivables receivables_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.receivables
+    ADD CONSTRAINT receivables_person_id_fkey FOREIGN KEY (person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5265 (class 2606 OID 17207)
+-- Name: receivables receivables_sector_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.receivables
+    ADD CONSTRAINT receivables_sector_id_fkey FOREIGN KEY (sector_id) REFERENCES miclub.sectors(id);
+
+
+--
+-- TOC entry 5272 (class 2606 OID 17309)
+-- Name: sector_settlements sector_settlements_responsible_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.sector_settlements
+    ADD CONSTRAINT sector_settlements_responsible_person_id_fkey FOREIGN KEY (responsible_person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 5273 (class 2606 OID 17304)
+-- Name: sector_settlements sector_settlements_sector_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.sector_settlements
+    ADD CONSTRAINT sector_settlements_sector_id_fkey FOREIGN KEY (sector_id) REFERENCES miclub.sectors(id);
+
+
+--
+-- TOC entry 5249 (class 2606 OID 16971)
+-- Name: sectors sectors_manager_person_id_fkey; Type: FK CONSTRAINT; Schema: miclub; Owner: miclub_app
+--
+
+ALTER TABLE ONLY miclub.sectors
+    ADD CONSTRAINT sectors_manager_person_id_fkey FOREIGN KEY (manager_person_id) REFERENCES miclub.people(id);
+
+
+--
+-- TOC entry 2317 (class 826 OID 17628)
+-- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: miclub; Owner: miclub_app
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE miclub_app IN SCHEMA miclub GRANT SELECT ON SEQUENCES TO miclub_app;
+
+
+--
+-- TOC entry 2318 (class 826 OID 17629)
+-- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: miclub; Owner: miclub_app
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE miclub_app IN SCHEMA miclub GRANT ALL ON FUNCTIONS TO miclub_app;
+
+
+--
+-- TOC entry 2316 (class 826 OID 17627)
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: miclub; Owner: miclub_app
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE miclub_app IN SCHEMA miclub GRANT SELECT,INSERT,DELETE,UPDATE ON TABLES TO miclub_app;
+
+
+-- Completed on 2026-06-26 21:50:08
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict CB401neeaNMQOKeS1thTTe5cZDm5xAu9LpeBk64jGXcxh1dFwsUEDJad7rKIKre
+

@@ -234,14 +234,3 @@ If you connect with discrete PostgreSQL variables instead of `DATABASE_URL`, pas
 psql -h "$PGHOST" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
 npm run import:sheets:dry
 ```
-
-### Applying the migration to an existing `miclub_gestion` database
-
-If you already restored or use the existing PostgreSQL structure from the `dump-miclub_gestion-*` backup, run the incremental compatibility migration after confirming your DBeaver connection points to the same database used by the API:
-
-```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606270001_align_existing_miclub_for_sheets_import.sql
-npm run import:sheets:dry
-```
-
-In DBeaver, open a SQL editor from the `miclub_gestion` connection/schema, execute `apps/api/db/migrations/202606270001_align_existing_miclub_for_sheets_import.sql`, then validate `miclub.v_current_enrollments`, `miclub.v_movements_enriched`, `miclub.v_dashboard_basic`, and `miclub.v_sector_finance_summary` before running the dry import.
