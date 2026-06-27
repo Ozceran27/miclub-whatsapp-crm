@@ -218,3 +218,30 @@ Recomendaciones para acceso remoto:
 - Usá una contraseña fuerte y un `SESSION_SECRET` largo, único y privado.
 - No compartas ni subas el archivo `.env` real.
 - Si usás una URL HTTPS del túnel, configurá `PUBLIC_APP_URL` con esa URL pública.
+
+## PostgreSQL schema migration for Google Sheets import
+
+Before running the Google Sheets dry-run importer, apply the versioned PostgreSQL migration that creates the `miclub` schema, required extensions, enums, tables, unique indexes used by importer `on conflict` clauses, and service views:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
+npm run import:sheets:dry
+```
+
+If you connect with discrete PostgreSQL variables instead of `DATABASE_URL`, pass the same host/database/user options you use for the API, for example:
+
+```bash
+psql -h "$PGHOST" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
+npm run import:sheets:dry
+```
+
+### Applying the migration to an existing `miclub_gestion` database
+
+If you already restored or use the existing PostgreSQL structure from the `dump-miclub_gestion-*` backup, run the incremental compatibility migration after confirming your DBeaver connection points to the same database used by the API:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606270001_align_existing_miclub_for_sheets_import.sql
+npm run import:sheets:dry
+```
+
+In DBeaver, open a SQL editor from the `miclub_gestion` connection/schema, execute `apps/api/db/migrations/202606270001_align_existing_miclub_for_sheets_import.sql`, then validate `miclub.v_current_enrollments`, `miclub.v_movements_enriched`, `miclub.v_dashboard_basic`, and `miclub.v_sector_finance_summary` before running the dry import.
