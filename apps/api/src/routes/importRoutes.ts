@@ -11,6 +11,11 @@ const requireImportEndpointsEnabled = (_req: Request, res: Response, next: NextF
   return next();
 };
 
+export const parseBatchSize = (value: unknown, fallback = 50): number => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 200) : fallback;
+};
+
 const parsePagination = (query: Record<string, unknown>) => ({
   limit: Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200),
   offset: Math.max(Number(query.offset ?? 0) || 0, 0)
@@ -20,8 +25,14 @@ router.use(requireImportEndpointsEnabled);
 
 router.post("/google-sheets", asyncHandler(async (req, res) => {
   const dryRun = req.body?.dryRun !== false;
-  const batchSize = Number(req.body?.batchSize ?? 50) || 50;
-  const summary = await importGoogleSheets({ dryRun, batchSize });
+  const batchSizeValue = req.body?.batchSize;
+  const batchSize = parseBatchSize(batchSizeValue, Number.NaN);
+
+  if (batchSizeValue !== undefined && Number.isNaN(batchSize)) {
+    return res.status(400).json({ error: true, message: "batchSize debe ser un entero positivo." });
+  }
+
+  const summary = await importGoogleSheets({ dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize });
   res.status(dryRun ? 200 : 202).json(summary);
 }));
 

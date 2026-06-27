@@ -12,7 +12,9 @@
     "typecheck": "npm run typecheck -ws",
     "start": "npm run start -w @miclub/api",
     "start:prod": "npm run build && npm run start",
-    "check": "npm run typecheck && npm run build && npm run test -w @miclub/api"
+    "check": "npm run typecheck && npm run build && npm run test -w @miclub/api",
+    "import:sheets": "tsx apps/api/src/scripts/importGoogleSheetsToPostgres.ts",
+    "import:sheets:dry": "tsx apps/api/src/scripts/importGoogleSheetsToPostgres.ts --dry-run"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
