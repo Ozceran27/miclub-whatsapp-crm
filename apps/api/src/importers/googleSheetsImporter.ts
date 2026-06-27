@@ -132,13 +132,18 @@ const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary
   const concept = valueAt(row.row, MOVEMENT_INDEXES.concepto) || valueAt(row.row, MOVEMENT_INDEXES.categoria);
   const amount = Math.abs(normalizeMoney(valueAt(row.row, MOVEMENT_INDEXES.monto)));
   if (!concept || amount === 0) return;
+  const typeText = normalizeComparableText(valueAt(row.row, MOVEMENT_INDEXES.tipo));
+  const movementType = typeText.startsWith("egreso") ? "EGRESOS" : typeText.startsWith("capital") ? "CAPITAL" : "INGRESOS";
+  const rawMovementDate = valueAt(row.row, MOVEMENT_INDEXES.fecha);
+  const movementDate = normalizeDate(rawMovementDate);
+  // Decisión: la fecha del movimiento es obligatoria porque miclub.movements.movement_date
+  // no permite nulos y usar la fecha actual distorsiona los reportes financieros históricos.
+  // El importador registra esta fila como error no bloqueante en el batch y continúa.
+  if (!movementDate) throw new Error(`Movimiento sin fecha válida en hoja ${row.sheet}, fila ${row.rowNumber}. Valor recibido: ${rawMovementDate || "vacío"}.`);
   const sectorId = await upsertSector(pool, valueAt(row.row, MOVEMENT_INDEXES.sector) || row.sheet); summary.sectorsProcessed += 1; summary.attemptedWrites += 1;
   const categoryId = await upsertCategory(pool, valueAt(row.row, MOVEMENT_INDEXES.categoria)); summary.movementCategoriesProcessed += 1; summary.attemptedWrites += 1;
   const paymentMethodId = await upsertPaymentMethod(pool, valueAt(row.row, MOVEMENT_INDEXES.medioPago));
   if (paymentMethodId) summary.attemptedWrites += 1;
-  const typeText = normalizeComparableText(valueAt(row.row, MOVEMENT_INDEXES.tipo));
-  const movementType = typeText.startsWith("egreso") ? "EGRESOS" : typeText.startsWith("capital") ? "CAPITAL" : "INGRESOS";
-  const movementDate = normalizeDate(valueAt(row.row, MOVEMENT_INDEXES.fecha)) ?? new Date().toISOString();
   const ext = valueAt(row.row, MOVEMENT_INDEXES.id) || externalId("google_sheets", row.sheet, row.rowNumber, movementDate.slice(0, 10), movementType, amount);
   await pool.query(
     `insert into miclub.movements (external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
