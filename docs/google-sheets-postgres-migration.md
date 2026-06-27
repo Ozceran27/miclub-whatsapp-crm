@@ -122,6 +122,60 @@ npm run import:sheets -- --missing-enrollment-strategy=warn
 
 Usar lotes más chicos ayuda a diagnosticar errores y reducir el impacto de una ventana de importación; lotes más grandes pueden acelerar una carga ya validada.
 
+### Resumen de salida
+
+El resumen diferencia filas leídas, entidades procesadas e intentos de escritura. Los contadores `*Processed` indican entidades que el importador pudo preparar/procesar; `attemptedWrites` cuenta escrituras SQL intentadas exitosamente antes de cerrar cada lote. En `dryRun`, todos los lotes se revierten, por lo que `persistedWrites` debe quedar en `0` y `rolledBackWrites` debe reflejar las escrituras simuladas revertidas. En una importación real, `persistedWrites` refleja lo confirmado por `commit`; si la estrategia de ausentes aplica una actualización posterior, esa actualización también suma como escritura persistida.
+
+Ejemplo de salida de dry-run:
+
+```json
+{
+  "batchId": "00000000-0000-0000-0000-000000000000",
+  "dryRun": true,
+  "read": 120,
+  "attemptedWrites": 420,
+  "persistedWrites": 0,
+  "rolledBackWrites": 420,
+  "sectorsProcessed": 80,
+  "movementCategoriesProcessed": 40,
+  "peopleProcessed": 70,
+  "instructorsProcessed": 70,
+  "activitiesProcessed": 70,
+  "enrollmentsProcessed": 70,
+  "movementsProcessed": 40,
+  "missingEnrollments": 0,
+  "missingEnrollmentsAction": "warn",
+  "errors": 0,
+  "warnings": []
+}
+```
+
+Ejemplo de salida de importación real:
+
+```json
+{
+  "batchId": "00000000-0000-0000-0000-000000000001",
+  "dryRun": false,
+  "read": 120,
+  "attemptedWrites": 421,
+  "persistedWrites": 421,
+  "rolledBackWrites": 0,
+  "sectorsProcessed": 80,
+  "movementCategoriesProcessed": 40,
+  "peopleProcessed": 70,
+  "instructorsProcessed": 70,
+  "activitiesProcessed": 70,
+  "enrollmentsProcessed": 70,
+  "movementsProcessed": 40,
+  "missingEnrollments": 3,
+  "missingEnrollmentsAction": "abandon",
+  "errors": 0,
+  "warnings": [
+    "3 inscripciones google_sheets no aparecieron en el último import."
+  ]
+}
+```
+
 ## 5. Estrategia para inscripciones ausentes en Google Sheets
 
 En cada importación real, el importador guarda en memoria los `external_id` de las inscripciones procesadas desde filas de miembros. Al terminar todos los lotes correctamente, compara ese conjunto contra `miclub.enrollments where source='google_sheets'`. Esta reconciliación no se ejecuta en `dryRun`, porque el dry-run debe limitarse a validar y revertir escrituras simuladas.
