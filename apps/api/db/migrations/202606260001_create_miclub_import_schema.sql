@@ -10,7 +10,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type miclub.enrollment_status as enum ('al_dia', 'nuevo_inscripto', 'adeudando', 'abandonado', 'otro');
+  create type miclub.enrollment_status as enum ('al_dia', 'nuevo_inscripto', 'adeudando', 'abandonado', 'cancelado', 'otro');
 exception when duplicate_object then null; end $$;
 
 do $$ begin
@@ -281,7 +281,8 @@ left join lateral (
   where (m.person_id = p.id or m.counterparty_text ilike p.first_name || '%') and m.movement_type = 'INGRESOS'
   order by m.movement_date desc, m.created_at desc
   limit 1
-) last_payment on true;
+) last_payment on true
+where e.status <> 'cancelado'::miclub.enrollment_status;
 
 create or replace view miclub.v_movements_enriched as
 select
@@ -328,7 +329,7 @@ select
   0::numeric as dollars,
   (select coalesce(sum(amount), 0) from miclub.receivables where status in ('pendiente', 'vencido')) as receivables_total,
   (select count(*) from miclub.people) as total_people,
-  (select count(*) from miclub.enrollments where status <> 'abandonado') as active_enrollments,
+  (select count(*) from miclub.enrollments where status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])) as active_enrollments,
   (select count(*) from miclub.enrollments where status = 'adeudando') as debtor_enrollments,
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where status = 'adeudando') as cuotas_adeudadas,
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where status in ('adeudando', 'nuevo_inscripto')) as cuotas_a_cobrar,

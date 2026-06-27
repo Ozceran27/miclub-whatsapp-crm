@@ -27,6 +27,7 @@ const normalizeStatusLabel = (value: unknown): DebtorStatus => {
   if (status === "nuevo_inscripto") return "Nuevo Inscripto";
   if (status === "adeudando") return "Adeudando";
   if (status === "abandonado") return "Abandonado";
+  if (status === "cancelado") return "Cancelado";
   return "Desconocido";
 };
 
@@ -61,17 +62,23 @@ const byKey = (members: Member[], getter: (member: Member) => string): Record<st
   return acc;
 }, {});
 
+const isActiveEnrollmentStatus = (status: unknown): boolean => {
+  const normalizedStatus = normalizeOperationalStatus(status);
+  return normalizedStatus !== "abandonado" && normalizedStatus !== "cancelado";
+};
+
 const buildStatusBreakdown = (members: Member[]): StatusBreakdown => {
-  const statusBreakdown: StatusBreakdown = { total: members.length, active: 0, alDia: 0, nuevoInscripto: 0, adeudando: 0, abandonado: 0, otros: 0 };
+  const statusBreakdown: StatusBreakdown = { total: members.length, active: 0, alDia: 0, nuevoInscripto: 0, adeudando: 0, abandonado: 0, cancelado: 0, otros: 0 };
   for (const member of members) {
     const status = normalizeOperationalStatus(member.estado);
     if (status === "al_dia") statusBreakdown.alDia += 1;
     else if (status === "nuevo_inscripto") statusBreakdown.nuevoInscripto += 1;
     else if (status === "adeudando") statusBreakdown.adeudando += 1;
     else if (status === "abandonado") statusBreakdown.abandonado += 1;
+    else if (status === "cancelado") statusBreakdown.cancelado += 1;
     else statusBreakdown.otros += 1;
   }
-  statusBreakdown.active = statusBreakdown.total - statusBreakdown.abandonado;
+  statusBreakdown.active = members.filter((member) => isActiveEnrollmentStatus(member.estado)).length;
   return statusBreakdown;
 };
 
@@ -117,7 +124,7 @@ export const getPostgresSectorOperationalSummary = async (): Promise<SectorOpera
   const membersBySector = (name: SourceSheet) => members.filter((member) => member.sourceSheet === name);
   const base = (name: SourceSheet) => {
     const sectorMembers = membersBySector(name);
-    return { totalMembers: sectorMembers.length, activeMembers: sectorMembers.filter((member) => normalizeOperationalStatus(member.estado) !== "abandonado").length };
+    return { totalMembers: sectorMembers.length, activeMembers: sectorMembers.filter((member) => isActiveEnrollmentStatus(member.estado)).length };
   };
   const finance = (name: string) => sectorRow(name);
   const debtors = members.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando");
@@ -127,7 +134,7 @@ export const getPostgresSectorOperationalSummary = async (): Promise<SectorOpera
     aula: { ...base("AULA"), totalProfitability: pickNumber(finance("AULA"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("AULA"), ["current_month_profitability"]), averageCommission: null, mostPopularActivity: null },
     local1: { totalRelevantIncomeMovements: 0, last30DaysRelevantIncomeMovements: 0, totalProfitability: pickNumber(finance("LOCAL_1"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("LOCAL_1"), ["current_month_profitability"]), settlementBalance: pickNumber(finance("LOCAL_1"), ["settlement_balance", "balance"]), highlightedIncome: null },
     cantina: { kioskIncome: 0, drinksIncome: 0, cmv: 0, totalProfitability: pickNumber(finance("CANTINA"), ["total_profitability", "profitability"]) },
-    crm: { totalMembers: members.length, activeMembers: members.filter((member) => normalizeOperationalStatus(member.estado) !== "abandonado").length, totalDebtors: debtors.length, totalDebtAmount: debtors.reduce((sum, member) => sum + (member.cuota ?? 0), 0) }
+    crm: { totalMembers: members.length, activeMembers: members.filter((member) => isActiveEnrollmentStatus(member.estado)).length, totalDebtors: debtors.length, totalDebtAmount: debtors.reduce((sum, member) => sum + (member.cuota ?? 0), 0) }
   };
 };
 
@@ -140,7 +147,7 @@ export const emptyPostgresSummary = () => ({
   debtorsByActivity: {},
   debtorsWithoutPayments: 0,
   totalEstimatedDebt: 0,
-  statusBreakdown: { total: 0, active: 0, alDia: 0, nuevoInscripto: 0, adeudando: 0, abandonado: 0, otros: 0 },
+  statusBreakdown: { total: 0, active: 0, alDia: 0, nuevoInscripto: 0, adeudando: 0, abandonado: 0, cancelado: 0, otros: 0 },
   rawStatusBreakdown: {}
 });
 

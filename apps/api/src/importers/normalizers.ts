@@ -24,6 +24,7 @@ export const normalizeOperationalStatus = (value: unknown): OperationalStatusKey
   if (!normalized) return "otro";
   if (normalized.includes("nuevo") && (normalized.includes("inscripto") || normalized.includes("inscrito"))) return "nuevo_inscripto";
   if (normalized.includes("abandon")) return "abandonado";
+  if (normalized.includes("cancel")) return "cancelado";
   if (normalized.includes("adeudando") || normalized.includes("adeud") || normalized.includes("deuda")) return "adeudando";
   if (normalized.includes("al dia") || compact.includes("aldia")) return "al_dia";
   return "otro";
@@ -35,6 +36,7 @@ export const toMemberStatus = (value: unknown): DebtorStatus => {
     case "al_dia": return "Al día";
     case "nuevo_inscripto": return "Nuevo Inscripto";
     case "abandonado": return "Abandonado";
+    case "cancelado": return "Cancelado";
     default: return normalizeComparableText(value).includes("pendiente") ? "Pendiente" : "Desconocido";
   }
 };

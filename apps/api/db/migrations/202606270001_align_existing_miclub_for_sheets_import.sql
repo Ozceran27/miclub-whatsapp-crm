@@ -14,6 +14,7 @@ exception when duplicate_object then null; end $$;
 
 -- Add labels used by newer app/import code when they are missing from an existing dump.
 alter type miclub.enrollment_status add value if not exists 'otro';
+alter type miclub.enrollment_status add value if not exists 'cancelado';
 alter type miclub.financial_status add value if not exists 'vencido';
 alter type miclub.financial_status add value if not exists 'cancelado';
 alter type miclub.financial_status add value if not exists 'otro';
