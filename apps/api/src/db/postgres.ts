@@ -5,8 +5,13 @@ type PgPool = {
   end: () => Promise<void>;
 };
 
+type PgPoolConstructor = new (config: Record<string, unknown>) => PgPool;
+
 type PgModule = {
-  Pool: new (config: Record<string, unknown>) => PgPool;
+  Pool?: PgPoolConstructor;
+  default?: {
+    Pool?: PgPoolConstructor;
+  };
 };
 
 let pool: PgPool | undefined;
@@ -36,7 +41,13 @@ const buildPoolConfig = (): Record<string, unknown> => {
 export const getPostgresPool = async (): Promise<PgPool> => {
   if (pool) return pool;
 
-  const { Pool } = (await import("pg")) as PgModule;
+  const pgModule = (await import("pg")) as PgModule;
+  const Pool = pgModule.Pool ?? pgModule.default?.Pool;
+
+  if (typeof Pool !== "function") {
+    throw new Error("No se pudo cargar pg.Pool");
+  }
+
   pool = new Pool(buildPoolConfig());
   return pool;
 };
