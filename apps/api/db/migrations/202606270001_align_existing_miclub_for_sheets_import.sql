@@ -30,6 +30,7 @@ alter table if exists miclub.enrollments add column if not exists source text no
 alter table if exists miclub.enrollments add column if not exists notes text;
 
 alter table if exists miclub.movements add column if not exists external_id text;
+alter table if exists miclub.movements add column if not exists person_id uuid;
 alter table if exists miclub.movements add column if not exists counterparty_text text;
 alter table if exists miclub.movements add column if not exists taxes numeric(14,2) not null default 0;
 alter table if exists miclub.movements add column if not exists source text not null default 'app';
@@ -45,6 +46,30 @@ alter table if exists miclub.import_batches add column if not exists notes text;
 alter table if exists miclub.import_errors add column if not exists source_table text;
 alter table if exists miclub.import_errors add column if not exists source_row text;
 alter table if exists miclub.import_errors add column if not exists raw_payload jsonb;
+
+-- Compatibility for dumps that used counterparty_person_id before the importer/base schema
+-- standardized on movements.person_id. Keep the canonical column populated without
+-- requiring the legacy column to exist on every database.
+do $$
+begin
+  if to_regclass('miclub.movements') is not null then
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'miclub'
+        and table_name = 'movements'
+        and column_name = 'counterparty_person_id'
+    ) then
+      execute 'update miclub.movements set person_id = coalesce(person_id, counterparty_person_id) where person_id is null and counterparty_person_id is not null';
+    end if;
+  end if;
+end $$;
+
+do $$ begin
+  alter table miclub.movements add constraint movements_person_id_fkey foreign key (person_id) references miclub.people(id);
+exception when duplicate_object then null; end $$;
+
+create index if not exists movements_person_id_idx on miclub.movements (person_id);
 
 -- Unique indexes/constraints required by ON CONFLICT clauses and importer lookups.
 create unique index if not exists people_dni_unique_not_null on miclub.people (dni) where dni is not null;
@@ -89,7 +114,7 @@ select
   e.fee_amount,
   e.status,
   e.due_date,
-  e.last_payment_at,
+  last_payment.last_payment_at,
   e.id as enrollment_id,
   p.id as person_id,
   p.first_name as nombre,
@@ -111,10 +136,10 @@ join miclub.activities a on a.id = e.activity_id
 join miclub.sectors s on s.id = a.sector_id
 left join miclub.instructors i on i.id = a.instructor_id
 left join lateral (
-  select m.amount as last_payment_amount, s2.name as last_payment_source_sheet, m.concept as last_payment_concept
+  select m.movement_date as last_payment_at, m.amount as last_payment_amount, s2.name as last_payment_source_sheet, m.concept as last_payment_concept
   from miclub.movements m
   left join miclub.sectors s2 on s2.id = m.sector_id
-  where (m.counterparty_person_id = p.id or m.counterparty_text ilike p.first_name || '%')
+  where (m.person_id = p.id or m.counterparty_text ilike p.first_name || '%')
     and m.movement_type = 'INGRESOS'
   order by m.movement_date desc, m.created_at desc
   limit 1
@@ -144,14 +169,14 @@ select
   m.created_at,
   m.category_id,
   m.sector_id,
-  m.counterparty_person_id as person_id,
+  m.person_id,
   m.payment_method_id,
   m.source_payload,
   m.updated_at
 from miclub.movements m
 left join miclub.movement_categories c on c.id = m.category_id
 left join miclub.sectors s on s.id = m.sector_id
-left join miclub.people p on p.id = m.counterparty_person_id
+left join miclub.people p on p.id = m.person_id
 left join miclub.payment_methods pm on pm.id = m.payment_method_id;
 
 create or replace view miclub.v_dashboard_basic as
