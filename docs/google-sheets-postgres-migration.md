@@ -49,6 +49,9 @@ GOOGLE_PRIVATE_KEY=<private_key-del-json-con-\\n>
 
 # Endpoints operativos de importación
 IMPORT_ENDPOINTS_ENABLED=false
+
+# Inscripciones google_sheets ausentes en import real: warn | noop | abandon | inactive
+GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=warn
 ```
 
 Notas operativas:
@@ -58,6 +61,7 @@ Notas operativas:
 - `GOOGLE_SHEETS_ENABLED=true` habilita lectura de Google Sheets.
 - `GOOGLE_SHEETS_IMPORT_ENABLED=true` debe estar activo para permitir el importador de Sheets a PostgreSQL.
 - `IMPORT_ENDPOINTS_ENABLED=true` solo debe usarse durante ventanas controladas si se invoca la importación por HTTP. Mantenerlo en `false` para uso normal de producción.
+- `GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY` define qué hacer, solo en importaciones reales, con inscripciones de `miclub.enrollments` cuyo `source='google_sheets'` y cuyo `external_id` ya no aparece en la planilla importada. La decisión operativa inicial es `warn`: no modifica esas inscripciones y deja la advertencia en el resumen/notas del batch para revisión manual.
 
 ## 3. Rangos leídos por defecto y sobrescritura
 
@@ -113,11 +117,27 @@ Ejemplos:
 ```bash
 npm run import:sheets:dry -- --batch-size=25
 npm run import:sheets -- --batch-size 100
+npm run import:sheets -- --missing-enrollment-strategy=warn
 ```
 
 Usar lotes más chicos ayuda a diagnosticar errores y reducir el impacto de una ventana de importación; lotes más grandes pueden acelerar una carga ya validada.
 
-## 5. Endpoints HTTP de importación
+## 5. Estrategia para inscripciones ausentes en Google Sheets
+
+En cada importación real, el importador guarda en memoria los `external_id` de las inscripciones procesadas desde filas de miembros. Al terminar todos los lotes correctamente, compara ese conjunto contra `miclub.enrollments where source='google_sheets'`. Esta reconciliación no se ejecuta en `dryRun`, porque el dry-run debe limitarse a validar y revertir escrituras simuladas.
+
+La estrategia se configura con `GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY`, con el flag CLI `--missing-enrollment-strategy` o con el campo HTTP `missingEnrollmentStrategy`. Valores aceptados:
+
+| Valor | Comportamiento |
+| --- | --- |
+| `warn` | Decisión recomendada/inicial. No modifica inscripciones; registra en el resumen/notas del batch cuántas inscripciones `google_sheets` no aparecieron en el último import. |
+| `noop` | No hace cambios. El resumen conserva el conteo de ausentes, pero la operación queda explícitamente en modo no-op. |
+| `abandon` / `abandonado` | Actualiza las ausentes a `status='abandonado'`. Usar solo si la planilla es la fuente autoritativa de bajas. |
+| `inactive` | Si existe la columna `miclub.enrollments.inactive`, actualiza las ausentes con `inactive=true`; si no existe, no modifica filas y agrega una advertencia al batch. |
+
+Decisión documentada para el corte: mantener `warn` hasta que Operaciones confirme que la ausencia en Sheets equivale a baja definitiva. Luego se puede pasar a `abandon` si el modelo vigente usa `status`, o a `inactive` únicamente en despliegues que agreguen esa columna.
+
+## 6. Endpoints HTTP de importación
 
 Los endpoints están montados bajo `/api/import` y responden `404` si `IMPORT_ENDPOINTS_ENABLED` no está en `true`.
 
@@ -139,7 +159,8 @@ Body para ejecución real:
 ```json
 {
   "dryRun": false,
-  "batchSize": 50
+  "batchSize": 50,
+  "missingEnrollmentStrategy": "warn"
 }
 ```
 
@@ -159,7 +180,7 @@ Lista errores asociados a un batch específico. También acepta `limit` y `offse
 /api/import/batches/<batch-id>/errors?limit=50&offset=0
 ```
 
-## 6. Validaciones posteriores al corte
+## 7. Validaciones posteriores al corte
 
 1. Cambiar la fuente operativa a PostgreSQL:
 
@@ -182,7 +203,7 @@ POSTGRES_ENABLED=true
    - `GET /comparison-debug/members`
 5. Registrar diferencias, tolerancias aceptadas, fecha/hora, responsable y resultado de cada endpoint antes de considerar estable el corte.
 
-## 7. Rollback operativo
+## 8. Rollback operativo
 
 Si la importación real o la validación con `DATA_SOURCE=postgres` falla:
 

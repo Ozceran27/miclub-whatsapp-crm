@@ -1,6 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { getPostgresPool } from "../db/postgres.js";
-import { importGoogleSheets } from "../importers/googleSheetsImporter.js";
+import { importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
 import asyncHandler from "./asyncHandler.js";
 
@@ -32,7 +32,8 @@ router.post("/google-sheets", asyncHandler(async (req, res) => {
     return res.status(400).json({ error: true, message: "batchSize debe ser un entero positivo." });
   }
 
-  const summary = await importGoogleSheets({ dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize });
+  const missingEnrollmentStrategy = req.body?.missingEnrollmentStrategy === undefined ? undefined : parseMissingEnrollmentStrategy(req.body.missingEnrollmentStrategy);
+  const summary = await importGoogleSheets({ dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize, missingEnrollmentStrategy });
   res.status(dryRun ? 200 : 202).json(summary);
 }));
 
