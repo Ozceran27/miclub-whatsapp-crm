@@ -6,8 +6,9 @@ import { createImportBatch, finishImportBatch, logImportError } from "./importLo
 import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeFinancialStatus, normalizeMoney, normalizeOperationalStatus, normalizePhone, normalizeSheetText } from "./normalizers.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
-type ImportOptions = { dryRun?: boolean; batchSize?: number };
-type ImportSummary = { batchId: string; dryRun: boolean; read: number; sectorsUpserted: number; movementCategoriesUpserted: number; peopleUpserted: number; instructorsUpserted: number; activitiesUpserted: number; enrollmentsUpserted: number; movementsUpserted: number; errors: number };
+export type MissingEnrollmentStrategy = "noop" | "abandon" | "inactive" | "warn";
+type ImportOptions = { dryRun?: boolean; batchSize?: number; missingEnrollmentStrategy?: MissingEnrollmentStrategy };
+type ImportSummary = { batchId: string; dryRun: boolean; read: number; sectorsUpserted: number; movementCategoriesUpserted: number; peopleUpserted: number; instructorsUpserted: number; activitiesUpserted: number; enrollmentsUpserted: number; movementsUpserted: number; missingEnrollments: number; missingEnrollmentsAction: MissingEnrollmentStrategy; errors: number; warnings: string[] };
 type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[] };
 
 const MEMBER_INDEXES = { id: 0, nombre: 4, apellido: 7, dni: 10, telefono: 12, actividad: 14, modalidad: 16, cuota: 18, estado: 20, vence: 21, instructor: 23 } as const;
@@ -25,6 +26,15 @@ const getSheetsClient = (config: ReturnType<typeof getGoogleSheetsConfig>) => {
 };
 
 const importEnabled = (): boolean => ["true", "1", "yes", "on"].includes((process.env.GOOGLE_SHEETS_IMPORT_ENABLED ?? "true").toLowerCase());
+
+export const parseMissingEnrollmentStrategy = (value = process.env.GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY): MissingEnrollmentStrategy => {
+  const normalized = normalizeComparableText(value ?? "warn").replace(/-/g, "_");
+  if (["noop", "none", "ignore", "nothing", "no_hacer_nada"].includes(normalized)) return "noop";
+  if (["abandon", "abandoned", "abandonado", "mark_abandoned", "marcar_abandonado"].includes(normalized)) return "abandon";
+  if (["inactive", "inactivo", "mark_inactive", "marcar_inactive", "marcar_inactivo"].includes(normalized)) return "inactive";
+  if (["warn", "warning", "advertir", "advertencia"].includes(normalized)) return "warn";
+  return "warn";
+};
 
 const readRows = async (): Promise<SheetRow[]> => {
   const config = getGoogleSheetsConfig();
@@ -78,9 +88,9 @@ const upsertPaymentMethod = async (pool: Pool, name: string): Promise<string | n
   return (await pool.query<{ id: string }>("insert into miclub.payment_methods (name) values ($1) on conflict (name) do update set name=excluded.name returning id", [clean])).rows[0]?.id ?? null;
 };
 
-const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<void> => {
+const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<string | null> => {
   const firstName = valueAt(row.row, MEMBER_INDEXES.nombre);
-  if (!firstName) return;
+  if (!firstName) return null;
   const sectorId = await upsertSector(pool, row.sheet); summary.sectorsUpserted += 1;
   const instructorName = valueAt(row.row, MEMBER_INDEXES.instructor) || "Sin instructor";
   const instructorPersonId = await upsertPerson(pool, { firstName: instructorName, kind: "instructor", source: `${row.sheet}:${row.rowNumber}` });
@@ -97,6 +107,7 @@ const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary):
     [ext, personId, activityId, normalizeFee(valueAt(row.row, MEMBER_INDEXES.cuota)) ?? 0, status === "otro" ? "nuevo_inscripto" : status, dueDate, JSON.stringify({ modality: valueAt(row.row, MEMBER_INDEXES.modalidad) || null })]
   );
   summary.enrollmentsUpserted += 1;
+  return ext;
 };
 
 const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<void> => {
@@ -119,12 +130,68 @@ const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary
   summary.movementsUpserted += 1;
 };
 
+const hasEnrollmentInactiveColumn = async (pool: Pool): Promise<boolean> => {
+  const result = await pool.query<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'miclub' and table_name = 'enrollments' and column_name = 'inactive'
+     )`,
+  );
+  return result.rows[0]?.exists === true;
+};
+
+const reconcileMissingEnrollments = async (pool: Pool, processedExternalIds: Set<string>, summary: ImportSummary): Promise<void> => {
+  if (summary.dryRun) return;
+  const result = await pool.query<{ external_id: string }>(
+    `select external_id
+     from miclub.enrollments
+     where source = 'google_sheets'
+       and external_id <> all($1::text[])`,
+    [[...processedExternalIds]],
+  );
+  const missingExternalIds = result.rows.map((row) => row.external_id);
+  summary.missingEnrollments = missingExternalIds.length;
+  if (missingExternalIds.length === 0) return;
+
+  const warning = `${missingExternalIds.length} inscripciones google_sheets no aparecieron en el último import.`;
+  summary.warnings.push(warning);
+  if (summary.missingEnrollmentsAction === "noop" || summary.missingEnrollmentsAction === "warn") return;
+
+  if (summary.missingEnrollmentsAction === "abandon") {
+    await pool.query(
+      `update miclub.enrollments
+       set status = 'abandonado'::miclub.enrollment_status, updated_at = now()
+       where source = 'google_sheets'
+         and external_id = any($1::text[])`,
+      [missingExternalIds],
+    );
+    return;
+  }
+
+  if (summary.missingEnrollmentsAction === "inactive") {
+    if (await hasEnrollmentInactiveColumn(pool)) {
+      await pool.query(
+        `update miclub.enrollments
+         set inactive = true, updated_at = now()
+         where source = 'google_sheets'
+           and external_id = any($1::text[])`,
+        [missingExternalIds],
+      );
+    } else {
+      summary.warnings.push("GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=inactive no aplicó cambios porque miclub.enrollments.inactive no existe.");
+    }
+  }
+};
+
 export const importGoogleSheets = async (options: ImportOptions = {}): Promise<ImportSummary> => {
   const dryRun = options.dryRun ?? true;
   const batchSize = options.batchSize ?? 50;
   const pool = await getPostgresPool();
+  const strategy = options.missingEnrollmentStrategy ?? parseMissingEnrollmentStrategy();
   const batchId = await createImportBatch(pool, { source: "google_sheets", dryRun, notes: dryRun ? "Dry run: solo valida y revierte entidades." : undefined });
-  const summary: ImportSummary = { batchId, dryRun, read: 0, sectorsUpserted: 0, movementCategoriesUpserted: 0, peopleUpserted: 0, instructorsUpserted: 0, activitiesUpserted: 0, enrollmentsUpserted: 0, movementsUpserted: 0, errors: 0 };
+  const summary: ImportSummary = { batchId, dryRun, read: 0, sectorsUpserted: 0, movementCategoriesUpserted: 0, peopleUpserted: 0, instructorsUpserted: 0, activitiesUpserted: 0, enrollmentsUpserted: 0, movementsUpserted: 0, missingEnrollments: 0, missingEnrollmentsAction: strategy, errors: 0, warnings: [] };
+  const processedEnrollmentExternalIds = new Set<string>();
   try {
     const rows = await readRows(); summary.read = rows.length;
     for (const group of chunk(rows, batchSize)) {
@@ -132,13 +199,19 @@ export const importGoogleSheets = async (options: ImportOptions = {}): Promise<I
       await pool.query("begin");
       try {
         for (const row of group) {
-          try { if (row.kind === "members") await processMember(pool, row, summary); else await processMovement(pool, row, summary); }
+          try {
+            if (row.kind === "members") {
+              const enrollmentExternalId = await processMember(pool, row, summary);
+              if (enrollmentExternalId) processedEnrollmentExternalIds.add(enrollmentExternalId);
+            } else await processMovement(pool, row, summary);
+          }
           catch (error) { summary.errors += 1; groupErrors.push({ row, error }); }
         }
         dryRun ? await pool.query("rollback") : await pool.query("commit");
       } catch (error) { await pool.query("rollback"); throw error; }
       for (const { row, error } of groupErrors) await logImportError(pool, { batchId, sourceTable: row.kind, sourceRow: `${row.sheet}:${row.rowNumber}`, error, rawPayload: row.row });
     }
+    await reconcileMissingEnrollments(pool, processedEnrollmentExternalIds, summary);
     await finishImportBatch(pool, batchId, dryRun ? "dry_run" : summary.errors > 0 ? "completed_with_errors" : "completed", JSON.stringify(summary));
     return summary;
   } catch (error) {

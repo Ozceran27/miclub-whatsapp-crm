@@ -1,11 +1,17 @@
 import "dotenv/config";
 import { closePostgresPool } from "../db/postgres.js";
-import { importGoogleSheets } from "../importers/googleSheetsImporter.js";
+import { importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 
 const hasFlag = (name: string): boolean => process.argv.includes(name);
-const readNumberFlag = (name: string, fallback: number): number => {
+const readStringFlag = (name: string): string | undefined => {
   const prefixed = process.argv.find((arg) => arg.startsWith(`${name}=`));
-  const value = prefixed ? prefixed.split("=")[1] : process.argv[process.argv.indexOf(name) + 1];
+  if (prefixed) return prefixed.split("=")[1];
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+};
+
+const readNumberFlag = (name: string, fallback: number): number => {
+  const value = readStringFlag(name);
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
@@ -13,7 +19,8 @@ const readNumberFlag = (name: string, fallback: number): number => {
 const main = async (): Promise<void> => {
   const dryRun = hasFlag("--dry-run") || hasFlag("--dry");
   const batchSize = readNumberFlag("--batch-size", 50);
-  const summary = await importGoogleSheets({ dryRun, batchSize });
+  const missingEnrollmentStrategy = parseMissingEnrollmentStrategy(readStringFlag("--missing-enrollment-strategy"));
+  const summary = await importGoogleSheets({ dryRun, batchSize, missingEnrollmentStrategy });
   console.log(JSON.stringify(summary, null, 2));
 };
 
