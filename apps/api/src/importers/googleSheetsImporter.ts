@@ -8,7 +8,25 @@ import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, nor
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 export type MissingEnrollmentStrategy = "noop" | "abandon" | "inactive" | "warn";
 type ImportOptions = { dryRun?: boolean; batchSize?: number; missingEnrollmentStrategy?: MissingEnrollmentStrategy };
-type ImportSummary = { batchId: string; dryRun: boolean; read: number; sectorsUpserted: number; movementCategoriesUpserted: number; peopleUpserted: number; instructorsUpserted: number; activitiesUpserted: number; enrollmentsUpserted: number; movementsUpserted: number; missingEnrollments: number; missingEnrollmentsAction: MissingEnrollmentStrategy; errors: number; warnings: string[] };
+type ImportSummary = {
+  batchId: string;
+  dryRun: boolean;
+  read: number;
+  attemptedWrites: number;
+  persistedWrites: number;
+  rolledBackWrites: number;
+  sectorsProcessed: number;
+  movementCategoriesProcessed: number;
+  peopleProcessed: number;
+  instructorsProcessed: number;
+  activitiesProcessed: number;
+  enrollmentsProcessed: number;
+  movementsProcessed: number;
+  missingEnrollments: number;
+  missingEnrollmentsAction: MissingEnrollmentStrategy;
+  errors: number;
+  warnings: string[];
+};
 type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[] };
 
 const MEMBER_INDEXES = { id: 0, nombre: 4, apellido: 7, dni: 10, telefono: 12, actividad: 14, modalidad: 16, cuota: 18, estado: 20, vence: 21, instructor: 23 } as const;
@@ -91,12 +109,12 @@ const upsertPaymentMethod = async (pool: Pool, name: string): Promise<string | n
 const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<string | null> => {
   const firstName = valueAt(row.row, MEMBER_INDEXES.nombre);
   if (!firstName) return null;
-  const sectorId = await upsertSector(pool, row.sheet); summary.sectorsUpserted += 1;
+  const sectorId = await upsertSector(pool, row.sheet); summary.sectorsProcessed += 1; summary.attemptedWrites += 1;
   const instructorName = valueAt(row.row, MEMBER_INDEXES.instructor) || "Sin instructor";
   const instructorPersonId = await upsertPerson(pool, { firstName: instructorName, kind: "instructor", source: `${row.sheet}:${row.rowNumber}` });
-  const instructorId = await upsertInstructor(pool, instructorPersonId, instructorName); summary.instructorsUpserted += 1;
-  const activityId = await upsertActivity(pool, { sectorId, name: valueAt(row.row, MEMBER_INDEXES.actividad) || "Sin actividad", modality: valueAt(row.row, MEMBER_INDEXES.modalidad) || null, instructorId, monthlyFee: normalizeFee(valueAt(row.row, MEMBER_INDEXES.cuota)) }); summary.activitiesUpserted += 1;
-  const personId = await upsertPerson(pool, { firstName, lastName: valueAt(row.row, MEMBER_INDEXES.apellido), dni: valueAt(row.row, MEMBER_INDEXES.dni), phone: valueAt(row.row, MEMBER_INDEXES.telefono), kind: "alumno", source: `${row.sheet}:${row.rowNumber}` }); summary.peopleUpserted += 1;
+  const instructorId = await upsertInstructor(pool, instructorPersonId, instructorName); summary.instructorsProcessed += 1; summary.attemptedWrites += 1;
+  const activityId = await upsertActivity(pool, { sectorId, name: valueAt(row.row, MEMBER_INDEXES.actividad) || "Sin actividad", modality: valueAt(row.row, MEMBER_INDEXES.modalidad) || null, instructorId, monthlyFee: normalizeFee(valueAt(row.row, MEMBER_INDEXES.cuota)) }); summary.activitiesProcessed += 1; summary.attemptedWrites += 1;
+  const personId = await upsertPerson(pool, { firstName, lastName: valueAt(row.row, MEMBER_INDEXES.apellido), dni: valueAt(row.row, MEMBER_INDEXES.dni), phone: valueAt(row.row, MEMBER_INDEXES.telefono), kind: "alumno", source: `${row.sheet}:${row.rowNumber}` }); summary.peopleProcessed += 1; summary.attemptedWrites += 1;
   const ext = externalId("google_sheets", "enrollment", normalizeDni(valueAt(row.row, MEMBER_INDEXES.dni)) || personId, row.sheet, activityId);
   const status = normalizeOperationalStatus(valueAt(row.row, MEMBER_INDEXES.estado));
   const dueDate = normalizeDate(valueAt(row.row, MEMBER_INDEXES.vence))?.slice(0, 10) ?? null;
@@ -106,7 +124,7 @@ const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary):
      on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, updated_at=now()`,
     [ext, personId, activityId, normalizeFee(valueAt(row.row, MEMBER_INDEXES.cuota)) ?? 0, status === "otro" ? "nuevo_inscripto" : status, dueDate, JSON.stringify({ modality: valueAt(row.row, MEMBER_INDEXES.modalidad) || null })]
   );
-  summary.enrollmentsUpserted += 1;
+  summary.enrollmentsProcessed += 1; summary.attemptedWrites += 1;
   return ext;
 };
 
@@ -114,9 +132,10 @@ const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary
   const concept = valueAt(row.row, MOVEMENT_INDEXES.concepto) || valueAt(row.row, MOVEMENT_INDEXES.categoria);
   const amount = Math.abs(normalizeMoney(valueAt(row.row, MOVEMENT_INDEXES.monto)));
   if (!concept || amount === 0) return;
-  const sectorId = await upsertSector(pool, valueAt(row.row, MOVEMENT_INDEXES.sector) || row.sheet); summary.sectorsUpserted += 1;
-  const categoryId = await upsertCategory(pool, valueAt(row.row, MOVEMENT_INDEXES.categoria)); summary.movementCategoriesUpserted += 1;
+  const sectorId = await upsertSector(pool, valueAt(row.row, MOVEMENT_INDEXES.sector) || row.sheet); summary.sectorsProcessed += 1; summary.attemptedWrites += 1;
+  const categoryId = await upsertCategory(pool, valueAt(row.row, MOVEMENT_INDEXES.categoria)); summary.movementCategoriesProcessed += 1; summary.attemptedWrites += 1;
   const paymentMethodId = await upsertPaymentMethod(pool, valueAt(row.row, MOVEMENT_INDEXES.medioPago));
+  if (paymentMethodId) summary.attemptedWrites += 1;
   const typeText = normalizeComparableText(valueAt(row.row, MOVEMENT_INDEXES.tipo));
   const movementType = typeText.startsWith("egreso") ? "EGRESOS" : typeText.startsWith("capital") ? "CAPITAL" : "INGRESOS";
   const movementDate = normalizeDate(valueAt(row.row, MOVEMENT_INDEXES.fecha)) ?? new Date().toISOString();
@@ -127,7 +146,7 @@ const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary
      on conflict (external_id) do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
     [externalId("google_sheets", "movement", ext), movementDate, movementType, categoryId, sectorId, concept, valueAt(row.row, MOVEMENT_INDEXES.contraparte) || null, amount, Math.abs(normalizeMoney(valueAt(row.row, MOVEMENT_INDEXES.impuestos))), paymentMethodId, normalizeFinancialStatus(valueAt(row.row, MOVEMENT_INDEXES.estado)), normalizeComparableText(valueAt(row.row, MOVEMENT_INDEXES.estado)).includes("pend") ? "PENDIENTE" : "COMPLETADO", JSON.stringify({ sheet: row.sheet, rowNumber: row.rowNumber, row: row.row })]
   );
-  summary.movementsUpserted += 1;
+  summary.movementsProcessed += 1; summary.attemptedWrites += 1;
 };
 
 const hasEnrollmentInactiveColumn = async (pool: Pool): Promise<boolean> => {
@@ -166,6 +185,8 @@ const reconcileMissingEnrollments = async (pool: Pool, processedExternalIds: Set
          and external_id = any($1::text[])`,
       [missingExternalIds],
     );
+    summary.attemptedWrites += 1;
+    summary.persistedWrites += 1;
     return;
   }
 
@@ -178,6 +199,8 @@ const reconcileMissingEnrollments = async (pool: Pool, processedExternalIds: Set
            and external_id = any($1::text[])`,
         [missingExternalIds],
       );
+      summary.attemptedWrites += 1;
+      summary.persistedWrites += 1;
     } else {
       summary.warnings.push("GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=inactive no aplicó cambios porque miclub.enrollments.inactive no existe.");
     }
@@ -190,12 +213,31 @@ export const importGoogleSheets = async (options: ImportOptions = {}): Promise<I
   const pool = await getPostgresPool();
   const strategy = options.missingEnrollmentStrategy ?? parseMissingEnrollmentStrategy();
   const batchId = await createImportBatch(pool, { source: "google_sheets", dryRun, notes: dryRun ? "Dry run: solo valida y revierte entidades." : undefined });
-  const summary: ImportSummary = { batchId, dryRun, read: 0, sectorsUpserted: 0, movementCategoriesUpserted: 0, peopleUpserted: 0, instructorsUpserted: 0, activitiesUpserted: 0, enrollmentsUpserted: 0, movementsUpserted: 0, missingEnrollments: 0, missingEnrollmentsAction: strategy, errors: 0, warnings: [] };
+  const summary: ImportSummary = {
+    batchId,
+    dryRun,
+    read: 0,
+    attemptedWrites: 0,
+    persistedWrites: 0,
+    rolledBackWrites: 0,
+    sectorsProcessed: 0,
+    movementCategoriesProcessed: 0,
+    peopleProcessed: 0,
+    instructorsProcessed: 0,
+    activitiesProcessed: 0,
+    enrollmentsProcessed: 0,
+    movementsProcessed: 0,
+    missingEnrollments: 0,
+    missingEnrollmentsAction: strategy,
+    errors: 0,
+    warnings: [],
+  };
   const processedEnrollmentExternalIds = new Set<string>();
   try {
     const rows = await readRows(); summary.read = rows.length;
     for (const group of chunk(rows, batchSize)) {
       const groupErrors: Array<{ row: SheetRow; error: unknown }> = [];
+      const groupAttemptedWritesStart = summary.attemptedWrites;
       await pool.query("begin");
       try {
         for (const row of group) {
@@ -207,8 +249,18 @@ export const importGoogleSheets = async (options: ImportOptions = {}): Promise<I
           }
           catch (error) { summary.errors += 1; groupErrors.push({ row, error }); }
         }
-        dryRun ? await pool.query("rollback") : await pool.query("commit");
-      } catch (error) { await pool.query("rollback"); throw error; }
+        if (dryRun) {
+          await pool.query("rollback");
+          summary.rolledBackWrites += summary.attemptedWrites - groupAttemptedWritesStart;
+        } else {
+          await pool.query("commit");
+          summary.persistedWrites += summary.attemptedWrites - groupAttemptedWritesStart;
+        }
+      } catch (error) {
+        await pool.query("rollback");
+        summary.rolledBackWrites += summary.attemptedWrites - groupAttemptedWritesStart;
+        throw error;
+      }
       for (const { row, error } of groupErrors) await logImportError(pool, { batchId, sourceTable: row.kind, sourceRow: `${row.sheet}:${row.rowNumber}`, error, rawPayload: row.row });
     }
     await reconcileMissingEnrollments(pool, processedEnrollmentExternalIds, summary);
