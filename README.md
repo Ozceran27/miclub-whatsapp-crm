@@ -76,6 +76,10 @@ La app calcula ingresos/egresos pendientes, saldo pendiente neto, saldos a pagar
 
 
 
+## Migración Google Sheets → PostgreSQL
+
+La guía operativa para importar Google Sheets a PostgreSQL, incluyendo variables `.env`, rangos, comandos `npm run import:sheets:dry` / `npm run import:sheets`, endpoints de importación, validaciones y rollback, está en `docs/google-sheets-postgres-migration.md`.
+
 ## Operación PostgreSQL y retiro de legacy
 
 El corte productivo a PostgreSQL debe seguir el runbook de `docs/postgres-cutover-runbook.md`. En resumen:
