@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate } from './googleSheets.js';
+import { calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMovementColumnIndexes } from './googleSheets.js';
 
 test('normalizeOperationalStatus normaliza estados operativos conocidos', () => {
   assert.equal(normalizeOperationalStatus('Al Día'), 'al_dia');
@@ -102,4 +102,38 @@ test('calculateFutureReceivableFeesUntilMonthEnd suma vencimientos al día del m
   ];
   assert.equal(calculateFutureReceivableFeesUntilMonthEnd(members, { 'arte ninos': 0.4 }, new Date('2026-06-18T12:00:00.000Z')), 27000);
   assert.equal(100000 + calculateFutureReceivableFeesUntilMonthEnd(members, { 'arte ninos': 0.4 }, new Date('2026-06-18T12:00:00.000Z')), 127000);
+});
+
+
+test('resolveMovementColumnIndexes mapea movimientos por headers del modelo Dashboard CLUB Actualizado', () => {
+  const headers = ['ID', 'Fecha', '', 'Tipo', '', '', 'Categoria', '', '', 'Concepto', '', '', '', '', 'Contraparte', '', '', 'Sector', '', 'Monto', '', '', 'Impuestos', '', 'Estado Finan.', 'Estado', 'Medio Pago'];
+  const row = ['MOV-001', '20/06/2026', '', 'INGRESOS', '', '', 'CUOTAS', '', '', 'Cuota mensual junio', '', '', '', '', '12345678', '', '', 'FITNESS', '', '$25.000', '', '', '$0', '', 'PAGADO', 'COMPLETADO', 'Transferencia'];
+
+  const resolved = resolveMovementColumnIndexes(headers);
+
+  assert.equal(resolved.usedFallback, false);
+  assert.equal(movementValue(row, resolved.indexes, 'id'), 'MOV-001');
+  assert.equal(movementValue(row, resolved.indexes, 'fecha'), '20/06/2026');
+  assert.equal(movementValue(row, resolved.indexes, 'tipo'), 'INGRESOS');
+  assert.equal(movementValue(row, resolved.indexes, 'categoria'), 'CUOTAS');
+  assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota mensual junio');
+  assert.equal(movementValue(row, resolved.indexes, 'contraparte'), '12345678');
+  assert.equal(movementValue(row, resolved.indexes, 'sector'), 'FITNESS');
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 25000);
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'impuestos')), 0);
+  assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
+  assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Transferencia');
+});
+
+test('resolveMovementColumnIndexes conserva fallback de compatibilidad sin headers', () => {
+  const resolved = resolveMovementColumnIndexes(undefined);
+  const row = ['MOV-002', '21/06/2026', '', 'EGRESOS', '', '', 'Servicios', '', '', 'Luz', '', '', '', '', 'Proveedor', '', '', 'ADMINISTRACIÓN', '', '$10.000', '', '', '$2100', '', 'PENDIENTE', '', 'Efectivo'];
+
+  assert.equal(resolved.usedFallback, true);
+  assert.ok(resolved.fallbackKeys.includes('fecha'));
+  assert.equal(movementValue(row, resolved.indexes, 'id'), 'MOV-002');
+  assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Luz');
+  assert.equal(movementValue(row, resolved.indexes, 'sector'), 'ADMINISTRACIÓN');
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 10000);
+  assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Efectivo');
 });

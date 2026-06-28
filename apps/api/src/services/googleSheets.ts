@@ -10,9 +10,11 @@ type OperationalSheetName = (typeof SHEET_NAMES)[number];
 type SourceType = "mock" | "google_sheets" | "postgres";
 type SectorBalanceSheetName = (typeof SECTOR_BALANCE_SHEET_NAMES)[number];
 
-type MovementColumnKey = "fecha" | "tipo" | "categoria" | "contraparte" | "monto" | "estadoFinan" | "estado" | "concepto";
+export type MovementColumnKey = "id" | "fecha" | "tipo" | "categoria" | "concepto" | "contraparte" | "sector" | "monto" | "impuestos" | "estadoFinan" | "estado" | "medioPago";
 
-type MovementColumnIndexes = Partial<Record<MovementColumnKey, number>>;
+export type MovementColumnIndexes = Partial<Record<MovementColumnKey, number>>;
+
+export type MovementColumnIndexResolution = { indexes: MovementColumnIndexes; usedFallback: boolean; fallbackKeys: MovementColumnKey[] };
 
 export interface LastPaymentInfo {
   dni: string;
@@ -102,42 +104,58 @@ const sheetNameFromRange = (range: string): OperationalSheetName | undefined => 
   return SHEET_NAMES.find((name) => name === sheetName);
 };
 
-const movementColumnAliases: Record<MovementColumnKey, string[]> = {
+export const movementColumnAliases: Record<MovementColumnKey, string[]> = {
+  id: ["id", "identificador", "codigo", "cod"],
   fecha: ["fecha"],
   tipo: ["tipo"],
   categoria: ["categoria"],
+  concepto: ["concepto"],
   contraparte: ["contraparte"],
+  sector: ["sector"],
   monto: ["monto"],
-  estadoFinan: ["estadofinan", "estadofinanciero", "estadofin"],
+  impuestos: ["impuestos", "impuesto", "taxes"],
+  estadoFinan: ["estadofinan", "estadofinanciero", "estadofin", "estadofinanc", "estadofinanzas"],
   estado: ["estado"],
-  concepto: ["concepto"]
+  medioPago: ["mediopago", "medio", "metodopago", "formapago", "pago"]
 };
 
-const movementFallbackIndexes: MovementColumnIndexes = {
+export const movementFallbackIndexes: MovementColumnIndexes = {
   // Índices relativos al rango B:AB de MOVIMIENTOS. Se usan solo si no se pudo ubicar el header dinámicamente.
+  id: 0,
   fecha: 1,
-  tipo: 2,
-  categoria: 3,
-  concepto: 4,
-  contraparte: 5,
-  monto: 6,
-  estadoFinan: 7,
-  estado: 8
+  tipo: 3,
+  categoria: 6,
+  concepto: 9,
+  contraparte: 14,
+  sector: 17,
+  monto: 19,
+  impuestos: 22,
+  estadoFinan: 24,
+  estado: 24,
+  medioPago: 26
 };
 
-const getMovementColumnIndexes = (headerRow: unknown[] | undefined): MovementColumnIndexes => {
+export const resolveMovementColumnIndexes = (headerRow: unknown[] | undefined, fallbackIndexes: MovementColumnIndexes = movementFallbackIndexes): MovementColumnIndexResolution => {
   const indexes: MovementColumnIndexes = {};
+  const fallbackKeys: MovementColumnKey[] = [];
   const normalizedHeaders = (headerRow ?? []).map(normalizeHeader);
 
   for (const [key, aliases] of Object.entries(movementColumnAliases) as Array<[MovementColumnKey, string[]]>) {
     const found = normalizedHeaders.findIndex((header) => aliases.includes(header));
-    indexes[key] = found >= 0 ? found : movementFallbackIndexes[key];
+    if (found >= 0) {
+      indexes[key] = found;
+    } else {
+      indexes[key] = fallbackIndexes[key];
+      if (fallbackIndexes[key] !== undefined) fallbackKeys.push(key);
+    }
   }
 
-  return indexes;
+  return { indexes, usedFallback: fallbackKeys.length > 0, fallbackKeys };
 };
 
-const movementValue = (row: unknown[], indexes: MovementColumnIndexes, key: MovementColumnKey): string => {
+const getMovementColumnIndexes = (headerRow: unknown[] | undefined): MovementColumnIndexes => resolveMovementColumnIndexes(headerRow).indexes;
+
+export const movementValue = (row: unknown[], indexes: MovementColumnIndexes, key: MovementColumnKey): string => {
   const index = indexes[key];
   return index === undefined ? "" : valueAt(row, index);
 };
@@ -239,7 +257,8 @@ export const getGoogleSheetsConfig = () => {
     sheetRanges,
     movementRanges,
     movementHeaderRanges: MOVEMENT_HEADER_RANGES,
-    adminMovementsRange: process.env.GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE?.trim() || "ADMINISTRACIÓN!B12:AB3000",
+    adminMovementsHeaderRange: process.env.GOOGLE_SHEETS_ADMIN_MOVEMENTS_HEADER_RANGE?.trim() || "ADMINISTRACIÓN!B12:AB12",
+    adminMovementsRange: process.env.GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE?.trim() || "ADMINISTRACIÓN!B13:AB3000",
     adminBalancesRange: process.env.GOOGLE_SHEETS_ADMIN_BALANCES_RANGE?.trim() || "ADMINISTRACIÓN!AD12:AG14",
     sectorBalanceRanges: {
       FITNESS: "FITNESS!X3",
@@ -434,9 +453,11 @@ const parseAdminMovementRow = (row: unknown[], rowNumber: number): AdminMovement
 };
 
 const parseAdminMovementsFromValues = (values: unknown[][]): AdminMovement[] => {
-  const rows = values.slice(1);
+  const firstRowIsHeader = (values[0] ?? []).some((cell) => ["id", "fecha", "tipo", "categoria", "concepto"].includes(normalizeHeader(cell)));
+  const rows = firstRowIsHeader ? values.slice(1) : values;
+  const firstRowNumber = firstRowIsHeader ? 13 : 12;
   return rows
-    .map((row, index) => parseAdminMovementRow(row, index + 13))
+    .map((row, index) => parseAdminMovementRow(row, index + firstRowNumber))
     .filter((movement): movement is AdminMovement => movement !== null);
 };
 
