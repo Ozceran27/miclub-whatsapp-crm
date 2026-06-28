@@ -53,6 +53,25 @@ const normalizeSheet = (value: unknown): SourceSheet => {
     ? (normalized as SourceSheet)
     : "FITNESS";
 };
+
+const MOVEMENT_BREAKDOWN_LIMIT = 4;
+
+const getMovementBreakdown = (groupColumn: "sector_name" | "category") => `
+  with grouped as (
+    select
+      coalesce(nullif(trim(${groupColumn}), ''), 'Sin datos') as name,
+      coalesce(sum(amount), 0) as amount
+    from miclub.v_movements_enriched
+    where movement_type = $1
+      and operational_status = 'COMPLETADO'
+    group by coalesce(nullif(trim(${groupColumn}), ''), 'Sin datos')
+  )
+  select name, amount, count(*) over () as total_count
+  from grouped
+  order by amount desc, name asc
+  limit ${MOVEMENT_BREAKDOWN_LIMIT}
+`;
+
 const normalizeStatusLabel = (value: unknown): DebtorStatus => {
   const status = normalizeOperationalStatus(String(value ?? ""));
   if (status === "al_dia") return "Al día";
@@ -209,18 +228,18 @@ export const getPostgresClubFinanceSummary =
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`,
       ),
-      pool.query<Record<string, unknown>>(
-        `select sector_name as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'INGRESOS' group by sector_name order by amount desc limit 4`,
-      ),
-      pool.query<Record<string, unknown>>(
-        `select sector_name as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by sector_name order by amount desc limit 4`,
-      ),
-      pool.query<Record<string, unknown>>(
-        `select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'INGRESOS' group by category order by amount desc limit 4`,
-      ),
-      pool.query<Record<string, unknown>>(
-        `select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by category order by amount desc limit 4`,
-      ),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
+        "INGRESOS",
+      ]),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
+        "EGRESOS",
+      ]),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
+        "INGRESOS",
+      ]),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
+        "EGRESOS",
+      ]),
     ]);
     const row = {
       ...(dashboard.rows[0] ?? {}),
@@ -235,6 +254,14 @@ export const getPostgresClubFinanceSummary =
         name: pickString(item, ["name"], "Sin datos"),
         amount: pickNumber(item, ["amount"]),
       }));
+    const totalBreakdownItems = (rows: Record<string, unknown>[]) =>
+      rows.length > 0 ? pickNumber(rows[0], ["total_count"]) : 0;
+    const totalIncomeSectors = totalBreakdownItems(incomeBySector.rows);
+    const totalExpenseSectors = totalBreakdownItems(expenseBySector.rows);
+    const totalIncomeCategories = totalBreakdownItems(incomeByCategory.rows);
+    const totalExpenseCategories = totalBreakdownItems(expenseByCategory.rows);
+    const remainingBreakdownItems = (total: number) =>
+      Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
     return {
       liquidity: pickNumber(row, [
         "liquidity",
@@ -259,14 +286,14 @@ export const getPostgresClubFinanceSummary =
       expenseBySector: breakdown(expenseBySector.rows),
       incomeByCategory: breakdown(incomeByCategory.rows),
       expenseByCategory: breakdown(expenseByCategory.rows),
-      totalIncomeSectors: incomeBySector.rows.length,
-      remainingIncomeSectors: 0,
-      totalExpenseSectors: expenseBySector.rows.length,
-      remainingExpenseSectors: 0,
-      totalIncomeCategories: incomeByCategory.rows.length,
-      remainingIncomeCategories: 0,
-      totalExpenseCategories: expenseByCategory.rows.length,
-      remainingExpenseCategories: 0,
+      totalIncomeSectors,
+      remainingIncomeSectors: remainingBreakdownItems(totalIncomeSectors),
+      totalExpenseSectors,
+      remainingExpenseSectors: remainingBreakdownItems(totalExpenseSectors),
+      totalIncomeCategories,
+      remainingIncomeCategories: remainingBreakdownItems(totalIncomeCategories),
+      totalExpenseCategories,
+      remainingExpenseCategories: remainingBreakdownItems(totalExpenseCategories),
     };
   };
 
