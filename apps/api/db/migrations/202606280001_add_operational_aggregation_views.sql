@@ -16,11 +16,17 @@ where replace(upper(coalesce(sector_name, '')), 'Ó', 'O') = 'ADMINISTRACION'
 
 create or replace view miclub.v_admin_real_balances as
 select
-  coalesce(sum(case when m.movement_type = 'INGRESOS' then m.amount when m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as liquidity,
-  coalesce(sum(case when lower(coalesce(m.payment_method, '')) like '%efect%' and m.movement_type = 'INGRESOS' then m.amount when lower(coalesce(m.payment_method, '')) like '%efect%' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as cash,
-  coalesce(sum(case when lower(coalesce(m.payment_method, '')) not like '%efect%' and lower(coalesce(m.payment_method, '')) not like '%dolar%' and lower(coalesce(m.payment_method, '')) not like '%usd%' and m.movement_type = 'INGRESOS' then m.amount when lower(coalesce(m.payment_method, '')) not like '%efect%' and lower(coalesce(m.payment_method, '')) not like '%dolar%' and lower(coalesce(m.payment_method, '')) not like '%usd%' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as bank,
-  coalesce(sum(case when (lower(coalesce(m.payment_method, '')) like '%dolar%' or lower(coalesce(m.payment_method, '')) like '%usd%') and m.movement_type = 'INGRESOS' then m.amount when (lower(coalesce(m.payment_method, '')) like '%dolar%' or lower(coalesce(m.payment_method, '')) like '%usd%') and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as dollars
-from miclub.v_admin_completed_movements m;
+  coalesce(ob.liquidity, 0) as liquidity,
+  coalesce(ob.cash, 0) as cash,
+  coalesce(ob.bank, 0) as bank,
+  coalesce(ob.dollars, 0) as dollars
+from (select 1) base
+left join lateral (
+  select liquidity, cash, bank, dollars
+  from miclub.operational_balances
+  order by cutoff_date desc, created_at desc
+  limit 1
+) ob on true;
 
 create or replace view miclub.v_sector_settlement_balances as
 select
