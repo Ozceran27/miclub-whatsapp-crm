@@ -306,7 +306,55 @@ export const getPostgresSectorOperationalSummary =
         `select * from miclub.v_sector_finance_summary`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_local1_special_metrics`,
+        `with relevant as (
+          select
+            amount,
+            coalesce(nullif(trim(concept), ''), category) as concept,
+            movement_date
+          from miclub.v_movements_enriched
+          where regexp_replace(
+              translate(lower(coalesce(sector_name, sector_code, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) = 'local1'
+            and (
+              regexp_replace(
+                translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
+                '[^a-z0-9]+',
+                ' ',
+                'g'
+              ) = 'ingresos'
+              or regexp_replace(
+                translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
+                '[^a-z0-9]+',
+                ' ',
+                'g'
+              ) like 'ingreso%'
+            )
+            and regexp_replace(
+              translate(lower(coalesce(category, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              ' ',
+              'g'
+            ) in ('comision', 'ventas')
+        ), highlighted as (
+          select amount, concept, movement_date
+          from relevant
+          order by amount desc, movement_date desc
+          limit 1
+        )
+        select
+          (select count(*) from relevant)::integer as total_relevant_income_movements,
+          (
+            select count(*)
+            from relevant
+            where movement_date >= now() - interval '30 days'
+              and movement_date <= now()
+          )::integer as last30days_relevant_income_movements,
+          (select amount from highlighted) as highlighted_income_amount,
+          (select concept from highlighted) as highlighted_income_concept,
+          (select movement_date from highlighted) as highlighted_income_date`,
       ),
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_cantina_special_metrics`,
