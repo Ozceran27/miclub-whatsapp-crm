@@ -73,6 +73,22 @@ do $$ begin
   alter table miclub.movements add constraint movements_external_id_key unique (external_id);
 exception when duplicate_object then null; end $$;
 
+
+create table if not exists miclub.operational_balances (
+  id uuid primary key default gen_random_uuid(),
+  cutoff_date date not null default current_date,
+  liquidity numeric(14,2) not null default 0,
+  cash numeric(14,2) not null default 0,
+  bank numeric(14,2) not null default 0,
+  dollars numeric(14,2) not null default 0,
+  source text not null default 'app',
+  source_payload jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists operational_balances_cutoff_date_idx on miclub.operational_balances (cutoff_date desc, created_at desc);
+create unique index if not exists operational_balances_source_cutoff_date_key on miclub.operational_balances (source, cutoff_date);
+
 -- Views consumed by services. Column order keeps existing dump view compatibility and app-friendly aliases are appended.
 create or replace view miclub.v_current_enrollments as
 select
@@ -166,15 +182,22 @@ select
   (select coalesce(sum(case when movement_type = 'INGRESOS' and financial_status = 'pendiente' then amount else 0 end), 0) from miclub.movements) as pending_income,
   (select coalesce(sum(case when movement_type = 'EGRESOS' and financial_status = 'pendiente' then amount else 0 end), 0) from miclub.movements) as pending_expenses,
   (select coalesce(sum(case when movement_type = 'INGRESOS' and financial_status = 'pendiente' then amount when movement_type = 'EGRESOS' and financial_status = 'pendiente' then -amount else 0 end), 0) from miclub.movements) as pending_net_balance,
-  (select coalesce(sum(case when operational_status = 'COMPLETADO' and movement_type = 'INGRESOS' then amount when operational_status = 'COMPLETADO' and movement_type = 'EGRESOS' then -amount else 0 end), 0) from miclub.movements) as liquidity,
-  (select coalesce(sum(case when operational_status = 'COMPLETADO' and movement_type = 'INGRESOS' then amount when operational_status = 'COMPLETADO' and movement_type = 'EGRESOS' then -amount else 0 end), 0) from miclub.movements) as cash,
-  0::numeric as bank,
-  0::numeric as dollars,
+  coalesce(ob.liquidity, 0) as liquidity,
+  coalesce(ob.cash, 0) as cash,
+  coalesce(ob.bank, 0) as bank,
+  coalesce(ob.dollars, 0) as dollars,
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where status = 'adeudando') as cuotas_adeudadas,
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where status in ('adeudando', 'nuevo_inscripto')) as cuotas_a_cobrar,
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where due_date between current_date and date_trunc('month', current_date)::date + interval '1 month - 1 day') as future_receivable_fees_until_month_end,
   (select coalesce(sum(case when operational_status = 'COMPLETADO' and movement_type = 'INGRESOS' then amount when operational_status = 'COMPLETADO' and movement_type = 'EGRESOS' then -amount else 0 end), 0) from miclub.movements)
-    + (select coalesce(sum(amount), 0) from miclub.receivables where status in ('pendiente', 'parcial', 'vencido')) as projected_balance;
+    + (select coalesce(sum(amount), 0) from miclub.receivables where status in ('pendiente', 'parcial', 'vencido')) as projected_balance
+from (select 1) base
+left join lateral (
+  select liquidity, cash, bank, dollars
+  from miclub.operational_balances
+  order by cutoff_date desc, created_at desc
+  limit 1
+) ob on true;
 
 create or replace view miclub.v_sector_finance_summary as
 select
