@@ -27,7 +27,18 @@ type ImportSummary = {
   errors: number;
   warnings: string[];
 };
-type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[]; memberIndexes?: MemberColumnIndexes; usedMemberFallback?: boolean; movementIndexes?: MovementColumnIndexes; usedMovementFallback?: boolean };
+type SheetRow = {
+  kind: "members" | "movements";
+  sheet: string;
+  rowNumber: number;
+  row: unknown[];
+  memberIndexes?: MemberColumnIndexes;
+  usedMemberFallback?: boolean;
+  movementIndexes?: MovementColumnIndexes;
+  usedMovementFallback?: boolean;
+  movementFallbackKeys?: string[];
+  movementHeadersFound?: boolean;
+};
 const isEmpty = (row: unknown[]): boolean => row.every((cell) => String(cell ?? "").trim() === "");
 const stablePart = (value: unknown): string => normalizeComparableText(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sin-datos";
 const externalId = (...parts: unknown[]): string => parts.map(stablePart).join(":");
@@ -72,8 +83,11 @@ const readRows = async (): Promise<SheetRow[]> => {
       memberIndexesBySheet[sheet] = resolveMemberColumnIndexes(valueRange.values?.[0]);
     }
     if (Object.values(movementHeaderRangesBySheet).includes(requestedRange)) {
-      const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
-      movementIndexesBySheet[sheet] = resolveMovementColumnIndexes(valueRange.values?.[0], fallbackIndexes);
+      const headerRow = valueRange.values?.[0];
+      if (headerRow?.some((cell) => String(cell ?? "").trim() !== "")) {
+        const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
+        movementIndexesBySheet[sheet] = resolveMovementColumnIndexes(headerRow, fallbackIndexes);
+      }
     }
   });
   response.data.valueRanges?.forEach((valueRange, rangeIndex) => {
@@ -83,6 +97,7 @@ const readRows = async (): Promise<SheetRow[]> => {
     const kind: SheetRow["kind"] | null = memberRangeSet.has(requestedRange) ? "members" : movementRangeSet.has(requestedRange) ? "movements" : null;
     if (!kind) return;
     const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
+    const movementHeadersFound = movementIndexesBySheet[sheet] !== undefined;
     const resolvedMovement = movementIndexesBySheet[sheet] ?? resolveMovementColumnIndexes(undefined, fallbackIndexes);
     const resolvedMember = memberIndexesBySheet[sheet] ?? resolveMemberColumnIndexes(undefined);
     (valueRange.values ?? []).forEach((row, index) => {
@@ -94,7 +109,9 @@ const readRows = async (): Promise<SheetRow[]> => {
         memberIndexes: kind === "members" ? resolvedMember.indexes : undefined,
         usedMemberFallback: kind === "members" ? resolvedMember.usedFallback : undefined,
         movementIndexes: kind === "movements" ? resolvedMovement.indexes : undefined,
-        usedMovementFallback: kind === "movements" ? resolvedMovement.usedFallback : undefined
+        usedMovementFallback: kind === "movements" ? resolvedMovement.usedFallback : undefined,
+        movementFallbackKeys: kind === "movements" ? resolvedMovement.fallbackKeys : undefined,
+        movementHeadersFound: kind === "movements" ? movementHeadersFound : undefined
       });
     });
   });
@@ -162,7 +179,10 @@ export const processMember = async (pool: Pool, row: SheetRow, summary: ImportSu
 
 export const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<void> => {
   if (row.usedMovementFallback) {
-    const warning = `Se usaron índices fallback para movimientos en ${row.sheet}; revisar headers del rango.`;
+    const fallbackKeys = row.movementFallbackKeys ?? [];
+    const warning = row.movementHeadersFound === false
+      ? `No se encontraron headers de movimientos en ${row.sheet}; se usó fallback completo`
+      : `Se usaron índices fallback para movimientos en ${row.sheet}: ${fallbackKeys.join(", ") || "columnas sin header"}`;
     if (!summary.warnings.includes(warning)) summary.warnings.push(warning);
   }
   const movementIndexes = row.movementIndexes ?? {};

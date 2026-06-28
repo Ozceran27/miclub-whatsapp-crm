@@ -62,6 +62,43 @@ test('processMovement omite filas de movimientos realmente vacías', async () =>
   assert.equal(summary.attemptedWrites, 0);
 });
 
+
+test('processMovement advierte columnas fallback de movimientos por nombre', async () => {
+  const pool = { query: async () => { throw new Error('No debería consultar la base para filas vacías.'); } };
+  const summary = createSummary();
+
+  await processMovement(pool as never, {
+    kind: 'movements',
+    sheet: 'FITNESS',
+    rowNumber: 44,
+    row: [],
+    movementIndexes: {},
+    usedMovementFallback: true,
+    movementFallbackKeys: ['medioPago'],
+    movementHeadersFound: true,
+  }, summary as never);
+
+  assert.deepEqual(summary.warnings, ['Se usaron índices fallback para movimientos en FITNESS: medioPago']);
+});
+
+test('processMovement advierte fallback completo cuando no hay headers de movimientos', async () => {
+  const pool = { query: async () => { throw new Error('No debería consultar la base para filas vacías.'); } };
+  const summary = createSummary();
+
+  await processMovement(pool as never, {
+    kind: 'movements',
+    sheet: 'FITNESS',
+    rowNumber: 45,
+    row: [],
+    movementIndexes: {},
+    usedMovementFallback: true,
+    movementFallbackKeys: ['id', 'fecha', 'medioPago'],
+    movementHeadersFound: false,
+  }, summary as never);
+
+  assert.deepEqual(summary.warnings, ['No se encontraron headers de movimientos en FITNESS; se usó fallback completo']);
+});
+
 test('processMovement importa movimientos de LOCAL 1 con layout sectorial sin columna Sector', async () => {
   const headers = ['Id.', 'Fecha', '', 'Tipo', '', 'Categoría', '', 'Concepto', '', '', '', '', 'Contra-parte', '', 'Monto', '', 'Impuestos', '', 'M.P.', '', 'Estado Finan.', '', '', 'Estado'];
   const row = ['I-0766', '46194.76393976852', '', 'INGRESOS', '', 'VENTAS', '', 'Pago (PARCIAL) Tattoo - Proyecto Fabian', '', '', '', '', '35.872.158', '', '50000.0', '', '0.0', '', 'Transferencia', '', 'PAGADO', '', '', 'COMPLETADO'];
