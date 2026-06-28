@@ -41,6 +41,41 @@ from miclub.sectors s
 left join miclub.movements m on m.sector_id = s.id
 group by s.id, s.code, s.name;
 
+
+create or replace view miclub.v_admin_real_balances as
+with latest_balance as (
+  select
+    source_payload,
+    case
+      when source_payload->>'fx' ~ '^-?[0-9]+([\.,][0-9]+)?$' then replace(source_payload->>'fx', ',', '.')::numeric
+      when source_payload->'rows'->2->>2 ~ '^-?[0-9]+([\.,][0-9]+)?$' then replace(source_payload->'rows'->2->>2, ',', '.')::numeric
+      else 0::numeric
+    end as fx
+  from miclub.operational_balances
+  order by cutoff_date desc, created_at desc
+  limit 1
+), admin_totals as (
+  select
+    coalesce(sum(case when movement_type in ('INGRESOS'::miclub.movement_type, 'CAPITAL'::miclub.movement_type) and lower(coalesce(payment_method, '')) = 'efectivo' then amount when movement_type = 'EGRESOS'::miclub.movement_type and lower(coalesce(payment_method, '')) = 'efectivo' then -amount else 0 end), 0) as cash,
+    coalesce(sum(case when movement_type in ('INGRESOS'::miclub.movement_type, 'CAPITAL'::miclub.movement_type) and lower(coalesce(payment_method, '')) = 'transferencia' then amount when movement_type = 'EGRESOS'::miclub.movement_type and lower(coalesce(payment_method, '')) = 'transferencia' then -amount else 0 end), 0) as bank,
+    coalesce(sum(case when movement_type in ('INGRESOS'::miclub.movement_type, 'CAPITAL'::miclub.movement_type) and replace(upper(coalesce(category, '')), 'Ó', 'O') = 'DOLARES' then amount when movement_type = 'EGRESOS'::miclub.movement_type and replace(upper(coalesce(category, '')), 'Ó', 'O') = 'DOLARES' then -amount else 0 end), 0) as dollars,
+    coalesce(sum(case when movement_type = 'CAPITAL'::miclub.movement_type then amount else 0 end), 0) as capital,
+    coalesce(sum(case when movement_type = 'CAPITAL'::miclub.movement_type and replace(upper(coalesce(category, '')), 'Ó', 'O') = 'DOLARES' then amount else 0 end), 0) as capital_dollars
+  from miclub.v_admin_completed_movements
+), settlements as (
+  select coalesce(sum(settlement_balance), 0) as sector_settlement_balance
+  from miclub.v_sector_settlement_balances
+)
+select
+  a.capital - a.capital_dollars + s.sector_settlement_balance + (a.dollars * coalesce(lb.fx, 0)) as liquidity,
+  a.cash,
+  a.bank,
+  a.dollars
+from admin_totals a
+cross join settlements s
+left join latest_balance lb on true;
+
+
 create or replace view miclub.v_module_total_profitability as
 select
   s.id as sector_id,
