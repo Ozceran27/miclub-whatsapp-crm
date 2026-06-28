@@ -193,6 +193,7 @@ export const getPostgresClubFinanceSummary =
     const pool = await getPostgresPool();
     const [
       dashboard,
+      operationalBalances,
       sectors,
       incomeBySector,
       expenseBySector,
@@ -201,6 +202,9 @@ export const getPostgresClubFinanceSummary =
     ] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_dashboard_basic`,
+      ),
+      pool.query<Record<string, unknown>>(
+        `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
       ),
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`,
@@ -218,7 +222,10 @@ export const getPostgresClubFinanceSummary =
         `select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by category order by amount desc limit 4`,
       ),
     ]);
-    const row = dashboard.rows[0] ?? {};
+    const row = {
+      ...(dashboard.rows[0] ?? {}),
+      ...(operationalBalances.rows[0] ?? {}),
+    };
     const sectorBalances = sectors.rows.map((sector) => ({
       sector: pickString(sector, ["sector_name", "sector"], "Sin sector"),
       amount: pickNumber(sector, ["settlement_balance", "balance", "amount"]),

@@ -14,6 +14,20 @@ from miclub.v_movements_enriched
 where replace(upper(coalesce(sector_name, '')), 'Ó', 'O') = 'ADMINISTRACION'
   and operational_status = 'PENDIENTE'::miclub.movement_status;
 
+create or replace view miclub.v_admin_real_balances as
+select
+  coalesce(ob.liquidity, 0) as liquidity,
+  coalesce(ob.cash, 0) as cash,
+  coalesce(ob.bank, 0) as bank,
+  coalesce(ob.dollars, 0) as dollars
+from (select 1) base
+left join lateral (
+  select liquidity, cash, bank, dollars
+  from miclub.operational_balances
+  order by cutoff_date desc, created_at desc
+  limit 1
+) ob on true;
+
 create or replace view miclub.v_sector_settlement_balances as
 select
   s.id as sector_id,
