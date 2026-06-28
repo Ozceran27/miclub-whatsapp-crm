@@ -46,12 +46,14 @@ type SectorMetric = {
   label: string;
   value: string;
   className?: string;
+  title?: string;
 };
 
 type SectorFeaturedMetric = {
   label: string;
   value: string;
   detail?: string;
+  title?: string;
 };
 
 type SectorCardConfig = {
@@ -390,9 +392,10 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
   const syncBadgeLabel = syncLabel;
   const lastSyncLabel = `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`;
   const unavailableLabel = financeError ? 'No disponible' : '—';
-  const formatFinanceMoney = (value: number | undefined) => financeSummary ? formatArPeso(value) : unavailableLabel;
-  const formatPayableObligation = (value: number | undefined) => financeSummary ? `-${formatArPeso(Math.abs(value ?? 0))}` : unavailableLabel;
-  const formatUsd = (value: number | undefined) => financeSummary ? `USD ${Math.round(value ?? 0).toLocaleString('es-AR')}` : unavailableLabel;
+  const isFiniteNumber = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
+  const formatFinanceMoney = (value: number | undefined) => financeSummary && isFiniteNumber(value) ? formatArPeso(value) : unavailableLabel;
+  const formatPayableObligation = (value: number | undefined) => financeSummary && isFiniteNumber(value) ? `-${formatArPeso(Math.abs(value))}` : unavailableLabel;
+  const formatUsd = (value: number | undefined) => financeSummary && isFiniteNumber(value) ? `USD ${Math.round(value).toLocaleString('es-AR')}` : unavailableLabel;
   const financialSummaryLines: FinancialLine[] = [
     { label: 'Liquidez', value: formatFinanceMoney(financeSummary?.liquidity), highlight: 'positiveCritical', iconBefore: '💰' },
     { label: 'Caja', value: formatFinanceMoney(financeSummary?.cash) },
@@ -400,7 +403,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     { label: 'Dólares', value: formatUsd(financeSummary?.dollars) }
   ];
   const operationalBalanceLines: FinancialLine[] = [
-    { label: 'Cuotas a cobrar', value: financeSummary || typeof estimatedDebt === 'number' ? formatArPeso(estimatedDebt) : unavailableLabel },
+    { label: 'Cuotas a cobrar', value: isFiniteNumber(estimatedDebt) ? formatArPeso(estimatedDebt) : unavailableLabel },
     { label: 'Saldos Pendientes', value: formatFinanceMoney(financeSummary?.pendingNetBalance) },
     { label: 'Saldos a Pagar', value: formatPayableObligation(financeSummary?.saldosAPagar) },
     { label: 'Saldo proyectado', value: formatFinanceMoney(financeSummary?.projectedBalance), highlight: 'positiveCritical', iconBefore: '📈' }
@@ -412,9 +415,15 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
     ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'negativeCritical' : undefined, iconAfter: index === 0 ? '🔻' : undefined }))
     : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
 
-  const formatOptionalNumber = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('es-AR') : '—';
-  const formatOptionalMoney = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? formatArPeso(value) : '—';
-  const formatOptionalPercent = (value: number | null | undefined) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 2 }).format(value > 1 ? value / 100 : value) : '—';
+  const formatOptionalNumber = (value: number | null | undefined) => isFiniteNumber(value) ? value.toLocaleString('es-AR') : '—';
+  const formatOptionalMoney = (value: number | null | undefined) => isFiniteNumber(value) ? formatArPeso(value) : '—';
+  const formatOptionalPercent = (value: number | null | undefined) => isFiniteNumber(value) ? new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 2 }).format(value > 1 ? value / 100 : value) : '—';
+  const pendingMetricLabel = '— · pendiente de cálculo';
+  const unavailableMetricTitle = 'Métrica pendiente de cálculo en PostgreSQL';
+  const isSectorMetricUnavailable = (path: string) => sectorSummary?.metadata?.sourceCompleteness?.[path]?.status === 'unavailable';
+  const formatSectorMoney = (path: string, value: number | null | undefined) => isSectorMetricUnavailable(path) ? pendingMetricLabel : formatOptionalMoney(value);
+  const formatSectorPercent = (path: string, value: number | null | undefined) => isSectorMetricUnavailable(path) ? pendingMetricLabel : formatOptionalPercent(value);
+  const pendingMetricProps = (path: string) => isSectorMetricUnavailable(path) ? { className: 'area-card__metric--pending', title: unavailableMetricTitle } : {};
   const formatArDate = (value?: string) => {
     if (!value) return '—';
     const date = new Date(value);
@@ -432,14 +441,14 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Membresías y liquidación',
       icon: '🏋️',
       accent: 'fitness',
-      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.fitness.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('fitness.totalProfitability', sectorSummary?.fitness.totalProfitability), ...pendingMetricProps('fitness.totalProfitability') },
       secondaryMetrics: [
         { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.fitness.totalMembers) },
         { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.fitness.activeMembers) },
         { label: 'ADEUDADOS', value: formatOptionalNumber(sectorSummary?.fitness.totalDebtors) },
         { label: 'MONTO ADEUDADOS', value: formatOptionalMoney(sectorSummary?.fitness.totalDebtAmount) },
-        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.fitness.currentMonthProfitability) },
-        { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sectorSummary?.fitness.settlementBalance) }
+        { label: currentMonthProfitabilityLabel, value: formatSectorMoney('fitness.currentMonthProfitability', sectorSummary?.fitness.currentMonthProfitability), ...pendingMetricProps('fitness.currentMonthProfitability') },
+        { label: 'SALDO A LIQUIDAR', value: formatSectorMoney('fitness.settlementBalance', sectorSummary?.fitness.settlementBalance), ...pendingMetricProps('fitness.settlementBalance') }
       ]
     },
     {
@@ -449,12 +458,12 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Ingresos relevantes',
       icon: '🏪',
       accent: 'local1',
-      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.local1.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('local1.totalProfitability', sectorSummary?.local1.totalProfitability), ...pendingMetricProps('local1.totalProfitability') },
       secondaryMetrics: [
         { label: 'TOTAL VENTAS', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) },
         { label: 'Últ. 30 días', value: formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements) },
-        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.local1.currentMonthProfitability) },
-        { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sectorSummary?.local1.settlementBalance) }
+        { label: currentMonthProfitabilityLabel, value: formatSectorMoney('local1.currentMonthProfitability', sectorSummary?.local1.currentMonthProfitability), ...pendingMetricProps('local1.currentMonthProfitability') },
+        { label: 'SALDO A LIQUIDAR', value: formatSectorMoney('local1.settlementBalance', sectorSummary?.local1.settlementBalance), ...pendingMetricProps('local1.settlementBalance') }
       ],
       featuredMetric: highlightedLocalIncome
         ? { label: 'Ingreso destacado', value: formatOptionalMoney(highlightedLocalIncome.amount), detail: `${highlightedLocalIncome.concept} · ${formatArDate(highlightedLocalIncome.date)}` }
@@ -467,11 +476,11 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Actividades EC',
       icon: '🎭',
       accent: 'salon',
-      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.salon.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('salon.totalProfitability', sectorSummary?.salon.totalProfitability), ...pendingMetricProps('salon.totalProfitability') },
       secondaryMetrics: [
         { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.salon.totalMembers) },
         { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.salon.activeMembers) },
-        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.salon.currentMonthProfitability) },
+        { label: currentMonthProfitabilityLabel, value: formatSectorMoney('salon.currentMonthProfitability', sectorSummary?.salon.currentMonthProfitability), ...pendingMetricProps('salon.currentMonthProfitability') },
         { label: 'MENOS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members), className: 'area-card__metric--subtle-alert' }
       ],
       featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.mostPopularActivity?.name, sectorSummary?.salon.mostPopularActivity?.members, true) }
@@ -483,12 +492,12 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       subtitle: 'Talleres y comisiones',
       icon: '🎓',
       accent: 'aula',
-      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.aula.totalProfitability) },
+      mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('aula.totalProfitability', sectorSummary?.aula.totalProfitability), ...pendingMetricProps('aula.totalProfitability') },
       secondaryMetrics: [
         { label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.aula.totalMembers) },
         { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.aula.activeMembers) },
-        { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sectorSummary?.aula.currentMonthProfitability) },
-        { label: 'Comisión prom.', value: formatOptionalPercent(sectorSummary?.aula.averageCommission) }
+        { label: currentMonthProfitabilityLabel, value: formatSectorMoney('aula.currentMonthProfitability', sectorSummary?.aula.currentMonthProfitability), ...pendingMetricProps('aula.currentMonthProfitability') },
+        { label: 'Comisión prom.', value: formatSectorPercent('aula.averageCommission', sectorSummary?.aula.averageCommission), ...pendingMetricProps('aula.averageCommission') }
       ],
       featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.aula.mostPopularActivity?.name, sectorSummary?.aula.mostPopularActivity?.members, true) }
     },
@@ -654,14 +663,14 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
 
               <div className="area-card__primary-metric">
                 <span>{area.mainMetric.label}</span>
-                <strong>{area.mainMetric.value}</strong>
+                <strong title={area.mainMetric.title}>{area.mainMetric.value}</strong>
               </div>
 
               <dl className="area-card__metrics">
                 {area.secondaryMetrics.map((metric) => (
                   <div className={`area-card__metric${metric.className ? ` ${metric.className}` : ''}`} key={metric.label}>
                     <dt>{metric.label}</dt>
-                    <dd>{metric.value}</dd>
+                    <dd title={metric.title}>{metric.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -669,7 +678,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
               {area.featuredMetric && (
                 <div className="area-card__featured-metric">
                   <span>{area.featuredMetric.label}</span>
-                  <strong>{area.featuredMetric.value}</strong>
+                  <strong title={area.featuredMetric.title}>{area.featuredMetric.value}</strong>
                   {area.featuredMetric.detail && <small>{area.featuredMetric.detail}</small>}
                 </div>
               )}
