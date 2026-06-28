@@ -188,7 +188,7 @@ export default function HomeModule({ onOpenModule }) {
         setFinanceError(null);
         setSectorError(null);
         try {
-            const financePromise = fetch(apiUrl('/club-finance-summary'))
+            const financePromise = fetch(apiUrl('/club-finance-summary'), { cache: 'no-store' })
                 .then(async (response) => {
                 if (!response.ok)
                     throw new Error('No se pudo cargar el resumen financiero.');
@@ -198,7 +198,7 @@ export default function HomeModule({ onOpenModule }) {
                 setFinanceError(financeLoadError instanceof Error ? financeLoadError.message : 'Resumen financiero no disponible.');
                 return null;
             });
-            const sectorPromise = fetch(apiUrl('/sector-operational-summary'))
+            const sectorPromise = fetch(apiUrl('/sector-operational-summary'), { cache: 'no-store' })
                 .then(async (response) => {
                 if (!response.ok)
                     throw new Error('No se pudo cargar el resumen operativo por sector.');
@@ -209,10 +209,10 @@ export default function HomeModule({ onOpenModule }) {
                 return null;
             });
             const [summaryRes, membersRes, debtorsRes, syncRes, financePayload, sectorPayload] = await Promise.all([
-                fetch(apiUrl('/summary')),
-                fetch(apiUrl('/members')),
-                fetch(apiUrl('/debtors')),
-                fetch(apiUrl('/sync-status')),
+                fetch(apiUrl('/summary'), { cache: 'no-store' }),
+                fetch(apiUrl('/members'), { cache: 'no-store' }),
+                fetch(apiUrl('/debtors'), { cache: 'no-store' }),
+                fetch(apiUrl('/sync-status'), { cache: 'no-store' }),
                 financePromise,
                 sectorPromise
             ]);
