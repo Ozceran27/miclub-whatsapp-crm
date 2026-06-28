@@ -119,8 +119,8 @@ export const movementColumnAliases: Record<MovementColumnKey, string[]> = {
   medioPago: ["mp", "mpp", "mediodepago", "medio", "mediopago", "formadepago", "formapago", "metodopago", "pago"]
 };
 
-export const movementFallbackIndexes: MovementColumnIndexes = {
-  // Índices relativos al rango B:AB de MOVIMIENTOS. Se usan solo si no se pudo ubicar el header dinámicamente.
+export const adminMovementFallbackIndexes: MovementColumnIndexes = {
+  // Índices relativos al rango B:AB de ADMINISTRACIÓN.
   id: 0,
   fecha: 1,
   tipo: 3,
@@ -130,10 +130,26 @@ export const movementFallbackIndexes: MovementColumnIndexes = {
   sector: 17,
   monto: 19,
   impuestos: 22,
-  estadoFinan: 24,
   estado: 24,
   medioPago: 26
 };
+
+export const sectorMovementFallbackIndexes: MovementColumnIndexes = {
+  // Índices relativos al rango B:AB de hojas sectoriales (FITNESS, SALON, AULA, LOCAL 1).
+  id: 0,
+  fecha: 1,
+  tipo: 3,
+  categoria: 5,
+  concepto: 7,
+  contraparte: 12,
+  monto: 14,
+  impuestos: 16,
+  medioPago: 18,
+  estadoFinan: 20,
+  estado: 23
+};
+
+export const movementFallbackIndexes: MovementColumnIndexes = adminMovementFallbackIndexes;
 
 export const resolveMovementColumnIndexes = (headerRow: unknown[] | undefined, fallbackIndexes: MovementColumnIndexes = movementFallbackIndexes): MovementColumnIndexResolution => {
   const indexes: MovementColumnIndexes = {};
@@ -153,7 +169,7 @@ export const resolveMovementColumnIndexes = (headerRow: unknown[] | undefined, f
   return { indexes, usedFallback: fallbackKeys.length > 0, fallbackKeys };
 };
 
-const getMovementColumnIndexes = (headerRow: unknown[] | undefined): MovementColumnIndexes => resolveMovementColumnIndexes(headerRow).indexes;
+const getMovementColumnIndexes = (headerRow: unknown[] | undefined): MovementColumnIndexes => resolveMovementColumnIndexes(headerRow, sectorMovementFallbackIndexes).indexes;
 
 export const movementValue = (row: unknown[], indexes: MovementColumnIndexes, key: MovementColumnKey): string => {
   const index = indexes[key];
@@ -398,19 +414,7 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
   return enrichMembersWithLastPayments(members, lastPaymentByDni);
 };
 
-const ADMIN_MOVEMENT_INDEXES = {
-  id: 0,
-  fecha: 1,
-  tipo: 3,
-  categoria: 6,
-  concepto: 9,
-  contraparte: 14,
-  sector: 17,
-  monto: 19,
-  impuestos: 22,
-  estado: 24,
-  medioPago: 26
-} as const;
+const ADMIN_MOVEMENT_INDEXES = adminMovementFallbackIndexes as Required<Pick<MovementColumnIndexes, "id" | "fecha" | "tipo" | "categoria" | "concepto" | "contraparte" | "sector" | "monto" | "impuestos" | "estado" | "medioPago">>;
 
 const normalizedEquals = (value: unknown, expected: string): boolean => normalizeComparableText(value) === normalizeComparableText(expected);
 
