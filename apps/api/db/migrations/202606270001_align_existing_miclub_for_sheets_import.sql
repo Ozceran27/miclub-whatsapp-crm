@@ -206,9 +206,12 @@ select
   s.name as sector_name,
   coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as total_income,
   coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as total_expense,
-  coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
-  coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as settlement_balance,
-  coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as total_profitability,
+  coalesce(sum(case when m.operational_status = 'COMPLETADO' and m.movement_type = 'INGRESOS' then m.amount when m.operational_status = 'COMPLETADO' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as balance,
+  case
+    when upper(replace(s.name, ' ', '_')) in ('FITNESS', 'LOCAL_1') then coalesce(sum(case when m.financial_status = 'a_liquidar' and m.movement_type = 'INGRESOS' then m.amount when m.financial_status = 'a_liquidar' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0)
+    else null::numeric
+  end as settlement_balance,
+  coalesce(sum(case when m.operational_status = 'COMPLETADO' and m.financial_status <> 'a_liquidar' and m.movement_type = 'INGRESOS' then m.amount when m.operational_status = 'COMPLETADO' and m.financial_status <> 'a_liquidar' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as total_profitability,
   coalesce(sum(case when date_trunc('month', m.movement_date) = date_trunc('month', now()) and m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when date_trunc('month', m.movement_date) = date_trunc('month', now()) and m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as current_month_profitability
 from miclub.sectors s
 left join miclub.movements m on m.sector_id = s.id

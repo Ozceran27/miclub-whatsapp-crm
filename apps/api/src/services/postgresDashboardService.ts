@@ -53,6 +53,25 @@ const normalizeSheet = (value: unknown): SourceSheet => {
     ? (normalized as SourceSheet)
     : "FITNESS";
 };
+
+const MOVEMENT_BREAKDOWN_LIMIT = 4;
+
+const getMovementBreakdown = (groupColumn: "sector_name" | "category") => `
+  with grouped as (
+    select
+      coalesce(nullif(trim(${groupColumn}), ''), 'Sin datos') as name,
+      coalesce(sum(amount), 0) as amount
+    from miclub.v_movements_enriched
+    where movement_type = $1
+      and operational_status = 'COMPLETADO'
+    group by coalesce(nullif(trim(${groupColumn}), ''), 'Sin datos')
+  )
+  select name, amount, count(*) over () as total_count
+  from grouped
+  order by amount desc, name asc
+  limit ${MOVEMENT_BREAKDOWN_LIMIT}
+`;
+
 const normalizeStatusLabel = (value: unknown): DebtorStatus => {
   const status = normalizeOperationalStatus(String(value ?? ""));
   if (status === "al_dia") return "Al día";
@@ -207,20 +226,20 @@ export const getPostgresClubFinanceSummary =
         `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`,
+        `select * from miclub.v_sector_settlement_balances where settlement_balance > 0 order by sector_name asc nulls last, sector_id asc nulls last`,
       ),
-      pool.query<Record<string, unknown>>(
-        `select sector_name as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'INGRESOS' group by sector_name order by amount desc limit 4`,
-      ),
-      pool.query<Record<string, unknown>>(
-        `select sector_name as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by sector_name order by amount desc limit 4`,
-      ),
-      pool.query<Record<string, unknown>>(
-        `select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'INGRESOS' group by category order by amount desc limit 4`,
-      ),
-      pool.query<Record<string, unknown>>(
-        `select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by category order by amount desc limit 4`,
-      ),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
+        "INGRESOS",
+      ]),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
+        "EGRESOS",
+      ]),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
+        "INGRESOS",
+      ]),
+      pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
+        "EGRESOS",
+      ]),
     ]);
     const row = {
       ...(dashboard.rows[0] ?? {}),
@@ -228,13 +247,21 @@ export const getPostgresClubFinanceSummary =
     };
     const sectorBalances = sectors.rows.map((sector) => ({
       sector: pickString(sector, ["sector_name", "sector"], "Sin sector"),
-      amount: pickNumber(sector, ["settlement_balance", "balance", "amount"]),
+      amount: pickNumber(sector, ["settlement_balance", "amount"]),
     }));
     const breakdown = (rows: Record<string, unknown>[]) =>
       rows.map((item) => ({
         name: pickString(item, ["name"], "Sin datos"),
         amount: pickNumber(item, ["amount"]),
       }));
+    const totalBreakdownItems = (rows: Record<string, unknown>[]) =>
+      rows.length > 0 ? pickNumber(rows[0], ["total_count"]) : 0;
+    const totalIncomeSectors = totalBreakdownItems(incomeBySector.rows);
+    const totalExpenseSectors = totalBreakdownItems(expenseBySector.rows);
+    const totalIncomeCategories = totalBreakdownItems(incomeByCategory.rows);
+    const totalExpenseCategories = totalBreakdownItems(expenseByCategory.rows);
+    const remainingBreakdownItems = (total: number) =>
+      Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
     return {
       liquidity: pickNumber(row, [
         "liquidity",
@@ -259,14 +286,14 @@ export const getPostgresClubFinanceSummary =
       expenseBySector: breakdown(expenseBySector.rows),
       incomeByCategory: breakdown(incomeByCategory.rows),
       expenseByCategory: breakdown(expenseByCategory.rows),
-      totalIncomeSectors: incomeBySector.rows.length,
-      remainingIncomeSectors: 0,
-      totalExpenseSectors: expenseBySector.rows.length,
-      remainingExpenseSectors: 0,
-      totalIncomeCategories: incomeByCategory.rows.length,
-      remainingIncomeCategories: 0,
-      totalExpenseCategories: expenseByCategory.rows.length,
-      remainingExpenseCategories: 0,
+      totalIncomeSectors,
+      remainingIncomeSectors: remainingBreakdownItems(totalIncomeSectors),
+      totalExpenseSectors,
+      remainingExpenseSectors: remainingBreakdownItems(totalExpenseSectors),
+      totalIncomeCategories,
+      remainingIncomeCategories: remainingBreakdownItems(totalIncomeCategories),
+      totalExpenseCategories,
+      remainingExpenseCategories: remainingBreakdownItems(totalExpenseCategories),
     };
   };
 
@@ -279,10 +306,101 @@ export const getPostgresSectorOperationalSummary =
         `select * from miclub.v_sector_finance_summary`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_local1_special_metrics`,
+        `with relevant as (
+          select
+            amount,
+            coalesce(nullif(trim(concept), ''), category) as concept,
+            movement_date
+          from miclub.v_movements_enriched
+          where regexp_replace(
+              translate(lower(coalesce(sector_name, sector_code, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) = 'local1'
+            and (
+              regexp_replace(
+                translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
+                '[^a-z0-9]+',
+                ' ',
+                'g'
+              ) = 'ingresos'
+              or regexp_replace(
+                translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
+                '[^a-z0-9]+',
+                ' ',
+                'g'
+              ) like 'ingreso%'
+            )
+            and regexp_replace(
+              translate(lower(coalesce(category, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              ' ',
+              'g'
+            ) in ('comision', 'ventas')
+        ), highlighted as (
+          select amount, concept, movement_date
+          from relevant
+          order by amount desc, movement_date desc
+          limit 1
+        )
+        select
+          (select count(*) from relevant)::integer as total_relevant_income_movements,
+          (
+            select count(*)
+            from relevant
+            where movement_date >= now() - interval '30 days'
+              and movement_date <= now()
+          )::integer as last30days_relevant_income_movements,
+          (select amount from highlighted) as highlighted_income_amount,
+          (select concept from highlighted) as highlighted_income_concept,
+          (select movement_date from highlighted) as highlighted_income_date`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_cantina_special_metrics`,
+        `with normalized_movements as (
+          select
+            coalesce(amount, 0) as amount,
+            regexp_replace(
+              translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) as normalized_type,
+            regexp_replace(
+              translate(lower(coalesce(category, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) as normalized_category
+          from miclub.v_movements_enriched
+          where regexp_replace(
+              translate(lower(coalesce(sector_name, sector_code, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) = 'cantina'
+        ), cantina_components as (
+          select
+            coalesce(sum(amount) filter (
+              where normalized_type like 'ingreso%'
+                and normalized_category in ('kiosco', 'kiosk', 'quiosco')
+            ), 0) as kiosk_income,
+            coalesce(sum(amount) filter (
+              where normalized_type like 'ingreso%'
+                and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
+            ), 0) as drinks_income,
+            coalesce(sum(amount) filter (
+              where normalized_type like 'egreso%'
+                and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
+            ), 0) as cmv
+          from normalized_movements
+        )
+        select
+          kiosk_income,
+          drinks_income,
+          cmv,
+          kiosk_income + drinks_income - cmv as total_profitability
+        from cantina_components`,
       ),
     ]);
     const sectors = sectorResult.rows;
@@ -338,10 +456,7 @@ export const getPostgresSectorOperationalSummary =
         totalDebtAmount: debtors
           .filter((member) => member.sourceSheet === "FITNESS")
           .reduce((sum, member) => sum + (member.cuota ?? 0), 0),
-        settlementBalance: pickNumber(finance("FITNESS"), [
-          "settlement_balance",
-          "balance",
-        ]),
+        settlementBalance: pickNumber(finance("FITNESS"), ["settlement_balance"]),
       },
       salon: {
         ...base("SALON"),
@@ -381,10 +496,7 @@ export const getPostgresSectorOperationalSummary =
         currentMonthProfitability: pickNumber(finance("LOCAL_1"), [
           "current_month_profitability",
         ]),
-        settlementBalance: pickNumber(finance("LOCAL_1"), [
-          "settlement_balance",
-          "balance",
-        ]),
+        settlementBalance: pickNumber(finance("LOCAL_1"), ["settlement_balance"]),
         highlightedIncome,
       },
       cantina: {
