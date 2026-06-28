@@ -31,7 +31,6 @@ type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: numbe
 
 const MEMBER_INDEXES = { id: 0, nombre: 4, apellido: 7, dni: 10, telefono: 12, actividad: 14, modalidad: 16, cuota: 18, estado: 20, vence: 21, instructor: 23 } as const;
 const MOVEMENT_INDEXES = { id: 0, fecha: 1, tipo: 3, categoria: 6, concepto: 9, contraparte: 14, sector: 17, monto: 19, impuestos: 22, estado: 24, medioPago: 26 } as const;
-const ADMIN_RANGE = "ADMINISTRACIÓN!B13:AB3000";
 const valueAt = (row: unknown[], idx: number): string => String(row[idx] ?? "").trim();
 const isEmpty = (row: unknown[]): boolean => row.every((cell) => String(cell ?? "").trim() === "");
 const stablePart = (value: unknown): string => normalizeComparableText(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sin-datos";
@@ -61,7 +60,8 @@ const readRows = async (): Promise<SheetRow[]> => {
   const client = getSheetsClient(config);
   const memberRanges = SHEET_NAMES.map((sheet) => config.sheetRanges[sheet]);
   const sectorMovementRanges = SHEET_NAMES.map((sheet) => config.movementRanges[sheet]);
-  const ranges = [ADMIN_RANGE, ...memberRanges, ...sectorMovementRanges];
+  const adminMovementRange = config.adminMovementsRange;
+  const ranges = [adminMovementRange, ...memberRanges, ...sectorMovementRanges];
   const response = await client.spreadsheets.values.batchGet({ spreadsheetId: config.sheetId, ranges, majorDimension: "ROWS" });
   const rows: SheetRow[] = [];
   response.data.valueRanges?.forEach((valueRange, rangeIndex) => {
