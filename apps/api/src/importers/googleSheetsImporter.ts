@@ -208,6 +208,7 @@ const readRows = async (): Promise<{
     spreadsheetId: config.sheetId,
     ranges,
     majorDimension: "ROWS",
+    valueRenderOption: "FORMATTED_VALUE",
   });
   const rows: SheetRow[] = [];
   const memberIndexesBySheet: Record<

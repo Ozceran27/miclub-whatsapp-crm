@@ -361,7 +361,8 @@ const readLastPaymentsFromGoogleSheets = async (config: ReturnType<typeof getGoo
   const response = await sheetsClient.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
     ranges,
-    majorDimension: "ROWS"
+    majorDimension: "ROWS",
+    valueRenderOption: "FORMATTED_VALUE"
   });
 
   const headerRows: Partial<Record<OperationalSheetName, unknown[]>> = {};
@@ -435,7 +436,8 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
   const response = await sheetsClient.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
     ranges,
-    majorDimension: "ROWS"
+    majorDimension: "ROWS",
+    valueRenderOption: "FORMATTED_VALUE"
   });
 
   const members: Member[] = [];
@@ -739,7 +741,8 @@ const readClubFinanceRanges = async (config: ReturnType<typeof getGoogleSheetsCo
   const response = await sheetsClient.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
     ranges: [config.adminMovementsRange, config.adminBalancesRange, ...SECTOR_BALANCE_SHEET_NAMES.map((sheet) => config.sectorBalanceRanges[sheet]), "AULA!B18:V30"],
-    majorDimension: "ROWS"
+    majorDimension: "ROWS",
+    valueRenderOption: "FORMATTED_VALUE"
   });
 
   const valueRanges = response.data.valueRanges ?? [];
