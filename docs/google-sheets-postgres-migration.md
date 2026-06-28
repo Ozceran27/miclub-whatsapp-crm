@@ -199,6 +199,18 @@ Decisión documentada para el corte: mantener `warn` hasta que Operaciones confi
 
 Los endpoints están montados bajo `/api/import` y responden `404` si `IMPORT_ENDPOINTS_ENABLED` no está en `true`.
 
+> **Ventana controlada:** el panel temporal de migración de la app web también depende de estos endpoints. Activar `IMPORT_ENDPOINTS_ENABLED=true` solo durante la ventana operativa, con acceso interno/autenticado, y volver a `false` apenas termine la validación o el rollback.
+
+### Panel temporal web
+
+La navegación administrativa de la app web incluye el módulo **MIGRACIÓN** (`apps/web/src/modules/DataMigrationModule.tsx`) para operar la carga de forma controlada. El panel permite:
+
+- Ver el estado de `GET /api/db/health`, `GET /sync-status` y `GET /api/import/batches?limit=10`.
+- Ejecutar un dry-run con `POST /api/import/google-sheets` y body `{ "dryRun": true, "batchSize": 50 }`.
+- Revisar los contadores `read`, `errors`, `warnings`, `attemptedWrites`, `persistedWrites`, `rolledBackWrites`, `enrollmentsProcessed` y `movementsProcessed`.
+- Consultar errores de batches recientes con `GET /api/import/batches/:id/errors`.
+- Habilitar la importación real únicamente cuando el último dry-run de la sesión termina con `errors === 0`; antes de enviarla, el navegador pide confirmación explícita.
+
 ### `POST /api/import/google-sheets`
 
 Dispara la importación desde Google Sheets.

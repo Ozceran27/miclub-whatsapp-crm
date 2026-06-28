@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import CrmModule from './modules/CrmModule';
+import DataMigrationModule from './modules/DataMigrationModule';
 import HomeModule from './modules/HomeModule';
 import ModuleNav, { type ModuleDefinition, type ModuleId } from './modules/ModuleNav';
 import PlaceholderModule from './modules/PlaceholderModule';
@@ -15,10 +16,11 @@ const MODULES: ModuleDefinition[] = [
   { id: 'aula', label: 'AULA' },
   { id: 'local1', label: 'LOCAL 1' },
   { id: 'cantina', label: 'CANTINA' },
-  { id: 'crm', label: 'CRM' }
+  { id: 'crm', label: 'CRM' },
+  { id: 'dataMigration', label: 'MIGRACIÓN' }
 ];
 
-const PLACEHOLDERS: Record<Exclude<ModuleId, 'home' | 'crm'>, { title: string; description: string; futureItems: string[] }> = {
+const PLACEHOLDERS: Record<Exclude<ModuleId, 'home' | 'crm' | 'dataMigration'>, { title: string; description: string; futureItems: string[] }> = {
   economy: {
     title: 'Economía Club',
     description: 'Tablero financiero general para consolidar la salud económica y los movimientos por sector del club.',
@@ -109,6 +111,7 @@ export default function App() {
   const renderModule = () => {
     if (currentModule === 'home') return <HomeModule onOpenModule={setCurrentModule} />;
     if (currentModule === 'crm') return <CrmModule />;
+    if (currentModule === 'dataMigration') return <DataMigrationModule />;
 
     const placeholder = PLACEHOLDERS[currentModule];
     return <PlaceholderModule {...placeholder} />;
