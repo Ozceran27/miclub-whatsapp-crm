@@ -65,56 +65,59 @@ Notas operativas:
 
 ## 3. Rangos leídos por defecto y sobrescritura
 
-El importador lee por defecto estos rangos de miembros/deudas:
+El importador separa los rangos de **inscriptos** y **movimientos**. En ambos casos los headers se leen con rangos propios para resolver columnas por nombre y no depender de índices fijos.
 
-| Sector | Variable para sobrescribir | Rango por defecto |
-| --- | --- | --- |
-| Fitness | `GOOGLE_SHEETS_FITNESS_RANGE` | `FITNESS!AB20:BA1500` |
-| Salón | `GOOGLE_SHEETS_SALON_RANGE` | `SALON!AB34:BB1500` |
-| Aula | `GOOGLE_SHEETS_AULA_RANGE` | `AULA!AB34:BB1500` |
+### Inscriptos
 
-También existen rangos operativos complementarios usados por la integración de Google Sheets:
+| Sector | Header range | Data range | Nota |
+| --- | --- | --- | --- |
+| Fitness | `GOOGLE_SHEETS_FITNESS_MEMBERS_HEADER_RANGE=FITNESS!AB19:BA19` | `GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:BA1500` | Confirmar si el layout vigente termina en `BA` o si debe ampliarse a `BB`: `FITNESS!AB19:BB19` y `FITNESS!AB20:BB1500`. |
+| Salón | `GOOGLE_SHEETS_SALON_MEMBERS_HEADER_RANGE=SALON!AB33:BB33` | `GOOGLE_SHEETS_SALON_RANGE=SALON!AB34:BB1500` | Layout sectorial con `Estado Finan.`. |
+| Aula | `GOOGLE_SHEETS_AULA_MEMBERS_HEADER_RANGE=AULA!AB33:BB33` | `GOOGLE_SHEETS_AULA_RANGE=AULA!AB34:BB1500` | Layout sectorial con `Estado Finan.`. |
 
-| Dato | Variable para sobrescribir | Rango por defecto |
-| --- | --- | --- |
-| Movimientos Fitness | `GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE` | `FITNESS!B20:AB800` |
-| Movimientos Salón | `GOOGLE_SHEETS_SALON_MOVEMENTS_RANGE` | `SALON!B34:AB800` |
-| Movimientos Aula | `GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE` | `AULA!B34:AB800` |
-| Headers movimientos Local 1 | `GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE` | `'LOCAL 1'!B9:AB9` |
-| Movimientos Local 1 | `GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE` | `'LOCAL 1'!B10:AB3000` |
-| Movimientos administración | `GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE` | `ADMINISTRACIÓN!B12:AB3000` |
-| Saldos administración | `GOOGLE_SHEETS_ADMIN_BALANCES_RANGE` | `ADMINISTRACIÓN!AD12:AG14` |
+El importador reconoce los headers reales `Id.`, `Fecha`, `Nombre`, `Apellido`, `D.N.I.`, `Tel.`, `Actividad`, `Modalidad`, `Cuota`, `Estado`, `Instructor` y `Vence`. Esto permite tomar `Vence` desde `BA` en Fitness, o desde `BB` si Operaciones confirma la ampliación, y desde `BB` en Salón/Aula para completar `miclub.enrollments.due_date`.
+
+### Movimientos
+
+| Hoja | Header range | Data range | Nota |
+| --- | --- | --- | --- |
+| Fitness | `GOOGLE_SHEETS_FITNESS_MOVEMENTS_HEADER_RANGE=FITNESS!B19:Y19` | `GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE=FITNESS!B20:Y1500` | Hoja sectorial: tiene `Estado Finan.` y no tiene `Sector`. |
+| Salón | `GOOGLE_SHEETS_SALON_MOVEMENTS_HEADER_RANGE=SALON!B33:Y33` | `GOOGLE_SHEETS_SALON_MOVEMENTS_RANGE=SALON!B34:Y1500` | Hoja sectorial: tiene `Estado Finan.` y no tiene `Sector`. |
+| Aula | `GOOGLE_SHEETS_AULA_MOVEMENTS_HEADER_RANGE=AULA!B33:Y33` | `GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE=AULA!B34:Y1500` | Hoja sectorial: tiene `Estado Finan.` y no tiene `Sector`. |
+| Administración | `GOOGLE_SHEETS_ADMIN_MOVEMENTS_HEADER_RANGE=ADMINISTRACIÓN!B12:AB12` | `GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE=ADMINISTRACIÓN!B13:AB3000` | Hoja administrativa: tiene `Sector` y no tiene `Estado Finan.`. |
+| Local 1 | Pendiente de confirmación | Pendiente de confirmación | Agregar `GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE` y `GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE` cuando Operaciones confirme la fila de header vigente. |
+
+La diferencia de layout es intencional: `ADMINISTRACIÓN` centraliza movimientos de múltiples sectores, por eso incluye la columna `Sector` y no incluye `Estado Finan.`; las hojas sectoriales (`FITNESS`, `SALON`, `AULA` y, si aplica, `LOCAL 1`) ya representan un sector específico, por eso incluyen `Estado Finan.` y no necesitan columna `Sector`.
+
+Los movimientos con `Monto` igual a `0` son válidos. No deben descartarse solo por el importe: se importan cuando la fila contiene información operativa suficiente, por ejemplo fecha, tipo/categoría, concepto, contraparte, medio de pago, estado financiero u otros datos que permitan auditar el movimiento.
 
 Para sobrescribir cualquier rango, agregar la variable correspondiente al `.env`, por ejemplo:
 
 ```env
+GOOGLE_SHEETS_FITNESS_MEMBERS_HEADER_RANGE=FITNESS!AB19:BA19
 GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:BA1500
-GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE=ADMINISTRACIÓN!B12:AB5000
-GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE='LOCAL 1'!B9:AB9
-GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE='LOCAL 1'!B10:AB3000
+# Si se confirma Fitness hasta BB:
+# GOOGLE_SHEETS_FITNESS_MEMBERS_HEADER_RANGE=FITNESS!AB19:BB19
+# GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:BB1500
+GOOGLE_SHEETS_ADMIN_MOVEMENTS_HEADER_RANGE=ADMINISTRACIÓN!B12:AB12
+GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE=ADMINISTRACIÓN!B13:AB3000
 ```
-
-
-Los headers de inscriptos se leen por separado para resolver columnas por nombre y no depender de un único índice fijo. Los rangos de headers por defecto son:
-
-| Sector | Rango de headers inscriptos |
-| --- | --- |
-| Fitness | `FITNESS!AB19:BA19` |
-| Salón | `SALON!AB33:BB33` |
-| Aula | `AULA!AB33:BB33` |
-
-El importador reconoce los headers reales `Id.`, `Fecha`, `Nombre`, `Apellido`, `D.N.I.`, `Tel.`, `Actividad`, `Modalidad`, `Cuota`, `Estado`, `Instructor` y `Vence`. Esto permite tomar `Vence` desde `BA` en Fitness y desde `BB` en Salón/Aula para completar `miclub.enrollments.due_date`.
 
 ### Decisión sobre inicio de movimientos de administración
 
-El rango por defecto de movimientos de administración se mantiene en `ADMINISTRACIÓN!B12:AB3000` para ser consistente con `getGoogleSheetsConfig().adminMovementsRange` y con las lecturas financieras de la API. En el modelo real `apps/api/data/db/Dashboard CLUB Actualizado.xlsx`, la fila 12 contiene los encabezados (`Id.`, `Fecha`, `Tipo`, `Categoría`, `Concepto`, `Contra-parte`, `Sector`, `Monto`, etc.) y la primera fila de datos está en `B13:AB13` (`I-0785`, fecha serial `46196.79794715278`, tipo `INGRESOS`). Por eso se documenta `B12` como inicio del rango configurable: las pantallas/debug financieros pueden leer encabezados junto con datos, y el importador a PostgreSQL descarta esa fila porque no tiene monto numérico; usar `B13` omitiría los encabezados y dejaría el importador con un default distinto al resto de la integración.
+El rango de movimientos de administración separa headers y datos: los encabezados se leen desde `ADMINISTRACIÓN!B12:AB12` y la primera fila importable desde `ADMINISTRACIÓN!B13:AB3000`. En el modelo real `apps/api/data/db/Dashboard CLUB Actualizado.xlsx`, la fila 12 contiene los encabezados (`Id.`, `Fecha`, `Tipo`, `Categoría`, `Concepto`, `Contra-parte`, `Sector`, `Monto`, etc.) y la primera fila de datos está en `B13:AB13` (`I-0785`, fecha serial `46196.79794715278`, tipo `INGRESOS`).
 
 
 ### Decisión sobre inicio de movimientos de LOCAL 1
 
-`LOCAL 1` se trata como hoja de movimientos, no como hoja de inscriptos. En el XLSX de referencia (`apps/api/data/db/Dashboard CLUB Actualizado.xlsx`) la fila real de cabeceras de movimientos es `LOCAL 1!B9:AB9`: contiene `Id.`, `Fecha`, `Tipo`, `Categoría`, `Concepto`, `Contra-parte`, `Monto`, `Impuestos`, `M.P.`, `Estado Finan.` y `Estado`. La primera fila de datos está en `LOCAL 1!B10:AB10`; por eso las filas 12, 13, 19, 20, 33 y 34 son datos y no cabeceras.
+`LOCAL 1` se trata como hoja de movimientos, no como hoja de inscriptos. Sus rangos quedan pendientes hasta confirmar con Operaciones la fila de header vigente. Cuando se confirme, documentar ambos valores explícitamente:
 
-El layout de `LOCAL 1` es sectorial: no tiene columna `Sector`, sí tiene `Estado Finan.`, y el importador usa `LOCAL 1` como sector por defecto para esos movimientos.
+```env
+GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE='LOCAL 1'!B<fila_header>:<columna_final><fila_header>
+GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE='LOCAL 1'!B<primera_fila_datos>:<columna_final>3000
+```
+
+El layout esperado de `LOCAL 1` es sectorial: no tiene columna `Sector`, sí tiene `Estado Finan.`, y el importador debe usar `LOCAL 1` como sector por defecto para esos movimientos.
 
 ## 4. Importación por CLI
 
@@ -125,6 +128,12 @@ Ejecutar primero un dry-run. Este modo valida lectura, parsing y escritura simul
 ```bash
 npm run import:sheets:dry
 ```
+
+Además de confirmar `errors === 0`, revisar explícitamente en el resumen, logs o consultas de auditoría del batch:
+
+- La cantidad de movimientos con `Monto` igual a `0`: deben aparecer como importables si tienen información operativa suficiente y cualquier pico inesperado debe validarse contra la planilla.
+- Las columnas resueltas por fallback: si el importador avisa que usó fallback columns, verificar que los headers reales sigan coincidiendo con el layout documentado antes de ejecutar la importación real.
+- Las inscripciones con `due_date`: confirmar que `Vence` se está leyendo desde el rango correcto (`BA`/`BB` según sector y confirmación de Fitness) y que el conteo de inscripciones con vencimiento no cae inesperadamente.
 
 ### Importación real
 
