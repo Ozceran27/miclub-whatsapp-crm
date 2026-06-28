@@ -103,23 +103,33 @@ export const getPostgresSummary = async () => {
 
 export const getPostgresClubFinanceSummary = async (): Promise<ClubOperationsSummary> => {
   const pool = await getPostgresPool();
-  const [dashboard, sectors] = await Promise.all([
+  const [dashboard, sectors, incomeBySector, expenseBySector, incomeByCategory, expenseByCategory] = await Promise.all([
     pool.query<Record<string, unknown>>(`select * from miclub.v_dashboard_basic`),
-    pool.query<Record<string, unknown>>(`select * from miclub.v_sector_finance_summary order by sector_name asc nulls last, sector_id asc nulls last`)
+    pool.query<Record<string, unknown>>(`select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`),
+    pool.query<Record<string, unknown>>(`select sector_name as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'INGRESOS' group by sector_name order by amount desc limit 4`),
+    pool.query<Record<string, unknown>>(`select sector_name as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by sector_name order by amount desc limit 4`),
+    pool.query<Record<string, unknown>>(`select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'INGRESOS' group by category order by amount desc limit 4`),
+    pool.query<Record<string, unknown>>(`select category as name, coalesce(sum(amount), 0) as amount from miclub.v_admin_completed_movements where movement_type = 'EGRESOS' group by category order by amount desc limit 4`)
   ]);
   const row = dashboard.rows[0] ?? {};
   const sectorBalances = sectors.rows.map((sector) => ({ sector: pickString(sector, ["sector_name", "sector"], "Sin sector"), amount: pickNumber(sector, ["settlement_balance", "balance", "amount"]) }));
+  const breakdown = (rows: Record<string, unknown>[]) => rows.map((item) => ({ name: pickString(item, ["name"], "Sin datos"), amount: pickNumber(item, ["amount"]) }));
   return {
     liquidity: pickNumber(row, ["liquidity", "cash_balance", "available_balance"]), cash: pickNumber(row, ["cash"]), bank: pickNumber(row, ["bank", "bank_balance"]), dollars: pickNumber(row, ["dollars", "usd"]),
-    pendingIncome: pickNumber(row, ["pending_income"]), pendingExpenses: pickNumber(row, ["pending_expenses"]), pendingNetBalance: pickNumber(row, ["pending_net_balance"]), cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]), cuotasACobrar: pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]), futureReceivableFeesUntilMonthEnd: pickNumber(row, ["future_receivable_fees_until_month_end"]), saldosAPagar: sectorBalances.reduce((sum, sector) => sum + sector.amount, 0), projectedBalance: pickNumber(row, ["projected_balance"]), sectorBalances,
-    incomeBySector: [], expenseBySector: [], incomeByCategory: [], expenseByCategory: [], totalIncomeSectors: 0, remainingIncomeSectors: 0, totalExpenseSectors: 0, remainingExpenseSectors: 0, totalIncomeCategories: 0, remainingIncomeCategories: 0, totalExpenseCategories: 0, remainingExpenseCategories: 0
+    pendingIncome: pickNumber(row, ["pending_income"]), pendingExpenses: pickNumber(row, ["pending_expenses"]), pendingNetBalance: pickNumber(row, ["pending_net_balance"]), cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]), cuotasACobrar: pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]), futureReceivableFeesUntilMonthEnd: pickNumber(row, ["future_receivable_fees_until_month_end"]), saldosAPagar: pickNumber(row, ["saldos_a_pagar"]), projectedBalance: pickNumber(row, ["projected_balance"]), sectorBalances,
+    incomeBySector: breakdown(incomeBySector.rows), expenseBySector: breakdown(expenseBySector.rows), incomeByCategory: breakdown(incomeByCategory.rows), expenseByCategory: breakdown(expenseByCategory.rows), totalIncomeSectors: incomeBySector.rows.length, remainingIncomeSectors: 0, totalExpenseSectors: expenseBySector.rows.length, remainingExpenseSectors: 0, totalIncomeCategories: incomeByCategory.rows.length, remainingIncomeCategories: 0, totalExpenseCategories: expenseByCategory.rows.length, remainingExpenseCategories: 0
   };
 };
 
 export const getPostgresSectorOperationalSummary = async (): Promise<SectorOperationalSummary> => {
   const members = await getPostgresMembers();
   const pool = await getPostgresPool();
-  const sectors = (await pool.query<Record<string, unknown>>(`select * from miclub.v_sector_finance_summary`)).rows;
+  const [sectorResult, local1Result, cantinaResult] = await Promise.all([
+    pool.query<Record<string, unknown>>(`select * from miclub.v_sector_finance_summary`),
+    pool.query<Record<string, unknown>>(`select * from miclub.v_local1_special_metrics`),
+    pool.query<Record<string, unknown>>(`select * from miclub.v_cantina_special_metrics`)
+  ]);
+  const sectors = sectorResult.rows;
   const sectorRow = (name: string) => sectors.find((row) => String(pick(row, ["sector_name", "sector"]) ?? "").toUpperCase().replace(/\s+/g, "_") === name) ?? {};
   const membersBySector = (name: SourceSheet) => members.filter((member) => member.sourceSheet === name);
   const base = (name: SourceSheet) => {
@@ -128,12 +138,15 @@ export const getPostgresSectorOperationalSummary = async (): Promise<SectorOpera
   };
   const finance = (name: string) => sectorRow(name);
   const debtors = members.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando");
+  const local1Special = local1Result.rows[0] ?? {};
+  const cantinaSpecial = cantinaResult.rows[0] ?? {};
+  const highlightedIncome = pick(local1Special, ["highlighted_income_amount"]) == null ? null : { amount: pickNumber(local1Special, ["highlighted_income_amount"]), concept: pickString(local1Special, ["highlighted_income_concept"], ""), date: pickString(local1Special, ["highlighted_income_date"], "") };
   return {
     fitness: { ...base("FITNESS"), totalProfitability: pickNumber(finance("FITNESS"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("FITNESS"), ["current_month_profitability"]), totalDebtors: debtors.filter((member) => member.sourceSheet === "FITNESS").length, totalDebtAmount: debtors.filter((member) => member.sourceSheet === "FITNESS").reduce((sum, member) => sum + (member.cuota ?? 0), 0), settlementBalance: pickNumber(finance("FITNESS"), ["settlement_balance", "balance"]) },
     salon: { ...base("SALON"), totalProfitability: pickNumber(finance("SALON"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("SALON"), ["current_month_profitability"]), mostPopularActivity: null, leastPopularActivity: null },
     aula: { ...base("AULA"), totalProfitability: pickNumber(finance("AULA"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("AULA"), ["current_month_profitability"]), averageCommission: null, mostPopularActivity: null },
-    local1: { totalRelevantIncomeMovements: 0, last30DaysRelevantIncomeMovements: 0, totalProfitability: pickNumber(finance("LOCAL_1"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("LOCAL_1"), ["current_month_profitability"]), settlementBalance: pickNumber(finance("LOCAL_1"), ["settlement_balance", "balance"]), highlightedIncome: null },
-    cantina: { kioskIncome: 0, drinksIncome: 0, cmv: 0, totalProfitability: pickNumber(finance("CANTINA"), ["total_profitability", "profitability"]) },
+    local1: { totalRelevantIncomeMovements: pickNumber(local1Special, ["total_relevant_income_movements"]), last30DaysRelevantIncomeMovements: pickNumber(local1Special, ["last30days_relevant_income_movements"]), totalProfitability: pickNumber(finance("LOCAL_1"), ["total_profitability", "profitability"]), currentMonthProfitability: pickNumber(finance("LOCAL_1"), ["current_month_profitability"]), settlementBalance: pickNumber(finance("LOCAL_1"), ["settlement_balance", "balance"]), highlightedIncome },
+    cantina: { kioskIncome: pickNumber(cantinaSpecial, ["kiosk_income"]), drinksIncome: pickNumber(cantinaSpecial, ["drinks_income"]), cmv: pickNumber(cantinaSpecial, ["cmv"]), totalProfitability: pickNumber(cantinaSpecial, ["total_profitability"]) },
     crm: { totalMembers: members.length, activeMembers: members.filter((member) => isActiveEnrollmentStatus(member.estado)).length, totalDebtors: debtors.length, totalDebtAmount: debtors.reduce((sum, member) => sum + (member.cuota ?? 0), 0) }
   };
 };
