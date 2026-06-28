@@ -106,23 +106,28 @@ test('calculateFutureReceivableFeesUntilMonthEnd suma vencimientos al día del m
 
 
 test('resolveMovementColumnIndexes mapea movimientos por headers del modelo Dashboard CLUB Actualizado', () => {
-  const headers = ['ID', 'Fecha', '', 'Tipo', '', '', 'Categoria', '', '', 'Concepto', '', '', '', '', 'Contraparte', '', '', 'Sector', '', 'Monto', '', '', 'Impuestos', '', 'Estado Finan.', 'Estado', 'Medio Pago'];
-  const row = ['MOV-001', '20/06/2026', '', 'INGRESOS', '', '', 'CUOTAS', '', '', 'Cuota mensual junio', '', '', '', '', '12345678', '', '', 'FITNESS', '', '$25.000', '', '', '$0', '', 'PAGADO', 'COMPLETADO', 'Transferencia'];
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', '', 'Categoría', '', '', 'Concepto', '', '', '', '', 'Contra-parte', '', '', 'Sector', '', 'Monto', '', '', 'Imp.', '', 'Estado Finan.', 'Estado', 'M.P.'];
+  const sectors = ['ADMINISTRACIÓN', 'FITNESS', 'SALON', 'AULA', 'LOCAL 1'];
 
-  const resolved = resolveMovementColumnIndexes(headers);
+  for (const sector of sectors) {
+    const row = ['MOV-001', '20/06/2026', '', 'INGRESOS', '', '', 'CUOTAS', '', '', 'Cuota mensual junio', '', '', '', '', '12345678', '', '', sector, '', '$25.000', '', '', '$0', '', 'PAGADO', 'COMPLETADO', 'Transferencia'];
+    const resolved = resolveMovementColumnIndexes(headers);
 
-  assert.equal(resolved.usedFallback, false);
-  assert.equal(movementValue(row, resolved.indexes, 'id'), 'MOV-001');
-  assert.equal(movementValue(row, resolved.indexes, 'fecha'), '20/06/2026');
-  assert.equal(movementValue(row, resolved.indexes, 'tipo'), 'INGRESOS');
-  assert.equal(movementValue(row, resolved.indexes, 'categoria'), 'CUOTAS');
-  assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota mensual junio');
-  assert.equal(movementValue(row, resolved.indexes, 'contraparte'), '12345678');
-  assert.equal(movementValue(row, resolved.indexes, 'sector'), 'FITNESS');
-  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 25000);
-  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'impuestos')), 0);
-  assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
-  assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Transferencia');
+    assert.equal(resolved.usedFallback, false, `No debe usar fallback para ${sector}`);
+    assert.deepEqual(resolved.fallbackKeys, []);
+    assert.equal(movementValue(row, resolved.indexes, 'id'), 'MOV-001');
+    assert.equal(movementValue(row, resolved.indexes, 'fecha'), '20/06/2026');
+    assert.equal(movementValue(row, resolved.indexes, 'tipo'), 'INGRESOS');
+    assert.equal(movementValue(row, resolved.indexes, 'categoria'), 'CUOTAS');
+    assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota mensual junio');
+    assert.equal(movementValue(row, resolved.indexes, 'contraparte'), '12345678');
+    assert.equal(movementValue(row, resolved.indexes, 'sector'), sector);
+    assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 25000);
+    assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'impuestos')), 0);
+    assert.equal(movementValue(row, resolved.indexes, 'estadoFinan'), 'PAGADO');
+    assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
+    assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Transferencia');
+  }
 });
 
 test('resolveMovementColumnIndexes conserva fallback de compatibilidad sin headers', () => {
