@@ -110,13 +110,13 @@ export const movementColumnAliases: Record<MovementColumnKey, string[]> = {
   tipo: ["tipo"],
   categoria: ["categoria"],
   concepto: ["concepto"],
-  contraparte: ["contraparte"],
+  contraparte: ["contraparte", "contra"],
   sector: ["sector"],
   monto: ["monto"],
-  impuestos: ["impuestos", "impuesto", "taxes"],
+  impuestos: ["imp", "impuesto", "impuestos", "taxes"],
   estadoFinan: ["estadofinan", "estadofinanciero", "estadofin", "estadofinanc", "estadofinanzas"],
   estado: ["estado"],
-  medioPago: ["mediopago", "medio", "metodopago", "formapago", "pago"]
+  medioPago: ["mp", "mpp", "mediodepago", "medio", "mediopago", "formadepago", "formapago", "metodopago", "pago"]
 };
 
 export const movementFallbackIndexes: MovementColumnIndexes = {
