@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { getPostgresPool } from "../db/postgres.js";
-import { adminMovementFallbackIndexes, getGoogleSheetsConfig, movementValue, resolveMovementColumnIndexes, sectorMovementFallbackIndexes, MOVEMENT_SHEET_NAMES, SHEET_NAMES, type MovementColumnIndexes } from "../services/googleSheets.js";
+import { adminMovementFallbackIndexes, getGoogleSheetsConfig, memberValue, movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes, MOVEMENT_SHEET_NAMES, SHEET_NAMES, type MemberColumnIndexes, type MovementColumnIndexes } from "../services/googleSheets.js";
 import { upsertActivity, upsertInstructor, upsertSector } from "../repositories/activitiesRepository.js";
 import { createImportBatch, finishImportBatch, logImportError } from "./importLogger.js";
 import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeFinancialStatus, normalizeMoney, normalizeOperationalStatus, normalizePhone, normalizeSheetText } from "./normalizers.js";
@@ -27,10 +27,7 @@ type ImportSummary = {
   errors: number;
   warnings: string[];
 };
-type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[]; movementIndexes?: MovementColumnIndexes; usedMovementFallback?: boolean };
-
-const MEMBER_INDEXES = { id: 0, nombre: 4, apellido: 7, dni: 10, telefono: 12, actividad: 14, modalidad: 16, cuota: 18, estado: 20, vence: 21, instructor: 23 } as const;
-const valueAt = (row: unknown[], idx: number): string => String(row[idx] ?? "").trim();
+type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[]; memberIndexes?: MemberColumnIndexes; usedMemberFallback?: boolean; movementIndexes?: MovementColumnIndexes; usedMovementFallback?: boolean };
 const isEmpty = (row: unknown[]): boolean => row.every((cell) => String(cell ?? "").trim() === "");
 const stablePart = (value: unknown): string => normalizeComparableText(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sin-datos";
 const externalId = (...parts: unknown[]): string => parts.map(stablePart).join(":");
@@ -58,17 +55,22 @@ const readRows = async (): Promise<SheetRow[]> => {
   if (!config.credentialsPresent) throw new Error("Faltan credenciales de Google Sheets (GOOGLE_SHEET_ID/GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY).");
   const client = getSheetsClient(config);
   const memberRanges = SHEET_NAMES.map((sheet) => config.sheetRanges[sheet]);
+  const memberHeaderRangesBySheet = Object.fromEntries(SHEET_NAMES.map((sheet) => [sheet, config.memberHeaderRanges[sheet]]));
   const movementRangesBySheet = { ...Object.fromEntries(MOVEMENT_SHEET_NAMES.map((sheet) => [sheet, config.movementRanges[sheet]])), ADMINISTRACIÓN: config.adminMovementsRange };
   const movementHeaderRangesBySheet = { ...Object.fromEntries(MOVEMENT_SHEET_NAMES.map((sheet) => [sheet, config.movementHeaderRanges[sheet]])), ADMINISTRACIÓN: config.adminMovementsHeaderRange };
   const memberRangeSet = new Set(memberRanges);
   const movementRangeSet = new Set(Object.values(movementRangesBySheet));
-  const ranges = [...memberRanges, ...Object.values(movementHeaderRangesBySheet), ...Object.values(movementRangesBySheet)];
+  const ranges = [...Object.values(memberHeaderRangesBySheet), ...memberRanges, ...Object.values(movementHeaderRangesBySheet), ...Object.values(movementRangesBySheet)];
   const response = await client.spreadsheets.values.batchGet({ spreadsheetId: config.sheetId, ranges, majorDimension: "ROWS" });
   const rows: SheetRow[] = [];
+  const memberIndexesBySheet: Record<string, ReturnType<typeof resolveMemberColumnIndexes>> = {};
   const movementIndexesBySheet: Record<string, ReturnType<typeof resolveMovementColumnIndexes>> = {};
   response.data.valueRanges?.forEach((valueRange, rangeIndex) => {
     const requestedRange = ranges[rangeIndex] ?? valueRange.range ?? "";
     const sheet = (requestedRange.split("!")[0] ?? "").replace(/'/g, "");
+    if (Object.values(memberHeaderRangesBySheet).includes(requestedRange)) {
+      memberIndexesBySheet[sheet] = resolveMemberColumnIndexes(valueRange.values?.[0]);
+    }
     if (Object.values(movementHeaderRangesBySheet).includes(requestedRange)) {
       const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
       movementIndexesBySheet[sheet] = resolveMovementColumnIndexes(valueRange.values?.[0], fallbackIndexes);
@@ -81,8 +83,20 @@ const readRows = async (): Promise<SheetRow[]> => {
     const kind: SheetRow["kind"] | null = memberRangeSet.has(requestedRange) ? "members" : movementRangeSet.has(requestedRange) ? "movements" : null;
     if (!kind) return;
     const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
-    const resolved = movementIndexesBySheet[sheet] ?? resolveMovementColumnIndexes(undefined, fallbackIndexes);
-    (valueRange.values ?? []).forEach((row, index) => { if (!isEmpty(row)) rows.push({ kind, sheet, rowNumber: start + index, row, movementIndexes: kind === "movements" ? resolved.indexes : undefined, usedMovementFallback: kind === "movements" ? resolved.usedFallback : undefined }); });
+    const resolvedMovement = movementIndexesBySheet[sheet] ?? resolveMovementColumnIndexes(undefined, fallbackIndexes);
+    const resolvedMember = memberIndexesBySheet[sheet] ?? resolveMemberColumnIndexes(undefined);
+    (valueRange.values ?? []).forEach((row, index) => {
+      if (!isEmpty(row)) rows.push({
+        kind,
+        sheet,
+        rowNumber: start + index,
+        row,
+        memberIndexes: kind === "members" ? resolvedMember.indexes : undefined,
+        usedMemberFallback: kind === "members" ? resolvedMember.usedFallback : undefined,
+        movementIndexes: kind === "movements" ? resolvedMovement.indexes : undefined,
+        usedMovementFallback: kind === "movements" ? resolvedMovement.usedFallback : undefined
+      });
+    });
   });
   return rows;
 };
@@ -119,23 +133,28 @@ const upsertPaymentMethod = async (pool: Pool, name: string): Promise<string | n
   return (await pool.query<{ id: string }>("insert into miclub.payment_methods (name) values ($1) on conflict (name) do update set name=excluded.name returning id", [clean])).rows[0]?.id ?? null;
 };
 
-const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<string | null> => {
-  const firstName = valueAt(row.row, MEMBER_INDEXES.nombre);
+export const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<string | null> => {
+  if (row.usedMemberFallback) {
+    const warning = `Se usaron índices fallback para inscriptos en ${row.sheet}; revisar headers del rango.`;
+    if (!summary.warnings.includes(warning)) summary.warnings.push(warning);
+  }
+  const memberIndexes = row.memberIndexes ?? {};
+  const firstName = memberValue(row.row, memberIndexes, "nombre");
   if (!firstName) return null;
   const sectorId = await upsertSector(pool, row.sheet); summary.sectorsProcessed += 1; summary.attemptedWrites += 1;
-  const instructorName = valueAt(row.row, MEMBER_INDEXES.instructor) || "Sin instructor";
+  const instructorName = memberValue(row.row, memberIndexes, "instructor") || "Sin instructor";
   const instructorPersonId = await upsertPerson(pool, { firstName: instructorName, kind: "instructor", source: `${row.sheet}:${row.rowNumber}` });
   const instructorId = await upsertInstructor(pool, instructorPersonId, instructorName); summary.instructorsProcessed += 1; summary.attemptedWrites += 1;
-  const activityId = await upsertActivity(pool, { sectorId, name: valueAt(row.row, MEMBER_INDEXES.actividad) || "Sin actividad", modality: valueAt(row.row, MEMBER_INDEXES.modalidad) || null, instructorId, monthlyFee: normalizeFee(valueAt(row.row, MEMBER_INDEXES.cuota)) }); summary.activitiesProcessed += 1; summary.attemptedWrites += 1;
-  const personId = await upsertPerson(pool, { firstName, lastName: valueAt(row.row, MEMBER_INDEXES.apellido), dni: valueAt(row.row, MEMBER_INDEXES.dni), phone: valueAt(row.row, MEMBER_INDEXES.telefono), kind: "alumno", source: `${row.sheet}:${row.rowNumber}` }); summary.peopleProcessed += 1; summary.attemptedWrites += 1;
-  const ext = externalId("google_sheets", "enrollment", normalizeDni(valueAt(row.row, MEMBER_INDEXES.dni)) || personId, row.sheet, activityId);
-  const status = normalizeOperationalStatus(valueAt(row.row, MEMBER_INDEXES.estado));
-  const dueDate = normalizeDate(valueAt(row.row, MEMBER_INDEXES.vence))?.slice(0, 10) ?? null;
+  const activityId = await upsertActivity(pool, { sectorId, name: memberValue(row.row, memberIndexes, "actividad") || "Sin actividad", modality: memberValue(row.row, memberIndexes, "modalidad") || null, instructorId, monthlyFee: normalizeFee(memberValue(row.row, memberIndexes, "cuota")) }); summary.activitiesProcessed += 1; summary.attemptedWrites += 1;
+  const personId = await upsertPerson(pool, { firstName, lastName: memberValue(row.row, memberIndexes, "apellido"), dni: memberValue(row.row, memberIndexes, "dni"), phone: memberValue(row.row, memberIndexes, "tel"), kind: "alumno", source: `${row.sheet}:${row.rowNumber}` }); summary.peopleProcessed += 1; summary.attemptedWrites += 1;
+  const ext = externalId("google_sheets", "enrollment", normalizeDni(memberValue(row.row, memberIndexes, "dni")) || personId, row.sheet, activityId);
+  const status = normalizeOperationalStatus(memberValue(row.row, memberIndexes, "estado"));
+  const dueDate = normalizeDate(memberValue(row.row, memberIndexes, "vence"))?.slice(0, 10) ?? null;
   await pool.query(
     `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes)
      values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7)
      on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, updated_at=now()`,
-    [ext, personId, activityId, normalizeFee(valueAt(row.row, MEMBER_INDEXES.cuota)) ?? 0, status === "otro" ? "nuevo_inscripto" : status, dueDate, JSON.stringify({ modality: valueAt(row.row, MEMBER_INDEXES.modalidad) || null })]
+    [ext, personId, activityId, normalizeFee(memberValue(row.row, memberIndexes, "cuota")) ?? 0, status === "otro" ? "nuevo_inscripto" : status, dueDate, JSON.stringify({ modality: memberValue(row.row, memberIndexes, "modalidad") || null })]
   );
   summary.enrollmentsProcessed += 1; summary.attemptedWrites += 1;
   return ext;
