@@ -1,4 +1,4 @@
-export type ModuleId = 'home' | 'economy' | 'fitness' | 'salon' | 'aula' | 'local1' | 'cantina' | 'crm';
+export type ModuleId = 'home' | 'economy' | 'fitness' | 'salon' | 'aula' | 'local1' | 'cantina' | 'crm' | 'dataMigration';
 
 export type ModuleDefinition = {
   id: ModuleId;

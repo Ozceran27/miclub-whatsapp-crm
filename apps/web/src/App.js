@@ -1,6 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useState } from 'react';
 import CrmModule from './modules/CrmModule';
+import DataMigrationModule from './modules/DataMigrationModule';
 import HomeModule from './modules/HomeModule';
 import ModuleNav from './modules/ModuleNav';
 import PlaceholderModule from './modules/PlaceholderModule';
@@ -14,7 +15,8 @@ const MODULES = [
     { id: 'aula', label: 'AULA' },
     { id: 'local1', label: 'LOCAL 1' },
     { id: 'cantina', label: 'CANTINA' },
-    { id: 'crm', label: 'CRM' }
+    { id: 'crm', label: 'CRM' },
+    { id: 'dataMigration', label: 'MIGRACIÓN' }
 ];
 const PLACEHOLDERS = {
     economy: {
@@ -103,6 +105,8 @@ export default function App() {
             return _jsx(HomeModule, { onOpenModule: setCurrentModule });
         if (currentModule === 'crm')
             return _jsx(CrmModule, {});
+        if (currentModule === 'dataMigration')
+            return _jsx(DataMigrationModule, {});
         const placeholder = PLACEHOLDERS[currentModule];
         return _jsx(PlaceholderModule, { ...placeholder });
     };
