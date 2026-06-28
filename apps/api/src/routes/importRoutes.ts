@@ -1,6 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { getPostgresPool } from "../db/postgres.js";
-import { importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
+import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
 import asyncHandler from "./asyncHandler.js";
 
@@ -35,6 +35,11 @@ router.post("/google-sheets", asyncHandler(async (req, res) => {
   const missingEnrollmentStrategy = req.body?.missingEnrollmentStrategy === undefined ? undefined : parseMissingEnrollmentStrategy(req.body.missingEnrollmentStrategy);
   const summary = await importGoogleSheets({ dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize, missingEnrollmentStrategy });
   res.status(dryRun ? 200 : 202).json(summary);
+}));
+
+
+router.get("/google-sheets/movements/audit", asyncHandler(async (_req, res) => {
+  res.json(await getMovementImportAudit());
 }));
 
 router.get("/batches", asyncHandler(async (req, res) => {

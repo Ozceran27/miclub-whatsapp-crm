@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { processMember, processMovement } from './googleSheetsImporter.js';
-import { resolveMemberColumnIndexes, resolveMovementColumnIndexes } from '../services/googleSheets.js';
+import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
 
 const createSummary = () => ({
   batchId: 'batch-1',
@@ -21,6 +21,7 @@ const createSummary = () => ({
   missingEnrollmentsAction: 'warn' as const,
   errors: 0,
   warnings: [],
+  movementFallbacks: { safeColumn: 0, fullLayout: 0 },
 });
 
 test('processMovement importa movimientos operativos con monto cero', async () => {
@@ -78,7 +79,7 @@ test('processMovement advierte columnas fallback de movimientos por nombre', asy
     movementHeadersFound: true,
   }, summary as never);
 
-  assert.deepEqual(summary.warnings, ['Se usaron índices fallback para movimientos en FITNESS: medioPago']);
+  assert.deepEqual(summary.warnings, ['Se usaron índices fallback seguros para movimientos en FITNESS: medioPago']);
 });
 
 test('processMovement advierte fallback completo cuando no hay headers de movimientos', async () => {
@@ -187,4 +188,49 @@ const createMemberPool = (queries: Array<{ sql: string; params?: unknown[] }>) =
     if (sql.includes('miclub.enrollments')) return { rows: [{ id: 'enrollment-1' }] };
     return { rows: [] };
   },
+});
+
+test('resolveMovementColumnIndexes resuelve headers reales sectoriales sin fallback semántico', () => {
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', 'Categoría', '', 'Concepto', '', '', '', '', 'Contra-parte', '', 'Monto', '', 'Impuestos', '', 'M.P.', '', 'Estado Finan.', '', '', 'Estado', '', '', 'Id.'];
+  for (const sheet of ['FITNESS', 'SALON', 'AULA', 'LOCAL 1']) {
+    const resolved = resolveMovementColumnIndexes(headers, sectorMovementFallbackIndexes);
+    assert.equal(resolved.usedFallback, false, `${sheet} no debería usar fallback`);
+    assert.equal(resolved.fallbackMode, 'none');
+    const row = ['I-0001', '01/06/2026', '', 'INGRESOS', '', 'CUOTA', '', `Concepto ${sheet}`, '', '', '', '', '30.111.222', '', '12345', '', '0', '', 'Transferencia', '', 'PAGADO', '', '', 'COMPLETADO', '', '', 'M-001'];
+    assert.deepEqual({
+      id: movementValue(row, resolved.indexes, 'id'),
+      fecha: movementValue(row, resolved.indexes, 'fecha'),
+      tipo: movementValue(row, resolved.indexes, 'tipo'),
+      categoria: movementValue(row, resolved.indexes, 'categoria'),
+      concepto: movementValue(row, resolved.indexes, 'concepto'),
+      contraparte: movementValue(row, resolved.indexes, 'contraparte'),
+      monto: movementValue(row, resolved.indexes, 'monto'),
+      impuestos: movementValue(row, resolved.indexes, 'impuestos'),
+      medioPago: movementValue(row, resolved.indexes, 'medioPago'),
+      estadoFinan: movementValue(row, resolved.indexes, 'estadoFinan'),
+      estado: movementValue(row, resolved.indexes, 'estado'),
+    }, {
+      id: 'I-0001', fecha: '01/06/2026', tipo: 'INGRESOS', categoria: 'CUOTA', concepto: `Concepto ${sheet}`, contraparte: '30.111.222', monto: '12345', impuestos: '0', medioPago: 'Transferencia', estadoFinan: 'PAGADO', estado: 'COMPLETADO'
+    });
+  }
+});
+
+test('resolveMovementColumnIndexes resuelve headers reales de ADMINISTRACIÓN sin fallback', () => {
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', '', 'Categoría', '', '', 'Concepto', '', '', '', '', 'Contra-parte', '', '', 'Sector', '', 'Monto', '', '', 'Impuestos', '', 'Estado', '', 'M.P.'];
+  const resolved = resolveMovementColumnIndexes(headers);
+  assert.equal(resolved.usedFallback, false);
+  assert.equal(resolved.fallbackMode, 'none');
+  const row = ['ADM-1', '02/06/2026', '', 'EGRESOS', '', '', 'SERVICIOS', '', '', 'Luz', '', '', '', '', 'Proveedor', '', '', 'FITNESS', '', '9000', '', '', '0', '', 'PENDIENTE', '', 'Efectivo'];
+  assert.equal(movementValue(row, resolved.indexes, 'sector'), 'FITNESS');
+  assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Efectivo');
+});
+
+test('processMovement contabiliza fallback seguro y fallback completo por separado', async () => {
+  const pool = { query: async () => { throw new Error('No debería consultar la base para filas vacías.'); } };
+  const summary = createSummary();
+
+  await processMovement(pool as never, { kind: 'movements', sheet: 'FITNESS', rowNumber: 1, row: [], movementIndexes: {}, usedMovementFallback: true, movementFallbackKeys: ['medioPago'], movementHeadersFound: true, movementFallbackMode: 'column' }, summary as never);
+  await processMovement(pool as never, { kind: 'movements', sheet: 'SALON', rowNumber: 1, row: [], movementIndexes: {}, usedMovementFallback: true, movementFallbackKeys: ['id'], movementHeadersFound: false, movementFallbackMode: 'layout' }, summary as never);
+
+  assert.deepEqual(summary.movementFallbacks, { safeColumn: 1, fullLayout: 1 });
 });

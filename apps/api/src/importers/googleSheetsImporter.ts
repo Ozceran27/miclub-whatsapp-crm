@@ -14,6 +14,7 @@ import {
   parseAulaCommissionAverage,
   parseCurrentMonthUtility,
   type MovementColumnIndexes,
+  type MovementFallbackMode,
 } from "../services/googleSheets.js";
 import {
   upsertActivity,
@@ -68,6 +69,7 @@ type ImportSummary = {
   missingEnrollmentsAction: MissingEnrollmentStrategy;
   errors: number;
   warnings: string[];
+  movementFallbacks: { safeColumn: number; fullLayout: number };
 };
 type SheetRow = {
   kind: "members" | "movements";
@@ -80,6 +82,7 @@ type SheetRow = {
   usedMovementFallback?: boolean;
   movementFallbackKeys?: string[];
   movementHeadersFound?: boolean;
+  movementFallbackMode?: MovementFallbackMode;
 };
 const isEmpty = (row: unknown[]): boolean =>
   row.every((cell) => String(cell ?? "").trim() === "");
@@ -276,6 +279,8 @@ const readRows = async (): Promise<{
             kind === "movements" ? resolvedMovement.fallbackKeys : undefined,
           movementHeadersFound:
             kind === "movements" ? movementHeadersFound : undefined,
+          movementFallbackMode:
+            kind === "movements" ? resolvedMovement.fallbackMode : undefined,
         });
     });
   });
@@ -471,7 +476,9 @@ export const processMovement = async (
     const warning =
       row.movementHeadersFound === false
         ? `No se encontraron headers de movimientos en ${row.sheet}; se usó fallback completo`
-        : `Se usaron índices fallback para movimientos en ${row.sheet}: ${fallbackKeys.join(", ") || "columnas sin header"}`;
+        : `Se usaron índices fallback seguros para movimientos en ${row.sheet}: ${fallbackKeys.join(", ") || "columnas sin header"}`;
+    if (row.movementFallbackMode === "layout" || row.movementHeadersFound === false) summary.movementFallbacks.fullLayout += 1;
+    else summary.movementFallbacks.safeColumn += 1;
     if (!summary.warnings.includes(warning)) summary.warnings.push(warning);
   }
   const movementIndexes = row.movementIndexes ?? {};
@@ -754,6 +761,7 @@ export const importGoogleSheets = async (
     missingEnrollmentsAction: strategy,
     errors: 0,
     warnings: [],
+    movementFallbacks: { safeColumn: 0, fullLayout: 0 },
   };
   const processedEnrollmentExternalIds = new Set<string>();
   try {
@@ -849,4 +857,33 @@ export const importGoogleSheets = async (
     );
     throw error;
   }
+};
+
+
+export const getMovementImportAudit = async () => {
+  const pool = await getPostgresPool();
+  const result = await pool.query(`
+    select
+      coalesce(s.name, 'Sin sector') as sector,
+      coalesce(c.name, 'Sin categoría') as category,
+      m.movement_type as type,
+      m.operational_status as status,
+      count(*)::int as count
+    from miclub.movements m
+    left join miclub.sectors s on s.id = m.sector_id
+    left join miclub.movement_categories c on c.id = m.category_id
+    where m.source = 'google_sheets'
+    group by 1, 2, 3, 4
+    order by 1, 2, 3, 4
+  `);
+  const totals = { total: 0, bySector: {} as Record<string, number>, byCategory: {} as Record<string, number>, byType: {} as Record<string, number>, byStatus: {} as Record<string, number> };
+  for (const row of result.rows as Array<{ sector: string; category: string; type: string; status: string; count: number }>) {
+    const count = Number(row.count);
+    totals.total += count;
+    totals.bySector[row.sector] = (totals.bySector[row.sector] ?? 0) + count;
+    totals.byCategory[row.category] = (totals.byCategory[row.category] ?? 0) + count;
+    totals.byType[row.type] = (totals.byType[row.type] ?? 0) + count;
+    totals.byStatus[row.status] = (totals.byStatus[row.status] ?? 0) + count;
+  }
+  return { totals, rows: result.rows };
 };
