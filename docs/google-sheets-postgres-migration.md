@@ -69,9 +69,9 @@ El importador lee por defecto estos rangos de miembros/deudas:
 
 | Sector | Variable para sobrescribir | Rango por defecto |
 | --- | --- | --- |
-| Fitness | `GOOGLE_SHEETS_FITNESS_RANGE` | `FITNESS!AB20:AY800` |
-| Salón | `GOOGLE_SHEETS_SALON_RANGE` | `SALON!AB34:AY800` |
-| Aula | `GOOGLE_SHEETS_AULA_RANGE` | `AULA!AB34:AY800` |
+| Fitness | `GOOGLE_SHEETS_FITNESS_RANGE` | `FITNESS!AB20:BA1500` |
+| Salón | `GOOGLE_SHEETS_SALON_RANGE` | `SALON!AB34:BB1500` |
+| Aula | `GOOGLE_SHEETS_AULA_RANGE` | `AULA!AB34:BB1500` |
 
 También existen rangos operativos complementarios usados por la integración de Google Sheets:
 
@@ -88,11 +88,22 @@ También existen rangos operativos complementarios usados por la integración de
 Para sobrescribir cualquier rango, agregar la variable correspondiente al `.env`, por ejemplo:
 
 ```env
-GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY1200
+GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:BA1500
 GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE=ADMINISTRACIÓN!B12:AB5000
 GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE='LOCAL 1'!B9:AB9
 GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE='LOCAL 1'!B10:AB3000
 ```
+
+
+Los headers de inscriptos se leen por separado para resolver columnas por nombre y no depender de un único índice fijo. Los rangos de headers por defecto son:
+
+| Sector | Rango de headers inscriptos |
+| --- | --- |
+| Fitness | `FITNESS!AB19:BA19` |
+| Salón | `SALON!AB33:BB33` |
+| Aula | `AULA!AB33:BB33` |
+
+El importador reconoce los headers reales `Id.`, `Fecha`, `Nombre`, `Apellido`, `D.N.I.`, `Tel.`, `Actividad`, `Modalidad`, `Cuota`, `Estado`, `Instructor` y `Vence`. Esto permite tomar `Vence` desde `BA` en Fitness y desde `BB` en Salón/Aula para completar `miclub.enrollments.due_date`.
 
 ### Decisión sobre inicio de movimientos de administración
 

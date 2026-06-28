@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processMovement } from './googleSheetsImporter.js';
-import { resolveMovementColumnIndexes } from '../services/googleSheets.js';
+import { processMember, processMovement } from './googleSheetsImporter.js';
+import { resolveMemberColumnIndexes, resolveMovementColumnIndexes } from '../services/googleSheets.js';
 
 const createSummary = () => ({
   batchId: 'batch-1',
@@ -92,4 +92,62 @@ test('processMovement importa movimientos de LOCAL 1 con layout sectorial sin co
   assert.equal(insert.params?.[10], 'pagado');
   assert.equal(insert.params?.[11], 'COMPLETADO');
   assert.equal(summary.movementsProcessed, 1);
+});
+
+test('processMember usa headers reales de FITNESS y completa due_date desde Vence en BA', async () => {
+  const headers = ['Id.', 'Fecha', '', '', 'Nombre', '', '', 'Apellido', '', '', 'D.N.I.', '', 'Tel.', '', 'Actividad', '', 'Modalidad', '', 'Cuota', '', 'Estado', '', '', 'Instructor', '', 'Vence'];
+  const row = ['F-001', '01/06/2026', '', '', 'Ana', '', '', 'Fit', '', '', '30111222', '', '11 5555-0001', '', 'Musculación', '', 'Mensual', '', '30000', '', 'Al Día', '', '', 'Profe Fit', '', '25/07/2026'];
+  const resolved = resolveMemberColumnIndexes(headers);
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const pool = createMemberPool(queries);
+  const summary = createSummary();
+
+  await processMember(pool as never, { kind: 'members', sheet: 'FITNESS', rowNumber: 20, row, memberIndexes: resolved.indexes, usedMemberFallback: false }, summary as never);
+
+  const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
+  assert.ok(insert, 'expected an enrollment insert query');
+  assert.equal(insert.params?.[5], '2026-07-25');
+});
+
+test('processMember usa headers reales de SALON y completa due_date desde Vence en BB', async () => {
+  const headers = ['Id.', 'Fecha', '', '', 'Nombre', '', '', 'Apellido', '', '', 'D.N.I.', '', 'Tel.', '', 'Actividad', '', 'Modalidad', '', 'Cuota', '', 'Estado', '', '', 'Instructor', '', '', 'Vence'];
+  const row = ['S-001', '01/06/2026', '', '', 'Bruno', '', '', 'Salon', '', '', '32111222', '', '11 5555-0002', '', 'Salsa', '', 'Grupal', '', '20000', '', 'Al Día', '', '', 'Profe Salon', '', '', '26/07/2026'];
+  const resolved = resolveMemberColumnIndexes(headers);
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const pool = createMemberPool(queries);
+  const summary = createSummary();
+
+  await processMember(pool as never, { kind: 'members', sheet: 'SALON', rowNumber: 34, row, memberIndexes: resolved.indexes, usedMemberFallback: false }, summary as never);
+
+  const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
+  assert.ok(insert, 'expected an enrollment insert query');
+  assert.equal(insert.params?.[5], '2026-07-26');
+});
+
+test('processMember usa headers reales de AULA y completa due_date desde Vence en BB', async () => {
+  const headers = ['Id.', 'Fecha', '', '', 'Nombre', '', '', 'Apellido', '', '', 'D.N.I.', '', 'Tel.', '', 'Actividad', '', 'Modalidad', '', 'Cuota', '', 'Estado', '', '', 'Instructor', '', '', 'Vence'];
+  const row = ['A-001', '01/06/2026', '', '', 'Carla', '', '', 'Aula', '', '', '33111222', '', '11 5555-0003', '', 'Arte', '', 'Niños', '', '25000', '', 'Al Día', '', '', 'Profe Aula', '', '', '27/07/2026'];
+  const resolved = resolveMemberColumnIndexes(headers);
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const pool = createMemberPool(queries);
+  const summary = createSummary();
+
+  await processMember(pool as never, { kind: 'members', sheet: 'AULA', rowNumber: 34, row, memberIndexes: resolved.indexes, usedMemberFallback: false }, summary as never);
+
+  const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
+  assert.ok(insert, 'expected an enrollment insert query');
+  assert.equal(insert.params?.[5], '2026-07-27');
+});
+
+const createMemberPool = (queries: Array<{ sql: string; params?: unknown[] }>) => ({
+  query: async (sql: string, params?: unknown[]) => {
+    queries.push({ sql, params });
+    if (sql.includes('from miclub.sectors')) return { rows: [{ id: 'sector-1' }] };
+    if (sql.includes('from miclub.people')) return { rows: [] };
+    if (sql.includes('insert into miclub.people')) return { rows: [{ id: `person-${queries.length}` }] };
+    if (sql.includes('miclub.instructors')) return { rows: [{ id: 'instructor-1' }] };
+    if (sql.includes('miclub.activities')) return { rows: [{ id: 'activity-1' }] };
+    if (sql.includes('miclub.enrollments')) return { rows: [{ id: 'enrollment-1' }] };
+    return { rows: [] };
+  },
 });

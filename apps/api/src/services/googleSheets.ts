@@ -13,10 +13,13 @@ type SourceType = "mock" | "google_sheets" | "postgres";
 type SectorBalanceSheetName = (typeof SECTOR_BALANCE_SHEET_NAMES)[number];
 
 export type MovementColumnKey = "id" | "fecha" | "tipo" | "categoria" | "concepto" | "contraparte" | "sector" | "monto" | "impuestos" | "estadoFinan" | "estado" | "medioPago";
+export type MemberColumnKey = "id" | "fecha" | "nombre" | "apellido" | "dni" | "tel" | "actividad" | "modalidad" | "cuota" | "estado" | "instructor" | "vence";
 
 export type MovementColumnIndexes = Partial<Record<MovementColumnKey, number>>;
+export type MemberColumnIndexes = Partial<Record<MemberColumnKey, number>>;
 
 export type MovementColumnIndexResolution = { indexes: MovementColumnIndexes; usedFallback: boolean; fallbackKeys: MovementColumnKey[] };
+export type MemberColumnIndexResolution = { indexes: MemberColumnIndexes; usedFallback: boolean; fallbackKeys: MemberColumnKey[] };
 
 export interface LastPaymentInfo {
   dni: string;
@@ -83,28 +86,74 @@ const MOVEMENT_HEADER_RANGES: Record<MovementSheetName, string> = {
   "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE?.trim() || "'LOCAL 1'!B9:AB9"
 };
 
+const MEMBER_HEADER_RANGES: Record<OperationalSheetName, string> = {
+  FITNESS: "FITNESS!AB19:BA19",
+  SALON: "SALON!AB33:BB33",
+  AULA: "AULA!AB33:BB33"
+};
+
 const toBool = (value: string | undefined): boolean => value?.toLowerCase() === "true";
 
 const valueAt = (row: unknown[], relativeIdx: number): string => String(row[relativeIdx] ?? "").trim();
 
-const MEMBER_COLUMN_INDEXES = {
-  // Índices relativos a los rangos AB:AY de inscriptos. AV es el índice 20 dentro de AB:AY.
+export const memberFallbackIndexes: MemberColumnIndexes = {
+  // Índices relativos al layout histórico de inscriptos. Se usan solo si faltan headers.
   id: 0,
   nombre: 4,
   apellido: 7,
   dni: 10,
-  telefono: 12,
+  tel: 12,
   actividad: 14,
   modalidad: 16,
   cuota: 18,
   estado: 20,
   vence: 21,
   instructor: 23
-} as const;
+};
 
 const sheetNameFromRange = (range: string): OperationalSheetName | undefined => {
   const sheetName = (range.split("!")[0] ?? "").replace(/'/g, "");
   return SHEET_NAMES.find((name) => name === sheetName);
+};
+
+
+export const memberColumnAliases: Record<MemberColumnKey, string[]> = {
+  id: ["id", "id.", "identificador", "codigo", "cod"],
+  fecha: ["fecha"],
+  nombre: ["nombre"],
+  apellido: ["apellido"],
+  dni: ["dni", "d.n.i.", "documento"],
+  tel: ["tel", "tel.", "telefono", "celular", "phone"],
+  actividad: ["actividad"],
+  modalidad: ["modalidad"],
+  cuota: ["cuota"],
+  estado: ["estado"],
+  instructor: ["instructor", "profe", "profesor"],
+  vence: ["vence", "vencimiento", "fecha vencimiento", "fechavencimiento"]
+};
+
+export const resolveMemberColumnIndexes = (headerRow: unknown[] | undefined, fallbackIndexes: MemberColumnIndexes = memberFallbackIndexes): MemberColumnIndexResolution => {
+  const indexes: MemberColumnIndexes = {};
+  const fallbackKeys: MemberColumnKey[] = [];
+  const normalizedHeaders = (headerRow ?? []).map(normalizeHeader);
+
+  for (const [key, aliases] of Object.entries(memberColumnAliases) as Array<[MemberColumnKey, string[]]>) {
+    const normalizedAliases = aliases.map(normalizeHeader);
+    const found = normalizedHeaders.findIndex((header) => normalizedAliases.includes(header));
+    if (found >= 0) {
+      indexes[key] = found;
+    } else {
+      indexes[key] = fallbackIndexes[key];
+      if (fallbackIndexes[key] !== undefined) fallbackKeys.push(key);
+    }
+  }
+
+  return { indexes, usedFallback: fallbackKeys.length > 0, fallbackKeys };
+};
+
+export const memberValue = (row: unknown[], indexes: MemberColumnIndexes, key: MemberColumnKey): string => {
+  const index = indexes[key];
+  return index === undefined ? "" : valueAt(row, index);
 };
 
 export const movementColumnAliases: Record<MovementColumnKey, string[]> = {
@@ -258,9 +307,9 @@ export const getGoogleSheetsConfig = () => {
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() ?? "";
   const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n")?.trim() ?? "";
   const sheetRanges: Record<OperationalSheetName, string> = {
-    FITNESS: process.env.GOOGLE_SHEETS_FITNESS_RANGE?.trim() || "FITNESS!AB20:AY800",
-    SALON: process.env.GOOGLE_SHEETS_SALON_RANGE?.trim() || "SALON!AB34:AY800",
-    AULA: process.env.GOOGLE_SHEETS_AULA_RANGE?.trim() || "AULA!AB34:AY800"
+    FITNESS: process.env.GOOGLE_SHEETS_FITNESS_RANGE?.trim() || "FITNESS!AB20:BA1500",
+    SALON: process.env.GOOGLE_SHEETS_SALON_RANGE?.trim() || "SALON!AB34:BB1500",
+    AULA: process.env.GOOGLE_SHEETS_AULA_RANGE?.trim() || "AULA!AB34:BB1500"
   };
   const movementRanges: Record<MovementSheetName, string> = {
     FITNESS: process.env.GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE?.trim() || "FITNESS!B20:AB800",
@@ -276,6 +325,7 @@ export const getGoogleSheetsConfig = () => {
     privateKey,
     sheetRanges,
     movementRanges,
+    memberHeaderRanges: MEMBER_HEADER_RANGES,
     movementHeaderRanges: MOVEMENT_HEADER_RANGES,
     adminMovementsHeaderRange: process.env.GOOGLE_SHEETS_ADMIN_MOVEMENTS_HEADER_RANGE?.trim() || "ADMINISTRACIÓN!B12:AB12",
     adminMovementsRange: process.env.GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE?.trim() || "ADMINISTRACIÓN!B13:AB3000",
@@ -377,7 +427,7 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
   }
 
   const sheetsClient = getSheetsClient(config);
-  const ranges = SHEET_NAMES.map((sheet) => config.sheetRanges[sheet]);
+  const ranges = SHEET_NAMES.flatMap((sheet) => [config.memberHeaderRanges[sheet], config.sheetRanges[sheet]]);
   const response = await sheetsClient.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
     ranges,
@@ -386,27 +436,41 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
 
   const members: Member[] = [];
 
+  const memberIndexesBySheet: Partial<Record<OperationalSheetName, MemberColumnIndexes>> = {};
+
   for (const valueRange of response.data.valueRanges ?? []) {
     const range = valueRange.range ?? "";
-    const sheetName = (range.split("!")[0] ?? "").replace(/'/g, "") as Member["sourceSheet"];
+    const sheetName = sheetNameFromRange(range);
+    if (!sheetName) continue;
+
+    if (range.includes(config.memberHeaderRanges[sheetName].split("!")[1].split(":")[0])) {
+      memberIndexesBySheet[sheetName] = resolveMemberColumnIndexes(valueRange.values?.[0]).indexes;
+    }
+  }
+
+  for (const valueRange of response.data.valueRanges ?? []) {
+    const range = valueRange.range ?? "";
+    const sheetName = sheetNameFromRange(range);
+    if (!sheetName || range.includes(config.memberHeaderRanges[sheetName].split("!")[1].split(":")[0])) continue;
+    const memberIndexes = memberIndexesBySheet[sheetName] ?? resolveMemberColumnIndexes(undefined).indexes;
 
     for (const row of valueRange.values ?? []) {
-      const nombre = valueAt(row, MEMBER_COLUMN_INDEXES.nombre);
-      const telefono = valueAt(row, MEMBER_COLUMN_INDEXES.telefono);
+      const nombre = memberValue(row, memberIndexes, "nombre");
+      const telefono = memberValue(row, memberIndexes, "tel");
       if (!nombre || !telefono) continue;
 
       const member: Member = {
-        id: valueAt(row, MEMBER_COLUMN_INDEXES.id) || `${sheetName}-${members.length + 1}`,
+        id: memberValue(row, memberIndexes, "id") || `${sheetName}-${members.length + 1}`,
         nombre,
-        apellido: valueAt(row, MEMBER_COLUMN_INDEXES.apellido),
-        dni: valueAt(row, MEMBER_COLUMN_INDEXES.dni) || undefined,
+        apellido: memberValue(row, memberIndexes, "apellido"),
+        dni: memberValue(row, memberIndexes, "dni") || undefined,
         telefono,
-        actividad: valueAt(row, MEMBER_COLUMN_INDEXES.actividad) || undefined,
-        modalidad: valueAt(row, MEMBER_COLUMN_INDEXES.modalidad) || undefined,
-        cuota: normalizeFee(valueAt(row, MEMBER_COLUMN_INDEXES.cuota)),
-        estado: toMemberStatus(valueAt(row, MEMBER_COLUMN_INDEXES.estado)),
-        instructor: valueAt(row, MEMBER_COLUMN_INDEXES.instructor) || undefined,
-        vence: normalizeDate(valueAt(row, MEMBER_COLUMN_INDEXES.vence)),
+        actividad: memberValue(row, memberIndexes, "actividad") || undefined,
+        modalidad: memberValue(row, memberIndexes, "modalidad") || undefined,
+        cuota: normalizeFee(memberValue(row, memberIndexes, "cuota")),
+        estado: toMemberStatus(memberValue(row, memberIndexes, "estado")),
+        instructor: memberValue(row, memberIndexes, "instructor") || undefined,
+        vence: normalizeDate(memberValue(row, memberIndexes, "vence")),
         sourceSheet: sheetName
       };
 
