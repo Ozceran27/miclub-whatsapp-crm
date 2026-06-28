@@ -104,6 +104,22 @@ export interface SectorActivityStat {
   members: number;
 }
 
+export type MetricAvailabilityStatus = "available" | "unavailable";
+
+export interface MetricCompleteness {
+  status: MetricAvailabilityStatus;
+  reason?: string;
+  source?: "postgres" | "google_sheets" | "fallback";
+}
+
+export type SourceCompleteness = Record<string, MetricCompleteness>;
+
+export interface SummaryMetadata {
+  sourceCompleteness?: SourceCompleteness;
+  warnings?: string[];
+  coverage?: "complete" | "partial" | "unavailable";
+}
+
 export interface HighlightedIncome {
   amount: number;
   concept: string;
@@ -111,44 +127,45 @@ export interface HighlightedIncome {
 }
 
 export interface SectorOperationalSummary {
+  metadata?: SummaryMetadata;
   fitness: {
     totalMembers: number;
     activeMembers: number;
-    totalProfitability: number;
-    currentMonthProfitability: number;
+    totalProfitability: number | null;
+    currentMonthProfitability: number | null;
     totalDebtors: number;
     totalDebtAmount: number;
-    settlementBalance: number;
+    settlementBalance: number | null;
   };
   salon: {
     totalMembers: number;
     activeMembers: number;
-    totalProfitability: number;
-    currentMonthProfitability: number;
+    totalProfitability: number | null;
+    currentMonthProfitability: number | null;
     mostPopularActivity: SectorActivityStat | null;
     leastPopularActivity: SectorActivityStat | null;
   };
   aula: {
     totalMembers: number;
     activeMembers: number;
-    totalProfitability: number;
-    currentMonthProfitability: number;
+    totalProfitability: number | null;
+    currentMonthProfitability: number | null;
     averageCommission: number | null;
     mostPopularActivity: SectorActivityStat | null;
   };
   local1: {
     totalRelevantIncomeMovements: number;
     last30DaysRelevantIncomeMovements: number;
-    totalProfitability: number;
-    currentMonthProfitability: number;
-    settlementBalance: number;
+    totalProfitability: number | null;
+    currentMonthProfitability: number | null;
+    settlementBalance: number | null;
     highlightedIncome: HighlightedIncome | null;
   };
   cantina: {
     kioskIncome: number;
     drinksIncome: number;
     cmv: number;
-    totalProfitability: number;
+    totalProfitability: number | null;
   };
   crm: {
     totalMembers: number;
@@ -195,6 +212,7 @@ export interface CategoryAmountBreakdown {
 }
 
 export interface ClubOperationsSummary extends FinancialSummary {
+  metadata?: SummaryMetadata;
   pendingIncome: number;
   pendingExpenses: number;
   pendingNetBalance: number;

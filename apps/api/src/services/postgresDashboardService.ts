@@ -44,6 +44,17 @@ const pickString = (
 ): string => toStringValue(pick(row, keys)) ?? fallback;
 const pickNumber = (row: Record<string, unknown>, keys: string[]): number =>
   toNumber(pick(row, keys));
+const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
+  keys.some((key) => row[key] !== undefined && row[key] !== null);
+const pickNullableNumber = (
+  row: Record<string, unknown>,
+  keys: string[],
+): number | null => hasValue(row, keys) ? pickNumber(row, keys) : null;
+const unavailableMetric = (reason = "Pendiente de cálculo en PostgreSQL") => ({
+  status: "unavailable" as const,
+  reason,
+  source: "postgres" as const,
+});
 const normalizeSheet = (value: unknown): SourceSheet => {
   const normalized = String(value ?? "")
     .trim()
@@ -450,13 +461,22 @@ export const getPostgresSectorOperationalSummary =
         pickNumber(row, ["metric_value"]),
       ]),
     );
-    function metric(key: string, fallback: null): number | null;
-    function metric(key: string, fallback?: number): number;
-    function metric(key: string, fallback: number | null = 0): number | null {
-      return Object.prototype.hasOwnProperty.call(snapshots, key)
-        ? snapshots[key]
-        : fallback;
-    }
+    const sourceCompleteness: Record<string, ReturnType<typeof unavailableMetric>> = {};
+    const markUnavailable = (path: string) => {
+      sourceCompleteness[path] = unavailableMetric();
+    };
+    const snapshotMetric = (path: string, snapshotKey: string): number | null => {
+      if (Object.prototype.hasOwnProperty.call(snapshots, snapshotKey)) {
+        return snapshots[snapshotKey];
+      }
+      markUnavailable(path);
+      return null;
+    };
+    const queriedMetric = (path: string, row: Record<string, unknown>, keys: string[]): number | null => {
+      const value = pickNullableNumber(row, keys);
+      if (value === null) markUnavailable(path);
+      return value;
+    };
     const activityRows = activityResult.rows;
     const activityMetric = (sector: SourceSheet, rankColumn: "popularity_rank" | "unpopularity_rank") => {
       const row = activityRows.find((item) =>
@@ -500,31 +520,52 @@ export const getPostgresSectorOperationalSummary =
             ),
             date: pickString(local1Special, ["highlighted_income_date"], ""),
           };
+    const fitnessTotalProfitability = snapshotMetric("fitness.totalProfitability", "fitness.total_profitability");
+    const fitnessCurrentMonthProfitability = snapshotMetric("fitness.currentMonthProfitability", "fitness.current_month_profitability");
+    const fitnessSettlementBalance = snapshotMetric("fitness.settlementBalance", "fitness.settlement_balance");
+    const salonTotalProfitability = snapshotMetric("salon.totalProfitability", "salon.total_profitability");
+    const salonCurrentMonthProfitability = snapshotMetric("salon.currentMonthProfitability", "salon.current_month_profitability");
+    const aulaTotalProfitability = snapshotMetric("aula.totalProfitability", "aula.total_profitability");
+    const aulaCurrentMonthProfitability = snapshotMetric("aula.currentMonthProfitability", "aula.current_month_profitability");
+    const aulaAverageCommission = snapshotMetric("aula.averageCommission", "aula.average_commission");
+    const local1TotalProfitability = queriedMetric("local1.totalProfitability", finance("LOCAL_1"), [
+      "total_profitability",
+      "profitability",
+    ]);
+    const local1CurrentMonthProfitability = queriedMetric("local1.currentMonthProfitability", finance("LOCAL_1"), [
+      "current_month_profitability",
+    ]);
+    const local1SettlementBalance = queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
     return {
+      metadata: {
+        coverage: Object.keys(sourceCompleteness).length > 0 ? "partial" : "complete",
+        sourceCompleteness,
+        warnings: Object.keys(sourceCompleteness).length > 0 ? ["Algunas métricas PostgreSQL están pendientes de cálculo."] : [],
+      },
       fitness: {
         ...base("FITNESS"),
-        totalProfitability: metric("fitness.total_profitability", pickNumber(finance("FITNESS"), ["total_profitability", "profitability"])),
-        currentMonthProfitability: metric("fitness.current_month_profitability", pickNumber(finance("FITNESS"), ["current_month_profitability"])),
+        totalProfitability: fitnessTotalProfitability,
+        currentMonthProfitability: fitnessCurrentMonthProfitability,
         totalDebtors: debtors.filter(
           (member) => member.sourceSheet === "FITNESS",
         ).length,
         totalDebtAmount: debtors
           .filter((member) => member.sourceSheet === "FITNESS")
           .reduce((sum, member) => sum + (member.cuota ?? 0), 0),
-        settlementBalance: metric("fitness.settlement_balance", pickNumber(finance("FITNESS"), ["settlement_balance"])),
+        settlementBalance: fitnessSettlementBalance,
       },
       salon: {
         ...base("SALON"),
-        totalProfitability: metric("salon.total_profitability", pickNumber(finance("SALON"), ["total_profitability", "profitability"])),
-        currentMonthProfitability: metric("salon.current_month_profitability", pickNumber(finance("SALON"), ["current_month_profitability"])),
+        totalProfitability: salonTotalProfitability,
+        currentMonthProfitability: salonCurrentMonthProfitability,
         mostPopularActivity: activityMetric("SALON", "popularity_rank"),
         leastPopularActivity: activityMetric("SALON", "unpopularity_rank"),
       },
       aula: {
         ...base("AULA"),
-        totalProfitability: metric("aula.total_profitability", pickNumber(finance("AULA"), ["total_profitability", "profitability"])),
-        currentMonthProfitability: metric("aula.current_month_profitability", pickNumber(finance("AULA"), ["current_month_profitability"])),
-        averageCommission: metric("aula.average_commission", null),
+        totalProfitability: aulaTotalProfitability,
+        currentMonthProfitability: aulaCurrentMonthProfitability,
+        averageCommission: aulaAverageCommission,
         mostPopularActivity: activityMetric("AULA", "popularity_rank"),
       },
       local1: {
@@ -534,14 +575,9 @@ export const getPostgresSectorOperationalSummary =
         last30DaysRelevantIncomeMovements: pickNumber(local1Special, [
           "last30days_relevant_income_movements",
         ]),
-        totalProfitability: pickNumber(finance("LOCAL_1"), [
-          "total_profitability",
-          "profitability",
-        ]),
-        currentMonthProfitability: pickNumber(finance("LOCAL_1"), [
-          "current_month_profitability",
-        ]),
-        settlementBalance: pickNumber(finance("LOCAL_1"), ["settlement_balance"]),
+        totalProfitability: local1TotalProfitability,
+        currentMonthProfitability: local1CurrentMonthProfitability,
+        settlementBalance: local1SettlementBalance,
         highlightedIncome,
       },
       cantina: {
@@ -587,6 +623,7 @@ export const emptyPostgresSummary = () => ({
 });
 
 export const emptyPostgresClubFinanceSummary = (): ClubOperationsSummary => ({
+  metadata: { coverage: "unavailable", warnings: ["Resumen financiero PostgreSQL no disponible."], sourceCompleteness: {} },
   liquidity: 0,
   cash: 0,
   bank: 0,
@@ -616,6 +653,7 @@ export const emptyPostgresClubFinanceSummary = (): ClubOperationsSummary => ({
 
 export const emptyPostgresSectorOperationalSummary =
   (): SectorOperationalSummary => ({
+    metadata: { coverage: "unavailable", warnings: ["Resumen sectorial PostgreSQL no disponible."], sourceCompleteness: {} },
     fitness: {
       totalMembers: 0,
       activeMembers: 0,
