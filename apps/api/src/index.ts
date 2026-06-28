@@ -220,6 +220,7 @@ const protectedApiPrefixes = [
   "/api/operational-balances",
   "/api/sector-settlements",
   "/api/dashboard",
+  "/api/dashboard-reconciliation",
   "/api/sector-finance-summary",
   "/api/import",
   "/api/modules"
