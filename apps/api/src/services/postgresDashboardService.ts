@@ -357,7 +357,50 @@ export const getPostgresSectorOperationalSummary =
           (select movement_date from highlighted) as highlighted_income_date`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_cantina_special_metrics`,
+        `with normalized_movements as (
+          select
+            coalesce(amount, 0) as amount,
+            regexp_replace(
+              translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) as normalized_type,
+            regexp_replace(
+              translate(lower(coalesce(category, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) as normalized_category
+          from miclub.v_movements_enriched
+          where regexp_replace(
+              translate(lower(coalesce(sector_name, sector_code, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) = 'cantina'
+        ), cantina_components as (
+          select
+            coalesce(sum(amount) filter (
+              where normalized_type like 'ingreso%'
+                and normalized_category in ('kiosco', 'kiosk', 'quiosco')
+            ), 0) as kiosk_income,
+            coalesce(sum(amount) filter (
+              where normalized_type like 'ingreso%'
+                and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
+            ), 0) as drinks_income,
+            coalesce(sum(amount) filter (
+              where normalized_type like 'egreso%'
+                and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
+            ), 0) as cmv
+          from normalized_movements
+        )
+        select
+          kiosk_income,
+          drinks_income,
+          cmv,
+          kiosk_income + drinks_income - cmv as total_profitability
+        from cantina_components`,
       ),
     ]);
     const sectors = sectorResult.rows;
