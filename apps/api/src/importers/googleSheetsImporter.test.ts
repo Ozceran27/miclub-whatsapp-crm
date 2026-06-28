@@ -47,6 +47,7 @@ test('processMovement importa movimientos operativos con monto cero', async () =
   assert.equal(insert.params?.[2], 'INGRESOS');
   assert.equal(insert.params?.[5], 'Bonificación 100%');
   assert.equal(insert.params?.[7], 0);
+  assert.equal(insert.params?.[10], 'pagado');
   assert.equal(insert.params?.[11], 'COMPLETADO');
   assert.equal(summary.movementsProcessed, 1);
 });
@@ -59,4 +60,36 @@ test('processMovement omite filas de movimientos realmente vacías', async () =>
 
   assert.equal(summary.movementsProcessed, 0);
   assert.equal(summary.attemptedWrites, 0);
+});
+
+test('processMovement importa movimientos de LOCAL 1 con layout sectorial sin columna Sector', async () => {
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', 'Categoría', '', 'Concepto', '', '', '', '', 'Contra-parte', '', 'Monto', '', 'Impuestos', '', 'M.P.', '', 'Estado Finan.', '', '', 'Estado'];
+  const row = ['I-0766', '46194.76393976852', '', 'INGRESOS', '', 'VENTAS', '', 'Pago (PARCIAL) Tattoo - Proyecto Fabian', '', '', '', '', '35.872.158', '', '50000.0', '', '0.0', '', 'Transferencia', '', 'PAGADO', '', '', 'COMPLETADO'];
+  const resolved = resolveMovementColumnIndexes(headers);
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const pool = {
+    query: async (sql: string, params?: unknown[]) => {
+      queries.push({ sql, params });
+      if (sql.includes('from miclub.sectors')) return { rows: [{ id: 'local-1-sector' }] };
+      if (sql.includes('from miclub.movement_categories')) return { rows: [{ id: 'category-1' }] };
+      if (sql.includes('miclub.payment_methods')) return { rows: [{ id: 'payment-method-1' }] };
+      if (sql.includes('miclub.movements')) return { rows: [{ id: 'movement-1' }] };
+      return { rows: [] };
+    },
+  };
+  const summary = createSummary();
+
+  await processMovement(pool as never, { kind: 'movements', sheet: 'LOCAL 1', rowNumber: 11, row, movementIndexes: resolved.indexes, usedMovementFallback: false }, summary as never);
+
+  const sectorLookup = queries.find((query) => query.sql.includes('from miclub.sectors'));
+  const insert = queries.find((query) => query.sql.includes('insert into miclub.movements'));
+  assert.ok(sectorLookup, 'expected sector lookup');
+  assert.equal(sectorLookup.params?.[0], 'LOCAL 1');
+  assert.ok(insert, 'expected a movement insert query');
+  assert.equal(insert.params?.[2], 'INGRESOS');
+  assert.equal(insert.params?.[5], 'Pago (PARCIAL) Tattoo - Proyecto Fabian');
+  assert.equal(insert.params?.[7], 50000);
+  assert.equal(insert.params?.[10], 'pagado');
+  assert.equal(insert.params?.[11], 'COMPLETADO');
+  assert.equal(summary.movementsProcessed, 1);
 });
