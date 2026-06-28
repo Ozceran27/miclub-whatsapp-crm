@@ -90,6 +90,10 @@ GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY1200
 GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE=ADMINISTRACIÓN!B12:AB5000
 ```
 
+### Decisión sobre inicio de movimientos de administración
+
+El rango por defecto de movimientos de administración se mantiene en `ADMINISTRACIÓN!B12:AB3000` para ser consistente con `getGoogleSheetsConfig().adminMovementsRange` y con las lecturas financieras de la API. En el modelo real `apps/api/data/db/Dashboard CLUB Actualizado.xlsx`, la fila 12 contiene los encabezados (`Id.`, `Fecha`, `Tipo`, `Categoría`, `Concepto`, `Contra-parte`, `Sector`, `Monto`, etc.) y la primera fila de datos está en `B13:AB13` (`I-0785`, fecha serial `46196.79794715278`, tipo `INGRESOS`). Por eso se documenta `B12` como inicio del rango configurable: las pantallas/debug financieros pueden leer encabezados junto con datos, y el importador a PostgreSQL descarta esa fila porque no tiene monto numérico; usar `B13` omitiría los encabezados y dejaría el importador con un default distinto al resto de la integración.
+
 ## 4. Importación por CLI
 
 ### Dry-run
