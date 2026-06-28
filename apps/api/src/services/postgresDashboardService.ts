@@ -226,7 +226,7 @@ export const getPostgresClubFinanceSummary =
         `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`,
+        `select * from miclub.v_sector_settlement_balances where settlement_balance > 0 order by sector_name asc nulls last, sector_id asc nulls last`,
       ),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
         "INGRESOS",
@@ -247,7 +247,7 @@ export const getPostgresClubFinanceSummary =
     };
     const sectorBalances = sectors.rows.map((sector) => ({
       sector: pickString(sector, ["sector_name", "sector"], "Sin sector"),
-      amount: pickNumber(sector, ["settlement_balance", "balance", "amount"]),
+      amount: pickNumber(sector, ["settlement_balance", "amount"]),
     }));
     const breakdown = (rows: Record<string, unknown>[]) =>
       rows.map((item) => ({
@@ -365,10 +365,7 @@ export const getPostgresSectorOperationalSummary =
         totalDebtAmount: debtors
           .filter((member) => member.sourceSheet === "FITNESS")
           .reduce((sum, member) => sum + (member.cuota ?? 0), 0),
-        settlementBalance: pickNumber(finance("FITNESS"), [
-          "settlement_balance",
-          "balance",
-        ]),
+        settlementBalance: pickNumber(finance("FITNESS"), ["settlement_balance"]),
       },
       salon: {
         ...base("SALON"),
@@ -408,10 +405,7 @@ export const getPostgresSectorOperationalSummary =
         currentMonthProfitability: pickNumber(finance("LOCAL_1"), [
           "current_month_profitability",
         ]),
-        settlementBalance: pickNumber(finance("LOCAL_1"), [
-          "settlement_balance",
-          "balance",
-        ]),
+        settlementBalance: pickNumber(finance("LOCAL_1"), ["settlement_balance"]),
         highlightedIncome,
       },
       cantina: {
