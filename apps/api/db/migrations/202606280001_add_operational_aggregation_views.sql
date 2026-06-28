@@ -34,8 +34,8 @@ select
   s.code as sector_code,
   s.name as sector_name,
   case
-    when upper(replace(s.name, ' ', '_')) in ('FITNESS', 'LOCAL_1') then coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0)
-    else 0::numeric
+    when upper(replace(s.name, ' ', '_')) in ('FITNESS', 'LOCAL_1') then coalesce(sum(case when m.financial_status = 'a_liquidar' and m.movement_type = 'INGRESOS' then m.amount when m.financial_status = 'a_liquidar' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0)
+    else null::numeric
   end as settlement_balance
 from miclub.sectors s
 left join miclub.movements m on m.sector_id = s.id
@@ -63,7 +63,7 @@ with latest_balance as (
     coalesce(sum(case when movement_type = 'CAPITAL'::miclub.movement_type and replace(upper(coalesce(category, '')), 'Ó', 'O') = 'DOLARES' then amount else 0 end), 0) as capital_dollars
   from miclub.v_admin_completed_movements
 ), settlements as (
-  select coalesce(sum(settlement_balance), 0) as sector_settlement_balance
+  select coalesce(sum(greatest(settlement_balance, 0)), 0) as sector_settlement_balance
   from miclub.v_sector_settlement_balances
 )
 select
@@ -81,7 +81,7 @@ select
   s.id as sector_id,
   s.code as sector_code,
   s.name as sector_name,
-  coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as total_profitability
+  coalesce(sum(case when m.operational_status = 'COMPLETADO' and m.financial_status <> 'a_liquidar' and m.movement_type = 'INGRESOS' then m.amount when m.operational_status = 'COMPLETADO' and m.financial_status <> 'a_liquidar' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as total_profitability
 from miclub.sectors s
 left join miclub.movements m on m.sector_id = s.id
 group by s.id, s.code, s.name;
@@ -180,7 +180,7 @@ pending as (
     coalesce(sum(receivable_fee) filter (where status = 'adeudando'), 0) as cuotas_adeudadas,
     coalesce(sum(receivable_fee) filter (where status = 'al_dia' and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
   from miclub.v_enrollment_receivable_fees
-), settlements as (select coalesce(sum(settlement_balance), 0) as saldos_a_pagar from miclub.v_sector_settlement_balances)
+), settlements as (select coalesce(sum(greatest(settlement_balance, 0)), 0) as saldos_a_pagar from miclub.v_sector_settlement_balances)
 select
   (select count(*) from miclub.people) as total_people,
   (select count(*) from miclub.enrollments where status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])) as active_enrollments,

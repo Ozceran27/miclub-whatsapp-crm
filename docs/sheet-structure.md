@@ -67,14 +67,11 @@ Los comparadores toleran mayúsculas/minúsculas, acentos y espacios extra.
 
 ### Saldos a pagar / liquidar por sector
 
-Se lee la celda `X3` de cada hoja sectorial:
+Se replica el saldo liquidable definido por la planilla solo en las hojas que lo exponen como obligación real:
 - `FITNESS!X3`
-- `SALON!X3`
-- `AULA!X3`
 - `LOCAL 1!X3`
-- `CANTINA!X3`
 
-La suma de esos importes alimenta `saldosAPagar`; además se devuelve el desglose por sector.
+`SALON`, `AULA` y `CANTINA` no aportan a `saldosAPagar` si la planilla no define un saldo liquidable equivalente. La suma de `saldosAPagar` incluye únicamente importes positivos pendientes de liquidar; además se devuelve el desglose por sector.
 
 ### Agrupaciones para INICIO
 
