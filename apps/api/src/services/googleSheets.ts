@@ -926,7 +926,7 @@ const sumDebt = (members: Member[]) => members.filter((member) => normalizeOpera
 
 const getCellNumber = (ranges: Record<string, unknown[][]>, sheetName: string, cell: string) => normalizeMoney(ranges[getRangeKey(sheetName, cell)]?.[0]?.[0]);
 
-const parseCurrentMonthUtility = (rows: unknown[][], monthName = getCurrentSpanishMonth()): { value: number; warning?: string } => {
+export const parseCurrentMonthUtility = (rows: unknown[][], monthName = getCurrentSpanishMonth()): { value: number; warning?: string } => {
   const normalizedMonth = normalizeComparableText(monthName);
   for (const row of rows) {
     const monthIndex = row.findIndex((cell) => normalizeComparableText(cell) === normalizedMonth);
@@ -981,7 +981,7 @@ const parseAulaActivityStats = (rows: unknown[][]) => {
   return { mostPopularActivity: sortedDesc[0] ?? null, activities };
 };
 
-const parseAulaCommissionAverage = (rows: unknown[][]) => {
+export const parseAulaCommissionAverage = (rows: unknown[][]) => {
   const commissions = rows
     .filter((row) => isCategory(row[0], "EC"))
     .map((row) => ({ raw: String(row[10] ?? "").trim(), value: normalizeMoney(row[10]) }))
