@@ -394,9 +394,17 @@ export const getPostgresClubFinanceSummary =
       "cash_balance",
       "available_balance",
     ]);
+    const fallbackReceivablesRow = receivablesFallback.rows[0] ?? {};
+    const fallbackCuotasACobrar = pickNumber(fallbackReceivablesRow, [
+      "cuotas_a_cobrar",
+      "cuotas_adeudadas",
+    ]);
+    const fallbackFutureReceivables = pickNumber(fallbackReceivablesRow, [
+      "future_receivable_fees_until_month_end",
+    ]);
     const dashboardCuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
     const receivablesTotal = pickNumber(row, ["receivables_total"]);
-    const cuotasACobrar = dashboardCuotasACobrar || receivablesTotal;
+    const cuotasACobrar = dashboardCuotasACobrar || receivablesTotal || fallbackCuotasACobrar;
     const pendingNetBalance = pickNumber(row, ["pending_net_balance"]);
     // Regla crítica de equivalencia con ADMINISTRACIÓN:
     // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
