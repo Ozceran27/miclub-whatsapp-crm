@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { getPostgresPool } from "../db/postgres.js";
-import { adminMovementFallbackIndexes, getGoogleSheetsConfig, movementValue, resolveMovementColumnIndexes, sectorMovementFallbackIndexes, SHEET_NAMES, type MovementColumnIndexes } from "../services/googleSheets.js";
+import { adminMovementFallbackIndexes, getGoogleSheetsConfig, movementValue, resolveMovementColumnIndexes, sectorMovementFallbackIndexes, MOVEMENT_SHEET_NAMES, SHEET_NAMES, type MovementColumnIndexes } from "../services/googleSheets.js";
 import { upsertActivity, upsertInstructor, upsertSector } from "../repositories/activitiesRepository.js";
 import { createImportBatch, finishImportBatch, logImportError } from "./importLogger.js";
 import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeFinancialStatus, normalizeMoney, normalizeOperationalStatus, normalizePhone, normalizeSheetText } from "./normalizers.js";
@@ -58,8 +58,8 @@ const readRows = async (): Promise<SheetRow[]> => {
   if (!config.credentialsPresent) throw new Error("Faltan credenciales de Google Sheets (GOOGLE_SHEET_ID/GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY).");
   const client = getSheetsClient(config);
   const memberRanges = SHEET_NAMES.map((sheet) => config.sheetRanges[sheet]);
-  const movementRangesBySheet = { ...config.movementRanges, ADMINISTRACIÓN: config.adminMovementsRange };
-  const movementHeaderRangesBySheet = { ...config.movementHeaderRanges, ADMINISTRACIÓN: config.adminMovementsHeaderRange };
+  const movementRangesBySheet = { ...Object.fromEntries(MOVEMENT_SHEET_NAMES.map((sheet) => [sheet, config.movementRanges[sheet]])), ADMINISTRACIÓN: config.adminMovementsRange };
+  const movementHeaderRangesBySheet = { ...Object.fromEntries(MOVEMENT_SHEET_NAMES.map((sheet) => [sheet, config.movementHeaderRanges[sheet]])), ADMINISTRACIÓN: config.adminMovementsHeaderRange };
   const memberRangeSet = new Set(memberRanges);
   const movementRangeSet = new Set(Object.values(movementRangesBySheet));
   const ranges = [...memberRanges, ...Object.values(movementHeaderRangesBySheet), ...Object.values(movementRangesBySheet)];
@@ -172,7 +172,7 @@ export const processMovement = async (pool: Pool, row: SheetRow, summary: Import
     `insert into miclub.movements (external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
      values ($1,$2,$3::miclub.movement_type,$4,$5,$6,$7,$8,$9,$10,$11::miclub.financial_status,$12::miclub.movement_status,'google_sheets',$13::jsonb)
      on conflict (external_id) do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
-    [externalId("google_sheets", "movement", ext), movementDate, movementType, categoryId, sectorId, concept, movementValue(row.row, movementIndexes, "contraparte") || null, amount, Math.abs(normalizeMoney(movementValue(row.row, movementIndexes, "impuestos"))), paymentMethodId, normalizeFinancialStatus(movementValue(row.row, movementIndexes, "estado")), normalizeComparableText(movementValue(row.row, movementIndexes, "estado")).includes("pend") ? "PENDIENTE" : "COMPLETADO", JSON.stringify({ sheet: row.sheet, rowNumber: row.rowNumber, row: row.row })]
+    [externalId("google_sheets", "movement", ext), movementDate, movementType, categoryId, sectorId, concept, movementValue(row.row, movementIndexes, "contraparte") || null, amount, Math.abs(normalizeMoney(movementValue(row.row, movementIndexes, "impuestos"))), paymentMethodId, normalizeFinancialStatus(movementValue(row.row, movementIndexes, "estadoFinan")), normalizeComparableText(movementValue(row.row, movementIndexes, "estado")).includes("pend") ? "PENDIENTE" : "COMPLETADO", JSON.stringify({ sheet: row.sheet, rowNumber: row.rowNumber, row: row.row })]
   );
   summary.movementsProcessed += 1; summary.attemptedWrites += 1;
 };

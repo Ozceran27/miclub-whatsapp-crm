@@ -80,6 +80,8 @@ También existen rangos operativos complementarios usados por la integración de
 | Movimientos Fitness | `GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE` | `FITNESS!B20:AB800` |
 | Movimientos Salón | `GOOGLE_SHEETS_SALON_MOVEMENTS_RANGE` | `SALON!B34:AB800` |
 | Movimientos Aula | `GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE` | `AULA!B34:AB800` |
+| Headers movimientos Local 1 | `GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE` | `'LOCAL 1'!B9:AB9` |
+| Movimientos Local 1 | `GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE` | `'LOCAL 1'!B10:AB3000` |
 | Movimientos administración | `GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE` | `ADMINISTRACIÓN!B12:AB3000` |
 | Saldos administración | `GOOGLE_SHEETS_ADMIN_BALANCES_RANGE` | `ADMINISTRACIÓN!AD12:AG14` |
 
@@ -88,11 +90,20 @@ Para sobrescribir cualquier rango, agregar la variable correspondiente al `.env`
 ```env
 GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY1200
 GOOGLE_SHEETS_ADMIN_MOVEMENTS_RANGE=ADMINISTRACIÓN!B12:AB5000
+GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE='LOCAL 1'!B9:AB9
+GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE='LOCAL 1'!B10:AB3000
 ```
 
 ### Decisión sobre inicio de movimientos de administración
 
 El rango por defecto de movimientos de administración se mantiene en `ADMINISTRACIÓN!B12:AB3000` para ser consistente con `getGoogleSheetsConfig().adminMovementsRange` y con las lecturas financieras de la API. En el modelo real `apps/api/data/db/Dashboard CLUB Actualizado.xlsx`, la fila 12 contiene los encabezados (`Id.`, `Fecha`, `Tipo`, `Categoría`, `Concepto`, `Contra-parte`, `Sector`, `Monto`, etc.) y la primera fila de datos está en `B13:AB13` (`I-0785`, fecha serial `46196.79794715278`, tipo `INGRESOS`). Por eso se documenta `B12` como inicio del rango configurable: las pantallas/debug financieros pueden leer encabezados junto con datos, y el importador a PostgreSQL descarta esa fila porque no tiene monto numérico; usar `B13` omitiría los encabezados y dejaría el importador con un default distinto al resto de la integración.
+
+
+### Decisión sobre inicio de movimientos de LOCAL 1
+
+`LOCAL 1` se trata como hoja de movimientos, no como hoja de inscriptos. En el XLSX de referencia (`apps/api/data/db/Dashboard CLUB Actualizado.xlsx`) la fila real de cabeceras de movimientos es `LOCAL 1!B9:AB9`: contiene `Id.`, `Fecha`, `Tipo`, `Categoría`, `Concepto`, `Contra-parte`, `Monto`, `Impuestos`, `M.P.`, `Estado Finan.` y `Estado`. La primera fila de datos está en `LOCAL 1!B10:AB10`; por eso las filas 12, 13, 19, 20, 33 y 34 son datos y no cabeceras.
+
+El layout de `LOCAL 1` es sectorial: no tiene columna `Sector`, sí tiene `Estado Finan.`, y el importador usa `LOCAL 1` como sector por defecto para esos movimientos.
 
 ## 4. Importación por CLI
 

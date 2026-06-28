@@ -4,9 +4,11 @@ import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, nor
 export { normalizeDate, normalizeDni, normalizeMoney, normalizeOperationalStatus, parseGoogleSheetDate, normalizeSheetText, toMemberStatus };
 
 export const SHEET_NAMES = ["FITNESS", "SALON", "AULA"] as const;
+export const MOVEMENT_SHEET_NAMES = ["FITNESS", "SALON", "AULA", "LOCAL 1"] as const;
 export const SECTOR_BALANCE_SHEET_NAMES = ["FITNESS", "SALON", "AULA", "LOCAL 1", "CANTINA"] as const;
 
 type OperationalSheetName = (typeof SHEET_NAMES)[number];
+type MovementSheetName = (typeof MOVEMENT_SHEET_NAMES)[number];
 type SourceType = "mock" | "google_sheets" | "postgres";
 type SectorBalanceSheetName = (typeof SECTOR_BALANCE_SHEET_NAMES)[number];
 
@@ -74,10 +76,11 @@ export interface ClubFinanceDebugInfo {
   missingAulaCommissions: string[];
 }
 
-const MOVEMENT_HEADER_RANGES: Record<OperationalSheetName, string> = {
+const MOVEMENT_HEADER_RANGES: Record<MovementSheetName, string> = {
   FITNESS: "FITNESS!B19:AB19",
   SALON: "SALON!B33:AB33",
-  AULA: "AULA!B33:AB33"
+  AULA: "AULA!B33:AB33",
+  "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE?.trim() || "'LOCAL 1'!B9:AB9"
 };
 
 const toBool = (value: string | undefined): boolean => value?.toLowerCase() === "true";
@@ -259,10 +262,11 @@ export const getGoogleSheetsConfig = () => {
     SALON: process.env.GOOGLE_SHEETS_SALON_RANGE?.trim() || "SALON!AB34:AY800",
     AULA: process.env.GOOGLE_SHEETS_AULA_RANGE?.trim() || "AULA!AB34:AY800"
   };
-  const movementRanges: Record<OperationalSheetName, string> = {
+  const movementRanges: Record<MovementSheetName, string> = {
     FITNESS: process.env.GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE?.trim() || "FITNESS!B20:AB800",
     SALON: process.env.GOOGLE_SHEETS_SALON_MOVEMENTS_RANGE?.trim() || "SALON!B34:AB800",
-    AULA: process.env.GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE?.trim() || "AULA!B34:AB800"
+    AULA: process.env.GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE?.trim() || "AULA!B34:AB800",
+    "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE?.trim() || "'LOCAL 1'!B10:AB3000"
   };
 
   return {
