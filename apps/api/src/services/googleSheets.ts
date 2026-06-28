@@ -128,7 +128,7 @@ export const memberColumnAliases: Record<MemberColumnKey, string[]> = {
   actividad: ["actividad"],
   modalidad: ["modalidad"],
   cuota: ["cuota"],
-  estado: ["estado"],
+  estado: ["estado", "estado finan", "estado finan.", "estado financiero", "estado financ", "estado fin"],
   instructor: ["instructor", "profe", "profesor"],
   vence: ["vence", "vencimiento", "fecha vencimiento", "fechavencimiento"]
 };
