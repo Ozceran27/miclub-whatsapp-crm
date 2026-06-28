@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMovementColumnIndexes } from './googleSheets.js';
+import { adminMovementFallbackIndexes, calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from './googleSheets.js';
 
 test('normalizeOperationalStatus normaliza estados operativos conocidos', () => {
   assert.equal(normalizeOperationalStatus('Al Día'), 'al_dia');
@@ -105,33 +105,50 @@ test('calculateFutureReceivableFeesUntilMonthEnd suma vencimientos al día del m
 });
 
 
-test('resolveMovementColumnIndexes mapea movimientos por headers del modelo Dashboard CLUB Actualizado', () => {
-  const headers = ['Id.', 'Fecha', '', 'Tipo', '', '', 'Categoría', '', '', 'Concepto', '', '', '', '', 'Contra-parte', '', '', 'Sector', '', 'Monto', '', '', 'Imp.', '', 'Estado Finan.', 'Estado', 'M.P.'];
-  const sectors = ['ADMINISTRACIÓN', 'FITNESS', 'SALON', 'AULA', 'LOCAL 1'];
+test('resolveMovementColumnIndexes mapea layout real de ADMINISTRACIÓN con fallback sin estadoFinan', () => {
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', '', 'Categoría', '', '', 'Concepto', '', '', '', '', 'Contra-parte', '', '', 'Sector', '', 'Monto', '', '', 'Imp.', '', 'Estado', '', 'M.P.'];
+  const row = ['ADM-001', '20/06/2026', '', 'INGRESOS', '', '', 'CUOTAS', '', '', 'Cuota mensual junio', '', '', '', '', '12345678', '', '', 'ADMINISTRACIÓN', '', '$25.000', '', '', '$0', '', 'COMPLETADO', '', 'Transferencia'];
+  const resolved = resolveMovementColumnIndexes(headers, adminMovementFallbackIndexes);
 
-  for (const sector of sectors) {
-    const row = ['MOV-001', '20/06/2026', '', 'INGRESOS', '', '', 'CUOTAS', '', '', 'Cuota mensual junio', '', '', '', '', '12345678', '', '', sector, '', '$25.000', '', '', '$0', '', 'PAGADO', 'COMPLETADO', 'Transferencia'];
-    const resolved = resolveMovementColumnIndexes(headers);
-
-    assert.equal(resolved.usedFallback, false, `No debe usar fallback para ${sector}`);
-    assert.deepEqual(resolved.fallbackKeys, []);
-    assert.equal(movementValue(row, resolved.indexes, 'id'), 'MOV-001');
-    assert.equal(movementValue(row, resolved.indexes, 'fecha'), '20/06/2026');
-    assert.equal(movementValue(row, resolved.indexes, 'tipo'), 'INGRESOS');
-    assert.equal(movementValue(row, resolved.indexes, 'categoria'), 'CUOTAS');
-    assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota mensual junio');
-    assert.equal(movementValue(row, resolved.indexes, 'contraparte'), '12345678');
-    assert.equal(movementValue(row, resolved.indexes, 'sector'), sector);
-    assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 25000);
-    assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'impuestos')), 0);
-    assert.equal(movementValue(row, resolved.indexes, 'estadoFinan'), 'PAGADO');
-    assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
-    assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Transferencia');
-  }
+  assert.equal(resolved.usedFallback, false);
+  assert.deepEqual(resolved.fallbackKeys, []);
+  assert.equal(movementValue(row, resolved.indexes, 'id'), 'ADM-001');
+  assert.equal(movementValue(row, resolved.indexes, 'fecha'), '20/06/2026');
+  assert.equal(movementValue(row, resolved.indexes, 'tipo'), 'INGRESOS');
+  assert.equal(movementValue(row, resolved.indexes, 'categoria'), 'CUOTAS');
+  assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota mensual junio');
+  assert.equal(movementValue(row, resolved.indexes, 'contraparte'), '12345678');
+  assert.equal(movementValue(row, resolved.indexes, 'sector'), 'ADMINISTRACIÓN');
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 25000);
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'impuestos')), 0);
+  assert.equal(movementValue(row, resolved.indexes, 'estadoFinan'), '');
+  assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
+  assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Transferencia');
 });
 
-test('resolveMovementColumnIndexes conserva fallback de compatibilidad sin headers', () => {
-  const resolved = resolveMovementColumnIndexes(undefined);
+test('resolveMovementColumnIndexes mapea layout real sectorial con sector derivado de hoja', () => {
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', 'Categoría', '', 'Concepto', '', '', '', '', 'Contra-parte', '', 'Monto', '', 'Imp.', '', 'M.P.', '', 'Estado Finan.', '', '', 'Estado', '', '', ''];
+  const row = ['SEC-001', '21/06/2026', '', 'INGRESOS', '', 'CUOTAS', '', 'Cuota fitness junio', '', '', '', '', '87654321', '', '$30.000', '', '$0', '', 'Efectivo', '', 'PAGADO', '', '', 'COMPLETADO', '', '', ''];
+  const resolved = resolveMovementColumnIndexes(headers, sectorMovementFallbackIndexes);
+
+  assert.equal(resolved.usedFallback, false);
+  assert.deepEqual(resolved.fallbackKeys, []);
+  assert.equal(movementValue(row, resolved.indexes, 'id'), 'SEC-001');
+  assert.equal(movementValue(row, resolved.indexes, 'fecha'), '21/06/2026');
+  assert.equal(movementValue(row, resolved.indexes, 'tipo'), 'INGRESOS');
+  assert.equal(movementValue(row, resolved.indexes, 'categoria'), 'CUOTAS');
+  assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota fitness junio');
+  assert.equal(movementValue(row, resolved.indexes, 'contraparte'), '87654321');
+  assert.equal(movementValue(row, resolved.indexes, 'sector'), '');
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 30000);
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'impuestos')), 0);
+  assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Efectivo');
+  assert.equal(movementValue(row, resolved.indexes, 'estadoFinan'), 'PAGADO');
+  assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
+});
+
+test('resolveMovementColumnIndexes conserva fallback de administración sin headers', () => {
+  const resolved = resolveMovementColumnIndexes(undefined, adminMovementFallbackIndexes);
   const row = ['MOV-002', '21/06/2026', '', 'EGRESOS', '', '', 'Servicios', '', '', 'Luz', '', '', '', '', 'Proveedor', '', '', 'ADMINISTRACIÓN', '', '$10.000', '', '', '$2100', '', 'PENDIENTE', '', 'Efectivo'];
 
   assert.equal(resolved.usedFallback, true);
@@ -141,4 +158,16 @@ test('resolveMovementColumnIndexes conserva fallback de compatibilidad sin heade
   assert.equal(movementValue(row, resolved.indexes, 'sector'), 'ADMINISTRACIÓN');
   assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 10000);
   assert.equal(movementValue(row, resolved.indexes, 'medioPago'), 'Efectivo');
+});
+
+test('resolveMovementColumnIndexes conserva fallback sectorial sin headers', () => {
+  const resolved = resolveMovementColumnIndexes(undefined, sectorMovementFallbackIndexes);
+  const row = ['MOV-003', '22/06/2026', '', 'INGRESOS', '', 'Cuotas', '', 'Cuota salón', '', '', '', '', 'Cliente', '', '$15.000', '', '$0', '', 'Mercado Pago', '', 'PAGADO', '', '', 'COMPLETADO', '', '', ''];
+
+  assert.equal(resolved.usedFallback, true);
+  assert.equal(movementValue(row, resolved.indexes, 'concepto'), 'Cuota salón');
+  assert.equal(movementValue(row, resolved.indexes, 'sector'), '');
+  assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 15000);
+  assert.equal(movementValue(row, resolved.indexes, 'estadoFinan'), 'PAGADO');
+  assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
 });

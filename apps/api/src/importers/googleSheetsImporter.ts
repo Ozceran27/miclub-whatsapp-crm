@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { getPostgresPool } from "../db/postgres.js";
-import { getGoogleSheetsConfig, movementValue, resolveMovementColumnIndexes, SHEET_NAMES, type MovementColumnIndexes } from "../services/googleSheets.js";
+import { adminMovementFallbackIndexes, getGoogleSheetsConfig, movementValue, resolveMovementColumnIndexes, sectorMovementFallbackIndexes, SHEET_NAMES, type MovementColumnIndexes } from "../services/googleSheets.js";
 import { upsertActivity, upsertInstructor, upsertSector } from "../repositories/activitiesRepository.js";
 import { createImportBatch, finishImportBatch, logImportError } from "./importLogger.js";
 import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeFinancialStatus, normalizeMoney, normalizeOperationalStatus, normalizePhone, normalizeSheetText } from "./normalizers.js";
@@ -70,7 +70,8 @@ const readRows = async (): Promise<SheetRow[]> => {
     const requestedRange = ranges[rangeIndex] ?? valueRange.range ?? "";
     const sheet = (requestedRange.split("!")[0] ?? "").replace(/'/g, "");
     if (Object.values(movementHeaderRangesBySheet).includes(requestedRange)) {
-      movementIndexesBySheet[sheet] = resolveMovementColumnIndexes(valueRange.values?.[0]);
+      const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
+      movementIndexesBySheet[sheet] = resolveMovementColumnIndexes(valueRange.values?.[0], fallbackIndexes);
     }
   });
   response.data.valueRanges?.forEach((valueRange, rangeIndex) => {
@@ -79,7 +80,8 @@ const readRows = async (): Promise<SheetRow[]> => {
     const start = Number(requestedRange.match(/![A-Z]+(\d+)/)?.[1] ?? 1);
     const kind: SheetRow["kind"] | null = memberRangeSet.has(requestedRange) ? "members" : movementRangeSet.has(requestedRange) ? "movements" : null;
     if (!kind) return;
-    const resolved = movementIndexesBySheet[sheet] ?? resolveMovementColumnIndexes(undefined);
+    const fallbackIndexes = normalizeComparableText(sheet) === "administracion" ? adminMovementFallbackIndexes : sectorMovementFallbackIndexes;
+    const resolved = movementIndexesBySheet[sheet] ?? resolveMovementColumnIndexes(undefined, fallbackIndexes);
     (valueRange.values ?? []).forEach((row, index) => { if (!isEmpty(row)) rows.push({ kind, sheet, rowNumber: start + index, row, movementIndexes: kind === "movements" ? resolved.indexes : undefined, usedMovementFallback: kind === "movements" ? resolved.usedFallback : undefined }); });
   });
   return rows;
