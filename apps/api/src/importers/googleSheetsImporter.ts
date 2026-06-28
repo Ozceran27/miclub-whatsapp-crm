@@ -11,6 +11,8 @@ import {
   MOVEMENT_SHEET_NAMES,
   SHEET_NAMES,
   type MemberColumnIndexes,
+  parseAulaCommissionAverage,
+  parseCurrentMonthUtility,
   type MovementColumnIndexes,
 } from "../services/googleSheets.js";
 import {
@@ -61,6 +63,7 @@ type ImportSummary = {
   enrollmentsProcessed: number;
   movementsProcessed: number;
   operationalBalancesProcessed: number;
+  sheetMetricSnapshotsProcessed: number;
   missingEnrollments: number;
   missingEnrollmentsAction: MissingEnrollmentStrategy;
   errors: number;
@@ -144,6 +147,7 @@ export const parseMissingEnrollmentStrategy = (
 const readRows = async (): Promise<{
   rows: SheetRow[];
   adminBalanceRows: unknown[][];
+  metricRanges: Record<string, unknown[][]>;
 }> => {
   const config = getGoogleSheetsConfig();
   if (!importEnabled())
@@ -179,12 +183,23 @@ const readRows = async (): Promise<{
   };
   const memberRangeSet = new Set(memberRanges);
   const movementRangeSet = new Set(Object.values(movementRangesBySheet));
+  const metricRangeNames = [
+    "FITNESS!AN3",
+    "FITNESS!AR9:AY14",
+    "FITNESS!X3",
+    "SALON!AW29",
+    "SALON!AN24:AU29",
+    "AULA!AW29",
+    "AULA!AN24:AU29",
+    "AULA!B18:V30",
+  ];
   const ranges = [
     ...Object.values(memberHeaderRangesBySheet),
     ...memberRanges,
     ...Object.values(movementHeaderRangesBySheet),
     ...Object.values(movementRangesBySheet),
     config.adminBalancesRange,
+    ...metricRangeNames,
   ];
   const response = await client.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
@@ -264,9 +279,16 @@ const readRows = async (): Promise<{
         });
     });
   });
+  const adminBalanceIndex = ranges.indexOf(config.adminBalancesRange);
   const adminBalanceRows =
-    response.data.valueRanges?.[ranges.length - 1]?.values ?? [];
-  return { rows, adminBalanceRows };
+    response.data.valueRanges?.[adminBalanceIndex]?.values ?? [];
+  const metricRanges = Object.fromEntries(
+    metricRangeNames.map((range) => [
+      range,
+      response.data.valueRanges?.[ranges.indexOf(range)]?.values ?? [],
+    ]),
+  );
+  return { rows, adminBalanceRows, metricRanges };
 };
 
 const upsertPerson = async (
@@ -594,6 +616,43 @@ const upsertOperationalBalances = async (
   summary.attemptedWrites += 1;
 };
 
+const getSingleMetricValue = (rows: unknown[][]): number | null => {
+  const raw = rows[0]?.[0];
+  if (raw == null || String(raw).trim() === "") return null;
+  return normalizeMoney(raw);
+};
+
+const buildSheetMetricSnapshots = (metricRanges: Record<string, unknown[][]>) => [
+  { metricKey: "fitness.total_profitability", metricValue: getSingleMetricValue(metricRanges["FITNESS!AN3"] ?? []), sourceRange: "FITNESS!AN3" },
+  { metricKey: "fitness.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["FITNESS!AR9:AY14"] ?? []).value, sourceRange: "FITNESS!AR9:AY14" },
+  { metricKey: "fitness.settlement_balance", metricValue: getSingleMetricValue(metricRanges["FITNESS!X3"] ?? []), sourceRange: "FITNESS!X3" },
+  { metricKey: "salon.total_profitability", metricValue: getSingleMetricValue(metricRanges["SALON!AW29"] ?? []), sourceRange: "SALON!AW29" },
+  { metricKey: "salon.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["SALON!AN24:AU29"] ?? []).value, sourceRange: "SALON!AN24:AU29" },
+  { metricKey: "aula.total_profitability", metricValue: getSingleMetricValue(metricRanges["AULA!AW29"] ?? []), sourceRange: "AULA!AW29" },
+  { metricKey: "aula.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["AULA!AN24:AU29"] ?? []).value, sourceRange: "AULA!AN24:AU29" },
+  { metricKey: "aula.average_commission", metricValue: parseAulaCommissionAverage(metricRanges["AULA!B18:V30"] ?? []), sourceRange: "AULA!B18:V30" },
+];
+
+const upsertSheetMetricSnapshots = async (
+  pool: Pool,
+  metricRanges: Record<string, unknown[][]>,
+  summary: ImportSummary,
+): Promise<void> => {
+  for (const metric of buildSheetMetricSnapshots(metricRanges)) {
+    if (metric.metricValue == null) {
+      summary.warnings.push(`No se detectó dato importable para ${metric.metricKey} (${metric.sourceRange}).`);
+      continue;
+    }
+    await pool.query(
+      `insert into miclub.sheet_metric_snapshots (metric_key, metric_value, source, source_range, source_payload)
+       values ($1, $2, 'google_sheets', $3, $4::jsonb)`,
+      [metric.metricKey, metric.metricValue, metric.sourceRange, JSON.stringify({ range: metric.sourceRange, rows: metricRanges[metric.sourceRange] ?? [] })],
+    );
+    summary.sheetMetricSnapshotsProcessed += 1;
+    summary.attemptedWrites += 1;
+  }
+};
+
 const hasEnrollmentInactiveColumn = async (pool: Pool): Promise<boolean> => {
   const result = await pool.query<{ exists: boolean }>(
     `select exists (
@@ -690,6 +749,7 @@ export const importGoogleSheets = async (
     enrollmentsProcessed: 0,
     movementsProcessed: 0,
     operationalBalancesProcessed: 0,
+    sheetMetricSnapshotsProcessed: 0,
     missingEnrollments: 0,
     missingEnrollmentsAction: strategy,
     errors: 0,
@@ -697,12 +757,13 @@ export const importGoogleSheets = async (
   };
   const processedEnrollmentExternalIds = new Set<string>();
   try {
-    const { rows, adminBalanceRows } = await readRows();
+    const { rows, adminBalanceRows, metricRanges } = await readRows();
     summary.read = rows.length;
     const balanceAttemptedWritesStart = summary.attemptedWrites;
     await pool.query("begin");
     try {
       await upsertOperationalBalances(pool, adminBalanceRows, summary);
+      await upsertSheetMetricSnapshots(pool, metricRanges, summary);
       if (dryRun) {
         await pool.query("rollback");
         summary.rolledBackWrites +=

@@ -301,7 +301,7 @@ export const getPostgresSectorOperationalSummary =
   async (): Promise<SectorOperationalSummary> => {
     const members = await getPostgresMembers();
     const pool = await getPostgresPool();
-    const [sectorResult, local1Result, cantinaResult] = await Promise.all([
+    const [sectorResult, local1Result, cantinaResult, snapshotResult, activityResult] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_finance_summary`,
       ),
@@ -402,8 +402,68 @@ export const getPostgresSectorOperationalSummary =
           kiosk_income + drinks_income - cmv as total_profitability
         from cantina_components`,
       ),
+      pool.query<Record<string, unknown>>(
+        `select distinct on (metric_key) metric_key, metric_value
+         from miclub.sheet_metric_snapshots
+         where metric_key = any($1::text[])
+         order by metric_key, captured_at desc`,
+        [[
+          "fitness.total_profitability",
+          "fitness.current_month_profitability",
+          "fitness.settlement_balance",
+          "salon.total_profitability",
+          "salon.current_month_profitability",
+          "aula.total_profitability",
+          "aula.current_month_profitability",
+          "aula.average_commission",
+        ]],
+      ),
+      pool.query<Record<string, unknown>>(
+        `with activity_counts as (
+          select
+            upper(replace(s.code, ' ', '_')) as sector_key,
+            a.name,
+            count(*)::integer as members
+          from miclub.enrollments e
+          join miclub.activities a on a.id = e.activity_id
+          join miclub.sectors s on s.id = a.sector_id
+          where e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])
+            and upper(replace(s.code, ' ', '_')) in ('SALON', 'AULA')
+          group by upper(replace(s.code, ' ', '_')), a.name
+        ), ranked as (
+          select
+            *,
+            row_number() over (partition by sector_key order by members desc, name asc) as popularity_rank,
+            row_number() over (partition by sector_key order by members asc, name asc) as unpopularity_rank
+          from activity_counts
+          where name is not null and trim(name) <> ''
+        )
+        select sector_key, name, members, popularity_rank, unpopularity_rank
+        from ranked
+        where popularity_rank = 1 or unpopularity_rank = 1`,
+      ),
     ]);
     const sectors = sectorResult.rows;
+    const snapshots = Object.fromEntries(
+      snapshotResult.rows.map((row) => [
+        pickString(row, ["metric_key"], ""),
+        pickNumber(row, ["metric_value"]),
+      ]),
+    );
+    function metric(key: string, fallback: null): number | null;
+    function metric(key: string, fallback?: number): number;
+    function metric(key: string, fallback: number | null = 0): number | null {
+      return Object.prototype.hasOwnProperty.call(snapshots, key)
+        ? snapshots[key]
+        : fallback;
+    }
+    const activityRows = activityResult.rows;
+    const activityMetric = (sector: SourceSheet, rankColumn: "popularity_rank" | "unpopularity_rank") => {
+      const row = activityRows.find((item) =>
+        pickString(item, ["sector_key"]) === sector && pickNumber(item, [rankColumn]) === 1,
+      );
+      return row ? { name: pickString(row, ["name"]), members: pickNumber(row, ["members"]) } : null;
+    };
     const sectorRow = (name: string) =>
       sectors.find(
         (row) =>
@@ -443,44 +503,29 @@ export const getPostgresSectorOperationalSummary =
     return {
       fitness: {
         ...base("FITNESS"),
-        totalProfitability: pickNumber(finance("FITNESS"), [
-          "total_profitability",
-          "profitability",
-        ]),
-        currentMonthProfitability: pickNumber(finance("FITNESS"), [
-          "current_month_profitability",
-        ]),
+        totalProfitability: metric("fitness.total_profitability", pickNumber(finance("FITNESS"), ["total_profitability", "profitability"])),
+        currentMonthProfitability: metric("fitness.current_month_profitability", pickNumber(finance("FITNESS"), ["current_month_profitability"])),
         totalDebtors: debtors.filter(
           (member) => member.sourceSheet === "FITNESS",
         ).length,
         totalDebtAmount: debtors
           .filter((member) => member.sourceSheet === "FITNESS")
           .reduce((sum, member) => sum + (member.cuota ?? 0), 0),
-        settlementBalance: pickNumber(finance("FITNESS"), ["settlement_balance"]),
+        settlementBalance: metric("fitness.settlement_balance", pickNumber(finance("FITNESS"), ["settlement_balance"])),
       },
       salon: {
         ...base("SALON"),
-        totalProfitability: pickNumber(finance("SALON"), [
-          "total_profitability",
-          "profitability",
-        ]),
-        currentMonthProfitability: pickNumber(finance("SALON"), [
-          "current_month_profitability",
-        ]),
-        mostPopularActivity: null,
-        leastPopularActivity: null,
+        totalProfitability: metric("salon.total_profitability", pickNumber(finance("SALON"), ["total_profitability", "profitability"])),
+        currentMonthProfitability: metric("salon.current_month_profitability", pickNumber(finance("SALON"), ["current_month_profitability"])),
+        mostPopularActivity: activityMetric("SALON", "popularity_rank"),
+        leastPopularActivity: activityMetric("SALON", "unpopularity_rank"),
       },
       aula: {
         ...base("AULA"),
-        totalProfitability: pickNumber(finance("AULA"), [
-          "total_profitability",
-          "profitability",
-        ]),
-        currentMonthProfitability: pickNumber(finance("AULA"), [
-          "current_month_profitability",
-        ]),
-        averageCommission: null,
-        mostPopularActivity: null,
+        totalProfitability: metric("aula.total_profitability", pickNumber(finance("AULA"), ["total_profitability", "profitability"])),
+        currentMonthProfitability: metric("aula.current_month_profitability", pickNumber(finance("AULA"), ["current_month_profitability"])),
+        averageCommission: metric("aula.average_commission", null),
+        mostPopularActivity: activityMetric("AULA", "popularity_rank"),
       },
       local1: {
         totalRelevantIncomeMovements: pickNumber(local1Special, [
