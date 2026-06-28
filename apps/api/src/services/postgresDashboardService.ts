@@ -295,7 +295,7 @@ export const getPostgresClubFinanceSummary =
          from miclub.sheet_metric_snapshots
          where metric_key = any($1::text[])
          order by metric_key, captured_at desc`,
-        [["fitness.settlement_balance", "local1.settlement_balance"]],
+        [["fitness.settlement_balance", "salon.settlement_balance", "aula.settlement_balance", "local1.settlement_balance"]],
       ),
     ]);
     const row = {
@@ -319,6 +319,10 @@ export const getPostgresClubFinanceSummary =
       const amount = pickNumber(snapshot, ["metric_value"]);
       if (metricKey === "fitness.settlement_balance") {
         upsertSectorBalance("Espacio Fitness", amount);
+      } else if (metricKey === "salon.settlement_balance") {
+        upsertSectorBalance("Salón", amount);
+      } else if (metricKey === "aula.settlement_balance") {
+        upsertSectorBalance("Aula", amount);
       } else if (metricKey === "local1.settlement_balance") {
         upsertSectorBalance("Local 1", amount);
       }
@@ -345,24 +349,27 @@ export const getPostgresClubFinanceSummary =
       Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
     const dashboardSaldosAPagar = pickNumber(row, ["saldos_a_pagar"]);
     const effectiveSaldosAPagar = dashboardSaldosAPagar || derivedSaldosAPagar;
-    const dashboardProjectedBalance = pickNumber(row, ["projected_balance"]);
-    const effectiveProjectedBalance = dashboardSaldosAPagar || !derivedSaldosAPagar
-      ? dashboardProjectedBalance
-      : dashboardProjectedBalance - derivedSaldosAPagar;
+    const liquidity = pickNumber(row, [
+      "liquidity",
+      "cash_balance",
+      "available_balance",
+    ]);
+    const cuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
+    const pendingNetBalance = pickNumber(row, ["pending_net_balance"]);
+    // Regla crítica de equivalencia con ADMINISTRACIÓN:
+    // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
+    // Los saldos a pagar son obligaciones y nunca se suman al proyectado.
+    const effectiveProjectedBalance = liquidity + cuotasACobrar + pendingNetBalance - effectiveSaldosAPagar;
     return {
-      liquidity: pickNumber(row, [
-        "liquidity",
-        "cash_balance",
-        "available_balance",
-      ]),
+      liquidity,
       cash: pickNumber(row, ["cash"]),
       bank: pickNumber(row, ["bank", "bank_balance"]),
       dollars: pickNumber(row, ["dollars", "usd"]),
       pendingIncome: pickNumber(row, ["pending_income"]),
       pendingExpenses: pickNumber(row, ["pending_expenses"]),
-      pendingNetBalance: pickNumber(row, ["pending_net_balance"]),
+      pendingNetBalance,
       cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]),
-      cuotasACobrar: pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]),
+      cuotasACobrar,
       futureReceivableFeesUntilMonthEnd: pickNumber(row, [
         "future_receivable_fees_until_month_end",
       ]),
@@ -405,6 +412,7 @@ export const getPostgresSectorOperationalSummary =
               '',
               'g'
             ) = 'local1'
+            and operational_status = 'COMPLETADO'
             and (
               regexp_replace(
                 translate(lower(coalesce(movement_type::text, '')), 'áéíóúüñ', 'aeiouun'),
@@ -481,6 +489,7 @@ export const getPostgresSectorOperationalSummary =
                 and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
             ), 0) as cmv
           from normalized_movements
+          where normalized_type in ('ingresos', 'egresos')
         )
         select
           kiosk_income,
@@ -503,6 +512,15 @@ export const getPostgresSectorOperationalSummary =
           "aula.total_profitability",
           "aula.current_month_profitability",
           "aula.average_commission",
+          "salon.settlement_balance",
+          "aula.settlement_balance",
+          "local1.total_profitability",
+          "local1.current_month_profitability",
+          "local1.settlement_balance",
+          "cantina.kiosk_income",
+          "cantina.drinks_income",
+          "cantina.cmv",
+          "cantina.total_profitability",
         ]],
       ),
       pool.query<Record<string, unknown>>(
@@ -604,14 +622,20 @@ export const getPostgresSectorOperationalSummary =
     const aulaTotalProfitability = snapshotMetric("aula.totalProfitability", "aula.total_profitability");
     const aulaCurrentMonthProfitability = snapshotMetric("aula.currentMonthProfitability", "aula.current_month_profitability");
     const aulaAverageCommission = snapshotMetric("aula.averageCommission", "aula.average_commission");
-    const local1TotalProfitability = queriedMetric("local1.totalProfitability", finance("LOCAL_1"), [
+    const salonSettlementBalance = snapshotMetric("salon.settlementBalance", "salon.settlement_balance");
+    const aulaSettlementBalance = snapshotMetric("aula.settlementBalance", "aula.settlement_balance");
+    const local1TotalProfitability = snapshotMetric("local1.totalProfitability", "local1.total_profitability") ?? queriedMetric("local1.totalProfitability", finance("LOCAL_1"), [
       "total_profitability",
       "profitability",
     ]);
-    const local1CurrentMonthProfitability = queriedMetric("local1.currentMonthProfitability", finance("LOCAL_1"), [
+    const local1CurrentMonthProfitability = snapshotMetric("local1.currentMonthProfitability", "local1.current_month_profitability") ?? queriedMetric("local1.currentMonthProfitability", finance("LOCAL_1"), [
       "current_month_profitability",
     ]);
-    const local1SettlementBalance = queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
+    const local1SettlementBalance = snapshotMetric("local1.settlementBalance", "local1.settlement_balance") ?? queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
+    const cantinaKioskIncome = snapshotMetric("cantina.kioskIncome", "cantina.kiosk_income") ?? pickNumber(cantinaSpecial, ["kiosk_income"]);
+    const cantinaDrinksIncome = snapshotMetric("cantina.drinksIncome", "cantina.drinks_income") ?? pickNumber(cantinaSpecial, ["drinks_income"]);
+    const cantinaCmv = snapshotMetric("cantina.cmv", "cantina.cmv") ?? pickNumber(cantinaSpecial, ["cmv"]);
+    const cantinaTotalProfitability = snapshotMetric("cantina.totalProfitability", "cantina.total_profitability") ?? (cantinaKioskIncome + cantinaDrinksIncome - cantinaCmv);
     return {
       metadata: {
         coverage: Object.keys(sourceCompleteness).length > 0 ? "partial" : "complete",
@@ -636,6 +660,7 @@ export const getPostgresSectorOperationalSummary =
         currentMonthProfitability: salonCurrentMonthProfitability,
         mostPopularActivity: activityMetric("SALON", "popularity_rank"),
         leastPopularActivity: activityMetric("SALON", "unpopularity_rank"),
+        settlementBalance: salonSettlementBalance,
       },
       aula: {
         ...base("AULA"),
@@ -643,6 +668,7 @@ export const getPostgresSectorOperationalSummary =
         currentMonthProfitability: aulaCurrentMonthProfitability,
         averageCommission: aulaAverageCommission,
         mostPopularActivity: activityMetric("AULA", "popularity_rank"),
+        settlementBalance: aulaSettlementBalance,
       },
       local1: {
         totalRelevantIncomeMovements: pickNumber(local1Special, [
@@ -657,10 +683,10 @@ export const getPostgresSectorOperationalSummary =
         highlightedIncome,
       },
       cantina: {
-        kioskIncome: pickNumber(cantinaSpecial, ["kiosk_income"]),
-        drinksIncome: pickNumber(cantinaSpecial, ["drinks_income"]),
-        cmv: pickNumber(cantinaSpecial, ["cmv"]),
-        totalProfitability: pickNumber(cantinaSpecial, ["total_profitability"]),
+        kioskIncome: cantinaKioskIncome,
+        drinksIncome: cantinaDrinksIncome,
+        cmv: cantinaCmv,
+        totalProfitability: cantinaTotalProfitability,
       },
       crm: {
         totalMembers: members.length,

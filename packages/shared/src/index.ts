@@ -144,6 +144,7 @@ export interface SectorOperationalSummary {
     currentMonthProfitability: number | null;
     mostPopularActivity: SectorActivityStat | null;
     leastPopularActivity: SectorActivityStat | null;
+    settlementBalance?: number | null;
   };
   aula: {
     totalMembers: number;
@@ -152,6 +153,7 @@ export interface SectorOperationalSummary {
     currentMonthProfitability: number | null;
     averageCommission: number | null;
     mostPopularActivity: SectorActivityStat | null;
+    settlementBalance?: number | null;
   };
   local1: {
     totalRelevantIncomeMovements: number;
