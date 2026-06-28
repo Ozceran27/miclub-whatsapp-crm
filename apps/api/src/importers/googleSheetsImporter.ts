@@ -195,6 +195,12 @@ const readRows = async (): Promise<{
     "AULA!AW29",
     "AULA!AN24:AU29",
     "AULA!B18:V30",
+    "SALON!X3",
+    "AULA!X3",
+    "'LOCAL 1'!AN3",
+    "'LOCAL 1'!AB19:AI24",
+    "'LOCAL 1'!X3",
+    "CANTINA!B13:AB3000",
   ];
   const ranges = [
     ...Object.values(memberHeaderRangesBySheet),
@@ -630,16 +636,47 @@ const getSingleMetricValue = (rows: unknown[][]): number | null => {
   return normalizeMoney(raw);
 };
 
-const buildSheetMetricSnapshots = (metricRanges: Record<string, unknown[][]>) => [
-  { metricKey: "fitness.total_profitability", metricValue: getSingleMetricValue(metricRanges["FITNESS!AN3"] ?? []), sourceRange: "FITNESS!AN3" },
-  { metricKey: "fitness.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["FITNESS!AR9:AY14"] ?? []).value, sourceRange: "FITNESS!AR9:AY14" },
-  { metricKey: "fitness.settlement_balance", metricValue: getSingleMetricValue(metricRanges["FITNESS!X3"] ?? []), sourceRange: "FITNESS!X3" },
-  { metricKey: "salon.total_profitability", metricValue: getSingleMetricValue(metricRanges["SALON!AW29"] ?? []), sourceRange: "SALON!AW29" },
-  { metricKey: "salon.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["SALON!AN24:AU29"] ?? []).value, sourceRange: "SALON!AN24:AU29" },
-  { metricKey: "aula.total_profitability", metricValue: getSingleMetricValue(metricRanges["AULA!AW29"] ?? []), sourceRange: "AULA!AW29" },
-  { metricKey: "aula.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["AULA!AN24:AU29"] ?? []).value, sourceRange: "AULA!AN24:AU29" },
-  { metricKey: "aula.average_commission", metricValue: parseAulaCommissionAverage(metricRanges["AULA!B18:V30"] ?? []), sourceRange: "AULA!B18:V30" },
-];
+const sumCantinaMetric = (rows: unknown[][], type: "INGRESOS" | "EGRESOS", category: "KIOSCO" | "BEBIDAS"): number => {
+  const indexes = sectorMovementFallbackIndexes;
+  return rows.reduce((sum, row) => {
+    const rowType = normalizeComparableText(movementValue(row, indexes, "tipo"));
+    const rowCategory = normalizeComparableText(movementValue(row, indexes, "categoria"));
+    const rowStatus = normalizeComparableText(movementValue(row, indexes, "estado"));
+    const matchesType = type === "INGRESOS" ? rowType.startsWith("ingreso") : rowType.startsWith("egreso");
+    const matchesCategory = rowCategory === normalizeComparableText(category);
+    return matchesType && matchesCategory && rowStatus.includes("completado")
+      ? sum + Math.abs(normalizeMoney(movementValue(row, indexes, "monto")))
+      : sum;
+  }, 0);
+};
+
+const buildSheetMetricSnapshots = (metricRanges: Record<string, unknown[][]>) => {
+  const cantinaRows = metricRanges["CANTINA!B13:AB3000"] ?? [];
+  const cantinaKioskIncome = sumCantinaMetric(cantinaRows, "INGRESOS", "KIOSCO");
+  const cantinaDrinksIncome = sumCantinaMetric(cantinaRows, "INGRESOS", "BEBIDAS");
+  const cantinaCmv = sumCantinaMetric(cantinaRows, "EGRESOS", "BEBIDAS");
+  // Snapshots conservan métricas que en la planilla viven fuera del detalle normalizado.
+  // CANTINA replica la regla contable: KIOSCO + BEBIDAS - CMV, donde CMV son EGRESOS BEBIDAS completados.
+  return [
+    { metricKey: "fitness.total_profitability", metricValue: getSingleMetricValue(metricRanges["FITNESS!AN3"] ?? []), sourceRange: "FITNESS!AN3" },
+    { metricKey: "fitness.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["FITNESS!AR9:AY14"] ?? []).value, sourceRange: "FITNESS!AR9:AY14" },
+    { metricKey: "fitness.settlement_balance", metricValue: getSingleMetricValue(metricRanges["FITNESS!X3"] ?? []), sourceRange: "FITNESS!X3" },
+    { metricKey: "salon.total_profitability", metricValue: getSingleMetricValue(metricRanges["SALON!AW29"] ?? []), sourceRange: "SALON!AW29" },
+    { metricKey: "salon.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["SALON!AN24:AU29"] ?? []).value, sourceRange: "SALON!AN24:AU29" },
+    { metricKey: "aula.total_profitability", metricValue: getSingleMetricValue(metricRanges["AULA!AW29"] ?? []), sourceRange: "AULA!AW29" },
+    { metricKey: "aula.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["AULA!AN24:AU29"] ?? []).value, sourceRange: "AULA!AN24:AU29" },
+    { metricKey: "aula.average_commission", metricValue: parseAulaCommissionAverage(metricRanges["AULA!B18:V30"] ?? []), sourceRange: "AULA!B18:V30" },
+    { metricKey: "salon.settlement_balance", metricValue: getSingleMetricValue(metricRanges["SALON!X3"] ?? []), sourceRange: "SALON!X3" },
+    { metricKey: "aula.settlement_balance", metricValue: getSingleMetricValue(metricRanges["AULA!X3"] ?? []), sourceRange: "AULA!X3" },
+    { metricKey: "local1.total_profitability", metricValue: getSingleMetricValue(metricRanges["'LOCAL 1'!AN3"] ?? []), sourceRange: "'LOCAL 1'!AN3" },
+    { metricKey: "local1.current_month_profitability", metricValue: parseCurrentMonthUtility(metricRanges["'LOCAL 1'!AB19:AI24"] ?? []).value, sourceRange: "'LOCAL 1'!AB19:AI24" },
+    { metricKey: "local1.settlement_balance", metricValue: getSingleMetricValue(metricRanges["'LOCAL 1'!X3"] ?? []), sourceRange: "'LOCAL 1'!X3" },
+    { metricKey: "cantina.kiosk_income", metricValue: cantinaKioskIncome, sourceRange: "CANTINA!B13:AB3000" },
+    { metricKey: "cantina.drinks_income", metricValue: cantinaDrinksIncome, sourceRange: "CANTINA!B13:AB3000" },
+    { metricKey: "cantina.cmv", metricValue: cantinaCmv, sourceRange: "CANTINA!B13:AB3000" },
+    { metricKey: "cantina.total_profitability", metricValue: cantinaKioskIncome + cantinaDrinksIncome - cantinaCmv, sourceRange: "CANTINA!B13:AB3000" },
+  ];
+};
 
 const upsertSheetMetricSnapshots = async (
   pool: Pool,
