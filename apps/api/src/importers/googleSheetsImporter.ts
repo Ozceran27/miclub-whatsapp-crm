@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { getPostgresPool } from "../db/postgres.js";
-import { getGoogleSheetsConfig, SHEET_NAMES } from "../services/googleSheets.js";
+import { getGoogleSheetsConfig, movementValue, resolveMovementColumnIndexes, SHEET_NAMES, type MovementColumnIndexes } from "../services/googleSheets.js";
 import { upsertActivity, upsertInstructor, upsertSector } from "../repositories/activitiesRepository.js";
 import { createImportBatch, finishImportBatch, logImportError } from "./importLogger.js";
 import { normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeFinancialStatus, normalizeMoney, normalizeOperationalStatus, normalizePhone, normalizeSheetText } from "./normalizers.js";
@@ -27,10 +27,9 @@ type ImportSummary = {
   errors: number;
   warnings: string[];
 };
-type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[] };
+type SheetRow = { kind: "members" | "movements"; sheet: string; rowNumber: number; row: unknown[]; movementIndexes?: MovementColumnIndexes; usedMovementFallback?: boolean };
 
 const MEMBER_INDEXES = { id: 0, nombre: 4, apellido: 7, dni: 10, telefono: 12, actividad: 14, modalidad: 16, cuota: 18, estado: 20, vence: 21, instructor: 23 } as const;
-const MOVEMENT_INDEXES = { id: 0, fecha: 1, tipo: 3, categoria: 6, concepto: 9, contraparte: 14, sector: 17, monto: 19, impuestos: 22, estado: 24, medioPago: 26 } as const;
 const valueAt = (row: unknown[], idx: number): string => String(row[idx] ?? "").trim();
 const isEmpty = (row: unknown[]): boolean => row.every((cell) => String(cell ?? "").trim() === "");
 const stablePart = (value: unknown): string => normalizeComparableText(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sin-datos";
@@ -59,17 +58,29 @@ const readRows = async (): Promise<SheetRow[]> => {
   if (!config.credentialsPresent) throw new Error("Faltan credenciales de Google Sheets (GOOGLE_SHEET_ID/GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY).");
   const client = getSheetsClient(config);
   const memberRanges = SHEET_NAMES.map((sheet) => config.sheetRanges[sheet]);
-  const sectorMovementRanges = SHEET_NAMES.map((sheet) => config.movementRanges[sheet]);
-  const adminMovementRange = config.adminMovementsRange;
-  const ranges = [adminMovementRange, ...memberRanges, ...sectorMovementRanges];
+  const movementRangesBySheet = { ...config.movementRanges, ADMINISTRACIÓN: config.adminMovementsRange };
+  const movementHeaderRangesBySheet = { ...config.movementHeaderRanges, ADMINISTRACIÓN: config.adminMovementsHeaderRange };
+  const memberRangeSet = new Set(memberRanges);
+  const movementRangeSet = new Set(Object.values(movementRangesBySheet));
+  const ranges = [...memberRanges, ...Object.values(movementHeaderRangesBySheet), ...Object.values(movementRangesBySheet)];
   const response = await client.spreadsheets.values.batchGet({ spreadsheetId: config.sheetId, ranges, majorDimension: "ROWS" });
   const rows: SheetRow[] = [];
+  const movementIndexesBySheet: Record<string, ReturnType<typeof resolveMovementColumnIndexes>> = {};
+  response.data.valueRanges?.forEach((valueRange, rangeIndex) => {
+    const requestedRange = ranges[rangeIndex] ?? valueRange.range ?? "";
+    const sheet = (requestedRange.split("!")[0] ?? "").replace(/'/g, "");
+    if (Object.values(movementHeaderRangesBySheet).includes(requestedRange)) {
+      movementIndexesBySheet[sheet] = resolveMovementColumnIndexes(valueRange.values?.[0]);
+    }
+  });
   response.data.valueRanges?.forEach((valueRange, rangeIndex) => {
     const requestedRange = ranges[rangeIndex] ?? valueRange.range ?? "";
     const sheet = (requestedRange.split("!")[0] ?? "").replace(/'/g, "");
     const start = Number(requestedRange.match(/![A-Z]+(\d+)/)?.[1] ?? 1);
-    const kind: SheetRow["kind"] = rangeIndex === 0 || rangeIndex > memberRanges.length ? "movements" : "members";
-    (valueRange.values ?? []).forEach((row, index) => { if (!isEmpty(row)) rows.push({ kind, sheet, rowNumber: start + index, row }); });
+    const kind: SheetRow["kind"] | null = memberRangeSet.has(requestedRange) ? "members" : movementRangeSet.has(requestedRange) ? "movements" : null;
+    if (!kind) return;
+    const resolved = movementIndexesBySheet[sheet] ?? resolveMovementColumnIndexes(undefined);
+    (valueRange.values ?? []).forEach((row, index) => { if (!isEmpty(row)) rows.push({ kind, sheet, rowNumber: start + index, row, movementIndexes: kind === "movements" ? resolved.indexes : undefined, usedMovementFallback: kind === "movements" ? resolved.usedFallback : undefined }); });
   });
   return rows;
 };
@@ -129,27 +140,31 @@ const processMember = async (pool: Pool, row: SheetRow, summary: ImportSummary):
 };
 
 const processMovement = async (pool: Pool, row: SheetRow, summary: ImportSummary): Promise<void> => {
-  const concept = valueAt(row.row, MOVEMENT_INDEXES.concepto) || valueAt(row.row, MOVEMENT_INDEXES.categoria);
-  const amount = Math.abs(normalizeMoney(valueAt(row.row, MOVEMENT_INDEXES.monto)));
+  if (row.usedMovementFallback) {
+    const warning = `Se usaron índices fallback para movimientos en ${row.sheet}; revisar headers del rango.`;
+    if (!summary.warnings.includes(warning)) summary.warnings.push(warning);
+  }
+  const concept = movementValue(row.row, row.movementIndexes ?? {}, "concepto") || movementValue(row.row, row.movementIndexes ?? {}, "categoria");
+  const amount = Math.abs(normalizeMoney(movementValue(row.row, row.movementIndexes ?? {}, "monto")));
   if (!concept || amount === 0) return;
-  const typeText = normalizeComparableText(valueAt(row.row, MOVEMENT_INDEXES.tipo));
+  const typeText = normalizeComparableText(movementValue(row.row, row.movementIndexes ?? {}, "tipo"));
   const movementType = typeText.startsWith("egreso") ? "EGRESOS" : typeText.startsWith("capital") ? "CAPITAL" : "INGRESOS";
-  const rawMovementDate = valueAt(row.row, MOVEMENT_INDEXES.fecha);
+  const rawMovementDate = movementValue(row.row, row.movementIndexes ?? {}, "fecha");
   const movementDate = normalizeDate(rawMovementDate);
   // Decisión: la fecha del movimiento es obligatoria porque miclub.movements.movement_date
   // no permite nulos y usar la fecha actual distorsiona los reportes financieros históricos.
   // El importador registra esta fila como error no bloqueante en el batch y continúa.
   if (!movementDate) throw new Error(`Movimiento sin fecha válida en hoja ${row.sheet}, fila ${row.rowNumber}. Valor recibido: ${rawMovementDate || "vacío"}.`);
-  const sectorId = await upsertSector(pool, valueAt(row.row, MOVEMENT_INDEXES.sector) || row.sheet); summary.sectorsProcessed += 1; summary.attemptedWrites += 1;
-  const categoryId = await upsertCategory(pool, valueAt(row.row, MOVEMENT_INDEXES.categoria)); summary.movementCategoriesProcessed += 1; summary.attemptedWrites += 1;
-  const paymentMethodId = await upsertPaymentMethod(pool, valueAt(row.row, MOVEMENT_INDEXES.medioPago));
+  const sectorId = await upsertSector(pool, movementValue(row.row, row.movementIndexes ?? {}, "sector") || row.sheet); summary.sectorsProcessed += 1; summary.attemptedWrites += 1;
+  const categoryId = await upsertCategory(pool, movementValue(row.row, row.movementIndexes ?? {}, "categoria")); summary.movementCategoriesProcessed += 1; summary.attemptedWrites += 1;
+  const paymentMethodId = await upsertPaymentMethod(pool, movementValue(row.row, row.movementIndexes ?? {}, "medioPago"));
   if (paymentMethodId) summary.attemptedWrites += 1;
-  const ext = valueAt(row.row, MOVEMENT_INDEXES.id) || externalId("google_sheets", row.sheet, row.rowNumber, movementDate.slice(0, 10), movementType, amount);
+  const ext = movementValue(row.row, row.movementIndexes ?? {}, "id") || externalId("google_sheets", row.sheet, row.rowNumber, movementDate.slice(0, 10), movementType, amount);
   await pool.query(
     `insert into miclub.movements (external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
      values ($1,$2,$3::miclub.movement_type,$4,$5,$6,$7,$8,$9,$10,$11::miclub.financial_status,$12::miclub.movement_status,'google_sheets',$13::jsonb)
      on conflict (external_id) do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
-    [externalId("google_sheets", "movement", ext), movementDate, movementType, categoryId, sectorId, concept, valueAt(row.row, MOVEMENT_INDEXES.contraparte) || null, amount, Math.abs(normalizeMoney(valueAt(row.row, MOVEMENT_INDEXES.impuestos))), paymentMethodId, normalizeFinancialStatus(valueAt(row.row, MOVEMENT_INDEXES.estado)), normalizeComparableText(valueAt(row.row, MOVEMENT_INDEXES.estado)).includes("pend") ? "PENDIENTE" : "COMPLETADO", JSON.stringify({ sheet: row.sheet, rowNumber: row.rowNumber, row: row.row })]
+    [externalId("google_sheets", "movement", ext), movementDate, movementType, categoryId, sectorId, concept, movementValue(row.row, row.movementIndexes ?? {}, "contraparte") || null, amount, Math.abs(normalizeMoney(movementValue(row.row, row.movementIndexes ?? {}, "impuestos"))), paymentMethodId, normalizeFinancialStatus(movementValue(row.row, row.movementIndexes ?? {}, "estado")), normalizeComparableText(movementValue(row.row, row.movementIndexes ?? {}, "estado")).includes("pend") ? "PENDIENTE" : "COMPLETADO", JSON.stringify({ sheet: row.sheet, rowNumber: row.rowNumber, row: row.row })]
   );
   summary.movementsProcessed += 1; summary.attemptedWrites += 1;
 };
