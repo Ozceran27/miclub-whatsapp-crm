@@ -18,7 +18,8 @@ export type MemberColumnKey = "id" | "fecha" | "nombre" | "apellido" | "dni" | "
 export type MovementColumnIndexes = Partial<Record<MovementColumnKey, number>>;
 export type MemberColumnIndexes = Partial<Record<MemberColumnKey, number>>;
 
-export type MovementColumnIndexResolution = { indexes: MovementColumnIndexes; usedFallback: boolean; fallbackKeys: MovementColumnKey[] };
+export type MovementFallbackMode = "none" | "column" | "layout";
+export type MovementColumnIndexResolution = { indexes: MovementColumnIndexes; usedFallback: boolean; fallbackKeys: MovementColumnKey[]; fallbackMode: MovementFallbackMode };
 export type MemberColumnIndexResolution = { indexes: MemberColumnIndexes; usedFallback: boolean; fallbackKeys: MemberColumnKey[] };
 
 export interface LastPaymentInfo {
@@ -209,7 +210,8 @@ export const resolveMovementColumnIndexes = (headerRow: unknown[] | undefined, f
   const normalizedHeaders = (headerRow ?? []).map(normalizeHeader);
 
   for (const [key, aliases] of Object.entries(movementColumnAliases) as Array<[MovementColumnKey, string[]]>) {
-    const found = normalizedHeaders.findIndex((header) => aliases.includes(header));
+    const normalizedAliases = aliases.map(normalizeHeader);
+    const found = normalizedHeaders.findIndex((header) => normalizedAliases.includes(header));
     if (found >= 0) {
       indexes[key] = found;
     } else {
@@ -218,7 +220,9 @@ export const resolveMovementColumnIndexes = (headerRow: unknown[] | undefined, f
     }
   }
 
-  return { indexes, usedFallback: fallbackKeys.length > 0, fallbackKeys };
+  const headersFound = normalizedHeaders.some((header) => header !== "");
+  const fallbackMode: MovementFallbackMode = fallbackKeys.length === 0 ? "none" : headersFound ? "column" : "layout";
+  return { indexes, usedFallback: fallbackKeys.length > 0, fallbackKeys, fallbackMode };
 };
 
 const getMovementColumnIndexes = (headerRow: unknown[] | undefined): MovementColumnIndexes => resolveMovementColumnIndexes(headerRow, sectorMovementFallbackIndexes).indexes;
