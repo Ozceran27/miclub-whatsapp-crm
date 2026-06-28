@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { adminMovementFallbackIndexes, calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from './googleSheets.js';
+import { adminMovementFallbackIndexes, calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from './googleSheets.js';
 
 test('normalizeOperationalStatus normaliza estados operativos conocidos', () => {
   assert.equal(normalizeOperationalStatus('Al Día'), 'al_dia');
@@ -170,4 +170,11 @@ test('resolveMovementColumnIndexes conserva fallback sectorial sin headers', () 
   assert.equal(normalizeMoney(movementValue(row, resolved.indexes, 'monto')), 15000);
   assert.equal(movementValue(row, resolved.indexes, 'estadoFinan'), 'PAGADO');
   assert.equal(movementValue(row, resolved.indexes, 'estado'), 'COMPLETADO');
+});
+
+
+test('resolveMemberColumnIndexes reconoce Estado Finan. como estado operativo', () => {
+  const resolved = resolveMemberColumnIndexes(['Id.', 'Nombre', 'Estado Finan.', 'Vence']);
+  assert.equal(resolved.indexes.estado, 2);
+  assert.equal(resolved.indexes.vence, 3);
 });

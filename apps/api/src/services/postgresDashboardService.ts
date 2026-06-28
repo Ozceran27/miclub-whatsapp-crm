@@ -93,11 +93,14 @@ const unavailableMetric = (reason = "Pendiente de cálculo en PostgreSQL") => ({
   reason,
   source: "postgres" as const,
 });
-const normalizeSheet = (value: unknown): SourceSheet => {
+export const normalizePostgresSourceSheet = (value: unknown): SourceSheet => {
   const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toUpperCase()
-    .replace(/\s+/g, "_");
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return (SHEETS as string[]).includes(normalized)
     ? (normalized as SourceSheet)
     : "FITNESS";
@@ -121,13 +124,21 @@ const getMovementBreakdown = (groupColumn: "sector_name" | "category") => `
   limit ${MOVEMENT_BREAKDOWN_LIMIT}
 `;
 
-const normalizeStatusLabel = (value: unknown): DebtorStatus => {
+const normalizeStatusLabel = (value: unknown, dueDate?: unknown): DebtorStatus => {
   const status = normalizeOperationalStatus(String(value ?? ""));
   if (status === "al_dia") return "Al día";
-  if (status === "nuevo_inscripto") return "Nuevo Inscripto";
   if (status === "adeudando") return "Adeudando";
   if (status === "abandonado") return "Abandonado";
   if (status === "cancelado") return "Cancelado";
+  if (status === "nuevo_inscripto") {
+    const due = dueDate == null ? undefined : new Date(String(dueDate));
+    if (due && !Number.isNaN(due.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return due < today ? "Adeudando" : "Al día";
+    }
+    return "Nuevo Inscripto";
+  }
   return "Desconocido";
 };
 
@@ -159,6 +170,7 @@ export const getPostgresMembers = async (): Promise<Member[]> => {
     cuota: pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"]),
     estado: normalizeStatusLabel(
       pick(row, ["estado", "status", "operational_status"]),
+      pick(row, ["due_date", "vence", "expiration_date", "expires_at"]),
     ),
     instructor: toStringValue(pick(row, ["instructor", "instructor_name"])),
     lastPaymentAt: toStringValue(
@@ -175,8 +187,8 @@ export const getPostgresMembers = async (): Promise<Member[]> => {
     vence: toStringValue(pick(row, ["vence", "due_day"])),
     expirationDate: toStringValue(pick(row, ["expiration_date", "expires_at"])),
     dueDate: toStringValue(pick(row, ["due_date"])),
-    sourceSheet: normalizeSheet(
-      pick(row, ["source_sheet", "sector", "sector_name"]),
+    sourceSheet: normalizePostgresSourceSheet(
+      pick(row, ["source_sheet", "sector", "sector_name", "sector_code"]),
     ),
   }));
 };
@@ -268,6 +280,7 @@ export const getPostgresClubFinanceSummary =
       incomeByCategory,
       expenseByCategory,
       settlementSnapshots,
+      receivablesFallback,
     ] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_dashboard_basic`,
@@ -297,6 +310,33 @@ export const getPostgresClubFinanceSummary =
          order by metric_key, captured_at desc`,
         [["fitness.settlement_balance", "salon.settlement_balance", "aula.settlement_balance", "local1.settlement_balance"]],
       ),
+      pool.query<Record<string, unknown>>(
+        `with enrollment_receivables as (
+          select
+            e.status,
+            e.due_date,
+            case
+              when e.status = 'nuevo_inscripto'::miclub.enrollment_status and e.due_date < current_date then 'adeudando'::miclub.enrollment_status
+              when e.status = 'nuevo_inscripto'::miclub.enrollment_status and e.due_date >= current_date then 'al_dia'::miclub.enrollment_status
+              else e.status
+            end as effective_status,
+            e.fee_amount * case
+              when upper(coalesce(s.code, s.name, '')) = 'FITNESS' then 0.5
+              when upper(coalesce(s.code, s.name, '')) = 'SALON' then 0
+              when upper(coalesce(s.code, s.name, '')) = 'AULA' then
+                case when coalesce(a.club_commission_percent, 0) > 1 then coalesce(a.club_commission_percent, 0) / 100 else coalesce(a.club_commission_percent, 0) end
+              else 0
+            end as receivable_fee
+          from miclub.enrollments e
+          join miclub.activities a on a.id = e.activity_id
+          join miclub.sectors s on s.id = a.sector_id
+        )
+        select
+          coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
+          coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_adeudadas,
+          coalesce(sum(receivable_fee) filter (where effective_status = 'al_dia'::miclub.enrollment_status and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
+        from enrollment_receivables`,
+      ),
     ]);
     const row = {
       ...(dashboard.rows[0] ?? {}),
@@ -305,7 +345,7 @@ export const getPostgresClubFinanceSummary =
     const sectorBalancesByName = new Map<string, { sector: string; amount: number }>();
     const upsertSectorBalance = (sector: string, amount: number) => {
       if (!Number.isFinite(amount) || amount <= 0) return;
-      const key = sector.toUpperCase().replace(/\s+/g, "_");
+      const key = normalizePostgresSourceSheet(sector);
       sectorBalancesByName.set(key, { sector, amount });
     };
     sectors.rows.forEach((sector) => {
@@ -354,8 +394,13 @@ export const getPostgresClubFinanceSummary =
       "cash_balance",
       "available_balance",
     ]);
-    const cuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
-    const pendingNetBalance = pickNumber(row, ["pending_net_balance"]);
+    const fallbackReceivablesRow = receivablesFallback.rows[0] ?? {};
+    const fallbackCuotasACobrar = pickNumber(fallbackReceivablesRow, ["cuotas_a_cobrar"]);
+    const fallbackFutureReceivables = pickNumber(fallbackReceivablesRow, ["future_receivable_fees_until_month_end"]);
+    const dashboardCuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
+    const receivablesTotal = pickNumber(row, ["receivables_total"]);
+    const cuotasACobrar = dashboardCuotasACobrar || fallbackCuotasACobrar || receivablesTotal;
+    const pendingNetBalance = pickNumber(row, ["pending_net_balance"]) || fallbackFutureReceivables;
     // Regla crítica de equivalencia con ADMINISTRACIÓN:
     // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
     // Los saldos a pagar son obligaciones y nunca se suman al proyectado.
@@ -368,11 +413,11 @@ export const getPostgresClubFinanceSummary =
       pendingIncome: pickNumber(row, ["pending_income"]),
       pendingExpenses: pickNumber(row, ["pending_expenses"]),
       pendingNetBalance,
-      cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]),
+      cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]) || fallbackCuotasACobrar,
       cuotasACobrar,
       futureReceivableFeesUntilMonthEnd: pickNumber(row, [
         "future_receivable_fees_until_month_end",
-      ]),
+      ]) || fallbackFutureReceivables,
       saldosAPagar: effectiveSaldosAPagar,
       projectedBalance: effectiveProjectedBalance,
       sectorBalances,
@@ -632,10 +677,13 @@ export const getPostgresSectorOperationalSummary =
       "current_month_profitability",
     ]);
     const local1SettlementBalance = snapshotMetric("local1.settlementBalance", "local1.settlement_balance") ?? queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
-    const cantinaKioskIncome = snapshotMetric("cantina.kioskIncome", "cantina.kiosk_income") ?? pickNumber(cantinaSpecial, ["kiosk_income"]);
-    const cantinaDrinksIncome = snapshotMetric("cantina.drinksIncome", "cantina.drinks_income") ?? pickNumber(cantinaSpecial, ["drinks_income"]);
-    const cantinaCmv = snapshotMetric("cantina.cmv", "cantina.cmv") ?? pickNumber(cantinaSpecial, ["cmv"]);
-    const cantinaTotalProfitability = snapshotMetric("cantina.totalProfitability", "cantina.total_profitability") ?? (cantinaKioskIncome + cantinaDrinksIncome - cantinaCmv);
+    const preferSnapshotUnlessZero = (snapshot: number | null, fallback: number): number =>
+      snapshot == null || (snapshot === 0 && fallback > 0) ? fallback : snapshot;
+    const cantinaKioskIncome = preferSnapshotUnlessZero(snapshotMetric("cantina.kioskIncome", "cantina.kiosk_income"), pickNumber(cantinaSpecial, ["kiosk_income"]));
+    const cantinaDrinksIncome = preferSnapshotUnlessZero(snapshotMetric("cantina.drinksIncome", "cantina.drinks_income"), pickNumber(cantinaSpecial, ["drinks_income"]));
+    const cantinaCmv = preferSnapshotUnlessZero(snapshotMetric("cantina.cmv", "cantina.cmv"), pickNumber(cantinaSpecial, ["cmv"]));
+    const fallbackCantinaProfitability = cantinaKioskIncome + cantinaDrinksIncome - cantinaCmv;
+    const cantinaTotalProfitability = preferSnapshotUnlessZero(snapshotMetric("cantina.totalProfitability", "cantina.total_profitability"), fallbackCantinaProfitability);
     return {
       metadata: {
         coverage: Object.keys(sourceCompleteness).length > 0 ? "partial" : "complete",
