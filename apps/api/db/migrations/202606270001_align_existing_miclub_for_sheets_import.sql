@@ -76,7 +76,6 @@ exception when duplicate_object then null; end $$;
 
 create table if not exists miclub.operational_balances (
   id uuid primary key default gen_random_uuid(),
-  label text not null default 'Saldos operativos',
   cutoff_date date not null default current_date,
   liquidity numeric(14,2) not null default 0,
   cash numeric(14,2) not null default 0,
@@ -87,23 +86,6 @@ create table if not exists miclub.operational_balances (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
--- Keep this migration safe when miclub.operational_balances already exists with
--- a partial/older shape from a manual DBeaver run or previous deploy.
-alter table if exists miclub.operational_balances add column if not exists id uuid default gen_random_uuid();
-alter table if exists miclub.operational_balances add column if not exists label text not null default 'Saldos operativos';
-alter table if exists miclub.operational_balances alter column label set default 'Saldos operativos';
-update miclub.operational_balances set label = 'Saldos operativos' where label is null;
-alter table if exists miclub.operational_balances add column if not exists cutoff_date date not null default current_date;
-alter table if exists miclub.operational_balances add column if not exists liquidity numeric(14,2) not null default 0;
-alter table if exists miclub.operational_balances add column if not exists cash numeric(14,2) not null default 0;
-alter table if exists miclub.operational_balances add column if not exists bank numeric(14,2) not null default 0;
-alter table if exists miclub.operational_balances add column if not exists dollars numeric(14,2) not null default 0;
-alter table if exists miclub.operational_balances add column if not exists source text not null default 'app';
-alter table if exists miclub.operational_balances add column if not exists source_payload jsonb;
-alter table if exists miclub.operational_balances add column if not exists created_at timestamptz not null default now();
-alter table if exists miclub.operational_balances add column if not exists updated_at timestamptz not null default now();
-
 create index if not exists operational_balances_cutoff_date_idx on miclub.operational_balances (cutoff_date desc, created_at desc);
 create unique index if not exists operational_balances_source_cutoff_date_key on miclub.operational_balances (source, cutoff_date);
 
@@ -208,9 +190,7 @@ select
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where status in ('adeudando', 'nuevo_inscripto')) as cuotas_a_cobrar,
   (select coalesce(sum(fee_amount), 0) from miclub.enrollments where due_date between current_date and date_trunc('month', current_date)::date + interval '1 month - 1 day') as future_receivable_fees_until_month_end,
   (select coalesce(sum(case when operational_status = 'COMPLETADO' and movement_type = 'INGRESOS' then amount when operational_status = 'COMPLETADO' and movement_type = 'EGRESOS' then -amount else 0 end), 0) from miclub.movements)
-    + (select coalesce(sum(amount), 0) from miclub.receivables where status in ('pendiente', 'parcial', 'vencido')) as projected_balance,
-  -- Preserve compatibility with newer v_dashboard_basic definitions that already append this column.
-  0::numeric as saldos_a_pagar
+    + (select coalesce(sum(amount), 0) from miclub.receivables where status in ('pendiente', 'parcial', 'vencido')) as projected_balance
 from (select 1) base
 left join lateral (
   select liquidity, cash, bank, dollars
