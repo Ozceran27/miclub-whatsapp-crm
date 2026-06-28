@@ -17,17 +17,55 @@ const SHEETS: SourceSheet[] = [
   "CANTINA",
   "ADMINISTRACION",
 ];
+const countOccurrences = (value: string, character: string): number =>
+  value.split(character).length - 1;
+
+const parseSingleSeparatorNumber = (
+  value: string,
+  separator: "," | ".",
+): string => {
+  const separatorIndex = value.indexOf(separator);
+  const integerPart = value.slice(0, separatorIndex);
+  const fractionalPart = value.slice(separatorIndex + 1);
+  if (fractionalPart.length === 3 && /^\d{1,3}$/.test(integerPart)) {
+    return `${integerPart}${fractionalPart}`;
+  }
+  if (fractionalPart.length >= 1 && fractionalPart.length <= 2) {
+    return `${integerPart}.${fractionalPart}`;
+  }
+  return `${integerPart}${fractionalPart}`;
+};
+
 const toNumber = (value: unknown): number => {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (typeof value === "bigint") return Number(value);
   if (typeof value === "string") {
-    const normalized = value
-      .replace(/\$/g, "")
-      .replace(/\s/g, "")
-      .replace(/\./g, "")
-      .replace(/,/g, ".");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
+    const raw = value.trim();
+    if (!raw) return 0;
+
+    const isNegative = /[-−–—]/.test(raw) || /^\s*\(.*\)\s*$/.test(raw);
+    let cleaned = raw
+      .replace(/[−–—]/g, "-")
+      .replace(/[^\d,.-]/g, "")
+      .replace(/-/g, "");
+    if (!/\d/.test(cleaned)) return 0;
+
+    const commaCount = countOccurrences(cleaned, ",");
+    const dotCount = countOccurrences(cleaned, ".");
+    if (commaCount > 0 && dotCount > 0) {
+      const lastComma = cleaned.lastIndexOf(",");
+      const lastDot = cleaned.lastIndexOf(".");
+      cleaned = lastComma > lastDot
+        ? cleaned.replace(/\./g, "").replace(/,/g, ".")
+        : cleaned.replace(/,/g, "");
+    } else if (dotCount > 1) cleaned = cleaned.replace(/\./g, "");
+    else if (commaCount > 1) cleaned = cleaned.replace(/,/g, "");
+    else if (dotCount === 1) cleaned = parseSingleSeparatorNumber(cleaned, ".");
+    else if (commaCount === 1) cleaned = parseSingleSeparatorNumber(cleaned, ",");
+
+    const parsed = Number(cleaned);
+    if (!Number.isFinite(parsed)) return 0;
+    return isNegative && parsed !== 0 ? -parsed : parsed;
   }
   return 0;
 };
@@ -229,6 +267,7 @@ export const getPostgresClubFinanceSummary =
       expenseBySector,
       incomeByCategory,
       expenseByCategory,
+      settlementSnapshots,
     ] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_dashboard_basic`,
@@ -251,15 +290,46 @@ export const getPostgresClubFinanceSummary =
       pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
         "EGRESOS",
       ]),
+      pool.query<Record<string, unknown>>(
+        `select distinct on (metric_key) metric_key, metric_value
+         from miclub.sheet_metric_snapshots
+         where metric_key = any($1::text[])
+         order by metric_key, captured_at desc`,
+        [["fitness.settlement_balance", "local1.settlement_balance"]],
+      ),
     ]);
     const row = {
       ...(dashboard.rows[0] ?? {}),
       ...(operationalBalances.rows[0] ?? {}),
     };
-    const sectorBalances = sectors.rows.map((sector) => ({
-      sector: pickString(sector, ["sector_name", "sector"], "Sin sector"),
-      amount: pickNumber(sector, ["settlement_balance", "amount"]),
-    }));
+    const sectorBalancesByName = new Map<string, { sector: string; amount: number }>();
+    const upsertSectorBalance = (sector: string, amount: number) => {
+      if (!Number.isFinite(amount) || amount <= 0) return;
+      const key = sector.toUpperCase().replace(/\s+/g, "_");
+      sectorBalancesByName.set(key, { sector, amount });
+    };
+    sectors.rows.forEach((sector) => {
+      upsertSectorBalance(
+        pickString(sector, ["sector_name", "sector"], "Sin sector"),
+        pickNumber(sector, ["settlement_balance", "amount"]),
+      );
+    });
+    settlementSnapshots.rows.forEach((snapshot) => {
+      const metricKey = pickString(snapshot, ["metric_key"]);
+      const amount = pickNumber(snapshot, ["metric_value"]);
+      if (metricKey === "fitness.settlement_balance") {
+        upsertSectorBalance("Espacio Fitness", amount);
+      } else if (metricKey === "local1.settlement_balance") {
+        upsertSectorBalance("Local 1", amount);
+      }
+    });
+    const sectorBalances = Array.from(sectorBalancesByName.values()).sort(
+      (a, b) => a.sector.localeCompare(b.sector, "es"),
+    );
+    const derivedSaldosAPagar = sectorBalances.reduce(
+      (sum, sector) => sum + sector.amount,
+      0,
+    );
     const breakdown = (rows: Record<string, unknown>[]) =>
       rows.map((item) => ({
         name: pickString(item, ["name"], "Sin datos"),
@@ -273,6 +343,12 @@ export const getPostgresClubFinanceSummary =
     const totalExpenseCategories = totalBreakdownItems(expenseByCategory.rows);
     const remainingBreakdownItems = (total: number) =>
       Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
+    const dashboardSaldosAPagar = pickNumber(row, ["saldos_a_pagar"]);
+    const effectiveSaldosAPagar = dashboardSaldosAPagar || derivedSaldosAPagar;
+    const dashboardProjectedBalance = pickNumber(row, ["projected_balance"]);
+    const effectiveProjectedBalance = dashboardSaldosAPagar || !derivedSaldosAPagar
+      ? dashboardProjectedBalance
+      : dashboardProjectedBalance - derivedSaldosAPagar;
     return {
       liquidity: pickNumber(row, [
         "liquidity",
@@ -290,8 +366,8 @@ export const getPostgresClubFinanceSummary =
       futureReceivableFeesUntilMonthEnd: pickNumber(row, [
         "future_receivable_fees_until_month_end",
       ]),
-      saldosAPagar: pickNumber(row, ["saldos_a_pagar"]),
-      projectedBalance: pickNumber(row, ["projected_balance"]),
+      saldosAPagar: effectiveSaldosAPagar,
+      projectedBalance: effectiveProjectedBalance,
       sectorBalances,
       incomeBySector: breakdown(incomeBySector.rows),
       expenseBySector: breakdown(expenseBySector.rows),

@@ -465,6 +465,15 @@ app.get("/auth/me", (req, res) => {
 });
 
 app.use(authProtection);
+app.use((req, res, next) => {
+  if (isProtectedApiPath(req.path)) {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+    res.set("Surrogate-Control", "no-store");
+  }
+  next();
+});
 app.use("/api/import", importRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api", catalogRoutes);
