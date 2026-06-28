@@ -93,11 +93,14 @@ const unavailableMetric = (reason = "Pendiente de cálculo en PostgreSQL") => ({
   reason,
   source: "postgres" as const,
 });
-const normalizeSheet = (value: unknown): SourceSheet => {
+export const normalizePostgresSourceSheet = (value: unknown): SourceSheet => {
   const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toUpperCase()
-    .replace(/\s+/g, "_");
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
   return (SHEETS as string[]).includes(normalized)
     ? (normalized as SourceSheet)
     : "FITNESS";
@@ -175,8 +178,8 @@ export const getPostgresMembers = async (): Promise<Member[]> => {
     vence: toStringValue(pick(row, ["vence", "due_day"])),
     expirationDate: toStringValue(pick(row, ["expiration_date", "expires_at"])),
     dueDate: toStringValue(pick(row, ["due_date"])),
-    sourceSheet: normalizeSheet(
-      pick(row, ["source_sheet", "sector", "sector_name"]),
+    sourceSheet: normalizePostgresSourceSheet(
+      pick(row, ["source_sheet", "sector", "sector_name", "sector_code"]),
     ),
   }));
 };
@@ -305,7 +308,7 @@ export const getPostgresClubFinanceSummary =
     const sectorBalancesByName = new Map<string, { sector: string; amount: number }>();
     const upsertSectorBalance = (sector: string, amount: number) => {
       if (!Number.isFinite(amount) || amount <= 0) return;
-      const key = sector.toUpperCase().replace(/\s+/g, "_");
+      const key = normalizePostgresSourceSheet(sector);
       sectorBalancesByName.set(key, { sector, amount });
     };
     sectors.rows.forEach((sector) => {
@@ -354,7 +357,9 @@ export const getPostgresClubFinanceSummary =
       "cash_balance",
       "available_balance",
     ]);
-    const cuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
+    const dashboardCuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
+    const receivablesTotal = pickNumber(row, ["receivables_total"]);
+    const cuotasACobrar = dashboardCuotasACobrar || receivablesTotal;
     const pendingNetBalance = pickNumber(row, ["pending_net_balance"]);
     // Regla crítica de equivalencia con ADMINISTRACIÓN:
     // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
