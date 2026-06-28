@@ -82,6 +82,16 @@ const pickString = (
 ): string => toStringValue(pick(row, keys)) ?? fallback;
 const pickNumber = (row: Record<string, unknown>, keys: string[]): number =>
   toNumber(pick(row, keys));
+
+export const normalizeSuspiciousArsAmount = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  const abs = Math.abs(value);
+  // Algunas importaciones históricas guardaron cuotas en milésimos
+  // (ej.: $25.000 como 25.000.000). Las cuotas normales del club
+  // están varios órdenes por debajo de ese umbral; mantener el signo.
+  if (abs >= 1_000_000 && Number.isInteger(value / 1000)) return value / 1000;
+  return value;
+};
 const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
   keys.some((key) => row[key] !== undefined && row[key] !== null);
 const pickNullableNumber = (
@@ -322,8 +332,8 @@ export const getPostgresClubFinanceSummary =
               else e.status
             end as effective_status,
             case
-              when e.fee_amount <= 0 or e.status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
-              else e.fee_amount * case
+              when normalized_fee_amount <= 0 or e.status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
+              else normalized_fee_amount * case
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) = 'AULA' then
@@ -334,6 +344,12 @@ export const getPostgresClubFinanceSummary =
           from miclub.enrollments e
           join miclub.activities a on a.id = e.activity_id
           join miclub.sectors s on s.id = a.sector_id
+          cross join lateral (
+            select case
+              when abs(e.fee_amount) >= 1000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+              else e.fee_amount
+            end as normalized_fee_amount
+          ) normalized_fee
         )
         select
           coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
@@ -347,7 +363,7 @@ export const getPostgresClubFinanceSummary =
            coalesce(sum(case when movement_type = 'EGRESOS' then amount else 0 end), 0) as pending_expenses,
            coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as pending_net_balance
          from miclub.v_movements_enriched
-         where replace(upper(coalesce(sector_name, '')), 'Ó', 'O') = 'ADMINISTRACION'
+         where coalesce(source_payload->>'sheet', '') = 'ADMINISTRACIÓN'
            and (operational_status = 'PENDIENTE'::miclub.movement_status or financial_status = 'pendiente'::miclub.financial_status)`,
       ),
     ]);
@@ -408,13 +424,13 @@ export const getPostgresClubFinanceSummary =
       "available_balance",
     ]);
     const fallbackReceivablesRow = receivablesFallback.rows[0] ?? {};
-    const fallbackCuotasACobrar = pickNumber(fallbackReceivablesRow, [
+    const fallbackCuotasACobrar = normalizeSuspiciousArsAmount(pickNumber(fallbackReceivablesRow, [
       "cuotas_a_cobrar",
       "cuotas_adeudadas",
-    ]);
-    const fallbackFutureReceivables = pickNumber(fallbackReceivablesRow, [
+    ]));
+    const fallbackFutureReceivables = normalizeSuspiciousArsAmount(pickNumber(fallbackReceivablesRow, [
       "future_receivable_fees_until_month_end",
-    ]);
+    ]));
     const cuotasACobrar = fallbackCuotasACobrar;
     const pendingFallbackRow = pendingFallback.rows[0] ?? {};
     const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
@@ -432,11 +448,11 @@ export const getPostgresClubFinanceSummary =
       pendingIncome,
       pendingExpenses,
       pendingNetBalance,
-      cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]) || fallbackCuotasACobrar,
+      cuotasAdeudadas: normalizeSuspiciousArsAmount(pickNumber(row, ["cuotas_adeudadas", "overdue_fees"])) || fallbackCuotasACobrar,
       cuotasACobrar,
-      futureReceivableFeesUntilMonthEnd: pickNumber(row, [
+      futureReceivableFeesUntilMonthEnd: normalizeSuspiciousArsAmount(pickNumber(row, [
         "future_receivable_fees_until_month_end",
-      ]) || fallbackFutureReceivables,
+      ])) || fallbackFutureReceivables,
       saldosAPagar: effectiveSaldosAPagar,
       projectedBalance: effectiveProjectedBalance,
       sectorBalances,
