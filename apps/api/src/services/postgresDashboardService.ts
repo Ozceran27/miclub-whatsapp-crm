@@ -281,6 +281,7 @@ export const getPostgresClubFinanceSummary =
       expenseByCategory,
       settlementSnapshots,
       receivablesFallback,
+      pendingFallback,
     ] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_dashboard_basic`,
@@ -320,12 +321,15 @@ export const getPostgresClubFinanceSummary =
               when e.status = 'nuevo_inscripto'::miclub.enrollment_status and e.due_date >= current_date then 'al_dia'::miclub.enrollment_status
               else e.status
             end as effective_status,
-            e.fee_amount * case
-              when upper(coalesce(s.code, s.name, '')) = 'FITNESS' then 0.5
-              when upper(coalesce(s.code, s.name, '')) = 'SALON' then 0
-              when upper(coalesce(s.code, s.name, '')) = 'AULA' then
-                case when coalesce(a.club_commission_percent, 0) > 1 then coalesce(a.club_commission_percent, 0) / 100 else coalesce(a.club_commission_percent, 0) end
-              else 0
+            case
+              when e.fee_amount <= 0 or e.status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
+              else e.fee_amount * case
+                when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
+                when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
+                when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) = 'AULA' then
+                  greatest(0, least(1, case when coalesce(a.club_commission_percent, 0) > 1 then coalesce(a.club_commission_percent, 0) / 100 else coalesce(a.club_commission_percent, 0) end))
+                else 0
+              end
             end as receivable_fee
           from miclub.enrollments e
           join miclub.activities a on a.id = e.activity_id
@@ -336,6 +340,15 @@ export const getPostgresClubFinanceSummary =
           coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_adeudadas,
           coalesce(sum(receivable_fee) filter (where effective_status = 'al_dia'::miclub.enrollment_status and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
         from enrollment_receivables`,
+      ),
+      pool.query<Record<string, unknown>>(
+        `select
+           coalesce(sum(case when movement_type = 'INGRESOS' then amount else 0 end), 0) as pending_income,
+           coalesce(sum(case when movement_type = 'EGRESOS' then amount else 0 end), 0) as pending_expenses,
+           coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as pending_net_balance
+         from miclub.v_movements_enriched
+         where replace(upper(coalesce(sector_name, '')), 'Ó', 'O') = 'ADMINISTRACION'
+           and (operational_status = 'PENDIENTE'::miclub.movement_status or financial_status = 'pendiente'::miclub.financial_status)`,
       ),
     ]);
     const row = {
@@ -402,10 +415,11 @@ export const getPostgresClubFinanceSummary =
     const fallbackFutureReceivables = pickNumber(fallbackReceivablesRow, [
       "future_receivable_fees_until_month_end",
     ]);
-    const dashboardCuotasACobrar = pickNumber(row, ["cuotas_a_cobrar", "receivable_fees"]);
-    const receivablesTotal = pickNumber(row, ["receivables_total"]);
-    const cuotasACobrar = dashboardCuotasACobrar || receivablesTotal || fallbackCuotasACobrar;
-    const pendingNetBalance = pickNumber(row, ["pending_net_balance"]);
+    const cuotasACobrar = fallbackCuotasACobrar;
+    const pendingFallbackRow = pendingFallback.rows[0] ?? {};
+    const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
+    const pendingExpenses = pickNumber(pendingFallbackRow, ["pending_expenses"]) || pickNumber(row, ["pending_expenses"]);
+    const pendingNetBalance = pickNumber(pendingFallbackRow, ["pending_net_balance"]) || pickNumber(row, ["pending_net_balance"]);
     // Regla crítica de equivalencia con ADMINISTRACIÓN:
     // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
     // Los saldos a pagar son obligaciones y nunca se suman al proyectado.
@@ -415,8 +429,8 @@ export const getPostgresClubFinanceSummary =
       cash: pickNumber(row, ["cash"]),
       bank: pickNumber(row, ["bank", "bank_balance"]),
       dollars: pickNumber(row, ["dollars", "usd"]),
-      pendingIncome: pickNumber(row, ["pending_income"]),
-      pendingExpenses: pickNumber(row, ["pending_expenses"]),
+      pendingIncome,
+      pendingExpenses,
       pendingNetBalance,
       cuotasAdeudadas: pickNumber(row, ["cuotas_adeudadas", "overdue_fees"]) || fallbackCuotasACobrar,
       cuotasACobrar,
