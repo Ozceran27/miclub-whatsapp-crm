@@ -57,13 +57,14 @@ import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets,
 import { shouldUsePostgresDataSource } from "./services/dataSourceService.js";
 import { emptyPostgresClubFinanceSummary, emptyPostgresSectorOperationalSummary, emptyPostgresSummary, getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "./services/postgresDashboardService.js";
 import { getPostgresHealth } from "./db/health.js";
-import { validatePostgresEnv } from "./config/env.js";
+import { validatePostgresEnv, warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
 import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "./services/comparisonService.js";
 import { createAuthProtection, isProtectedApiPath } from "./middleware/auth.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const debugEndpointsEnabled = process.env.DEBUG_ENDPOINTS_ENABLED === "true";
+warnIfProductionCrmSourceIsNotPostgres(isProduction);
 app.set("trust proxy", true);
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());

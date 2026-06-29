@@ -13,6 +13,11 @@ const readOptional = (key: string): string | undefined => {
   return value ? value : undefined;
 };
 
+const normalize = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.toLowerCase() : undefined;
+};
+
 const parseBoolean = (key: string, defaultValue: boolean): boolean => {
   const value = readOptional(key);
   if (!value) return defaultValue;
@@ -57,4 +62,13 @@ export const validatePostgresEnv = (env: PostgresEnv = getPostgresEnv()): string
     .map(([key]) => key);
 
   return missing.length > 0 ? [`Faltan variables PostgreSQL: ${missing.join(", ")}.`] : [];
+};
+
+export const warnIfProductionCrmSourceIsNotPostgres = (isProduction: boolean): void => {
+  if (!isProduction) return;
+
+  const crmSource = normalize(process.env.CRM_SOURCE) ?? "sqlite";
+  if (crmSource === "postgres") return;
+
+  console.warn(`CRM_SOURCE debería ser postgres en producción. Valor actual: ${crmSource}. Se mantiene el comportamiento legacy/local sin bloquear el arranque.`);
 };
