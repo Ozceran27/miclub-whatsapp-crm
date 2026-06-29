@@ -2,7 +2,9 @@ import { Router } from "express";
 import { getConfiguredDataSource, isPostgresEnabled } from "../config/featureFlags.js";
 import { validatePostgresEnv } from "../config/env.js";
 import { getPostgresHealth } from "../db/health.js";
+import { auditSqliteCrmData, migrateCrmToPostgres } from "../services/crmService.js";
 
+// migración/debug: paths bajo /api/db; no renombrar sin migración frontend.
 const router = Router();
 
 router.get("/health", async (_req, res) => {
@@ -29,6 +31,27 @@ router.get("/health", async (_req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo consultar PostgreSQL.";
     return res.status(503).json({ ok: false, postgresEnabled: true, dataSource, message });
+  }
+});
+
+
+router.get("/crm/audit", async (_req, res) => {
+  try {
+    res.json(await auditSqliteCrmData());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo auditar CRM legacy.";
+    res.status(500).json({ error: true, message });
+  }
+});
+
+router.post("/crm/migrate", async (req, res) => {
+  const dryRun = req.body?.dryRun !== false;
+  const phase = ["templates", "history", "all"].includes(req.body?.phase) ? req.body.phase : "all";
+  try {
+    res.json(await migrateCrmToPostgres({ dryRun, phase }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo migrar CRM a PostgreSQL.";
+    res.status(500).json({ error: true, message });
   }
 });
 

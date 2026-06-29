@@ -1,3 +1,4 @@
+// legacy-compat: paths raíz del CRM; no renombrar sin migración frontend.
 import { randomUUID } from "node:crypto";
 import { Router, type Response } from "express";
 import type { Member, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";

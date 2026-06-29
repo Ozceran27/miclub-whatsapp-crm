@@ -3,6 +3,7 @@ import asyncHandler from "./asyncHandler.js";
 import { getPeople } from "../repositories/peopleRepository.js";
 import { normalizeCatalogRow } from "../services/catalogService.js";
 
+// productivo: personas bajo /api; no renombrar sin migración frontend.
 const router = Router();
 
 const DEFAULT_LIMIT = 50;
