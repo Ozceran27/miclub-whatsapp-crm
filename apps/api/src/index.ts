@@ -109,6 +109,13 @@ const allDb = <T>(query: string, params: unknown[] = []): Promise<T[]> =>
 
 let lastSyncAt: string | undefined;
 let lastSyncError: string | undefined;
+const mockSyncWarningKeys = new Set<string>();
+
+const warnMockSyncStatus = (reason: string): void => {
+  if (mockSyncWarningKeys.has(reason)) return;
+  mockSyncWarningKeys.add(reason);
+  console.warn(`[sync-status] Respondiendo con source=mock (${reason}). mockData es fallback legacy y no fuente productiva.`);
+};
 
 const postgresFallback = <T>(operation: string, fallback: T, error: unknown): T & { dataSourceError: string } => {
   const message = error instanceof Error ? error.message : `Error desconocido al consultar ${operation}.`;
@@ -148,6 +155,7 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
 
   if (!config.enabled) {
     lastSyncError = undefined;
+    warnMockSyncStatus("google_sheets_disabled");
     return {
       members: mockMembers,
       syncStatus: { source: "mock", enabled: false, sheets: SHEET_NAMES }
@@ -157,6 +165,7 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
   if (!config.credentialsPresent) {
     lastSyncError = "Google Sheets está habilitado pero faltan credenciales. Usando datos mock.";
     console.warn(lastSyncError);
+    warnMockSyncStatus("google_sheets_missing_credentials");
     return {
       members: mockMembers,
       syncStatus: { source: "mock", enabled: true, sheets: SHEET_NAMES, error: lastSyncError }
@@ -176,6 +185,7 @@ const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: Sync
     const message = error instanceof Error ? error.message : "Error desconocido al sincronizar con Google Sheets.";
     lastSyncError = `Google Sheets falló, usando datos mock. ${message}`;
     console.warn(lastSyncError);
+    warnMockSyncStatus("google_sheets_sync_failed");
     return {
       members: mockMembers,
       syncStatus: { source: "mock", enabled: true, sheets: SHEET_NAMES, lastSyncAt, error: lastSyncError }

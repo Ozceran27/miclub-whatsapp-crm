@@ -1,3 +1,6 @@
+// Fallback legacy: estos datos sostienen demos, desarrollo local y pruebas manuales
+// cuando Google Sheets/PostgreSQL no están disponibles. No usarlos como fuente productiva.
+// Ver docs/architecture-current.md antes de mover o eliminar este archivo.
 import type { Member, MessageTemplate } from "@miclub/shared";
 
 export const members: Member[] = [
