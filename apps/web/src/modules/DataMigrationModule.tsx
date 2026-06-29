@@ -1,61 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiUrl } from '../api';
-
-type EndpointState<T> = {
-  loading: boolean;
-  error?: string;
-  data?: T;
-};
-
-type ImportSummary = {
-  batchId?: string;
-  dryRun?: boolean;
-  read?: number;
-  errors?: number;
-  warnings?: string[] | number;
-  attemptedWrites?: number;
-  persistedWrites?: number;
-  rolledBackWrites?: number;
-  enrollmentsProcessed?: number;
-  movementsProcessed?: number;
-};
-
-type ImportBatch = {
-  id?: string;
-  batch_id?: string;
-  dry_run?: boolean;
-  status?: string;
-  started_at?: string;
-  finished_at?: string;
-  errors?: number;
-  warnings?: string[] | number;
-  read?: number;
-  persisted_writes?: number;
-  rolled_back_writes?: number;
-  total_count?: string | number;
-};
-
-type ImportBatchesResponse = {
-  rows?: ImportBatch[];
-  total?: number;
-  limit?: number;
-  offset?: number;
-};
-
-type ImportError = {
-  id?: string;
-  row_number?: number;
-  source?: string;
-  severity?: string;
-  message?: string;
-  details?: unknown;
-  created_at?: string;
-};
-
-type ImportErrorsResponse = {
-  rows?: ImportError[];
-  total?: number;
-};
+import { type EndpointState, type ImportSummary } from '../services/api/importApi';
+import { getBatchId, useDataMigration } from './DataMigration/useDataMigration';
 
 const SUMMARY_FIELDS: Array<{ key: keyof ImportSummary; label: string }> = [
   { key: 'read', label: 'Filas leídas' },
@@ -68,23 +12,6 @@ const SUMMARY_FIELDS: Array<{ key: keyof ImportSummary; label: string }> = [
   { key: 'movementsProcessed', label: 'Movimientos procesados' }
 ];
 
-const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error desconocido';
-
-const fetchJson = async <T,>(path: `/${string}`, init?: RequestInit): Promise<T> => {
-  const response = await fetch(apiUrl(path), {
-    headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
-    ...init
-  });
-  const payload = await response.json().catch(() => undefined) as T | { message?: string } | undefined;
-
-  if (!response.ok) {
-    const message = payload && typeof payload === 'object' && 'message' in payload ? payload.message : undefined;
-    throw new Error(message || `HTTP ${response.status}`);
-  }
-
-  return payload as T;
-};
-
 const formatValue = (value: unknown) => {
   if (value === undefined || value === null || value === '') return '—';
   if (Array.isArray(value)) return String(value.length);
@@ -95,8 +22,6 @@ const formatValue = (value: unknown) => {
 
 const formatDateTime = (value?: string) => value ? new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
-const getBatchId = (batch: ImportBatch) => batch.id ?? batch.batch_id ?? '';
-
 const JsonPanel = ({ title, state }: { title: string; state: EndpointState<unknown> }) => (
   <article className="card migration-status-card">
     <h4>{title}</h4>
@@ -106,105 +31,46 @@ const JsonPanel = ({ title, state }: { title: string; state: EndpointState<unkno
   </article>
 );
 
+const renderSummary = (summary: ImportSummary | null, title: string) => (
+  <article className="card migration-summary-card">
+    <h4>{title}</h4>
+    {!summary ? <p className="section-note">Sin ejecución registrada en esta sesión.</p> : (
+      <>
+        <p className="section-note">Batch: {summary.batchId ?? '—'} · Modo: {summary.dryRun ? 'dry-run' : 'real'}</p>
+        <dl className="migration-summary-grid">
+          {SUMMARY_FIELDS.map(({ key, label }) => (
+            <div key={key} className="migration-summary-item">
+              <dt>{label}</dt>
+              <dd>{formatValue(summary[key])}</dd>
+            </div>
+          ))}
+        </dl>
+        {Array.isArray(summary.warnings) && summary.warnings.length > 0 && (
+          <ul className="migration-warning-list">{summary.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+        )}
+      </>
+    )}
+  </article>
+);
+
 export default function DataMigrationModule() {
-  const [dbHealth, setDbHealth] = useState<EndpointState<unknown>>({ loading: true });
-  const [syncStatus, setSyncStatus] = useState<EndpointState<unknown>>({ loading: true });
-  const [batches, setBatches] = useState<EndpointState<ImportBatchesResponse>>({ loading: true });
-  const [lastDryRun, setLastDryRun] = useState<ImportSummary | null>(null);
-  const [lastImport, setLastImport] = useState<ImportSummary | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [isRunningDryRun, setIsRunningDryRun] = useState(false);
-  const [isRunningImport, setIsRunningImport] = useState(false);
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
-  const [batchErrors, setBatchErrors] = useState<EndpointState<ImportErrorsResponse>>({ loading: false });
-
-  const loadStatus = useCallback(async () => {
-    setDbHealth({ loading: true });
-    setSyncStatus({ loading: true });
-    setBatches({ loading: true });
-
-    const [healthResult, syncResult, batchesResult] = await Promise.allSettled([
-      fetchJson<unknown>('/api/db/health'),
-      fetchJson<unknown>('/sync-status'),
-      fetchJson<ImportBatchesResponse>('/api/import/batches?limit=10')
-    ]);
-
-    setDbHealth(healthResult.status === 'fulfilled' ? { loading: false, data: healthResult.value } : { loading: false, error: getErrorMessage(healthResult.reason) });
-    setSyncStatus(syncResult.status === 'fulfilled' ? { loading: false, data: syncResult.value } : { loading: false, error: getErrorMessage(syncResult.reason) });
-    setBatches(batchesResult.status === 'fulfilled' ? { loading: false, data: batchesResult.value } : { loading: false, error: getErrorMessage(batchesResult.reason) });
-  }, []);
-
-  useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
-
-  const canRunImport = (lastDryRun?.errors ?? Number.POSITIVE_INFINITY) === 0;
-
-  const selectedBatch = useMemo(() => batches.data?.rows?.find((batch) => getBatchId(batch) === selectedBatchId), [batches.data?.rows, selectedBatchId]);
-
-  const runImport = async (dryRun: boolean) => {
-    setActionError(null);
-    if (!dryRun) {
-      const confirmed = window.confirm('Confirmá explícitamente la importación REAL a PostgreSQL. Esta acción persistirá cambios si la API valida la operación.');
-      if (!confirmed) return;
-    }
-
-    if (dryRun) setIsRunningDryRun(true);
-    else setIsRunningImport(true);
-
-    try {
-      const summary = await fetchJson<ImportSummary>('/api/import/google-sheets', {
-        method: 'POST',
-        body: JSON.stringify({ dryRun, batchSize: 50 })
-      });
-      if (dryRun) setLastDryRun(summary);
-      else setLastImport(summary);
-      await loadStatus();
-    } catch (error) {
-      setActionError(getErrorMessage(error));
-    } finally {
-      setIsRunningDryRun(false);
-      setIsRunningImport(false);
-    }
-  };
-
-  const loadBatchErrors = async (batchId: string) => {
-    setSelectedBatchId(batchId);
-    if (!batchId) {
-      setBatchErrors({ loading: false });
-      return;
-    }
-    setBatchErrors({ loading: true });
-    try {
-      const errors = await fetchJson<ImportErrorsResponse>(`/api/import/batches/${encodeURIComponent(batchId)}/errors?limit=100` as `/${string}`);
-      setBatchErrors({ loading: false, data: errors });
-    } catch (error) {
-      setBatchErrors({ loading: false, error: getErrorMessage(error) });
-    }
-  };
-
-  const renderSummary = (summary: ImportSummary | null, title: string) => (
-    <article className="card migration-summary-card">
-      <h4>{title}</h4>
-      {!summary ? <p className="section-note">Sin ejecución registrada en esta sesión.</p> : (
-        <>
-          <p className="section-note">Batch: {summary.batchId ?? '—'} · Modo: {summary.dryRun ? 'dry-run' : 'real'}</p>
-          <dl className="migration-summary-grid">
-            {SUMMARY_FIELDS.map(({ key, label }) => (
-              <div key={key} className="migration-summary-item">
-                <dt>{label}</dt>
-                <dd>{formatValue(summary[key])}</dd>
-              </div>
-            ))}
-          </dl>
-          {Array.isArray(summary.warnings) && summary.warnings.length > 0 && (
-            <ul className="migration-warning-list">{summary.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-          )}
-        </>
-      )}
-    </article>
-  );
-
+  const {
+    dbHealth,
+    syncStatus,
+    batches,
+    lastDryRun,
+    lastImport,
+    actionError,
+    isRunningDryRun,
+    isRunningImport,
+    selectedBatchId,
+    selectedBatch,
+    batchErrors,
+    canRunImport,
+    loadStatus,
+    runImport,
+    loadBatchErrors
+  } = useDataMigration();
   return (
     <main className="module-content">
       <section className="module-hero">
