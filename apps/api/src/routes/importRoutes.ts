@@ -4,6 +4,7 @@ import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrat
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
 import asyncHandler from "./asyncHandler.js";
 
+// migración: importadores bajo /api/import; no renombrar sin migración frontend.
 const router = Router();
 
 const requireImportEndpointsEnabled = (_req: Request, res: Response, next: NextFunction) => {

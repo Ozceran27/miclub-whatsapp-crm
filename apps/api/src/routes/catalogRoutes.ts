@@ -3,6 +3,7 @@ import asyncHandler from "./asyncHandler.js";
 import { getCatalog, getCatalogItems, listCatalogs } from "../services/catalogService.js";
 import { isCatalogName, type CatalogName } from "../repositories/catalogRepository.js";
 
+// productivo: catálogo bajo /api; no renombrar sin migración frontend.
 const router = Router();
 
 const catalogEndpoints: Array<{ path: string; catalog: CatalogName }> = [

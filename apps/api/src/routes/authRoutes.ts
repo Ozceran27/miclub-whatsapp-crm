@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authEnabled, authPassword, authUser, clearSessionCookie, getSession, safeEqual, setSessionCookie } from "../middleware/auth.js";
 
+// auth: paths públicos de autenticación; no renombrar sin migración frontend.
 const router = Router();
 
 router.post("/login", (req, res) => {

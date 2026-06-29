@@ -2,6 +2,7 @@ import { Router } from "express";
 import asyncHandler from "./asyncHandler.js";
 import { getOperationalBalances, getSectorSettlements, listMovements, listPayments, listReceivables } from "../services/financeService.js";
 
+// productivo: finanzas bajo /api; no renombrar sin migración frontend.
 const router = Router();
 
 router.get("/movements", asyncHandler(async (_req, res) => res.json(await listMovements())));
