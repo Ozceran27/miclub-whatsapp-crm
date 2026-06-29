@@ -1,6 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiUrl } from '../api';
+import { getBatchId, useDataMigration } from './DataMigration/useDataMigration';
 const SUMMARY_FIELDS = [
     { key: 'read', label: 'Filas leídas' },
     { key: 'errors', label: 'Errores' },
@@ -11,19 +10,6 @@ const SUMMARY_FIELDS = [
     { key: 'enrollmentsProcessed', label: 'Inscripciones procesadas' },
     { key: 'movementsProcessed', label: 'Movimientos procesados' }
 ];
-const getErrorMessage = (error) => error instanceof Error ? error.message : 'Error desconocido';
-const fetchJson = async (path, init) => {
-    const response = await fetch(apiUrl(path), {
-        headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
-        ...init
-    });
-    const payload = await response.json().catch(() => undefined);
-    if (!response.ok) {
-        const message = payload && typeof payload === 'object' && 'message' in payload ? payload.message : undefined;
-        throw new Error(message || `HTTP ${response.status}`);
-    }
-    return payload;
-};
 const formatValue = (value) => {
     if (value === undefined || value === null || value === '')
         return '—';
@@ -36,83 +22,10 @@ const formatValue = (value) => {
     return String(value);
 };
 const formatDateTime = (value) => value ? new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-const getBatchId = (batch) => batch.id ?? batch.batch_id ?? '';
 const JsonPanel = ({ title, state }) => (_jsxs("article", { className: "card migration-status-card", children: [_jsx("h4", { children: title }), state.loading && _jsx("p", { className: "section-note", children: "Cargando\u2026" }), state.error && _jsx("p", { className: "error-msg", children: state.error }), state.data !== undefined && _jsx("pre", { className: "migration-json", children: JSON.stringify(state.data, null, 2) })] }));
+const renderSummary = (summary, title) => (_jsxs("article", { className: "card migration-summary-card", children: [_jsx("h4", { children: title }), !summary ? _jsx("p", { className: "section-note", children: "Sin ejecuci\u00F3n registrada en esta sesi\u00F3n." }) : (_jsxs(_Fragment, { children: [_jsxs("p", { className: "section-note", children: ["Batch: ", summary.batchId ?? '—', " \u00B7 Modo: ", summary.dryRun ? 'dry-run' : 'real'] }), _jsx("dl", { className: "migration-summary-grid", children: SUMMARY_FIELDS.map(({ key, label }) => (_jsxs("div", { className: "migration-summary-item", children: [_jsx("dt", { children: label }), _jsx("dd", { children: formatValue(summary[key]) })] }, key))) }), Array.isArray(summary.warnings) && summary.warnings.length > 0 && (_jsx("ul", { className: "migration-warning-list", children: summary.warnings.map((warning) => _jsx("li", { children: warning }, warning)) }))] }))] }));
 export default function DataMigrationModule() {
-    const [dbHealth, setDbHealth] = useState({ loading: true });
-    const [syncStatus, setSyncStatus] = useState({ loading: true });
-    const [batches, setBatches] = useState({ loading: true });
-    const [lastDryRun, setLastDryRun] = useState(null);
-    const [lastImport, setLastImport] = useState(null);
-    const [actionError, setActionError] = useState(null);
-    const [isRunningDryRun, setIsRunningDryRun] = useState(false);
-    const [isRunningImport, setIsRunningImport] = useState(false);
-    const [selectedBatchId, setSelectedBatchId] = useState('');
-    const [batchErrors, setBatchErrors] = useState({ loading: false });
-    const loadStatus = useCallback(async () => {
-        setDbHealth({ loading: true });
-        setSyncStatus({ loading: true });
-        setBatches({ loading: true });
-        const [healthResult, syncResult, batchesResult] = await Promise.allSettled([
-            fetchJson('/api/db/health'),
-            fetchJson('/sync-status'),
-            fetchJson('/api/import/batches?limit=10')
-        ]);
-        setDbHealth(healthResult.status === 'fulfilled' ? { loading: false, data: healthResult.value } : { loading: false, error: getErrorMessage(healthResult.reason) });
-        setSyncStatus(syncResult.status === 'fulfilled' ? { loading: false, data: syncResult.value } : { loading: false, error: getErrorMessage(syncResult.reason) });
-        setBatches(batchesResult.status === 'fulfilled' ? { loading: false, data: batchesResult.value } : { loading: false, error: getErrorMessage(batchesResult.reason) });
-    }, []);
-    useEffect(() => {
-        void loadStatus();
-    }, [loadStatus]);
-    const canRunImport = (lastDryRun?.errors ?? Number.POSITIVE_INFINITY) === 0;
-    const selectedBatch = useMemo(() => batches.data?.rows?.find((batch) => getBatchId(batch) === selectedBatchId), [batches.data?.rows, selectedBatchId]);
-    const runImport = async (dryRun) => {
-        setActionError(null);
-        if (!dryRun) {
-            const confirmed = window.confirm('Confirmá explícitamente la importación REAL a PostgreSQL. Esta acción persistirá cambios si la API valida la operación.');
-            if (!confirmed)
-                return;
-        }
-        if (dryRun)
-            setIsRunningDryRun(true);
-        else
-            setIsRunningImport(true);
-        try {
-            const summary = await fetchJson('/api/import/google-sheets', {
-                method: 'POST',
-                body: JSON.stringify({ dryRun, batchSize: 50 })
-            });
-            if (dryRun)
-                setLastDryRun(summary);
-            else
-                setLastImport(summary);
-            await loadStatus();
-        }
-        catch (error) {
-            setActionError(getErrorMessage(error));
-        }
-        finally {
-            setIsRunningDryRun(false);
-            setIsRunningImport(false);
-        }
-    };
-    const loadBatchErrors = async (batchId) => {
-        setSelectedBatchId(batchId);
-        if (!batchId) {
-            setBatchErrors({ loading: false });
-            return;
-        }
-        setBatchErrors({ loading: true });
-        try {
-            const errors = await fetchJson(`/api/import/batches/${encodeURIComponent(batchId)}/errors?limit=100`);
-            setBatchErrors({ loading: false, data: errors });
-        }
-        catch (error) {
-            setBatchErrors({ loading: false, error: getErrorMessage(error) });
-        }
-    };
-    const renderSummary = (summary, title) => (_jsxs("article", { className: "card migration-summary-card", children: [_jsx("h4", { children: title }), !summary ? _jsx("p", { className: "section-note", children: "Sin ejecuci\u00F3n registrada en esta sesi\u00F3n." }) : (_jsxs(_Fragment, { children: [_jsxs("p", { className: "section-note", children: ["Batch: ", summary.batchId ?? '—', " \u00B7 Modo: ", summary.dryRun ? 'dry-run' : 'real'] }), _jsx("dl", { className: "migration-summary-grid", children: SUMMARY_FIELDS.map(({ key, label }) => (_jsxs("div", { className: "migration-summary-item", children: [_jsx("dt", { children: label }), _jsx("dd", { children: formatValue(summary[key]) })] }, key))) }), Array.isArray(summary.warnings) && summary.warnings.length > 0 && (_jsx("ul", { className: "migration-warning-list", children: summary.warnings.map((warning) => _jsx("li", { children: warning }, warning)) }))] }))] }));
+    const { dbHealth, syncStatus, batches, lastDryRun, lastImport, actionError, isRunningDryRun, isRunningImport, selectedBatchId, selectedBatch, batchErrors, canRunImport, loadStatus, runImport, loadBatchErrors } = useDataMigration();
     return (_jsxs("main", { className: "module-content", children: [_jsxs("section", { className: "module-hero", children: [_jsxs("div", { children: [_jsx("p", { className: "eyebrow", children: "Migraci\u00F3n controlada" }), _jsx("h2", { children: "Panel temporal de importaci\u00F3n" }), _jsx("p", { children: "Uso interno durante la ventana operativa de Google Sheets a PostgreSQL." })] }), _jsx("button", { className: "icon-btn", type: "button", onClick: () => void loadStatus(), children: "Actualizar estado" })] }), _jsxs("section", { className: "section-panel migration-alert", children: [_jsx("strong", { children: "Requisito operativo:" }), " los endpoints de importaci\u00F3n requieren ", _jsx("code", { children: "IMPORT_ENDPOINTS_ENABLED=true" }), " \u00FAnicamente durante una ventana controlada. Volver a ", _jsx("code", { children: "false" }), " al finalizar."] }), actionError && _jsxs("p", { className: "error-msg", children: ["Error de operaci\u00F3n: ", actionError] }), _jsxs("section", { className: "migration-status-grid", "aria-label": "Estado actual de servicios", children: [_jsx(JsonPanel, { title: "GET /api/db/health", state: dbHealth }), _jsx(JsonPanel, { title: "GET /sync-status", state: syncStatus }), _jsx(JsonPanel, { title: "GET /api/import/batches?limit=10", state: batches })] }), _jsxs("section", { className: "section-panel", children: [_jsxs("div", { className: "section-header", children: [_jsxs("div", { children: [_jsx("h3", { children: "Operaciones de importaci\u00F3n" }), _jsx("p", { children: "Primero ejecutar dry-run; la importaci\u00F3n real se habilita solo con cero errores." })] }), _jsxs("div", { className: "actions-row", children: [_jsx("button", { type: "button", onClick: () => void runImport(true), disabled: isRunningDryRun || isRunningImport, children: "Ejecutar dry-run" }), _jsx("button", { type: "button", onClick: () => void runImport(false), disabled: !canRunImport || isRunningDryRun || isRunningImport, children: "Ejecutar importaci\u00F3n real" })] })] }), !canRunImport && _jsxs("p", { className: "section-note", children: ["La importaci\u00F3n real queda bloqueada hasta que el \u00FAltimo dry-run de esta sesi\u00F3n tenga ", _jsx("strong", { children: "errors === 0" }), "."] }), _jsxs("div", { className: "migration-summary-stack", children: [renderSummary(lastDryRun, 'Resumen del último dry-run'), renderSummary(lastImport, 'Resumen de la última importación real')] })] }), _jsxs("section", { className: "section-panel", children: [_jsxs("div", { className: "section-header", children: [_jsxs("div", { children: [_jsx("h3", { children: "Errores por batch" }), _jsxs("p", { children: ["Seleccion\u00E1 un batch reciente para consultar ", _jsx("code", { children: "GET /api/import/batches/:id/errors" }), "."] })] }), _jsxs("select", { value: selectedBatchId, onChange: (event) => void loadBatchErrors(event.target.value), children: [_jsx("option", { value: "", children: "Seleccionar batch\u2026" }), batches.data?.rows?.map((batch) => {
                                         const id = getBatchId(batch);
                                         return _jsxs("option", { value: id, children: [id, " \u00B7 ", batch.status ?? 'sin estado'] }, id);
