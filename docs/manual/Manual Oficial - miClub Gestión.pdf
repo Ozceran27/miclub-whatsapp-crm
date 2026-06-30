@@ -1,0 +1,288 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 3583 >>
+stream
+BT /F1 11 Tf 50 805 Td (Manual Oficial - miClub Gestion | Capitulo 1 Inicio) Tj ET
+BT /F1 16 Tf 50 790 Td (PORTADA) Tj ET
+BT /F1 10 Tf 50 766 Td (Manual Oficial de Usuario ? miClub Gestin) Tj ET
+BT /F1 10 Tf 50 750 Td (Sistema Integral de Gestin Operativa) Tj ET
+BT /F1 10 Tf 50 734 Td (Versin del documento: 1.0 ? Captulo 1 Inicio) Tj ET
+BT /F1 10 Tf 50 718 Td (Fecha de generacin: 30/06/2026) Tj ET
+BT /F1 10 Tf 50 702 Td (Estado: Versin Estable) Tj ET
+BT /F1 10 Tf 50 686 Td (Logo: apps/web/public/logo/miClub - Logo trans.png) Tj ET
+BT /F1 10 Tf 50 670 Td () Tj ET
+BT /F1 16 Tf 50 654 Td (NDICE) Tj ET
+BT /F1 10 Tf 50 630 Td (Captulo 0 Presentacin) Tj ET
+BT /F1 10 Tf 50 614 Td (Captulo 1 Inicio) Tj ET
+BT /F1 10 Tf 50 598 Td (Captulo 2 Economa Club) Tj ET
+BT /F1 10 Tf 50 582 Td (Captulo 3 Espacio Fitness) Tj ET
+BT /F1 10 Tf 50 566 Td (Captulo 4 Saln) Tj ET
+BT /F1 10 Tf 50 550 Td (Captulo 5 Aula) Tj ET
+BT /F1 10 Tf 50 534 Td (Captulo 6 Local 1) Tj ET
+BT /F1 10 Tf 50 518 Td (Captulo 7 Cantina) Tj ET
+BT /F1 10 Tf 50 502 Td (Captulo 8 CRM) Tj ET
+BT /F1 10 Tf 50 486 Td (Captulo 9 Migracin) Tj ET
+BT /F1 10 Tf 50 470 Td (Captulo 10 Administracin) Tj ET
+BT /F1 10 Tf 50 454 Td (Captulo 11 Arquitectura Tcnica) Tj ET
+BT /F1 10 Tf 50 438 Td (Apndices) Tj ET
+BT /F1 10 Tf 50 422 Td () Tj ET
+BT /F1 16 Tf 50 406 Td (CAPTULO 1 ? INICIO) Tj ET
+BT /F1 10 Tf 50 382 Td () Tj ET
+BT /F1 10 Tf 50 366 Td (Alcance auditado. La pantalla Inicio est implementada por HomeModule,) Tj ET
+BT /F1 10 Tf 50 350 Td (useHomeDashboard, HomeMetricCards, RecentMovements y SectorDistribution. Consume) Tj ET
+BT /F1 10 Tf 50 334 Td (endpoints raz legacy compatibles: /summary, /members, /debtors, /sync-status,) Tj ET
+BT /F1 10 Tf 50 318 Td (/club-finance-summary y /sector-operational-summary. En el estado productivo) Tj ET
+BT /F1 10 Tf 50 302 Td (declarado, PostgreSQL es la fuente oficial; Google Sheets queda como origen) Tj ET
+BT /F1 10 Tf 50 286 Td (histrico de migracin y compatibilidad no productiva.) Tj ET
+BT /F1 10 Tf 50 270 Td () Tj ET
+BT /F1 10 Tf 50 254 Td (1. Panel Operativo) Tj ET
+BT /F1 10 Tf 50 238 Td (Qu representa: cabecera ejecutiva del Inicio con ttulo ?Panel operativo de) Tj ET
+BT /F1 10 Tf 50 222 Td (miClub?, estado de sincronizacin, fecha de ltima sincronizacin y botn) Tj ET
+BT /F1 10 Tf 50 206 Td (Sincronizar.) Tj ET
+BT /F1 10 Tf 50 190 Td (Estado: el frontend muestra ?Con advertencias? si /sync-status devuelve error;) Tj ET
+BT /F1 10 Tf 50 174 Td (muestra ?Google Sheets conectado? si la fuente fuese google_sheets; para cualquier) Tj ET
+BT /F1 10 Tf 50 158 Td (otro caso muestra ?Datos mock/locales?. Inconsistencia: para source=postgres no) Tj ET
+BT /F1 10 Tf 50 142 Td (existe etiqueta especfica y el frontend cae en ?Datos mock/locales?, aunque el) Tj ET
+BT /F1 10 Tf 50 126 Td (backend productivo responde source=postgres. Impacto: puede confundir al usuario) Tj ET
+BT /F1 10 Tf 50 110 Td (sobre el origen oficial. Solucin: agregar etiqueta ?PostgreSQL conectado?.) Tj ET
+BT /F1 10 Tf 50 94 Td (ltima sincronizacin: se formatea en es-AR desde lastSyncAt. En PostgreSQL,) Tj ET
+BT /F1 10 Tf 50 78 Td (/sync-status ejecuta health check; si es correcto actualiza lastSyncAt con la) Tj ET
+BT /F1 10 Tf 50 62 Td (fecha/hora actual.) Tj ET
+BT /F1 10 Tf 50 46 Td (Botn Sincronizar: vuelve a ejecutar loadHome y recarga en paralelo todos los) Tj ET
+BT /F1 10 Tf 50 30 Td (endpoints del Inicio. No importa datos ni escribe en PostgreSQL; solo refresca la) Tj ET
+BT /F1 10 Tf 50 14 Td (vista.) Tj ET
+BT /F1 9 Tf 285 25 Td (1) Tj ET
+endstream
+endobj
+3 0 obj
+<< /Length 4650 >>
+stream
+BT /F1 11 Tf 50 805 Td (Manual Oficial - miClub Gestion | Capitulo 1 Inicio) Tj ET
+BT /F1 10 Tf 50 790 Td (Origen de datos: DATA_SOURCE=postgres activa PostgreSQL mediante) Tj ET
+BT /F1 10 Tf 50 774 Td (shouldUsePostgresDataSource. Google Sheets no es backend oficial; aparece solo en) Tj ET
+BT /F1 10 Tf 50 758 Td (rutas heredadas y procesos de migracin.) Tj ET
+BT /F1 10 Tf 50 742 Td (Tablas/servicios: /sync-status usa getPostgresHealth y validatePostgresEnv. Los) Tj ET
+BT /F1 10 Tf 50 726 Td (datos funcionales se construyen desde people, enrollments, activities, sectors,) Tj ET
+BT /F1 10 Tf 50 710 Td (movements, operational_balances y sheet_metric_snapshots.) Tj ET
+BT /F1 10 Tf 50 694 Td () Tj ET
+BT /F1 10 Tf 50 678 Td (2. Resumen Financiero) Tj ET
+BT /F1 10 Tf 50 662 Td (Endpoint: GET /club-finance-summary. Servicio: getPostgresClubFinanceSummary.) Tj ET
+BT /F1 10 Tf 50 646 Td (Consultas principales: miclub.v_dashboard_basic, miclub.operational_balances,) Tj ET
+BT /F1 10 Tf 50 630 Td (miclub.v_sector_settlement_balances y miclub.v_movements_enriched.) Tj ET
+BT /F1 10 Tf 50 614 Td (Liquidez: valor destacado. En la vista SQL se calcula como capital sin dlares +) Tj ET
+BT /F1 10 Tf 50 598 Td (saldos positivos a liquidar + dlares valorizados por tipo de cambio del ltimo) Tj ET
+BT /F1 10 Tf 50 582 Td (operational_balances. En el servicio se toma de operational_balances ms reciente) Tj ET
+BT /F1 10 Tf 50 566 Td (o de v_dashboard_basic. Interpretacin: capacidad econmica operativa actual del) Tj ET
+BT /F1 10 Tf 50 550 Td (club.) Tj ET
+BT /F1 10 Tf 50 534 Td (Caja: suma neta de movimientos administrativos completados con payment_method) Tj ET
+BT /F1 10 Tf 50 518 Td (efectivo: ingresos/capital suman, egresos restan.) Tj ET
+BT /F1 10 Tf 50 502 Td (Banco: suma neta de movimientos administrativos completados con payment_method) Tj ET
+BT /F1 10 Tf 50 486 Td (transferencia: ingresos/capital suman, egresos restan.) Tj ET
+BT /F1 10 Tf 50 470 Td (Dlares: suma neta de movimientos administrativos completados cuya categora) Tj ET
+BT /F1 10 Tf 50 454 Td (normalizada es DOLARES: ingresos/capital suman y egresos restan. Se presenta como) Tj ET
+BT /F1 10 Tf 50 438 Td (USD entero redondeado.) Tj ET
+BT /F1 10 Tf 50 422 Td (Movimientos incluidos: movimientos de Administracin completados para saldos) Tj ET
+BT /F1 10 Tf 50 406 Td (reales; capital, ingresos y egresos segn tipo; mtodo de pago) Tj ET
+BT /F1 10 Tf 50 390 Td (efectivo/transferencia; categora Dlares para USD.) Tj ET
+BT /F1 10 Tf 50 374 Td (Movimientos excluidos: pendientes, cancelados/no completados para) Tj ET
+BT /F1 10 Tf 50 358 Td (caja/banco/dlares; movimientos fuera de Administracin para saldos) Tj ET
+BT /F1 10 Tf 50 342 Td (administrativos; importes sin estado o categora que no cumplen las reglas.) Tj ET
+BT /F1 10 Tf 50 326 Td (Ajustes manuales: operational_balances se ordena por cutoff_date y created_at) Tj ET
+BT /F1 10 Tf 50 310 Td (descendente; el registro ms reciente prevalece como foto operativa, incluyendo) Tj ET
+BT /F1 10 Tf 50 294 Td (source_payload con tipo de cambio histrico.) Tj ET
+BT /F1 10 Tf 50 278 Td () Tj ET
+BT /F1 10 Tf 50 262 Td (3. Saldos Operativos) Tj ET
+BT /F1 10 Tf 50 246 Td (Endpoint: GET /club-finance-summary. Servicio: getPostgresClubFinanceSummary.) Tj ET
+BT /F1 10 Tf 50 230 Td (Contrato compartido: ClubOperationsSummary.) Tj ET
+BT /F1 10 Tf 50 214 Td (Cuotas a Cobrar: suma de receivable_fee de inscripciones cuyo estado efectivo es) Tj ET
+BT /F1 10 Tf 50 198 Td (adeudando. La cuota se normaliza si lleg inflada por mil: valores enteros >=) Tj ET
+BT /F1 10 Tf 50 182 Td (1.000.000 divisibles por 1.000 se dividen por 1.000. Se excluyen cuotas <= 0,) Tj ET
+BT /F1 10 Tf 50 166 Td (abandonados y cancelados. Comisin aplicada: Fitness 50%; Saln 0%; Aula usa) Tj ET
+BT /F1 10 Tf 50 150 Td (club_commission_percent acotado entre 0 y 1; otros sectores 0.) Tj ET
+BT /F1 10 Tf 50 134 Td (Saldos Pendientes: pendingNetBalance = pendingIncome - pendingExpenses. El SQL de) Tj ET
+BT /F1 10 Tf 50 118 Td (la vista suma adems futureReceivableFeesUntilMonthEnd, pero el servicio usa un) Tj ET
+BT /F1 10 Tf 50 102 Td (fallback directo sobre v_movements_enriched filtrando source_payload.sheet =) Tj ET
+BT /F1 10 Tf 50 86 Td (ADMINISTRACIN y estado operativo PENDIENTE o estado financiero pendiente; por eso) Tj ET
+BT /F1 10 Tf 50 70 Td (el valor de la pantalla es neto de ingresos pendientes menos egresos pendientes) Tj ET
+BT /F1 10 Tf 50 54 Td (administrativos.) Tj ET
+BT /F1 10 Tf 50 38 Td (Saldos a Pagar: suma de saldos positivos a liquidar por sector. El servicio toma) Tj ET
+BT /F1 9 Tf 285 25 Td (2) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 4103 >>
+stream
+BT /F1 11 Tf 50 805 Td (Manual Oficial - miClub Gestion | Capitulo 1 Inicio) Tj ET
+BT /F1 10 Tf 50 790 Td (v_sector_settlement_balances con settlement_balance > 0 y complementa snapshots) Tj ET
+BT /F1 10 Tf 50 774 Td (histricos fitness/salon/aula/local1. Se muestra con signo negativo porque) Tj ET
+BT /F1 10 Tf 50 758 Td (representa obligacin.) Tj ET
+BT /F1 10 Tf 50 742 Td (Saldo Proyectado: frmula crtica del backend: Liquidez + Cuotas a cobrar + Saldos) Tj ET
+BT /F1 10 Tf 50 726 Td (pendientes - Saldos a pagar. Cambia al modificar movimientos pendientes,) Tj ET
+BT /F1 10 Tf 50 710 Td (pagos/estados de inscripciones, saldos de liquidacin o liquidez.) Tj ET
+BT /F1 10 Tf 50 694 Td (Registros que afectan: enrollments.fee_amount/status/due_date/activity_id;) Tj ET
+BT /F1 10 Tf 50 678 Td (activities.club_commission_percent/sector_id; sectors.code/name;) Tj ET
+BT /F1 10 Tf 50 662 Td (movements.amount/type/status/financial_status/source_payload;) Tj ET
+BT /F1 10 Tf 50 646 Td (operational_balances; sheet_metric_snapshots.) Tj ET
+BT /F1 10 Tf 50 630 Td () Tj ET
+BT /F1 10 Tf 50 614 Td (4. Ingresos por Sector) Tj ET
+BT /F1 10 Tf 50 598 Td (Endpoint /club-finance-summary. SQL: v_movements_enriched filtrada por) Tj ET
+BT /F1 10 Tf 50 582 Td (movement_type=INGRESOS y operational_status=COMPLETADO, agrupada por sector_name) Tj ET
+BT /F1 10 Tf 50 566 Td (con ?Sin datos? como fallback. Se ordena por monto descendente y nombre) Tj ET
+BT /F1 10 Tf 50 550 Td (ascendente, limitado a 4 filas. La pantalla marca con estrella el sector) Tj ET
+BT /F1 10 Tf 50 534 Td (principal. No cuenta egresos, pendientes ni movimientos no completados.) Tj ET
+BT /F1 10 Tf 50 518 Td () Tj ET
+BT /F1 10 Tf 50 502 Td (5. Egresos por Sector) Tj ET
+BT /F1 10 Tf 50 486 Td (Mismo endpoint y servicio. Filtra movement_type=EGRESOS y) Tj ET
+BT /F1 10 Tf 50 470 Td (operational_status=COMPLETADO, agrupa por sector_name, ordena por monto) Tj ET
+BT /F1 10 Tf 50 454 Td (descendente y limita a 4. El primer egreso se marca con seal visual negativa. No) Tj ET
+BT /F1 10 Tf 50 438 Td (incluye ingresos ni pendientes.) Tj ET
+BT /F1 10 Tf 50 422 Td () Tj ET
+BT /F1 10 Tf 50 406 Td (6. Inscriptos) Tj ET
+BT /F1 10 Tf 50 390 Td (Endpoints: /summary, /members y /debtors. Servicios: getPostgresSummary,) Tj ET
+BT /F1 10 Tf 50 374 Td (getPostgresMembers, getPostgresDebtors.) Tj ET
+BT /F1 10 Tf 50 358 Td (Total: cantidad de filas actuales de v_current_enrollments mapeadas como miembros.) Tj ET
+BT /F1 10 Tf 50 342 Td (Activos: inscripciones cuyo estado normalizado no es abandonado ni cancelado.) Tj ET
+BT /F1 10 Tf 50 326 Td (Al da: estado normalizado al_dia. Nuevo inscripto con due_date vigente puede) Tj ET
+BT /F1 10 Tf 50 310 Td (convertirse en ?Al da? durante el mapeo.) Tj ET
+BT /F1 10 Tf 50 294 Td (Adeudando: estado normalizado adeudando. Nuevo inscripto vencido puede convertirse) Tj ET
+BT /F1 10 Tf 50 278 Td (en ?Adeudando?.) Tj ET
+BT /F1 10 Tf 50 262 Td (Abandonados: estado abandonado.) Tj ET
+BT /F1 10 Tf 50 246 Td (Cancelados: estado cancelado.) Tj ET
+BT /F1 10 Tf 50 230 Td (Cuota promedio: promedio simple de cuotas positivas de miembros activos cargados) Tj ET
+BT /F1 10 Tf 50 214 Td (en frontend.) Tj ET
+BT /F1 10 Tf 50 198 Td (Adeudados por actividad: se filtran miembros deudores, se agrupan por actividad o) Tj ET
+BT /F1 10 Tf 50 182 Td (modalidad, se ordenan por cantidad descendente y nombre; se muestran las primeras) Tj ET
+BT /F1 10 Tf 50 166 Td (3 y un contador de actividades restantes.) Tj ET
+BT /F1 10 Tf 50 150 Td () Tj ET
+BT /F1 10 Tf 50 134 Td (7. Inscriptos por actividad) Tj ET
+BT /F1 10 Tf 50 118 Td (Se calcula en frontend con miembros activos: excluye abandonados y cancelados,) Tj ET
+BT /F1 10 Tf 50 102 Td (agrupa por actividad/modalidad, ordena por cantidad descendente y nombre, muestra) Tj ET
+BT /F1 10 Tf 50 86 Td (las primeras 6 y destaca la primera. No usa un endpoint especfico adicional:) Tj ET
+BT /F1 10 Tf 50 70 Td (depende de /members.) Tj ET
+BT /F1 10 Tf 50 54 Td () Tj ET
+BT /F1 10 Tf 50 38 Td (8. Distribucin Operativa por Sector) Tj ET
+BT /F1 9 Tf 285 25 Td (3) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 4526 >>
+stream
+BT /F1 11 Tf 50 805 Td (Manual Oficial - miClub Gestion | Capitulo 1 Inicio) Tj ET
+BT /F1 10 Tf 50 790 Td (Endpoint: /sector-operational-summary. Servicio:) Tj ET
+BT /F1 10 Tf 50 774 Td (getPostgresSectorOperationalSummary.) Tj ET
+BT /F1 10 Tf 50 758 Td (Espacio Fitness: total de inscriptos, activos, adeudados, monto adeudado,) Tj ET
+BT /F1 10 Tf 50 742 Td (rentabilidad total, rentabilidad mensual y saldo a liquidar. Rentabilidad y saldo) Tj ET
+BT /F1 10 Tf 50 726 Td (provienen de sheet_metric_snapshots; si faltan, se marca pendiente de clculo.) Tj ET
+BT /F1 10 Tf 50 710 Td (Adeudados suman cuotas de miembros Fitness con estado adeudando.) Tj ET
+BT /F1 10 Tf 50 694 Td (Local 1: rentabilidad total, rentabilidad mensual, saldo a liquidar, total ventas,) Tj ET
+BT /F1 10 Tf 50 678 Td (ventas ltimos 30 das e ingreso destacado. Ventas relevantes son ingresos) Tj ET
+BT /F1 10 Tf 50 662 Td (completados del sector Local 1 con categora comisin o ventas. Ingreso destacado) Tj ET
+BT /F1 10 Tf 50 646 Td (es el mayor monto y, ante empate operativo, el ms reciente.) Tj ET
+BT /F1 10 Tf 50 630 Td (Saln: total, activos, rentabilidad total/mensual, actividad ms popular y menos) Tj ET
+BT /F1 10 Tf 50 614 Td (popular. Popularidad usa inscripciones no abandonadas/no canceladas agrupadas por) Tj ET
+BT /F1 10 Tf 50 598 Td (actividad, ordenadas por cantidad.) Tj ET
+BT /F1 10 Tf 50 582 Td (Aula: total, activos, rentabilidad total/mensual, comisin promedio y actividad) Tj ET
+BT /F1 10 Tf 50 566 Td (ms popular. Comisin promedio proviene de snapshot aula.average_commission.) Tj ET
+BT /F1 10 Tf 50 550 Td (Cantina: kiosco, bebidas, CMV y rentabilidad total. Frmula: ingresos kiosco +) Tj ET
+BT /F1 10 Tf 50 534 Td (ingresos bebidas - egresos bebidas. Puede usar snapshots y fallback consultado.) Tj ET
+BT /F1 10 Tf 50 518 Td (CRM: total de miembros, activos, deudores y monto adeudado general. Es una tarjeta) Tj ET
+BT /F1 10 Tf 50 502 Td (de visin transversal de cobranzas.) Tj ET
+BT /F1 10 Tf 50 486 Td () Tj ET
+BT /F1 10 Tf 50 470 Td (Interpretacin Operativa) Tj ET
+BT /F1 10 Tf 50 454 Td (Primero mirar Liquidez y Saldo proyectado: si ambos bajan, existe riesgo) Tj ET
+BT /F1 10 Tf 50 438 Td (financiero. Luego revisar Saldos a Pagar para entender obligaciones prximas.) Tj ET
+BT /F1 10 Tf 50 422 Td (Despus analizar Cuotas a cobrar y Adeudados por actividad para detectar morosidad) Tj ET
+BT /F1 10 Tf 50 406 Td (concentrada. Ingresos y egresos por sector muestran dnde se genera o consume) Tj ET
+BT /F1 10 Tf 50 390 Td (dinero. Las tarjetas sectoriales permiten identificar qu unidad crece, cul) Tj ET
+BT /F1 10 Tf 50 374 Td (pierde rentabilidad y dnde conviene accionar. Un crecimiento sano combina ms) Tj ET
+BT /F1 10 Tf 50 358 Td (activos, ingresos completados y rentabilidad mensual positiva. Una alerta de) Tj ET
+BT /F1 10 Tf 50 342 Td (morosidad aparece cuando aumentan Adeudando, Monto adeudado o Cuotas a cobrar sin) Tj ET
+BT /F1 10 Tf 50 326 Td (mejora en liquidez. Una cada de ingresos se ve cuando el ranking de ingresos baja) Tj ET
+BT /F1 10 Tf 50 310 Td (o cuando rentabilidad mensual queda pendiente, negativa o menor al patrn) Tj ET
+BT /F1 10 Tf 50 294 Td (esperado.) Tj ET
+BT /F1 10 Tf 50 278 Td () Tj ET
+BT /F1 10 Tf 50 262 Td (Buenas prcticas) Tj ET
+BT /F1 10 Tf 50 246 Td (Actualizar Inicio antes de tomar decisiones. Leer saldos proyectados como) Tj ET
+BT /F1 10 Tf 50 230 Td (estimacin operativa, no como extracto bancario. Validar pagos pendientes antes de) Tj ET
+BT /F1 10 Tf 50 214 Td (liquidar sectores. Revisar actividades con deudores altos. Usar tarjetas) Tj ET
+BT /F1 10 Tf 50 198 Td (sectoriales para priorizar seguimiento.) Tj ET
+BT /F1 10 Tf 50 182 Td () Tj ET
+BT /F1 10 Tf 50 166 Td (Errores comunes) Tj ET
+BT /F1 10 Tf 50 150 Td (Confundir Saldos a Pagar con dinero disponible. Leer Cuotas a cobrar como efectivo) Tj ET
+BT /F1 10 Tf 50 134 Td (confirmado. Comparar Dlares con pesos sin tipo de cambio. Tratar Google Sheets) Tj ET
+BT /F1 10 Tf 50 118 Td (como backend actual. Ignorar mtricas ?pendiente de clculo?.) Tj ET
+BT /F1 10 Tf 50 102 Td () Tj ET
+BT /F1 10 Tf 50 86 Td (Recomendaciones) Tj ET
+BT /F1 10 Tf 50 70 Td (Agregar etiqueta PostgreSQL conectado. Revisar diferencias entre v_dashboard_basic) Tj ET
+BT /F1 10 Tf 50 54 Td (y fallback del servicio en Saldos Pendientes. Consolidar snapshots crticos o) Tj ET
+BT /F1 10 Tf 50 38 Td (reemplazarlos por vistas PostgreSQL autoritativas. Mantener pruebas sobre saldo) Tj ET
+BT /F1 9 Tf 285 25 Td (4) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 1497 >>
+stream
+BT /F1 11 Tf 50 805 Td (Manual Oficial - miClub Gestion | Capitulo 1 Inicio) Tj ET
+BT /F1 10 Tf 50 790 Td (proyectado, receivables y estados.) Tj ET
+BT /F1 10 Tf 50 774 Td () Tj ET
+BT /F1 10 Tf 50 758 Td (Inconsistencias detectadas) Tj ET
+BT /F1 10 Tf 50 742 Td (1. Etiqueta de origen en frontend: source=postgres se muestra como Datos) Tj ET
+BT /F1 10 Tf 50 726 Td (mock/locales. Impacto alto de UX; solucin: mapear postgres a PostgreSQL) Tj ET
+BT /F1 10 Tf 50 710 Td (conectado.) Tj ET
+BT /F1 10 Tf 50 694 Td (2. Saldos Pendientes: v_dashboard_basic incluye cuotas futuras del mes en) Tj ET
+BT /F1 10 Tf 50 678 Td (pending_net_balance, pero getPostgresClubFinanceSummary prioriza fallback directo) Tj ET
+BT /F1 10 Tf 50 662 Td (sin cuotas futuras. Impacto: posible diferencia entre endpoint) Tj ET
+BT /F1 10 Tf 50 646 Td (/api/dashboard/basic y pantalla Inicio. Solucin: unificar frmula.) Tj ET
+BT /F1 10 Tf 50 630 Td (3. Mtricas sectoriales: varias rentabilidades y saldos dependen de) Tj ET
+BT /F1 10 Tf 50 614 Td (sheet_metric_snapshots importados histricamente. Impacto: cobertura parcial si) Tj ET
+BT /F1 10 Tf 50 598 Td (falta snapshot. Solucin: vistas PostgreSQL completas por sector.) Tj ET
+BT /F1 10 Tf 50 582 Td (4. Rutas legacy raz: el frontend consume /summary, /members, /debtors y no rutas) Tj ET
+BT /F1 10 Tf 50 566 Td (/api. Impacto: contrato heredado; solucin: documentar y migrar con) Tj ET
+BT /F1 10 Tf 50 550 Td (compatibilidad.) Tj ET
+BT /F1 9 Tf 285 25 Td (5) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+8 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 3 0 R >>
+endobj
+9 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 5 0 R >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 12 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 6 0 R >>
+endobj
+12 0 obj
+<< /Type /Pages /Kids [7 0 R 8 0 R 9 0 R 10 0 R 11 0 R] /Count 5 >>
+endobj
+13 0 obj
+<< /Type /Catalog /Pages 12 0 R >>
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000003714 00000 n 
+0000008416 00000 n 
+0000012571 00000 n 
+0000017149 00000 n 
+0000018698 00000 n 
+0000018825 00000 n 
+0000018952 00000 n 
+0000019079 00000 n 
+0000019207 00000 n 
+0000019335 00000 n 
+0000019419 00000 n 
+trailer << /Size 14 /Root 13 0 R >>
+startxref
+19470
+%%EOF
