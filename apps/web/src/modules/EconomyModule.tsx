@@ -1,4 +1,5 @@
 import { EconomyComparisonCards } from './Economy/EconomyComparisonCards';
+import { EconomyDashboardState } from './Economy/EconomyDashboardState';
 import { EconomyInsights } from './Economy/EconomyInsights';
 import { EconomyMonthlyChart } from './Economy/EconomyMonthlyChart';
 import { EconomyPaymentMethodsChart } from './Economy/EconomyPaymentMethodsChart';
@@ -27,9 +28,29 @@ export default function EconomyModule() {
         </div>
       </section>
 
-      {dashboard.status === 'loading' && <div className="card"><p>Cargando economía…</p></div>}
-      {dashboard.status === 'error' && <div className="card error-card"><strong>No se pudo cargar Economía Club.</strong><p>{dashboard.error?.message}</p></div>}
-      {dashboard.status === 'empty' && <div className="card"><strong>Sin datos económicos.</strong><p>Cuando se registren movimientos, el tablero mostrará ingresos, egresos y pendientes.</p></div>}
+      {dashboard.status === 'loading' && (
+        <EconomyDashboardState type="loading" title="Cargando Economía Club" message="Consultando PostgreSQL y preparando indicadores, gráficos y movimientos." />
+      )}
+      {dashboard.status === 'error' && (
+        <EconomyDashboardState
+          type="error"
+          title="No se pudo cargar Economía Club"
+          message={dashboard.error?.message ?? 'Error desconocido al consultar los datos económicos.'}
+          actionLabel="Reintentar"
+          onAction={() => void dashboard.loadEconomyDashboard()}
+          isActionDisabled={dashboard.loading}
+        />
+      )}
+      {dashboard.status === 'empty' && (
+        <EconomyDashboardState
+          type="empty"
+          title="Sin datos económicos"
+          message="Cuando se registren movimientos en PostgreSQL, el tablero mostrará ingresos, egresos y pendientes."
+          actionLabel="Actualizar"
+          onAction={() => void dashboard.loadEconomyDashboard()}
+          isActionDisabled={dashboard.loading}
+        />
+      )}
 
       {data && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero económico del club">
