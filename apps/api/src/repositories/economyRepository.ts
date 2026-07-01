@@ -108,6 +108,20 @@ export const getPendingMovements = async (limit: number): Promise<EconomyRow[]> 
   return result.rows;
 };
 
+export const getPendingSummary = async (): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<EconomyRow>(`
+    select
+      coalesce(sum(case when movement_type = 'INGRESOS' then amount else 0 end), 0) as pending_income,
+      coalesce(sum(case when movement_type = 'EGRESOS' then amount else 0 end), 0) as pending_expenses,
+      coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as pending_balance,
+      count(*)::integer as pending_movements
+    from miclub.movements
+    where financial_status = 'pendiente' or operational_status = 'PENDIENTE'
+  `, []);
+  return result.rows;
+};
+
 export const getAnnualSummary = async (year = new Date().getUTCFullYear()): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
