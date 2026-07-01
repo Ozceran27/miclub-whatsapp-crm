@@ -2004,3 +2004,96 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .economy-insights-list__item--positive { border-color: rgba(118, 240, 195, 0.28); }
 .economy-insights-list__item--warning { border-color: rgba(255, 173, 102, 0.34); }
 .economy-insights-list__item--info { border-color: rgba(143, 216, 255, 0.28); }
+
+.economy-state {
+  --economy-state-accent: #8fd8ff;
+  --economy-state-accent-rgb: 143, 216, 255;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(var(--economy-state-accent-rgb), 0.28);
+  border-radius: 18px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--economy-state-accent-rgb), 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(19, 31, 53, 0.95), rgba(10, 19, 36, 0.9));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.economy-state--error {
+  --economy-state-accent: #ff8787;
+  --economy-state-accent-rgb: 255, 135, 135;
+}
+
+.economy-state--empty {
+  --economy-state-accent: #c59bff;
+  --economy-state-accent-rgb: 197, 155, 255;
+  border-style: dashed;
+}
+
+.economy-state__icon {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(var(--economy-state-accent-rgb), 0.16);
+  box-shadow: inset 0 0 0 1px rgba(var(--economy-state-accent-rgb), 0.25);
+  font-size: 22px;
+}
+
+.economy-state__content h3 {
+  margin: 0;
+  color: #f4f8ff;
+  font-size: 18px;
+}
+
+.economy-state__content p {
+  margin: 5px 0 0;
+  color: #a9badb;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.economy-state__action {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .economy-state {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .economy-state__action {
+    width: 100%;
+  }
+
+  .economy-chart-card,
+  .economy-chart-card--payments {
+    min-height: auto;
+  }
+
+  .economy-chart-card__canvas,
+  .economy-payment-chart,
+  .economy-ranking-chart {
+    min-height: 230px;
+  }
+
+  .economy-payment-list li,
+  .economy-ranking-item {
+    align-items: start;
+  }
+
+  .economy-ranking-item {
+    flex-wrap: wrap;
+  }
+
+  .economy-ranking-item__value {
+    width: 100%;
+    text-align: left;
+    padding-left: 40px;
+  }
+}
