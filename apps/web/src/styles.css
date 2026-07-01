@@ -1848,3 +1848,15 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
     font-size: 28px;
   }
 }
+
+.economy-module-hero {
+  border-color: rgba(143, 216, 255, 0.28);
+  background:
+    radial-gradient(circle at 16% 0%, rgba(143, 216, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(19, 31, 53, 0.96), rgba(10, 28, 48, 0.82));
+}
+
+.economy-module-actions .home-sync-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}

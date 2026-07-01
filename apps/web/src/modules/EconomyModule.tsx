@@ -11,15 +11,15 @@ export default function EconomyModule() {
 
   return (
     <main className="module-content">
-      <section className="module-hero home-hero">
+      <section className="module-hero home-hero economy-module-hero">
         <div className="home-hero__copy">
           <p className="eyebrow">Economía Club</p>
           <h2>Tablero económico del club</h2>
           <p>Resumen financiero, movimientos recientes y pendientes operativos.</p>
         </div>
-        <div className="home-sync-badges" aria-label="Acciones de economía">
+        <div className="home-sync-badges economy-module-actions" aria-label="Acciones de economía">
           <span className="home-sync-badge hero-sync-badge--compact home-sync-badge--muted">/api/economy</span>
-          <button className="icon-btn home-sync-button" onClick={() => void dashboard.loadEconomyDashboard()} disabled={dashboard.loading}>Actualizar</button>
+          <button className="icon-btn home-sync-button" onClick={() => void dashboard.loadEconomyDashboard()} disabled={dashboard.loading}>{dashboard.loading ? 'Actualizando…' : 'Actualizar'}</button>
         </div>
       </section>
 
