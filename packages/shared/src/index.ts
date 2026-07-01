@@ -213,6 +213,127 @@ export interface CategoryAmountBreakdown {
   amount: number;
 }
 
+export type EconomyMovementType = "INGRESOS" | "EGRESOS" | string;
+
+export type EconomyFinancialStatus = "pendiente" | "pagado" | "cancelado" | string;
+
+export type EconomyOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | string;
+
+export interface EconomySummary {
+  income: number;
+  expenses: number;
+  balance: number;
+  pendingBalance: number;
+  completedMovements: number;
+  totalMovements: number;
+}
+
+export interface EconomyMonthlyEvolutionItem {
+  year: number;
+  month: number;
+  period: string;
+  income: number;
+  expenses: number;
+  balance: number;
+  movements: number;
+  balanceVariation: number | null;
+}
+
+export interface EconomySectorBreakdownItem {
+  id: string | null;
+  name: string;
+  income: number;
+  expenses: number;
+  balance: number;
+  movements: number;
+}
+
+export interface EconomyCategoryBreakdownItem {
+  id: string | null;
+  name: string;
+  income: number;
+  expenses: number;
+  balance: number;
+  movements: number;
+}
+
+export interface EconomyPaymentMethodItem {
+  id: string | null;
+  name: string;
+  amount: number;
+  movements: number;
+}
+
+export interface EconomyRecentMovement {
+  id: string;
+  externalId?: string | null;
+  movementDate?: string | null;
+  movementType: EconomyMovementType;
+  categoryId?: string | null;
+  category?: string | null;
+  sectorId?: string | null;
+  sectorCode?: string | null;
+  sectorName?: string | null;
+  concept?: string | null;
+  personId?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  counterpartyText?: string | null;
+  amount: number;
+  taxes?: number | null;
+  paymentMethodId?: string | null;
+  paymentMethod?: string | null;
+  financialStatus?: EconomyFinancialStatus | null;
+  operationalStatus?: EconomyOperationalStatus | null;
+  source?: string | null;
+  sourcePayload?: Record<string, unknown> | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface EconomyPendingSummary {
+  pendingBalance: number;
+  pendingIncome: number;
+  pendingExpenses: number;
+  pendingMovements: number;
+  items: EconomyRecentMovement[];
+  total: number;
+}
+
+export interface EconomyAnnualSummary {
+  year: number;
+  income: number;
+  expenses: number;
+  balance: number;
+  movements: number;
+}
+
+export type EconomyInsightType = "positive" | "warning" | "info" | string;
+
+export interface EconomyInsight {
+  key: string;
+  type: EconomyInsightType;
+  message: string;
+  value: number | null;
+}
+
+export interface EconomyDashboardCollection<TItem> {
+  items: TItem[];
+  total: number;
+}
+
+export interface EconomyDashboardResponse {
+  summary: EconomySummary;
+  monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem>;
+  bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
+  byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
+  paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;
+  recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
+  pending: EconomyPendingSummary;
+  annualSummary: EconomyAnnualSummary;
+  insights: EconomyDashboardCollection<EconomyInsight>;
+}
+
 export interface ClubOperationsSummary extends FinancialSummary {
   metadata?: SummaryMetadata;
   pendingIncome: number;
