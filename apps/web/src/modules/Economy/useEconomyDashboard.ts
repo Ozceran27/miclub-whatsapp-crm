@@ -38,9 +38,9 @@ const endpoints: { [K in keyof EconomyEndpointMap]: `/${string}` } = {
   insights: '/api/economy/insights'
 };
 
-const fetchEconomyResource = async <K extends keyof EconomyEndpointMap>(key: K): Promise<EconomyEndpointMap[K]> => {
-  const response = await fetch(apiUrl(endpoints[key]), { cache: 'no-store' });
-  if (!response.ok) throw new Error('No se pudo cargar el tablero de economía.');
+const fetchEconomyResource = async <K extends keyof EconomyEndpointMap>(key: K, signal?: AbortSignal): Promise<EconomyEndpointMap[K]> => {
+  const response = await fetch(apiUrl(endpoints[key]), { cache: 'no-store', signal });
+  if (!response.ok) throw new Error(`No se pudo cargar ${endpoints[key]}.`);
   return response.json() as Promise<EconomyEndpointMap[K]>;
 };
 
@@ -49,31 +49,36 @@ export function useEconomyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<EconomyDashboardError | null>(null);
 
-  const loadEconomyDashboard = useCallback(async () => {
+  const loadEconomyDashboard = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
       const [summary, monthlyEvolution, bySector, byCategory, paymentMethods, recentMovements, pending, annualSummary, insights] = await Promise.all([
-        fetchEconomyResource('summary'),
-        fetchEconomyResource('monthlyEvolution'),
-        fetchEconomyResource('bySector'),
-        fetchEconomyResource('byCategory'),
-        fetchEconomyResource('paymentMethods'),
-        fetchEconomyResource('recentMovements'),
-        fetchEconomyResource('pending'),
-        fetchEconomyResource('annualSummary'),
-        fetchEconomyResource('insights')
+        fetchEconomyResource('summary', signal),
+        fetchEconomyResource('monthlyEvolution', signal),
+        fetchEconomyResource('bySector', signal),
+        fetchEconomyResource('byCategory', signal),
+        fetchEconomyResource('paymentMethods', signal),
+        fetchEconomyResource('recentMovements', signal),
+        fetchEconomyResource('pending', signal),
+        fetchEconomyResource('annualSummary', signal),
+        fetchEconomyResource('insights', signal)
       ]);
       setData({ summary, monthlyEvolution, bySector, byCategory, paymentMethods, recentMovements, pending, annualSummary, insights });
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
       setError({ message: loadError instanceof Error ? loadError.message : 'Error desconocido al cargar economía.' });
       setData(null);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void loadEconomyDashboard(); }, [loadEconomyDashboard]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadEconomyDashboard(controller.signal);
+    return () => controller.abort();
+  }, [loadEconomyDashboard]);
 
   return useMemo(() => {
     const isEmpty = !loading && !error && Boolean(data) && data?.summary.totalMovements === 0 && data?.recentMovements.total === 0 && data?.pending.total === 0;
