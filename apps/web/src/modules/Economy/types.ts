@@ -4,6 +4,7 @@ export type {
   EconomyDashboardCollection,
   EconomyDashboardResponse,
   EconomyInsight,
+  EconomyMonthlyEvolutionItem,
   EconomyPaymentMethodItem,
   EconomyPendingSummary,
   EconomyRecentMovement,

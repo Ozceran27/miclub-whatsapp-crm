@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiUrl } from '../../api';
-import type { DashboardStatus, EconomyAnnualSummary, EconomyCategoryBreakdownItem, EconomyDashboardCollection, EconomyDashboardError, EconomyInsight, EconomyPaymentMethodItem, EconomyPendingSummary, EconomyRecentMovement, EconomySectorBreakdownItem, EconomySummary } from './types';
+import type { DashboardStatus, EconomyAnnualSummary, EconomyCategoryBreakdownItem, EconomyDashboardCollection, EconomyDashboardError, EconomyInsight, EconomyMonthlyEvolutionItem, EconomyPaymentMethodItem, EconomyPendingSummary, EconomyRecentMovement, EconomySectorBreakdownItem, EconomySummary } from './types';
 
 type EconomyDashboardData = {
   summary: EconomySummary;
-  monthlyEvolution: EconomyDashboardCollection<unknown>;
+  monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem>;
   bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
   byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
   paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;
@@ -16,7 +16,7 @@ type EconomyDashboardData = {
 
 type EconomyEndpointMap = {
   summary: EconomySummary;
-  monthlyEvolution: EconomyDashboardCollection<unknown>;
+  monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem>;
   bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
   byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
   paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;

@@ -1,3 +1,5 @@
+import { EconomyMonthlyChart } from './Economy/EconomyMonthlyChart';
+import { EconomyProfitChart } from './Economy/EconomyProfitChart';
 import { EconomySummaryCards } from './Economy/EconomySummaryCards';
 import { PendingMovementsPanel } from './Economy/PendingMovementsPanel';
 import { RecentMovementsPanel } from './Economy/RecentMovementsPanel';
@@ -28,6 +30,10 @@ export default function EconomyModule() {
       {data && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero económico del club">
           <EconomySummaryCards summary={data.summary} />
+          <div className="economy-charts-grid">
+            <EconomyMonthlyChart monthlyEvolution={data.monthlyEvolution} />
+            <EconomyProfitChart monthlyEvolution={data.monthlyEvolution} />
+          </div>
           <div className="home-dashboard-row home-dashboard-row--primary">
             <RecentMovementsPanel movements={data.recentMovements.items} />
             <PendingMovementsPanel pending={data.pending} />
