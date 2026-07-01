@@ -152,3 +152,42 @@ export const getBaseInsights = async (): Promise<EconomyRow[]> => {
   `, []);
   return result.rows;
 };
+
+
+export const getCurrentPreviousMonthComparison = async (): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<EconomyRow>(`
+    with current_month as (${currentMonthRangeSql}), previous_month as (
+      select start_at - interval '1 month' as start_at, start_at as end_at from current_month
+    ), periods as (
+      select 'current' as period_key, start_at, end_at from current_month
+      union all
+      select 'previous' as period_key, start_at, end_at from previous_month
+    ), movement_totals as (
+      select
+        p.period_key,
+        to_char(p.start_at, 'YYYY-MM') as period,
+        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as income,
+        coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as expenses,
+        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance
+      from periods p
+      left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
+      group by p.period_key, p.start_at
+    ), liquidity_totals as (
+      select p.period_key, ob.liquidity
+      from periods p
+      left join lateral (
+        select liquidity
+        from miclub.operational_balances
+        where cutoff_date < p.end_at::date
+        order by cutoff_date desc, created_at desc
+        limit 1
+      ) ob on true
+    )
+    select mt.period_key, mt.period, mt.income, mt.expenses, mt.balance, lt.liquidity
+    from movement_totals mt
+    left join liquidity_totals lt on lt.period_key = mt.period_key
+    order by case mt.period_key when 'previous' then 1 else 2 end
+  `, []);
+  return result.rows;
+};
