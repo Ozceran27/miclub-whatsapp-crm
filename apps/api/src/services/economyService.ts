@@ -2,6 +2,7 @@ import {
   getAnnualEvolution,
   getAnnualSummary as getAnnualSummaryRows,
   getBaseInsights,
+  getCurrentPreviousMonthComparison,
   getMonthlySummary,
   getPaymentMethods as getPaymentMethodRows,
   getPendingMovements as getPendingMovementRows,
@@ -46,12 +47,28 @@ const monthRange = (date = new Date()): { from: Date; to: Date } => {
   return { from, to };
 };
 
+const calculateVariation = (current: number, previous: number): number | null =>
+  previous === 0 ? null : ((current - previous) / Math.abs(previous)) * 100;
+
+const getDirection = (current: number, previous: number): "up" | "down" | "flat" | "none" => {
+  if (previous === 0 && current === 0) return "none";
+  if (current > previous) return "up";
+  if (current < previous) return "down";
+  return "flat";
+};
+
 const addVariation = (items: JsonRecord[]): JsonRecord[] =>
   items.map((item, index) => {
-    const previousBalance = index > 0 ? toNumber(items[index - 1]?.balance) : 0;
+    const previous = index > 0 ? items[index - 1] : undefined;
+    const income = toNumber(item.income);
+    const expenses = toNumber(item.expenses);
     const balance = toNumber(item.balance);
-    const balanceVariation = previousBalance === 0 ? null : ((balance - previousBalance) / Math.abs(previousBalance)) * 100;
-    return { ...item, balanceVariation };
+    return {
+      ...item,
+      incomeVariation: previous ? calculateVariation(income, toNumber(previous.income)) : null,
+      expensesVariation: previous ? calculateVariation(expenses, toNumber(previous.expenses)) : null,
+      balanceVariation: previous ? calculateVariation(balance, toNumber(previous.balance)) : null,
+    };
   });
 
 export const getSummary = async (): Promise<JsonRecord> => {
@@ -122,17 +139,55 @@ export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord>
   };
 };
 
+export const getComparison = async (): Promise<JsonRecord> => {
+  const rows = normalizeRows(await getCurrentPreviousMonthComparison());
+  const previous = rows.find((row) => row.periodKey === "previous") ?? {};
+  const current = rows.find((row) => row.periodKey === "current") ?? {};
+  const buildMetric = (key: string, label: string, applies = true): JsonRecord => {
+    const currentValue = toNumber(current[key]);
+    const previousValue = toNumber(previous[key]);
+    return {
+      key,
+      label,
+      current: currentValue,
+      previous: previousValue,
+      variation: applies ? calculateVariation(currentValue, previousValue) : null,
+      direction: applies ? getDirection(currentValue, previousValue) : "none",
+      applies,
+    };
+  };
+  const liquidityApplies = current.liquidity !== null && current.liquidity !== undefined && previous.liquidity !== null && previous.liquidity !== undefined;
+  const items = [
+    buildMetric("income", "Variación de ingresos"),
+    buildMetric("expenses", "Variación de egresos"),
+    buildMetric("balance", "Variación de utilidad"),
+    buildMetric("liquidity", "Variación de liquidez", liquidityApplies),
+  ];
+  return {
+    currentPeriod: String(current.period ?? ""),
+    previousPeriod: String(previous.period ?? ""),
+    items,
+    total: items.length,
+  };
+};
+
 export const getInsights = async (): Promise<{ items: JsonRecord[]; total: number }> => {
-  const rows = normalizeRows(await getBaseInsights());
+  const [rows, comparison] = await Promise.all([normalizeRows(await getBaseInsights()), getComparison()]);
   const valueByMetric = new Map(rows.map((row) => [String(row.metric), toNumber(row.value)]));
   const current = valueByMetric.get("current_month_balance") ?? 0;
-  const previous = valueByMetric.get("previous_month_balance") ?? 0;
   const pendingCount = valueByMetric.get("pending_count") ?? 0;
-  const variation = previous === 0 ? null : ((current - previous) / Math.abs(previous)) * 100;
+  const metric = (key: string) => (comparison.items as JsonRecord[]).find((item) => item.key === key);
+  const income = metric("income");
+  const expenses = metric("expenses");
+  const balance = metric("balance");
+  const liquidity = metric("liquidity");
   const items: JsonRecord[] = [
-    { key: "monthly_balance", type: current >= 0 ? "positive" : "warning", message: `Balance mensual ${current >= 0 ? "positivo" : "negativo"}`, value: current },
-    { key: "monthly_variation", type: variation === null || variation >= 0 ? "info" : "warning", message: variation === null ? "Sin base del mes anterior para comparar" : `Variación mensual ${variation.toFixed(2)}%`, value: variation },
-    { key: "pending_movements", type: pendingCount > 0 ? "warning" : "positive", message: pendingCount > 0 ? `${pendingCount} movimientos pendientes` : "No hay movimientos pendientes", value: pendingCount },
+    { key: "monthly_balance", type: current >= 0 ? "positive" : "warning", message: `Utilidad mensual ${current >= 0 ? "positiva" : "negativa"}: ${current.toLocaleString("es-AR")}`, value: current },
+    { key: "income_trend", type: toNumber(income?.current) >= toNumber(income?.previous) ? "positive" : "warning", message: `Ingresos ${income?.direction === "up" ? "en alza" : income?.direction === "down" ? "en baja" : "estables"} contra el mes anterior`, value: toNumber(income?.variation) },
+    { key: "expense_trend", type: toNumber(expenses?.current) > toNumber(expenses?.previous) ? "warning" : "positive", message: `Egresos ${expenses?.direction === "up" ? "crecieron" : expenses?.direction === "down" ? "bajaron" : "estables"} contra el mes anterior`, value: toNumber(expenses?.variation) },
+    { key: "profit_trend", type: toNumber(balance?.current) >= toNumber(balance?.previous) ? "positive" : "warning", message: `Utilidad ${balance?.direction === "up" ? "mejoró" : balance?.direction === "down" ? "retrocedió" : "se mantuvo"} en la comparación mensual`, value: toNumber(balance?.variation) },
+    { key: "liquidity_trend", type: liquidity?.applies === false ? "info" : toNumber(liquidity?.current) >= toNumber(liquidity?.previous) ? "positive" : "warning", message: liquidity?.applies === false ? "Sin saldos de liquidez suficientes para comparar" : `Liquidez ${liquidity?.direction === "up" ? "en alza" : liquidity?.direction === "down" ? "en baja" : "estable"}`, value: liquidity?.applies === false ? null : toNumber(liquidity?.variation) },
+    { key: "pending_movements", type: pendingCount > 0 ? "warning" : "positive", message: pendingCount > 0 ? `${pendingCount} movimientos pendientes requieren seguimiento` : "No hay movimientos pendientes", value: pendingCount },
   ];
   return { items, total: items.length };
 };

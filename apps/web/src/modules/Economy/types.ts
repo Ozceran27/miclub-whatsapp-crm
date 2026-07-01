@@ -1,5 +1,6 @@
 export type {
   EconomyAnnualSummary,
+  EconomyComparison,
   EconomyCategoryBreakdownItem,
   EconomyDashboardCollection,
   EconomyDashboardResponse,

@@ -236,7 +236,26 @@ export interface EconomyMonthlyEvolutionItem {
   expenses: number;
   balance: number;
   movements: number;
+  incomeVariation: number | null;
+  expensesVariation: number | null;
   balanceVariation: number | null;
+}
+
+export interface EconomyComparisonMetric {
+  key: "income" | "expenses" | "balance" | "liquidity" | string;
+  label: string;
+  current: number;
+  previous: number;
+  variation: number | null;
+  direction: "up" | "down" | "flat" | "none" | string;
+  applies: boolean;
+}
+
+export interface EconomyComparison {
+  currentPeriod: string;
+  previousPeriod: string;
+  items: EconomyComparisonMetric[];
+  total: number;
 }
 
 export interface EconomySectorBreakdownItem {
@@ -331,6 +350,7 @@ export interface EconomyDashboardResponse {
   recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
   pending: EconomyPendingSummary;
   annualSummary: EconomyAnnualSummary;
+  comparison: EconomyComparison;
   insights: EconomyDashboardCollection<EconomyInsight>;
 }
 

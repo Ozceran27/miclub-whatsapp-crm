@@ -1948,3 +1948,59 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
     grid-template-columns: 1fr;
   }
 }
+
+.economy-comparison-section {
+  display: grid;
+  gap: 10px;
+}
+
+.economy-comparison-section__heading h4,
+.economy-insights-panel .finance-card__header h4 {
+  color: #f4f8ff;
+}
+
+.economy-comparison-section__heading p {
+  color: #91a4c8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.economy-comparison-card .finance-card__header p {
+  white-space: normal;
+}
+
+.economy-insights-panel {
+  --finance-accent: #76f0c3;
+  --finance-accent-rgb: 118, 240, 195;
+  display: grid;
+  gap: 14px;
+}
+
+.economy-insights-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.economy-insights-list__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid rgba(92, 122, 166, 0.26);
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: rgba(9, 18, 34, 0.48);
+  color: #dce8ff;
+}
+
+.economy-insights-list__item strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.economy-insights-list__item--positive { border-color: rgba(118, 240, 195, 0.28); }
+.economy-insights-list__item--warning { border-color: rgba(255, 173, 102, 0.34); }
+.economy-insights-list__item--info { border-color: rgba(143, 216, 255, 0.28); }
