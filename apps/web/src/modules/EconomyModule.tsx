@@ -1,5 +1,7 @@
 import { EconomyMonthlyChart } from './Economy/EconomyMonthlyChart';
+import { EconomyPaymentMethodsChart } from './Economy/EconomyPaymentMethodsChart';
 import { EconomyProfitChart } from './Economy/EconomyProfitChart';
+import { EconomyRankings } from './Economy/EconomyRankings';
 import { EconomySummaryCards } from './Economy/EconomySummaryCards';
 import { PendingMovementsPanel } from './Economy/PendingMovementsPanel';
 import { RecentMovementsPanel } from './Economy/RecentMovementsPanel';
@@ -34,6 +36,8 @@ export default function EconomyModule() {
             <EconomyMonthlyChart monthlyEvolution={data.monthlyEvolution} />
             <EconomyProfitChart monthlyEvolution={data.monthlyEvolution} />
           </div>
+          <EconomyRankings bySector={data.bySector} byCategory={data.byCategory} />
+          <EconomyPaymentMethodsChart paymentMethods={data.paymentMethods} />
           <div className="home-dashboard-row home-dashboard-row--primary">
             <RecentMovementsPanel movements={data.recentMovements.items} />
             <PendingMovementsPanel pending={data.pending} />
