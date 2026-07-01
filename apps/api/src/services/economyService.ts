@@ -5,6 +5,7 @@ import {
   getMonthlySummary,
   getPaymentMethods as getPaymentMethodRows,
   getPendingMovements as getPendingMovementRows,
+  getPendingSummary as getPendingSummaryRows,
   getRankingByCategory,
   getRankingBySector,
   getRecentMovements as getRecentMovementRows,
@@ -93,9 +94,21 @@ export const getRecentMovements = async (limitQuery?: unknown): Promise<{ items:
   return { items, total: items.length };
 };
 
-export const getPending = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = normalizeRows(await getPendingMovementRows(parseLimit(limitQuery, 20)));
-  return { items, total: items.length };
+export const getPending = async (limitQuery?: unknown): Promise<JsonRecord> => {
+  const [summary, items] = await Promise.all([
+    getPendingSummaryRows(),
+    getPendingMovementRows(parseLimit(limitQuery, 20)),
+  ]);
+  const [pendingSummary] = normalizeRows(summary);
+  const pendingItems = normalizeRows(items);
+  return {
+    pendingBalance: toNumber(pendingSummary?.pendingBalance),
+    pendingIncome: toNumber(pendingSummary?.pendingIncome),
+    pendingExpenses: toNumber(pendingSummary?.pendingExpenses),
+    pendingMovements: toInteger(pendingSummary?.pendingMovements),
+    items: pendingItems,
+    total: toInteger(pendingSummary?.pendingMovements) || pendingItems.length,
+  };
 };
 
 export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord> => {
