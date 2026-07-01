@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import CrmModule from './modules/CrmModule';
 import DataMigrationModule from './modules/DataMigrationModule';
+import EconomyModule from './modules/EconomyModule';
 import HomeModule from './modules/HomeModule';
 import ModuleNav, { type ModuleDefinition, type ModuleId } from './modules/ModuleNav';
 import PlaceholderModule from './modules/PlaceholderModule';
@@ -20,12 +21,7 @@ const MODULES: ModuleDefinition[] = [
   { id: 'dataMigration', label: 'MIGRACIÓN' }
 ];
 
-const PLACEHOLDERS: Record<Exclude<ModuleId, 'home' | 'crm' | 'dataMigration'>, { title: string; description: string; futureItems: string[] }> = {
-  economy: {
-    title: 'Economía Club',
-    description: 'Tablero financiero general para consolidar la salud económica y los movimientos por sector del club.',
-    futureItems: ['Ingresos totales.', 'Egresos totales.', 'Utilidad.', 'Movimientos por sector.', 'Evolución mensual.', 'Estado general del club.']
-  },
+const PLACEHOLDERS: Record<Exclude<ModuleId, 'home' | 'economy' | 'crm' | 'dataMigration'>, { title: string; description: string; futureItems: string[] }> = {
   fitness: {
     title: 'Espacio Fitness',
     description: 'Gestión operativa del espacio de entrenamiento, cuotas, pagos y actividades vinculadas a Fitness.',
@@ -110,6 +106,7 @@ export default function App() {
 
   const renderModule = () => {
     if (currentModule === 'home') return <HomeModule onOpenModule={setCurrentModule} />;
+    if (currentModule === 'economy') return <EconomyModule />;
     if (currentModule === 'crm') return <CrmModule />;
     if (currentModule === 'dataMigration') return <DataMigrationModule />;
 
