@@ -116,7 +116,7 @@ const importEnabled = (): boolean =>
 export const parseMissingEnrollmentStrategy = (
   value = process.env.GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY,
 ): MissingEnrollmentStrategy => {
-  const normalized = normalizeComparableText(value ?? "warn").replace(
+  const normalized = normalizeComparableText(value ?? "archive").replace(
     /-/g,
     "_",
   );
@@ -760,6 +760,23 @@ const reconcileMissingEnrollments = async (
      left join miclub.sectors s on s.id = a.sector_id
      where e.source = 'google_sheets'
        and e.external_id <> all($1::text[])
+       and e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])
+       and (not exists (
+             select 1
+             from information_schema.columns c
+             where c.table_schema = 'miclub'
+               and c.table_name = 'enrollments'
+               and c.column_name = 'inactive'
+           )
+           or coalesce((to_jsonb(e)->>'inactive')::boolean, false) = false)
+       and (not exists (
+             select 1
+             from information_schema.columns c
+             where c.table_schema = 'miclub'
+               and c.table_name = 'enrollments'
+               and c.column_name = 'superseded_at'
+           )
+           or to_jsonb(e)->>'superseded_at' is null)
      order by s.name nulls last, a.name nulls last, p.last_name nulls last, p.first_name nulls last`,
     [[...processedExternalIds]],
   );
@@ -775,12 +792,13 @@ const reconcileMissingEnrollments = async (
     });
   const suffix = result.rows.length > details.length ? ` (+${result.rows.length - details.length} más)` : "";
   const warning = `${missingExternalIds.length} inscripciones google_sheets no aparecieron en el último import${suffix}. Detalle: ${details.join(" | ")}`;
-  summary.warnings.push(warning);
   if (
     summary.missingEnrollmentsAction === "noop" ||
     summary.missingEnrollmentsAction === "warn"
-  )
+  ) {
+    summary.warnings.push(warning);
     return;
+  }
 
   if (summary.missingEnrollmentsAction === "abandon") {
     await pool.query(
@@ -792,6 +810,7 @@ const reconcileMissingEnrollments = async (
     );
     summary.attemptedWrites += 1;
     summary.persistedWrites += 1;
+    summary.warnings.push(`${missingExternalIds.length} inscripciones google_sheets ausentes fueron marcadas como abandonado${suffix}.`);
     return;
   }
 
@@ -830,6 +849,7 @@ const reconcileMissingEnrollments = async (
     );
     summary.attemptedWrites += 1;
     summary.persistedWrites += 1;
+    summary.warnings.push(`${missingExternalIds.length} inscripciones google_sheets ausentes fueron archivadas/inactivadas${suffix}.`);
   }
 };
 
