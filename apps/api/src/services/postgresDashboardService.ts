@@ -126,6 +126,17 @@ export const normalizeSuspiciousArsAmount = (value: number): number => {
 };
 
 export const normalizeSuspiciousMembershipFee = (value: number): number => normalizeMembershipFeeAmount(value) ?? 0;
+export const calculateOperationalProjectedBalance = ({
+  liquidity,
+  cuotasACobrar,
+  pendingNetBalance,
+  saldosAPagar,
+}: {
+  liquidity: number;
+  cuotasACobrar: number;
+  pendingNetBalance: number;
+  saldosAPagar: number;
+}): number => liquidity + cuotasACobrar + pendingNetBalance - saldosAPagar;
 const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
   keys.some((key) => row[key] !== undefined && row[key] !== null);
 const pickNullableNumber = (
@@ -469,7 +480,11 @@ export const getPostgresClubFinanceSummary =
     const fallbackFutureReceivables = normalizeSuspiciousArsAmount(pickNumber(fallbackReceivablesRow, [
       "future_receivable_fees_until_month_end",
     ]));
-    const cuotasACobrar = fallbackCuotasACobrar;
+    const dashboardCuotasACobrar = normalizeSuspiciousArsAmount(pickNumber(row, [
+      "cuotas_a_cobrar",
+      "cuotas_adeudadas",
+    ]));
+    const cuotasACobrar = fallbackCuotasACobrar || dashboardCuotasACobrar;
     const pendingFallbackRow = pendingFallback.rows[0] ?? {};
     const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
     const pendingExpenses = pickNumber(pendingFallbackRow, ["pending_expenses"]) || pickNumber(row, ["pending_expenses"]);
@@ -477,7 +492,12 @@ export const getPostgresClubFinanceSummary =
     // Regla crítica de equivalencia con ADMINISTRACIÓN:
     // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
     // Los saldos a pagar son obligaciones y nunca se suman al proyectado.
-    const effectiveProjectedBalance = liquidity + cuotasACobrar + pendingNetBalance - effectiveSaldosAPagar;
+    const effectiveProjectedBalance = calculateOperationalProjectedBalance({
+      liquidity,
+      cuotasACobrar,
+      pendingNetBalance,
+      saldosAPagar: effectiveSaldosAPagar,
+    });
     return {
       liquidity,
       cash: pickNumber(row, ["cash"]),
