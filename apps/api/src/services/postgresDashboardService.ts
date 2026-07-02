@@ -353,15 +353,10 @@ export const getPostgresClubFinanceSummary =
       pool.query<Record<string, unknown>>(
         `with enrollment_receivables as (
           select
-            e.status,
-            e.due_date,
+            eos.effective_status,
+            eos.due_date,
             case
-              when e.status = 'nuevo_inscripto'::miclub.enrollment_status and e.due_date < current_date then 'adeudando'::miclub.enrollment_status
-              when e.status = 'nuevo_inscripto'::miclub.enrollment_status and e.due_date >= current_date then 'al_dia'::miclub.enrollment_status
-              else e.status
-            end as effective_status,
-            case
-              when normalized_fee_amount <= 0 or e.status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
+              when normalized_fee_amount <= 0 or eos.effective_status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
               else normalized_fee_amount * case
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
@@ -371,6 +366,7 @@ export const getPostgresClubFinanceSummary =
               end
             end as receivable_fee
           from miclub.enrollments e
+          join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
           join miclub.activities a on a.id = e.activity_id
           join miclub.sectors s on s.id = a.sector_id
           cross join lateral (
@@ -478,11 +474,9 @@ export const getPostgresClubFinanceSummary =
       pendingIncome,
       pendingExpenses,
       pendingNetBalance,
-      cuotasAdeudadas: normalizeSuspiciousArsAmount(pickNumber(row, ["cuotas_adeudadas", "overdue_fees"])) || fallbackCuotasACobrar,
+      cuotasAdeudadas: cuotasACobrar,
       cuotasACobrar,
-      futureReceivableFeesUntilMonthEnd: normalizeSuspiciousArsAmount(pickNumber(row, [
-        "future_receivable_fees_until_month_end",
-      ])) || fallbackFutureReceivables,
+      futureReceivableFeesUntilMonthEnd: fallbackFutureReceivables,
       saldosAPagar: effectiveSaldosAPagar,
       projectedBalance: effectiveProjectedBalance,
       sectorBalances,
