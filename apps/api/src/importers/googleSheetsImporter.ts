@@ -44,6 +44,7 @@ export type MissingEnrollmentStrategy =
   | "noop"
   | "abandon"
   | "inactive"
+  | "archive"
   | "warn";
 type ImportOptions = {
   dryRun?: boolean;
@@ -136,13 +137,25 @@ export const parseMissingEnrollmentStrategy = (
   if (
     [
       "inactive",
+      "archive",
+      "archivar",
+      "archived",
+      "supersede",
+      "superseded",
+      "supersede_missing",
+      "replace",
+      "replaced",
+      "obsolete",
+      "obsoleto",
       "inactivo",
       "mark_inactive",
       "marcar_inactive",
       "marcar_inactivo",
     ].includes(normalized)
   )
-    return "inactive";
+    return normalized.includes("archive") || normalized.includes("archiv") || normalized.includes("supers") || normalized.includes("replace") || normalized.includes("obsolete") || normalized.includes("obsoleto")
+      ? "archive"
+      : "inactive";
   if (["warn", "warning", "advertir", "advertencia"].includes(normalized))
     return "warn";
   return "warn";
@@ -453,10 +466,23 @@ export const processMember = async (
   const dueDate = formatDateOnlyForPostgres(
     memberValue(row.row, memberIndexes, "vence"),
   );
+  const archiveColumns = await getEnrollmentArchiveColumns(pool);
+  const reactivateSetClauses = archiveColumns.has("inactive")
+    ? [
+        "inactive=false",
+        archiveColumns.has("inactive_reason") ? "inactive_reason=null" : undefined,
+        archiveColumns.has("inactive_at") ? "inactive_at=null" : undefined,
+        archiveColumns.has("superseded_at") ? "superseded_at=null" : undefined,
+        archiveColumns.has("superseded_reason") ? "superseded_reason=null" : undefined,
+      ].filter((clause): clause is string => Boolean(clause))
+    : [];
+  const reactivateOnConflict = reactivateSetClauses.length > 0
+    ? `, ${reactivateSetClauses.join(", ")}`
+    : "";
   await pool.query(
     `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes)
      values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7)
-     on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, updated_at=now()`,
+     on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, updated_at=now()${reactivateOnConflict}`,
     [
       ext,
       personId,
@@ -699,16 +725,18 @@ const upsertSheetMetricSnapshots = async (
   }
 };
 
-const hasEnrollmentInactiveColumn = async (pool: Pool): Promise<boolean> => {
-  const result = await pool.query<{ exists: boolean }>(
-    `select exists (
-       select 1
+const getEnrollmentArchiveColumns = async (pool: Pool): Promise<Set<string>> => {
+  const result = await pool.query<{ column_name: string }>(
+    `select column_name
        from information_schema.columns
-       where table_schema = 'miclub' and table_name = 'enrollments' and column_name = 'inactive'
-     )`,
+       where table_schema = 'miclub'
+         and table_name = 'enrollments'
+         and column_name = any($1::text[])`,
+    [["inactive", "inactive_reason", "inactive_at", "superseded_at", "superseded_reason"]],
   );
-  return result.rows[0]?.exists === true;
+  return new Set(result.rows.map((row) => row.column_name));
 };
+
 
 const reconcileMissingEnrollments = async (
   pool: Pool,
@@ -767,22 +795,41 @@ const reconcileMissingEnrollments = async (
     return;
   }
 
-  if (summary.missingEnrollmentsAction === "inactive") {
-    if (await hasEnrollmentInactiveColumn(pool)) {
-      await pool.query(
-        `update miclub.enrollments
-         set inactive = true, updated_at = now()
-         where source = 'google_sheets'
-           and external_id = any($1::text[])`,
-        [missingExternalIds],
-      );
-      summary.attemptedWrites += 1;
-      summary.persistedWrites += 1;
-    } else {
+  if (
+    summary.missingEnrollmentsAction === "inactive" ||
+    summary.missingEnrollmentsAction === "archive"
+  ) {
+    const archiveColumns = await getEnrollmentArchiveColumns(pool);
+    if (!archiveColumns.has("inactive")) {
       summary.warnings.push(
-        "GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=inactive no aplicó cambios porque miclub.enrollments.inactive no existe.",
+        `GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=${summary.missingEnrollmentsAction} no aplicó cambios porque miclub.enrollments.inactive no existe. Ejecutá el SQL manual documentado para habilitar el archivado seguro; el import continúa como warn.`,
       );
+      return;
     }
+
+    const setClauses = ["inactive = true", "updated_at = now()"];
+    if (archiveColumns.has("inactive_reason")) {
+      setClauses.push("inactive_reason = 'missing_from_google_sheets_import'");
+    }
+    if (archiveColumns.has("inactive_at")) {
+      setClauses.push("inactive_at = coalesce(inactive_at, now())");
+    }
+    if (archiveColumns.has("superseded_at")) {
+      setClauses.push("superseded_at = coalesce(superseded_at, now())");
+    }
+    if (archiveColumns.has("superseded_reason")) {
+      setClauses.push("superseded_reason = 'missing_from_google_sheets_import'");
+    }
+
+    await pool.query(
+      `update miclub.enrollments
+       set ${setClauses.join(", ")}
+       where source = 'google_sheets'
+         and external_id = any($1::text[])`,
+      [missingExternalIds],
+    );
+    summary.attemptedWrites += 1;
+    summary.persistedWrites += 1;
   }
 };
 
