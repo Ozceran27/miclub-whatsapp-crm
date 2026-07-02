@@ -26,7 +26,6 @@ export function RecentMovements({ enrollmentStats, weightedAverageFeeLabel, main
           <span className="metric-row"><strong className="metric-row__label">Nuevos inscriptos</strong><span className="metric-row__value">{enrollmentStats.newEnrollment}</span></span>
           <span className="metric-row"><strong className="metric-row__label">Adeudando</strong><span className="metric-row__value">{enrollmentStats.debtor}</span></span>
           <span className="metric-row"><strong className="metric-row__label">Abandonados</strong><span className="metric-row__value">{enrollmentStats.abandoned}</span></span>
-          <span className="metric-row"><strong className="metric-row__label">Cancelados</strong><span className="metric-row__value">{enrollmentStats.cancelled}</span></span>
           <span className="metric-row"><strong className="metric-row__label">Cuota Promedio</strong><span className="metric-row__value">{weightedAverageFeeLabel}</span></span>
         </div>
         <div className="debtor-activity-panel"><div className="debtor-activity-panel__heading"><strong>Adeudados por actividad</strong><span>{totalDebtors} deudores</span></div><div className="activity-breakdown-list activity-breakdown-list--compact">{renderActivityBreakdown(mainDebtorBreakdown, maxDebtorActivityCount, 'Sin deudores registrados', 'warning')}{remainingDebtorActivities > 0 && <small>+ {remainingDebtorActivities} actividades</small>}</div></div>
