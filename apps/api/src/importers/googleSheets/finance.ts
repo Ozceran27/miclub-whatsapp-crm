@@ -10,6 +10,7 @@ export {
   parseCommissionRate,
   parseAulaCommissionMap,
   getReceivableCommissionRate,
+  normalizeSuspiciousArsFee,
   calculateReceivableFee,
   getMemberDueDate,
   calculateFutureReceivableFeesUntilMonthEnd,
