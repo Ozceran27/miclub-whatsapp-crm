@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processMember, processMovement } from './googleSheetsImporter.js';
+import { parseMissingEnrollmentStrategy, processMember, processMovement } from './googleSheetsImporter.js';
 import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
+
+
+test('parseMissingEnrollmentStrategy mantiene warn por defecto y acepta aliases de archivado', () => {
+  assert.equal(parseMissingEnrollmentStrategy(undefined), 'warn');
+  assert.equal(parseMissingEnrollmentStrategy('archive'), 'archive');
+  assert.equal(parseMissingEnrollmentStrategy('supersede'), 'archive');
+  assert.equal(parseMissingEnrollmentStrategy('replace'), 'archive');
+  assert.equal(parseMissingEnrollmentStrategy('inactive'), 'inactive');
+  assert.equal(parseMissingEnrollmentStrategy('abandonado'), 'abandon');
+});
 
 const createSummary = () => ({
   batchId: 'batch-1',

@@ -75,6 +75,33 @@ const pick = (row: Record<string, unknown>, keys: string[]): unknown =>
   keys.find((key) => row[key] !== undefined)
     ? row[keys.find((key) => row[key] !== undefined)!]
     : undefined;
+
+const hasRelationColumn = async (
+  relationName: string,
+  columnName: string,
+): Promise<boolean> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'miclub'
+         and table_name = $1
+         and column_name = $2
+     )`,
+    [relationName, columnName],
+  );
+  return result.rows[0]?.exists === true;
+};
+
+const enrollmentInactiveFilter = async (
+  relationName = "enrollments",
+  alias = "e",
+): Promise<string> =>
+  (await hasRelationColumn(relationName, "inactive"))
+    ? ` and coalesce(${alias}.inactive, false) = false`
+    : "";
+
 const pickString = (
   row: Record<string, unknown>,
   keys: string[],
@@ -154,8 +181,9 @@ const normalizeStatusLabel = (value: unknown, dueDate?: unknown): DebtorStatus =
 
 export const getPostgresMembers = async (): Promise<Member[]> => {
   const pool = await getPostgresPool();
+  const inactiveFilter = await enrollmentInactiveFilter("v_current_enrollments", "v_current_enrollments");
   const result = await pool.query<Record<string, unknown>>(
-    `select * from miclub.v_current_enrollments`,
+    `select * from miclub.v_current_enrollments where true${inactiveFilter}`,
   );
   return result.rows.map((row, index) => ({
     id: pickString(
@@ -281,6 +309,7 @@ export const getPostgresSummary = async () => {
 export const getPostgresClubFinanceSummary =
   async (): Promise<ClubOperationsSummary> => {
     const pool = await getPostgresPool();
+    const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
     const [
       dashboard,
       operationalBalances,
@@ -350,6 +379,7 @@ export const getPostgresClubFinanceSummary =
               else e.fee_amount
             end as normalized_fee_amount
           ) normalized_fee
+          where true${inactiveEnrollmentFilter}
         )
         select
           coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
@@ -475,6 +505,7 @@ export const getPostgresSectorOperationalSummary =
   async (): Promise<SectorOperationalSummary> => {
     const members = await getPostgresMembers();
     const pool = await getPostgresPool();
+    const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
     const [sectorResult, local1Result, cantinaResult, snapshotResult, activityResult] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_finance_summary`,
@@ -612,7 +643,7 @@ export const getPostgresSectorOperationalSummary =
           from miclub.enrollments e
           join miclub.activities a on a.id = e.activity_id
           join miclub.sectors s on s.id = a.sector_id
-          where e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])
+          where e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])${inactiveEnrollmentFilter}
             and upper(replace(s.code, ' ', '_')) in ('SALON', 'AULA')
           group by upper(replace(s.code, ' ', '_')), a.name
         ), ranked as (
