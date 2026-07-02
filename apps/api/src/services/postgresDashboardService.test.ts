@@ -7,6 +7,9 @@ test("normalizePostgresSourceSheet reconoce nombres acentuados y variantes opera
   assert.equal(normalizePostgresSourceSheet("LOCAL 1"), "LOCAL_1");
   assert.equal(normalizePostgresSourceSheet("Cantina"), "CANTINA");
   assert.equal(normalizePostgresSourceSheet("Espacio Fitness"), "FITNESS");
+  assert.equal(normalizePostgresSourceSheet("Salón de Eventos"), "SALON");
+  assert.equal(normalizePostgresSourceSheet("Aulas"), "AULA");
+  assert.equal(normalizePostgresSourceSheet("Sector desconocido"), "ADMINISTRACION");
 });
 
 test("normalizeSuspiciousArsAmount corrige importes de cuotas inflados por mil", () => {
