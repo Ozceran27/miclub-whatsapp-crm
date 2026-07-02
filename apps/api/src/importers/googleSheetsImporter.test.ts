@@ -192,6 +192,7 @@ const createMemberPool = (queries: Array<{ sql: string; params?: unknown[] }>) =
   query: async (sql: string, params?: unknown[]) => {
     queries.push({ sql, params });
     if (sql.includes('from miclub.sectors')) return { rows: [{ id: 'sector-1' }] };
+    if (sql.includes('from miclub.enrollments')) return { rows: [] };
     if (sql.includes('from miclub.people')) return { rows: [] };
     if (sql.includes('insert into miclub.people')) return { rows: [{ id: `person-${queries.length}` }] };
     if (sql.includes('miclub.instructors')) return { rows: [{ id: 'instructor-1' }] };
@@ -199,6 +200,34 @@ const createMemberPool = (queries: Array<{ sql: string; params?: unknown[] }>) =
     if (sql.includes('miclub.enrollments')) return { rows: [{ id: 'enrollment-1' }] };
     return { rows: [] };
   },
+});
+
+test('processMember actualiza inscripción existente si coincide DNI, nombre, apellido y actividad', async () => {
+  const headers = ['Id.', 'Fecha', '', '', 'Nombre', '', '', 'Apellido', '', '', 'D.N.I.', '', 'Tel.', '', 'Actividad', '', 'Modalidad', '', 'Cuota', '', 'Estado', '', '', 'Instructor', '', 'Vence'];
+  const row = ['F-002', '01/06/2026', '', '', 'Ana', '', '', 'Fit', '', '', '30111222', '', '11 5555-0001', '', 'Musculación', '', 'Mensual', '', '35000', '', 'Adeudando', '', '', 'Profe Fit', '', '25/07/2026'];
+  const resolved = resolveMemberColumnIndexes(headers);
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const pool = {
+    query: async (sql: string, params?: unknown[]) => {
+      queries.push({ sql, params });
+      if (sql.includes('from miclub.sectors')) return { rows: [{ id: 'sector-1' }] };
+      if (sql.includes('from miclub.people')) return { rows: [{ id: 'person-1' }] };
+      if (sql.includes('miclub.instructors')) return { rows: [{ id: 'instructor-1' }] };
+      if (sql.includes('miclub.activities')) return { rows: [{ id: 'activity-1' }] };
+      if (sql.includes('from miclub.enrollments')) return { rows: [{ id: 'enrollment-1' }] };
+      return { rows: [] };
+    },
+  };
+  const summary = createSummary();
+
+  await processMember(pool as never, { kind: 'members', sheet: 'FITNESS', rowNumber: 20, row, memberIndexes: resolved.indexes, usedMemberFallback: false }, summary as never);
+
+  const update = queries.find((query) => query.sql.includes('update miclub.enrollments'));
+  const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
+  assert.ok(update, 'expected an enrollment update query');
+  assert.equal(insert, undefined);
+  assert.equal(update.params?.[0], 'enrollment-1');
+  assert.equal(update.params?.[5], 'adeudando');
 });
 
 test('resolveMovementColumnIndexes resuelve headers reales sectoriales sin fallback semántico', () => {

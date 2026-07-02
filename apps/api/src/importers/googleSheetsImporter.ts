@@ -405,6 +405,49 @@ const upsertPaymentMethod = async (
   );
 };
 
+const findActiveEnrollmentByImportedIdentity = async (
+  pool: Pool,
+  input: {
+    dni: string | null;
+    firstName: string;
+    lastName: string;
+    activityId: string;
+  },
+): Promise<string | null> => {
+  if (!input.dni) return null;
+  const result = await pool.query<{ id: string }>(
+    `select e.id
+       from miclub.enrollments e
+       join miclub.people p on p.id = e.person_id
+       where e.source = 'google_sheets'
+         and e.activity_id = $4
+         and p.dni = $1
+         and lower(p.first_name) = lower($2)
+         and lower(p.last_name) = lower($3)
+         and e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])
+         and (not exists (
+               select 1
+               from information_schema.columns c
+               where c.table_schema = 'miclub'
+                 and c.table_name = 'enrollments'
+                 and c.column_name = 'inactive'
+             )
+             or coalesce((to_jsonb(e)->>'inactive')::boolean, false) = false)
+         and (not exists (
+               select 1
+               from information_schema.columns c
+               where c.table_schema = 'miclub'
+                 and c.table_name = 'enrollments'
+                 and c.column_name = 'superseded_at'
+             )
+             or to_jsonb(e)->>'superseded_at' is null)
+       order by e.updated_at desc
+       limit 1`,
+    [input.dni, input.firstName, input.lastName, input.activityId],
+  );
+  return result.rows[0]?.id ?? null;
+};
+
 export const processMember = async (
   pool: Pool,
   row: SheetRow,
@@ -443,10 +486,13 @@ export const processMember = async (
   });
   summary.activitiesProcessed += 1;
   summary.attemptedWrites += 1;
+  const memberFirstName = normalizeSheetText(firstName);
+  const memberLastName = normalizeSheetText(memberValue(row.row, memberIndexes, "apellido")) || " ";
+  const memberDni = normalizeDni(memberValue(row.row, memberIndexes, "dni")) || null;
   const personId = await upsertPerson(pool, {
     firstName,
-    lastName: memberValue(row.row, memberIndexes, "apellido"),
-    dni: memberValue(row.row, memberIndexes, "dni"),
+    lastName: memberLastName,
+    dni: memberDni,
     phone: memberValue(row.row, memberIndexes, "tel"),
     kind: "alumno",
     source: `${row.sheet}:${row.rowNumber}`,
@@ -456,7 +502,7 @@ export const processMember = async (
   const ext = externalId(
     "google_sheets",
     "enrollment",
-    normalizeDni(memberValue(row.row, memberIndexes, "dni")) || personId,
+    memberDni || personId,
     row.sheet,
     activityId,
   );
@@ -479,22 +525,49 @@ export const processMember = async (
   const reactivateOnConflict = reactivateSetClauses.length > 0
     ? `, ${reactivateSetClauses.join(", ")}`
     : "";
-  await pool.query(
-    `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes)
-     values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7)
-     on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, updated_at=now()${reactivateOnConflict}`,
-    [
-      ext,
-      personId,
-      activityId,
-      normalizeFee(memberValue(row.row, memberIndexes, "cuota")) ?? 0,
-      status === "otro" ? "nuevo_inscripto" : status,
-      dueDate,
-      JSON.stringify({
-        modality: memberValue(row.row, memberIndexes, "modalidad") || null,
-      }),
-    ],
-  );
+  const feeAmount = normalizeFee(memberValue(row.row, memberIndexes, "cuota")) ?? 0;
+  const enrollmentStatus = status === "otro" ? "nuevo_inscripto" : status;
+  const notes = JSON.stringify({
+    modality: memberValue(row.row, memberIndexes, "modalidad") || null,
+  });
+  const matchedEnrollmentId = await findActiveEnrollmentByImportedIdentity(pool, {
+    dni: memberDni,
+    firstName: memberFirstName,
+    lastName: memberLastName,
+    activityId,
+  });
+  if (matchedEnrollmentId) {
+    await pool.query(
+      `update miclub.enrollments
+       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, notes=$8::jsonb, updated_at=now()${reactivateOnConflict}
+       where id=$1`,
+      [
+        matchedEnrollmentId,
+        ext,
+        personId,
+        activityId,
+        feeAmount,
+        enrollmentStatus,
+        dueDate,
+        notes,
+      ],
+    );
+  } else {
+    await pool.query(
+      `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes)
+       values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7)
+       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, notes=excluded.notes, updated_at=now()${reactivateOnConflict}`,
+      [
+        ext,
+        personId,
+        activityId,
+        feeAmount,
+        enrollmentStatus,
+        dueDate,
+        notes,
+      ],
+    );
+  }
   summary.enrollmentsProcessed += 1;
   summary.attemptedWrites += 1;
   return ext;
