@@ -11,6 +11,8 @@ export {
   isSector,
   isWithinLastDays,
   parseCurrentMonthUtility,
+  parseAulaCommissionMap,
+  normalizeActivityName,
   getSectorBalance,
   getCurrentMonthUtility,
   parseAulaCommissionAverage,

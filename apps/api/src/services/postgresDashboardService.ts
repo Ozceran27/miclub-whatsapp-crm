@@ -503,7 +503,7 @@ export const getPostgresSectorOperationalSummary =
     const members = await getPostgresMembers();
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
-    const [sectorResult, local1Result, cantinaResult, snapshotResult, activityResult] = await Promise.all([
+    const [sectorResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_finance_summary`,
       ),
@@ -655,6 +655,20 @@ export const getPostgresSectorOperationalSummary =
         from ranked
         where popularity_rank = 1 or unpopularity_rank = 1`,
       ),
+      pool.query<Record<string, unknown>>(
+        `select
+           upper(replace(s.code, ' ', '_')) as sector_key,
+           count(*)::integer as total_debtors,
+           coalesce(sum(case
+             when abs(e.fee_amount) >= 1000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+             else e.fee_amount
+           end), 0) as total_debt_amount
+         from miclub.enrollments e
+         join miclub.activities a on a.id = e.activity_id
+         join miclub.sectors s on s.id = a.sector_id
+         where e.status = 'adeudando'::miclub.enrollment_status${inactiveEnrollmentFilter}
+         group by upper(replace(s.code, ' ', '_'))`,
+      ),
     ]);
     const sectors = sectorResult.rows;
     const snapshots = Object.fromEntries(
@@ -680,6 +694,13 @@ export const getPostgresSectorOperationalSummary =
       return value;
     };
     const activityRows = activityResult.rows;
+    const debtMetric = (sector: SourceSheet) => {
+      const row = debtBySectorResult.rows.find((item) => pickString(item, ["sector_key"]) === sector);
+      return {
+        totalDebtors: row ? pickNumber(row, ["total_debtors"]) : 0,
+        totalDebtAmount: row ? normalizeSuspiciousArsAmount(pickNumber(row, ["total_debt_amount"])) : 0,
+      };
+    };
     const activityMetric = (sector: SourceSheet, rankColumn: "popularity_rank" | "unpopularity_rank") => {
       const row = activityRows.find((item) =>
         pickString(item, ["sector_key"]) === sector && pickNumber(item, [rankColumn]) === 1,
@@ -725,6 +746,7 @@ export const getPostgresSectorOperationalSummary =
     const fitnessTotalProfitability = snapshotMetric("fitness.totalProfitability", "fitness.total_profitability");
     const fitnessCurrentMonthProfitability = snapshotMetric("fitness.currentMonthProfitability", "fitness.current_month_profitability");
     const fitnessSettlementBalance = snapshotMetric("fitness.settlementBalance", "fitness.settlement_balance");
+    const fitnessDebt = debtMetric("FITNESS");
     const salonTotalProfitability = snapshotMetric("salon.totalProfitability", "salon.total_profitability");
     const salonCurrentMonthProfitability = snapshotMetric("salon.currentMonthProfitability", "salon.current_month_profitability");
     const aulaTotalProfitability = snapshotMetric("aula.totalProfitability", "aula.total_profitability");
@@ -757,12 +779,8 @@ export const getPostgresSectorOperationalSummary =
         ...base("FITNESS"),
         totalProfitability: fitnessTotalProfitability,
         currentMonthProfitability: fitnessCurrentMonthProfitability,
-        totalDebtors: debtors.filter(
-          (member) => member.sourceSheet === "FITNESS",
-        ).length,
-        totalDebtAmount: debtors
-          .filter((member) => member.sourceSheet === "FITNESS")
-          .reduce((sum, member) => sum + normalizeSuspiciousArsAmount(member.cuota ?? 0), 0),
+        totalDebtors: fitnessDebt.totalDebtors,
+        totalDebtAmount: fitnessDebt.totalDebtAmount,
         settlementBalance: fitnessSettlementBalance,
       },
       salon: {

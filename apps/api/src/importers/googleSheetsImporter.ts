@@ -12,6 +12,8 @@ import {
   SHEET_NAMES,
   type MemberColumnIndexes,
   parseAulaCommissionAverage,
+  parseAulaCommissionMap,
+  normalizeActivityName,
   parseCurrentMonthUtility,
   type MovementColumnIndexes,
   type MovementFallbackMode,
@@ -798,6 +800,43 @@ const upsertSheetMetricSnapshots = async (
   }
 };
 
+const upsertAulaActivityCommissions = async (
+  pool: Pool,
+  metricRanges: Record<string, unknown[][]>,
+  summary: ImportSummary,
+): Promise<void> => {
+  const aulaCommissionMap = parseAulaCommissionMap(metricRanges["AULA!B18:V30"] ?? []);
+  const entries = Object.entries(aulaCommissionMap).filter(([, rate]) =>
+    Number.isFinite(rate) && rate > 0,
+  );
+  if (entries.length === 0) {
+    summary.warnings.push("No se detectaron comisiones EC de AULA para actualizar actividades.");
+    return;
+  }
+  const sectorId = await upsertSector(pool, "AULA");
+  for (const [activityKey, rate] of entries) {
+    const result = await pool.query<{ id: string }>(
+      `update miclub.activities
+          set club_commission_percent = $3,
+              updated_at = now()
+        where sector_id = $1
+          and trim(regexp_replace(
+                translate(lower(coalesce(name, '')), 'áéíóúüñ', 'aeiouun'),
+                '[^a-z0-9]+',
+                ' ',
+                'g'
+              )) = $2
+        returning id`,
+      [sectorId, normalizeActivityName(activityKey), rate],
+    );
+    summary.activitiesProcessed += result.rows.length;
+    summary.attemptedWrites += 1;
+    if (result.rows.length === 0) {
+      summary.warnings.push(`No se encontró actividad AULA para comisión: ${activityKey}.`);
+    }
+  }
+};
+
 const getEnrollmentArchiveColumns = async (pool: Pool): Promise<Set<string>> => {
   const result = await pool.query<{ column_name: string }>(
     `select column_name
@@ -970,6 +1009,7 @@ export const importGoogleSheets = async (
     try {
       await upsertOperationalBalances(pool, adminBalanceRows, summary);
       await upsertSheetMetricSnapshots(pool, metricRanges, summary);
+      await upsertAulaActivityCommissions(pool, metricRanges, summary);
       if (dryRun) {
         await pool.query("rollback");
         summary.rolledBackWrites +=
