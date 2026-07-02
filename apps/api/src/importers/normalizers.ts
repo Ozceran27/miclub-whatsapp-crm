@@ -75,22 +75,64 @@ export const normalizeFee = (value: unknown): number | undefined => {
   return normalized === 0 && String(value ?? "").trim() === "" ? undefined : normalized;
 };
 
-export const normalizeDate = (value: unknown): string | undefined => {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
-  if (typeof value === "number" && Number.isFinite(value)) return new Date(Math.round((value - 25569) * 86_400_000)).toISOString();
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+const isValidDateParts = (year: number, month: number, day: number): boolean => {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+};
+
+const formatDateParts = (year: number, month: number, day: number): string | undefined =>
+  isValidDateParts(year, month, day) ? `${year}-${pad2(month)}-${pad2(day)}` : undefined;
+
+export const parseArgentinianDate = (value: unknown): string | undefined => {
   const raw = String(value ?? "").trim();
   if (!raw) return undefined;
-  const numeric = Number(raw.replace(",", "."));
-  if (Number.isFinite(numeric) && raw.match(/^\d+(?:[,.]\d+)?$/)) return new Date(Math.round((numeric - 25569) * 86_400_000)).toISOString();
-  const slashMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (slashMatch) {
-    const [, dayRaw, monthRaw, yearRaw, hourRaw = "0", minuteRaw = "0", secondRaw = "0"] = slashMatch;
-    const year = Number(yearRaw.length === 2 ? `20${yearRaw}` : yearRaw);
-    const date = new Date(Date.UTC(year, Number(monthRaw) - 1, Number(dayRaw), Number(hourRaw), Number(minuteRaw), Number(secondRaw)));
-    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  const match = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+  if (!match) return undefined;
+  const [, dayRaw, monthRaw, yearRaw] = match;
+  const year = Number(yearRaw.length === 2 ? `20${yearRaw}` : yearRaw);
+  return formatDateParts(year, Number(monthRaw), Number(dayRaw));
+};
+
+export const parseSheetDateToLocalDate = (value: unknown): string | undefined => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return formatDateParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
   }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(Math.round((value - 25569) * 86_400_000));
+    return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+  }
+
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+
+  const argentinianDate = parseArgentinianDate(raw);
+  if (argentinianDate) return argentinianDate;
+
+  const isoDate = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (isoDate) return formatDateParts(Number(isoDate[1]), Number(isoDate[2]), Number(isoDate[3]));
+
+  const numeric = Number(raw.replace(",", "."));
+  if (Number.isFinite(numeric) && /^\d+(?:[,.]\d+)?$/.test(raw)) return parseSheetDateToLocalDate(numeric);
+
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+  return Number.isNaN(parsed.getTime()) ? undefined : formatDateParts(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
+};
+
+export const formatDateOnlyForPostgres = (value: unknown): string | null =>
+  parseSheetDateToLocalDate(value) ?? null;
+
+export const formatArgentinaTimestampForPostgres = (value: unknown): string | null => {
+  const dateOnly = parseSheetDateToLocalDate(value);
+  return dateOnly ? `${dateOnly} 00:00:00 America/Argentina/Buenos_Aires` : null;
+};
+
+export const normalizeDate = (value: unknown): string | undefined => {
+  const dateOnly = parseSheetDateToLocalDate(value);
+  return dateOnly ? `${dateOnly}T00:00:00-03:00` : undefined;
 };
 export const parseGoogleSheetDate = normalizeDate;
 

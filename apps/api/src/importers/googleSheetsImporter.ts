@@ -28,7 +28,8 @@ import {
 } from "./importLogger.js";
 import {
   normalizeComparableText,
-  normalizeDate,
+  formatArgentinaTimestampForPostgres,
+  formatDateOnlyForPostgres,
   normalizeDni,
   normalizeFee,
   normalizeFinancialStatus,
@@ -449,9 +450,9 @@ export const processMember = async (
   const status = normalizeOperationalStatus(
     memberValue(row.row, memberIndexes, "estado"),
   );
-  const dueDate =
-    normalizeDate(memberValue(row.row, memberIndexes, "vence"))?.slice(0, 10) ??
-    null;
+  const dueDate = formatDateOnlyForPostgres(
+    memberValue(row.row, memberIndexes, "vence"),
+  );
   await pool.query(
     `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes)
      values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7)
@@ -518,7 +519,7 @@ export const processMovement = async (
     : typeText.startsWith("capital")
       ? "CAPITAL"
       : "INGRESOS";
-  const movementDate = normalizeDate(rawMovementDate);
+  const movementDate = formatArgentinaTimestampForPostgres(rawMovementDate);
   // Decisión: la fecha del movimiento es obligatoria porque miclub.movements.movement_date
   // no permite nulos y usar la fecha actual distorsiona los reportes financieros históricos.
   // El importador registra esta fila como error no bloqueante en el batch y continúa.
@@ -715,18 +716,37 @@ const reconcileMissingEnrollments = async (
   summary: ImportSummary,
 ): Promise<void> => {
   if (summary.dryRun) return;
-  const result = await pool.query<{ external_id: string }>(
-    `select external_id
-     from miclub.enrollments
-     where source = 'google_sheets'
-       and external_id <> all($1::text[])`,
+  const result = await pool.query<{
+    external_id: string;
+    dni: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    activity: string | null;
+    sector: string | null;
+    status: string | null;
+  }>(
+    `select e.external_id, p.dni, p.first_name, p.last_name, a.name as activity, s.name as sector, e.status::text as status
+     from miclub.enrollments e
+     left join miclub.people p on p.id = e.person_id
+     left join miclub.activities a on a.id = e.activity_id
+     left join miclub.sectors s on s.id = a.sector_id
+     where e.source = 'google_sheets'
+       and e.external_id <> all($1::text[])
+     order by s.name nulls last, a.name nulls last, p.last_name nulls last, p.first_name nulls last`,
     [[...processedExternalIds]],
   );
   const missingExternalIds = result.rows.map((row) => row.external_id);
   summary.missingEnrollments = missingExternalIds.length;
   if (missingExternalIds.length === 0) return;
 
-  const warning = `${missingExternalIds.length} inscripciones google_sheets no aparecieron en el último import.`;
+  const details = result.rows
+    .slice(0, 20)
+    .map((row) => {
+      const name = `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim() || "sin nombre";
+      return `external_id=${row.external_id}; hoja=${row.sector ?? "sin hoja"}; fila=no disponible; DNI=${row.dni ?? "sin DNI"}; nombre=${name}; actividad=${row.activity ?? "sin actividad"}; estado=${row.status ?? "sin estado"}; motivo=no apareció un external_id equivalente en las filas leídas del último import (posible baja en Sheets, cambio de DNI/persona/actividad/estado/external_id o rango incompleto)`;
+    });
+  const suffix = result.rows.length > details.length ? ` (+${result.rows.length - details.length} más)` : "";
+  const warning = `${missingExternalIds.length} inscripciones google_sheets no aparecieron en el último import${suffix}. Detalle: ${details.join(" | ")}`;
   summary.warnings.push(warning);
   if (
     summary.missingEnrollmentsAction === "noop" ||
