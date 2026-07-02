@@ -1009,7 +1009,6 @@ export const importGoogleSheets = async (
     try {
       await upsertOperationalBalances(pool, adminBalanceRows, summary);
       await upsertSheetMetricSnapshots(pool, metricRanges, summary);
-      await upsertAulaActivityCommissions(pool, metricRanges, summary);
       if (dryRun) {
         await pool.query("rollback");
         summary.rolledBackWrites +=
@@ -1069,6 +1068,25 @@ export const importGoogleSheets = async (
           error,
           rawPayload: row.row,
         });
+    }
+    const commissionAttemptedWritesStart = summary.attemptedWrites;
+    await pool.query("begin");
+    try {
+      await upsertAulaActivityCommissions(pool, metricRanges, summary);
+      if (dryRun) {
+        await pool.query("rollback");
+        summary.rolledBackWrites +=
+          summary.attemptedWrites - commissionAttemptedWritesStart;
+      } else {
+        await pool.query("commit");
+        summary.persistedWrites +=
+          summary.attemptedWrites - commissionAttemptedWritesStart;
+      }
+    } catch (error) {
+      await pool.query("rollback");
+      summary.rolledBackWrites +=
+        summary.attemptedWrites - commissionAttemptedWritesStart;
+      throw error;
     }
     await reconcileMissingEnrollments(
       pool,

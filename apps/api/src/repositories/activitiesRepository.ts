@@ -36,10 +36,13 @@ export const upsertActivity = async (pool: Pool, input: { sectorId: string; name
      on conflict (sector_id, name, coalesce(modality, ''::text)) do update
        set instructor_id = excluded.instructor_id,
            monthly_fee = greatest(miclub.activities.monthly_fee, excluded.monthly_fee),
-           club_commission_percent = excluded.club_commission_percent,
+           club_commission_percent = case
+             when $7::boolean then excluded.club_commission_percent
+             else miclub.activities.club_commission_percent
+           end,
            updated_at = now()
      returning id`,
-    [input.sectorId, input.name.trim() || "Sin actividad", input.modality ?? null, input.instructorId, input.monthlyFee ?? 0, input.clubCommissionPercent ?? 0]
+    [input.sectorId, input.name.trim() || "Sin actividad", input.modality ?? null, input.instructorId, input.monthlyFee ?? 0, input.clubCommissionPercent ?? 0, input.clubCommissionPercent !== undefined]
   );
   return result.rows[0]?.id ?? "";
 };
