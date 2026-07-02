@@ -161,21 +161,13 @@ const getMovementBreakdown = (groupColumn: "sector_name" | "category") => `
   limit ${MOVEMENT_BREAKDOWN_LIMIT}
 `;
 
-const normalizeStatusLabel = (value: unknown, dueDate?: unknown): DebtorStatus => {
+export const normalizeStatusLabel = (value: unknown, _dueDate?: unknown): DebtorStatus => {
   const status = normalizeOperationalStatus(String(value ?? ""));
   if (status === "al_dia") return "Al día";
   if (status === "adeudando") return "Adeudando";
   if (status === "abandonado") return "Abandonado";
   if (status === "cancelado") return "Cancelado";
-  if (status === "nuevo_inscripto") {
-    const due = dueDate == null ? undefined : new Date(String(dueDate));
-    if (due && !Number.isNaN(due.getTime())) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return due < today ? "Adeudando" : "Al día";
-    }
-    return "Nuevo Inscripto";
-  }
+  if (status === "nuevo_inscripto") return "Nuevo Inscripto";
   return "Desconocido";
 };
 
@@ -353,10 +345,10 @@ export const getPostgresClubFinanceSummary =
       pool.query<Record<string, unknown>>(
         `with enrollment_receivables as (
           select
-            eos.effective_status,
-            eos.due_date,
+            e.status,
+            e.due_date,
             case
-              when normalized_fee_amount <= 0 or eos.effective_status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
+              when normalized_fee_amount <= 0 or e.status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
               else normalized_fee_amount * case
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
@@ -366,7 +358,6 @@ export const getPostgresClubFinanceSummary =
               end
             end as receivable_fee
           from miclub.enrollments e
-          join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
           join miclub.activities a on a.id = e.activity_id
           join miclub.sectors s on s.id = a.sector_id
           cross join lateral (
@@ -378,9 +369,9 @@ export const getPostgresClubFinanceSummary =
           where true${inactiveEnrollmentFilter}
         )
         select
-          coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
-          coalesce(sum(receivable_fee) filter (where effective_status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_adeudadas,
-          coalesce(sum(receivable_fee) filter (where effective_status = 'al_dia'::miclub.enrollment_status and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
+          coalesce(sum(receivable_fee) filter (where status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
+          coalesce(sum(receivable_fee) filter (where status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_adeudadas,
+          coalesce(sum(receivable_fee) filter (where status = 'al_dia'::miclub.enrollment_status and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
         from enrollment_receivables`,
       ),
       pool.query<Record<string, unknown>>(
