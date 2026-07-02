@@ -5,8 +5,8 @@ import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
 
-test('parseMissingEnrollmentStrategy mantiene warn por defecto y acepta aliases de archivado', () => {
-  assert.equal(parseMissingEnrollmentStrategy(undefined), 'warn');
+test('parseMissingEnrollmentStrategy usa archive por defecto y acepta aliases de archivado', () => {
+  assert.equal(parseMissingEnrollmentStrategy(undefined), 'archive');
   assert.equal(parseMissingEnrollmentStrategy('archive'), 'archive');
   assert.equal(parseMissingEnrollmentStrategy('supersede'), 'archive');
   assert.equal(parseMissingEnrollmentStrategy('replace'), 'archive');

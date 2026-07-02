@@ -50,8 +50,8 @@ GOOGLE_PRIVATE_KEY=<private_key-del-json-con-\\n>
 # Endpoints operativos de importación
 IMPORT_ENDPOINTS_ENABLED=false
 
-# Inscripciones google_sheets ausentes en import real: warn | noop | abandon | inactive
-GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=warn
+# Inscripciones google_sheets ausentes en import real: archive | warn | noop | abandon | inactive
+GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY=archive
 ```
 
 Notas operativas:
@@ -61,7 +61,7 @@ Notas operativas:
 - `GOOGLE_SHEETS_ENABLED=true` habilita lectura de Google Sheets.
 - `GOOGLE_SHEETS_IMPORT_ENABLED=true` debe estar activo para permitir el importador de Sheets a PostgreSQL.
 - `IMPORT_ENDPOINTS_ENABLED=true` solo debe usarse durante ventanas controladas si se invoca la importación por HTTP. Mantenerlo en `false` para uso normal de producción.
-- `GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY` define qué hacer, solo en importaciones reales, con inscripciones de `miclub.enrollments` cuyo `source='google_sheets'` y cuyo `external_id` ya no aparece en la planilla importada. La decisión operativa inicial es `warn`: no modifica esas inscripciones y deja la advertencia en el resumen/notas del batch para revisión manual.
+- `GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY` define qué hacer, solo en importaciones reales, con inscripciones de `miclub.enrollments` cuyo `source='google_sheets'` y cuyo `external_id` ya no aparece en la planilla importada. La decisión operativa predeterminada es `archive`: marca esas inscripciones como inactivas/obsoletas sin perder historial y las excluye de futuras advertencias.
 
 ## 3. Rangos leídos por defecto y sobrescritura
 
@@ -219,12 +219,13 @@ La estrategia se configura con `GOOGLE_SHEETS_MISSING_ENROLLMENT_STRATEGY`, con 
 
 | Valor | Comportamiento |
 | --- | --- |
-| `warn` | Decisión recomendada/inicial. No modifica inscripciones; registra en el resumen/notas del batch cuántas inscripciones `google_sheets` no aparecieron en el último import. |
+| `warn` | Modo de auditoría. No modifica inscripciones; registra en el resumen/notas del batch cuántas inscripciones `google_sheets` no aparecieron en el último import. |
 | `noop` | No hace cambios. El resumen conserva el conteo de ausentes, pero la operación queda explícitamente en modo no-op. |
 | `abandon` / `abandonado` | Actualiza las ausentes a `status='abandonado'`. Usar solo si la planilla es la fuente autoritativa de bajas. |
 | `inactive` | Si existe la columna `miclub.enrollments.inactive`, actualiza las ausentes con `inactive=true`; si no existe, no modifica filas y agrega una advertencia al batch. |
+| `archive` / `supersede` / `replace` | Predeterminado. Marca `inactive=true`, completa metadatos de inactivación/superseded cuando existen y evita que esas filas obsoletas vuelvan a aparecer como ausentes en importaciones posteriores. |
 
-Decisión documentada para el corte: mantener `warn` hasta que Operaciones confirme que la ausencia en Sheets equivale a baja definitiva. Luego se puede pasar a `abandon` si el modelo vigente usa `status`, o a `inactive` únicamente en despliegues que agreguen esa columna.
+Decisión documentada para el corte: usar `archive` para diferenciar inscripciones obsoletas cuando cambian DNI/persona/actividad/estado/external_id o cuando ya no aparecen en Sheets. `abandon` queda disponible si Operaciones decide que la ausencia equivale a baja definitiva de estado, y `warn` sirve solo para auditoría sin cambios.
 
 ## 6. Endpoints HTTP de importación
 
