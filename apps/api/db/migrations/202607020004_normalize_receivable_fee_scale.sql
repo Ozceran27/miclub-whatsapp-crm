@@ -1,6 +1,6 @@
 -- Normaliza definitivamente las cuotas a cobrar con escalas históricas incorrectas.
--- Caso real: cuotas unitarias importadas con un cero extra ($30.000 => 300.000)
--- inflaban el agregado "CUOTAS A COBRAR" de $405.500 a $4.055.000.
+-- Caso real: cuotas importadas con un cero extra ($811.000 => 8.110.000)
+-- inflaban "CUOTAS A COBRAR" de $405.500 a $4.055.000.
 
 begin;
 
@@ -36,9 +36,8 @@ join miclub.activities a on a.id = e.activity_id
 join miclub.sectors s on s.id = a.sector_id
 cross join lateral (
   select case
-    when abs(e.fee_amount) > 100000 and abs(e.fee_amount) < 1000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
-    when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 100) = 0 then e.fee_amount / 100
-    when abs(e.fee_amount) >= 10000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+    when abs(e.fee_amount) >= 100000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+    when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
     else e.fee_amount
   end as normalized_fee_amount
 ) normalized_fee;
