@@ -113,10 +113,14 @@ const pickNumber = (row: Record<string, unknown>, keys: string[]): number =>
 export const normalizeSuspiciousArsAmount = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   const abs = Math.abs(value);
-  // Algunas importaciones históricas guardaron cuotas en milésimos
-  // (ej.: $25.000 como 25.000.000). Las cuotas normales del club
-  // están varios órdenes por debajo de ese umbral; mantener el signo.
-  if (abs >= 1_000_000 && Number.isInteger(value / 1000)) return value / 1000;
+  // Algunas importaciones históricas dejaron cuotas de socios corridas por
+  // separadores/escala (ej.: $811.000 como 8.110.000, o $25.000 como
+  // 25.000.000). Normalizamos solo importes enteros con escala exacta:
+  // - miles de millones/millones muy altos: milésimos;
+  // - millones bajos: un decimal extra.
+  // Mantener el signo permite reutilizar el helper en ajustes o saldos.
+  if (abs >= 100_000_000 && Number.isInteger(value / 1000)) return value / 1000;
+  if (abs >= 1_000_000 && abs < 10_000_000 && Number.isInteger(value / 10)) return value / 10;
   return value;
 };
 const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
@@ -374,7 +378,8 @@ export const getPostgresClubFinanceSummary =
           join miclub.sectors s on s.id = a.sector_id
           cross join lateral (
             select case
-              when abs(e.fee_amount) >= 1000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+              when abs(e.fee_amount) >= 100000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+              when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
               else e.fee_amount
             end as normalized_fee_amount
           ) normalized_fee
@@ -660,7 +665,8 @@ export const getPostgresSectorOperationalSummary =
            upper(replace(s.code, ' ', '_')) as sector_key,
            count(*)::integer as total_debtors,
            coalesce(sum(case
-             when abs(e.fee_amount) >= 1000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+             when abs(e.fee_amount) >= 100000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+             when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
              else e.fee_amount
            end), 0) as total_debt_amount
          from miclub.enrollments e

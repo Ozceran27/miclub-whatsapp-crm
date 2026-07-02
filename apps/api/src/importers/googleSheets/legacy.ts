@@ -597,8 +597,17 @@ export const getReceivableCommissionRate = (member: Member, aulaCommissionMap: R
   return 0;
 };
 
+export const normalizeSuspiciousArsFee = (value: unknown): number => {
+  const fee = normalizeMoney(value);
+  if (!Number.isFinite(fee)) return 0;
+  const abs = Math.abs(fee);
+  if (abs >= 100_000_000 && Number.isInteger(fee / 1000)) return fee / 1000;
+  if (abs >= 1_000_000 && abs < 10_000_000 && Number.isInteger(fee / 10)) return fee / 10;
+  return fee;
+};
+
 export const calculateReceivableFee = (member: Member, aulaCommissionMap: Record<string, number>): number => {
-  const fee = normalizeMoney(member.cuota);
+  const fee = normalizeSuspiciousArsFee(member.cuota);
   if (fee <= 0) return 0;
   return fee * getReceivableCommissionRate(member, aulaCommissionMap);
 };
