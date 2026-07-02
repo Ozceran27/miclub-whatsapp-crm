@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import type { AdminMovement, ClubOperationsSummary, Member, SectorBalance } from "@miclub/shared";
-import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeHeader, normalizeMoney, normalizeOperationalStatus, parseArgentinianDate, parseGoogleSheetDate, parseSheetDateToLocalDate, normalizeSheetText, toMemberStatus } from "../normalizers.js";
+import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeMembershipFeeAmount, normalizeHeader, normalizeMoney, normalizeOperationalStatus, parseArgentinianDate, parseGoogleSheetDate, parseSheetDateToLocalDate, normalizeSheetText, toMemberStatus } from "../normalizers.js";
 export { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeDate, normalizeDni, normalizeMoney, normalizeOperationalStatus, parseArgentinianDate, parseGoogleSheetDate, parseSheetDateToLocalDate, normalizeSheetText, toMemberStatus };
 
 export const SHEET_NAMES = ["FITNESS", "SALON", "AULA"] as const;
@@ -473,7 +473,7 @@ export const getMembersFromGoogleSheets = async (): Promise<Member[]> => {
         telefono,
         actividad: memberValue(row, memberIndexes, "actividad") || undefined,
         modalidad: memberValue(row, memberIndexes, "modalidad") || undefined,
-        cuota: normalizeFee(memberValue(row, memberIndexes, "cuota")),
+        cuota: normalizeMembershipFeeAmount(memberValue(row, memberIndexes, "cuota")),
         estado: toMemberStatus(memberValue(row, memberIndexes, "estado")),
         instructor: memberValue(row, memberIndexes, "instructor") || undefined,
         vence: normalizeDate(memberValue(row, memberIndexes, "vence")),

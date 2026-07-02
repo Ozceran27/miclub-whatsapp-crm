@@ -7,6 +7,7 @@ import type {
   StatusBreakdown,
 } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
+import { normalizeMembershipFeeAmount } from "../importers/normalizers.js";
 import { normalizeOperationalStatus } from "./googleSheets.js";
 
 const SHEETS: SourceSheet[] = [
@@ -123,6 +124,8 @@ export const normalizeSuspiciousArsAmount = (value: number): number => {
   if (abs >= 1_000_000 && abs < 10_000_000 && Number.isInteger(value / 10)) return value / 10;
   return value;
 };
+
+export const normalizeSuspiciousMembershipFee = (value: number): number => normalizeMembershipFeeAmount(value) ?? 0;
 const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
   keys.some((key) => row[key] !== undefined && row[key] !== null);
 const pickNullableNumber = (
@@ -213,7 +216,7 @@ export const getPostgresMembers = async (): Promise<Member[]> => {
     modalidad: toStringValue(
       pick(row, ["modalidad", "modality", "modality_name"]),
     ),
-    cuota: normalizeSuspiciousArsAmount(pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"])),
+    cuota: normalizeSuspiciousMembershipFee(pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"])),
     estado: normalizeStatusLabel(
       pick(row, ["estado", "status", "operational_status"]),
       pick(row, ["due_date", "vence", "expiration_date", "expires_at"]),
@@ -306,7 +309,7 @@ export const getPostgresSummary = async () => {
     debtorsWithoutPayments: debtors.filter((member) => !member.lastPaymentAt)
       .length,
     totalEstimatedDebt: debtors.reduce(
-      (sum, member) => sum + (member.cuota ?? 0),
+      (sum, member) => sum + normalizeSuspiciousMembershipFee(member.cuota ?? 0),
       0,
     ),
     statusBreakdown: buildStatusBreakdown(members),
@@ -830,7 +833,7 @@ export const getPostgresSectorOperationalSummary =
         ).length,
         totalDebtors: debtors.length,
         totalDebtAmount: debtors.reduce(
-          (sum, member) => sum + normalizeSuspiciousArsAmount(member.cuota ?? 0),
+          (sum, member) => sum + normalizeSuspiciousMembershipFee(member.cuota ?? 0),
           0,
         ),
       },

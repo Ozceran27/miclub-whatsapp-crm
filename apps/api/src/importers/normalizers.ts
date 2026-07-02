@@ -75,6 +75,23 @@ export const normalizeFee = (value: unknown): number | undefined => {
   return normalized === 0 && String(value ?? "").trim() === "" ? undefined : normalized;
 };
 
+export const normalizeMembershipFeeAmount = (value: unknown): number | undefined => {
+  const normalized = normalizeFee(value);
+  if (normalized === undefined) return undefined;
+  let fee = normalized;
+  let abs = Math.abs(fee);
+
+  // Las cuotas mensuales del club son importes unitarios. Cuando llegan con
+  // escala corrida ($30.000 como 300.000, o $25.000 como 25.000.000),
+  // reducimos la escala hasta volver al rango operativo esperado.
+  while (abs > 100_000 && Number.isInteger(fee / 10)) {
+    fee /= 10;
+    abs = Math.abs(fee);
+  }
+
+  return fee;
+};
+
 const pad2 = (value: number): string => String(value).padStart(2, "0");
 
 const isValidDateParts = (year: number, month: number, day: number): boolean => {

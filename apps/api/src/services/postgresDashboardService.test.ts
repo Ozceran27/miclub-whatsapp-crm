@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount } from "./postgresDashboardService.js";
+import { normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee } from "./postgresDashboardService.js";
 
 test("normalizePostgresSourceSheet reconoce nombres acentuados y variantes operativas", () => {
   assert.equal(normalizePostgresSourceSheet("Salón"), "SALON");
@@ -20,6 +20,12 @@ test("normalizeSuspiciousArsAmount corrige importes de cuotas con escala incorre
   assert.equal(normalizeSuspiciousArsAmount(1_234_567), 1_234_567);
 });
 
+
+test("normalizeSuspiciousMembershipFee corrige cuotas unitarias importadas con un cero extra", () => {
+  assert.equal(normalizeSuspiciousMembershipFee(30_000), 30_000);
+  assert.equal(normalizeSuspiciousMembershipFee(300_000), 30_000);
+  assert.equal(normalizeSuspiciousMembershipFee(25_000_000), 25_000);
+});
 
 test("normalizeStatusLabel respeta el estado explícito de la hoja para saldos", () => {
   assert.equal(normalizeStatusLabel("Nuevo Inscripto", "2026-01-01"), "Nuevo Inscripto");

@@ -33,7 +33,7 @@ import {
   formatArgentinaTimestampForPostgres,
   formatDateOnlyForPostgres,
   normalizeDni,
-  normalizeFee,
+  normalizeMembershipFeeAmount,
   normalizeFinancialStatus,
   normalizeMoney,
   normalizeOperationalStatus,
@@ -484,7 +484,7 @@ export const processMember = async (
     name: memberValue(row.row, memberIndexes, "actividad") || "Sin actividad",
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
     instructorId,
-    monthlyFee: normalizeFee(memberValue(row.row, memberIndexes, "cuota")),
+    monthlyFee: normalizeMembershipFeeAmount(memberValue(row.row, memberIndexes, "cuota")),
   });
   summary.activitiesProcessed += 1;
   summary.attemptedWrites += 1;
@@ -527,7 +527,7 @@ export const processMember = async (
   const reactivateOnConflict = reactivateSetClauses.length > 0
     ? `, ${reactivateSetClauses.join(", ")}`
     : "";
-  const feeAmount = normalizeFee(memberValue(row.row, memberIndexes, "cuota")) ?? 0;
+  const feeAmount = normalizeMembershipFeeAmount(memberValue(row.row, memberIndexes, "cuota")) ?? 0;
   const enrollmentStatus = status === "otro" ? "nuevo_inscripto" : status;
   const notes = JSON.stringify({
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
