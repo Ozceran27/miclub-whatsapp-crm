@@ -364,10 +364,10 @@ export const getPostgresClubFinanceSummary =
       pool.query<Record<string, unknown>>(
         `with enrollment_receivables as (
           select
-            e.status,
-            e.due_date,
+            eos.effective_status as status,
+            eos.due_date,
             case
-              when normalized_fee_amount <= 0 or e.status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
+              when normalized_fee_amount <= 0 or eos.effective_status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
               else normalized_fee_amount * case
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
                 when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
@@ -377,6 +377,7 @@ export const getPostgresClubFinanceSummary =
               end
             end as receivable_fee
           from miclub.enrollments e
+          join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
           join miclub.activities a on a.id = e.activity_id
           join miclub.sectors s on s.id = a.sector_id
           cross join lateral (

@@ -84,6 +84,19 @@ const buildActivityBreakdown = (records) => {
     return Array.from(counts.entries()).map(([activity, count]) => ({ activity, count })).sort((a, b) => b.count - a.count || a.activity.localeCompare(b.activity, 'es'));
 };
 const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+const normalizeReceivableDisplayAmount = (value) => {
+    if (!isFiniteNumber(value))
+        return undefined;
+    const abs = Math.abs(value);
+    // Blindaje de UI para datos históricos ya agregados con un cero extra.
+    // Caso real: $4.055.000 debe mostrarse como $405.500.
+    if (abs >= 1000000 && abs < 10000000 && Number.isInteger(value / 10))
+        return value / 10;
+    if (abs >= 100000000 && Number.isInteger(value / 1000))
+        return value / 1000;
+    return value;
+};
 export function useHomeDashboard() {
     const [summary, setSummary] = useState(null);
     const [members, setMembers] = useState([]);
@@ -134,7 +147,7 @@ export function useHomeDashboard() {
         const mainActiveActivityBreakdown = activeActivityBreakdown.slice(0, 6);
         const weightedAverageFee = calculateWeightedAverageFee(members);
         const unavailableLabel = financeError ? 'No disponible' : '—';
-        const estimatedDebt = financeSummary?.cuotasACobrar ?? financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt;
+        const estimatedDebt = normalizeReceivableDisplayAmount(financeSummary?.cuotasACobrar ?? financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt);
         const formatFinanceMoney = (value) => financeSummary && isFiniteNumber(value) ? formatArPeso(value) : unavailableLabel;
         const formatPayableObligation = (value) => financeSummary && isFiniteNumber(value) ? `-${formatArPeso(Math.abs(value))}` : unavailableLabel;
         const formatUsd = (value) => financeSummary && isFiniteNumber(value) ? `USD ${Math.round(value).toLocaleString('es-AR')}` : unavailableLabel;
