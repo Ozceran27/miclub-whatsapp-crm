@@ -929,7 +929,9 @@ const quoteSheetName = (sheetName: string) => sheetName.includes(" ") ? `'${shee
 const buildRange = (sheetName: string, range: string) => `${quoteSheetName(sheetName)}!${range}`;
 
 const getSectorMembers = (members: Member[], sheet: string) => members.filter((member) => isSector(member.sourceSheet, sheet));
-const sumDebt = (members: Member[]) => members.filter((member) => normalizeOperationalStatus(member.estado) === "adeudando").reduce((sum, member) => sum + (member.cuota ?? 0), 0);
+const sumDebt = (members: Member[]) => members
+  .filter((member) => normalizeOperationalStatus(member.estado) === "adeudando")
+  .reduce((sum, member) => sum + normalizeMoney(member.cuota), 0);
 
 const getCellNumber = (ranges: Record<string, unknown[][]>, sheetName: string, cell: string) => normalizeMoney(ranges[getRangeKey(sheetName, cell)]?.[0]?.[0]);
 

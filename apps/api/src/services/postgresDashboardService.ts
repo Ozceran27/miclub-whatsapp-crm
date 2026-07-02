@@ -138,9 +138,21 @@ export const normalizePostgresSourceSheet = (value: unknown): SourceSheet => {
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-  return (SHEETS as string[]).includes(normalized)
-    ? (normalized as SourceSheet)
-    : "FITNESS";
+  const aliases: Record<string, SourceSheet> = {
+    ESPACIO_FITNESS: "FITNESS",
+    GYM: "FITNESS",
+    GIMNASIO: "FITNESS",
+    SALON_DE_EVENTOS: "SALON",
+    EVENTOS: "SALON",
+    AULAS: "AULA",
+    LOCAL1: "LOCAL_1",
+    LOCAL_1: "LOCAL_1",
+    LOCAL: "LOCAL_1",
+    ADMINISTRACION: "ADMINISTRACION",
+    ADMIN: "ADMINISTRACION",
+  };
+  if ((SHEETS as string[]).includes(normalized)) return normalized as SourceSheet;
+  return aliases[normalized] ?? "ADMINISTRACION";
 };
 
 const MOVEMENT_BREAKDOWN_LIMIT = 4;
@@ -197,7 +209,7 @@ export const getPostgresMembers = async (): Promise<Member[]> => {
     modalidad: toStringValue(
       pick(row, ["modalidad", "modality", "modality_name"]),
     ),
-    cuota: pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"]),
+    cuota: normalizeSuspiciousArsAmount(pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"])),
     estado: normalizeStatusLabel(
       pick(row, ["estado", "status", "operational_status"]),
       pick(row, ["due_date", "vence", "expiration_date", "expires_at"]),
@@ -750,7 +762,7 @@ export const getPostgresSectorOperationalSummary =
         ).length,
         totalDebtAmount: debtors
           .filter((member) => member.sourceSheet === "FITNESS")
-          .reduce((sum, member) => sum + (member.cuota ?? 0), 0),
+          .reduce((sum, member) => sum + normalizeSuspiciousArsAmount(member.cuota ?? 0), 0),
         settlementBalance: fitnessSettlementBalance,
       },
       salon: {
@@ -794,7 +806,7 @@ export const getPostgresSectorOperationalSummary =
         ).length,
         totalDebtors: debtors.length,
         totalDebtAmount: debtors.reduce(
-          (sum, member) => sum + (member.cuota ?? 0),
+          (sum, member) => sum + normalizeSuspiciousArsAmount(member.cuota ?? 0),
           0,
         ),
       },
