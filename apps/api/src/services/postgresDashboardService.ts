@@ -7,6 +7,7 @@ import type {
   StatusBreakdown,
 } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
+import { normalizeMembershipFeeAmount } from "../importers/normalizers.js";
 import { normalizeOperationalStatus } from "./googleSheets.js";
 
 const SHEETS: SourceSheet[] = [
@@ -113,12 +114,14 @@ const pickNumber = (row: Record<string, unknown>, keys: string[]): number =>
 export const normalizeSuspiciousArsAmount = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   const abs = Math.abs(value);
-  // Algunas importaciones históricas guardaron cuotas en milésimos
-  // (ej.: $25.000 como 25.000.000). Las cuotas normales del club
-  // están varios órdenes por debajo de ese umbral; mantener el signo.
-  if (abs >= 1_000_000 && Number.isInteger(value / 1000)) return value / 1000;
+  // Para agregados financieros ya sumados aplicamos un único ajuste de escala.
+  // El caso reportado llega como $4.055.000 y corresponde a $405.500.
+  if (abs >= 100_000_000 && Number.isInteger(value / 1000)) return value / 1000;
+  if (abs >= 1_000_000 && abs < 10_000_000 && Number.isInteger(value / 10)) return value / 10;
   return value;
 };
+
+export const normalizeSuspiciousMembershipFee = (value: number): number => normalizeMembershipFeeAmount(value) ?? 0;
 const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
   keys.some((key) => row[key] !== undefined && row[key] !== null);
 const pickNullableNumber = (
@@ -209,7 +212,7 @@ export const getPostgresMembers = async (): Promise<Member[]> => {
     modalidad: toStringValue(
       pick(row, ["modalidad", "modality", "modality_name"]),
     ),
-    cuota: normalizeSuspiciousArsAmount(pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"])),
+    cuota: normalizeSuspiciousMembershipFee(pickNumber(row, ["cuota", "fee", "fee_amount", "monthly_fee"])),
     estado: normalizeStatusLabel(
       pick(row, ["estado", "status", "operational_status"]),
       pick(row, ["due_date", "vence", "expiration_date", "expires_at"]),
@@ -302,7 +305,7 @@ export const getPostgresSummary = async () => {
     debtorsWithoutPayments: debtors.filter((member) => !member.lastPaymentAt)
       .length,
     totalEstimatedDebt: debtors.reduce(
-      (sum, member) => sum + (member.cuota ?? 0),
+      (sum, member) => sum + normalizeSuspiciousMembershipFee(member.cuota ?? 0),
       0,
     ),
     statusBreakdown: buildStatusBreakdown(members),
@@ -374,7 +377,9 @@ export const getPostgresClubFinanceSummary =
           join miclub.sectors s on s.id = a.sector_id
           cross join lateral (
             select case
-              when abs(e.fee_amount) >= 1000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+              when abs(e.fee_amount) > 100000 and abs(e.fee_amount) < 1000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
+              when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 100) = 0 then e.fee_amount / 100
+              when abs(e.fee_amount) >= 10000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
               else e.fee_amount
             end as normalized_fee_amount
           ) normalized_fee
@@ -660,7 +665,9 @@ export const getPostgresSectorOperationalSummary =
            upper(replace(s.code, ' ', '_')) as sector_key,
            count(*)::integer as total_debtors,
            coalesce(sum(case
-             when abs(e.fee_amount) >= 1000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+             when abs(e.fee_amount) > 100000 and abs(e.fee_amount) < 1000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
+             when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 100) = 0 then e.fee_amount / 100
+             when abs(e.fee_amount) >= 10000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
              else e.fee_amount
            end), 0) as total_debt_amount
          from miclub.enrollments e
@@ -824,7 +831,7 @@ export const getPostgresSectorOperationalSummary =
         ).length,
         totalDebtors: debtors.length,
         totalDebtAmount: debtors.reduce(
-          (sum, member) => sum + normalizeSuspiciousArsAmount(member.cuota ?? 0),
+          (sum, member) => sum + normalizeSuspiciousMembershipFee(member.cuota ?? 0),
           0,
         ),
       },
