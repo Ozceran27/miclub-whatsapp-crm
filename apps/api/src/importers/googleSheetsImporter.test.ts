@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { processMember, processMovement } from './googleSheetsImporter.js';
 import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
+import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
 const createSummary = () => ({
   batchId: 'batch-1',
@@ -233,4 +234,42 @@ test('processMovement contabiliza fallback seguro y fallback completo por separa
   await processMovement(pool as never, { kind: 'movements', sheet: 'SALON', rowNumber: 1, row: [], movementIndexes: {}, usedMovementFallback: true, movementFallbackKeys: ['id'], movementHeadersFound: false, movementFallbackMode: 'layout' }, summary as never);
 
   assert.deepEqual(summary.movementFallbacks, { safeColumn: 1, fullLayout: 1 });
+});
+
+test('parseSheetDateToLocalDate conserva fechas de Sheets sin desfase horario', () => {
+  assert.equal(parseArgentinianDate('01/07/2026'), '2026-07-01');
+  assert.equal(parseSheetDateToLocalDate('01/07/2026'), '2026-07-01');
+  assert.equal(parseSheetDateToLocalDate('30/06/2026'), '2026-06-30');
+  assert.equal(parseSheetDateToLocalDate('26/06/2026'), '2026-06-26');
+  assert.equal(parseSheetDateToLocalDate('31/07/2026'), '2026-07-31');
+  assert.equal(parseSheetDateToLocalDate('1/7/2026'), '2026-07-01');
+  assert.equal(parseSheetDateToLocalDate('2026-07-01'), '2026-07-01');
+  assert.equal(parseSheetDateToLocalDate(46204), '2026-07-01');
+  assert.equal(parseSheetDateToLocalDate(new Date(2026, 6, 1, 12)), '2026-07-01');
+  assert.equal(formatDateOnlyForPostgres('01/07/2026'), '2026-07-01');
+  assert.equal(formatArgentinaTimestampForPostgres('01/07/2026'), '2026-07-01 00:00:00 America/Argentina/Buenos_Aires');
+});
+
+test('processMovement envía timestamp explícito de Argentina para evitar desfase de un día', async () => {
+  const headers = ['ID', 'Fecha', '', 'Tipo', '', '', 'Categoria', '', '', 'Concepto', '', '', '', '', 'Contraparte', '', '', 'Sector', '', 'Monto', '', '', 'Impuestos', '', 'Estado Finan.', 'Estado', 'Medio Pago'];
+  const row = ['JUL-001', '01/07/2026', '', 'INGRESOS', '', '', 'CUOTA', '', '', 'Cuota julio', '', '', '', '', 'Alumno', '', '', 'FITNESS', '', '1000', '', '', '0', '', 'PAGADO', 'COMPLETADO', 'Transferencia'];
+  const resolved = resolveMovementColumnIndexes(headers);
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const pool = {
+    query: async (sql: string, params?: unknown[]) => {
+      queries.push({ sql, params });
+      if (sql.includes('from miclub.sectors')) return { rows: [{ id: 'sector-1' }] };
+      if (sql.includes('from miclub.movement_categories')) return { rows: [{ id: 'category-1' }] };
+      if (sql.includes('miclub.payment_methods')) return { rows: [{ id: 'payment-method-1' }] };
+      if (sql.includes('miclub.movements')) return { rows: [{ id: 'movement-1' }] };
+      return { rows: [] };
+    },
+  };
+  const summary = createSummary();
+
+  await processMovement(pool as never, { kind: 'movements', sheet: 'FITNESS', rowNumber: 99, row, movementIndexes: resolved.indexes, usedMovementFallback: false }, summary as never);
+
+  const insert = queries.find((query) => query.sql.includes('insert into miclub.movements'));
+  assert.ok(insert, 'expected a movement insert query');
+  assert.equal(insert.params?.[1], '2026-07-01 00:00:00 America/Argentina/Buenos_Aires');
 });
