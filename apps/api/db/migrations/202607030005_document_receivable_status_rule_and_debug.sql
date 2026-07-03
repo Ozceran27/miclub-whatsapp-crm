@@ -4,8 +4,6 @@
 --   La misma definición se usa en miclub.v_dashboard_basic y en los reportes
 --   derivados de miclub.v_enrollment_receivable_fees.
 
-begin;
-
 comment on view miclub.v_enrollment_receivable_fees is
   'Base de cuotas por inscripcion. Regla de Cuotas a cobrar: sumar receivable_fee solo cuando status/effective_status = adeudando; nuevo_inscripto no integra Cuotas a cobrar.';
 
@@ -79,5 +77,3 @@ cross join settlements s;
 
 comment on view miclub.v_dashboard_basic is
   'Dashboard financiero. Regla de Cuotas a cobrar: incluye solo status/effective_status=adeudando desde v_enrollment_receivable_fees; nuevo_inscripto queda excluido.';
-
-commit;
