@@ -87,6 +87,48 @@ const unavailableMetric = (reason = "Pendiente de cálculo en PostgreSQL") => ({
   reason,
   source: "postgres" as const,
 });
+
+const CUOTAS_A_COBRAR_DIFF_THRESHOLD = 1_000;
+
+type CuotasACobrarSource = "v_dashboard_basic" | "fallback";
+
+export interface CuotasACobrarSelection {
+  cuotasACobrar: number;
+  source: CuotasACobrarSource;
+  dashboardValue: number | null;
+  fallbackValue: number | null;
+  difference: number | null;
+  differsBeyondThreshold: boolean;
+  threshold: number;
+}
+
+export const selectCuotasACobrar = ({
+  dashboardValue,
+  fallbackValue,
+  threshold = CUOTAS_A_COBRAR_DIFF_THRESHOLD,
+}: {
+  dashboardValue?: number | null;
+  fallbackValue?: number | null;
+  threshold?: number;
+}): CuotasACobrarSelection => {
+  const normalizedDashboardValue = dashboardValue == null ? null : normalizeSuspiciousArsAmount(dashboardValue);
+  const normalizedFallbackValue = fallbackValue == null ? null : normalizeSuspiciousArsAmount(fallbackValue);
+  const source: CuotasACobrarSource = normalizedDashboardValue == null ? "fallback" : "v_dashboard_basic";
+  const cuotasACobrar = source === "v_dashboard_basic" ? normalizedDashboardValue! : (normalizedFallbackValue ?? 0);
+  const difference = normalizedDashboardValue != null && normalizedFallbackValue != null
+    ? Math.abs(normalizedDashboardValue - normalizedFallbackValue)
+    : null;
+
+  return {
+    cuotasACobrar,
+    source,
+    dashboardValue: normalizedDashboardValue,
+    fallbackValue: normalizedFallbackValue,
+    difference,
+    differsBeyondThreshold: difference != null && difference > threshold,
+    threshold,
+  };
+};
 export const normalizePostgresSourceSheet = (value: unknown): SourceSheet => {
   const normalized = String(value ?? "")
     .normalize("NFD")
@@ -285,7 +327,10 @@ export const getPostgresClubFinanceSummary =
     ] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_dashboard_basic`,
-      ),
+      ).catch((error: unknown) => {
+        console.warn("[postgres-dashboard] v_dashboard_basic no disponible; usando fallback para métricas derivadas.", error);
+        return { rows: [], rowCount: 0, command: "SELECT", oid: 0, fields: [] };
+      }),
       pool.query<Record<string, unknown>>(
         `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
       ),
@@ -416,18 +461,31 @@ export const getPostgresClubFinanceSummary =
       "available_balance",
     ]);
     const fallbackReceivablesRow = receivablesFallback.rows[0] ?? {};
-    const fallbackCuotasACobrar = normalizeSuspiciousArsAmount(pickNumber(fallbackReceivablesRow, [
+    const fallbackCuotasACobrar = hasValue(fallbackReceivablesRow, [
       "cuotas_a_cobrar",
       "cuotas_adeudadas",
-    ]));
+    ]) ? normalizeSuspiciousArsAmount(pickNumber(fallbackReceivablesRow, [
+      "cuotas_a_cobrar",
+      "cuotas_adeudadas",
+    ])) : null;
     const fallbackFutureReceivables = normalizeSuspiciousArsAmount(pickNumber(fallbackReceivablesRow, [
       "future_receivable_fees_until_month_end",
     ]));
-    const dashboardCuotasACobrar = normalizeSuspiciousArsAmount(pickNumber(row, [
+    const dashboardCuotasACobrar = hasValue(row, [
       "cuotas_a_cobrar",
       "cuotas_adeudadas",
-    ]));
-    const cuotasACobrar = fallbackCuotasACobrar || dashboardCuotasACobrar;
+    ]) ? normalizeSuspiciousArsAmount(pickNumber(row, [
+      "cuotas_a_cobrar",
+      "cuotas_adeudadas",
+    ])) : null;
+    const cuotasACobrarSelection = selectCuotasACobrar({
+      dashboardValue: dashboardCuotasACobrar,
+      fallbackValue: fallbackCuotasACobrar,
+    });
+    if (cuotasACobrarSelection.differsBeyondThreshold) {
+      console.warn("[postgres-dashboard] cuotas_a_cobrar difiere entre v_dashboard_basic y fallback", cuotasACobrarSelection);
+    }
+    const cuotasACobrar = cuotasACobrarSelection.cuotasACobrar;
     const pendingFallbackRow = pendingFallback.rows[0] ?? {};
     const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
     const pendingExpenses = pickNumber(pendingFallbackRow, ["pending_expenses"]) || pickNumber(row, ["pending_expenses"]);
@@ -442,6 +500,15 @@ export const getPostgresClubFinanceSummary =
       saldosAPagar: effectiveSaldosAPagar,
     });
     return {
+      metadata: {
+        coverage: "complete",
+        warnings: cuotasACobrarSelection.differsBeyondThreshold
+          ? ["cuotas_a_cobrar difiere entre v_dashboard_basic y fallback."]
+          : [],
+        sourceCompleteness: {},
+        cuotasACobrarSource: cuotasACobrarSelection.source,
+        cuotasACobrarDebug: cuotasACobrarSelection,
+      },
       liquidity,
       cash: pickNumber(row, ["cash"]),
       bank: pickNumber(row, ["bank", "bank_balance"]),

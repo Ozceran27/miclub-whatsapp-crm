@@ -119,6 +119,16 @@ export interface SummaryMetadata {
   sourceCompleteness?: SourceCompleteness;
   warnings?: string[];
   coverage?: "complete" | "partial" | "unavailable";
+  cuotasACobrarSource?: "v_dashboard_basic" | "fallback";
+  cuotasACobrarDebug?: {
+    cuotasACobrar: number;
+    source: "v_dashboard_basic" | "fallback";
+    dashboardValue: number | null;
+    fallbackValue: number | null;
+    difference: number | null;
+    differsBeyondThreshold: boolean;
+    threshold: number;
+  };
 }
 
 export interface HighlightedIncome {

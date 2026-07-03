@@ -276,6 +276,9 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
   if (debugEndpointsEnabled) {
     router.get("/club-finance-debug", async (_req, res) => {
       try {
+        if (shouldUsePostgresDataSource()) {
+          return res.json(await getPostgresClubFinanceSummary());
+        }
         const { members } = await getMembersSource();
         res.json(await getClubFinanceDebugFromGoogleSheets(members));
       } catch (error) {
