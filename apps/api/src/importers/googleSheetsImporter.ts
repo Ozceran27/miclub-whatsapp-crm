@@ -479,12 +479,32 @@ export const processMember = async (
   );
   summary.instructorsProcessed += 1;
   summary.attemptedWrites += 1;
+  const rawFeeAmountText = String(memberValue(row.row, memberIndexes, "cuota") ?? "").trim();
+  const parsedFeeAmount = rawFeeAmountText === "" ? undefined : normalizeMoney(rawFeeAmountText);
+  const normalizedFeeAmount = normalizeMembershipFeeAmount(rawFeeAmountText) ?? 0;
+  const feeNormalizationReason = parsedFeeAmount === undefined
+    ? "blank"
+    : parsedFeeAmount !== normalizedFeeAmount
+      ? `scale_adjustment:${parsedFeeAmount}->${normalizedFeeAmount}`
+      : "unchanged";
+  if (parsedFeeAmount !== undefined && parsedFeeAmount !== normalizedFeeAmount) {
+    console.warn("[google-sheets-import] cuota normalizada por escala", {
+      batchId: summary.batchId,
+      sheet: row.sheet,
+      rowNumber: row.rowNumber,
+      student: `${firstName} ${memberValue(row.row, memberIndexes, "apellido") || ""}`.trim(),
+      rawValue: rawFeeAmountText,
+      parsedValue: parsedFeeAmount,
+      normalizedValue: normalizedFeeAmount,
+      reason: feeNormalizationReason,
+    });
+  }
   const activityId = await upsertActivity(pool, {
     sectorId,
     name: memberValue(row.row, memberIndexes, "actividad") || "Sin actividad",
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
     instructorId,
-    monthlyFee: normalizeMembershipFeeAmount(memberValue(row.row, memberIndexes, "cuota")),
+    monthlyFee: normalizedFeeAmount,
   });
   summary.activitiesProcessed += 1;
   summary.attemptedWrites += 1;
@@ -527,7 +547,8 @@ export const processMember = async (
   const reactivateOnConflict = reactivateSetClauses.length > 0
     ? `, ${reactivateSetClauses.join(", ")}`
     : "";
-  const feeAmount = normalizeMembershipFeeAmount(memberValue(row.row, memberIndexes, "cuota")) ?? 0;
+  // fee_amount queda temporalmente como compatibilidad; los cálculos deben leer normalized_fee_amount.
+  const feeAmount = normalizedFeeAmount;
   const enrollmentStatus = status === "otro" ? "nuevo_inscripto" : status;
   const notes = JSON.stringify({
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
@@ -541,7 +562,7 @@ export const processMember = async (
   if (matchedEnrollmentId) {
     await pool.query(
       `update miclub.enrollments
-       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, notes=$8::jsonb, updated_at=now()${reactivateOnConflict}
+       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, notes=$8::jsonb, raw_fee_amount_text=$9, raw_fee_amount=$10, normalized_fee_amount=$11, fee_normalization_reason=$12, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
        where id=$1`,
       [
         matchedEnrollmentId,
@@ -552,13 +573,17 @@ export const processMember = async (
         enrollmentStatus,
         dueDate,
         notes,
+        rawFeeAmountText || null,
+        parsedFeeAmount ?? null,
+        normalizedFeeAmount,
+        feeNormalizationReason,
       ],
     );
   } else {
     await pool.query(
-      `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes)
-       values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7)
-       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, notes=excluded.notes, updated_at=now()${reactivateOnConflict}`,
+      `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
+       values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7,$8,$9,$10,$11,now())
+       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}`,
       [
         ext,
         personId,
@@ -567,6 +592,10 @@ export const processMember = async (
         enrollmentStatus,
         dueDate,
         notes,
+        rawFeeAmountText || null,
+        parsedFeeAmount ?? null,
+        normalizedFeeAmount,
+        feeNormalizationReason,
       ],
     );
   }
