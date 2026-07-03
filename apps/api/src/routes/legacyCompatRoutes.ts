@@ -2,7 +2,7 @@ import { Router, type Response } from "express";
 import type { Member, OperationalStatusKey, StatusBreakdown } from "@miclub/shared";
 import { getAdminMovementsFromGoogleSheets, getClubFinanceDebugFromGoogleSheets, getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, getPaymentsDebugFromGoogleSheets, getSectorOperationalDebug, getSectorOperationalSummary, normalizeOperationalStatus, SHEET_NAMES, type SyncStatus } from "../services/googleSheets.js";
 import { shouldUsePostgresDataSource } from "../services/dataSourceService.js";
-import { emptyPostgresClubFinanceSummary, emptyPostgresSectorOperationalSummary, emptyPostgresSummary, getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
+import { emptyPostgresClubFinanceSummary, emptyPostgresSectorOperationalSummary, emptyPostgresSummary, getPostgresClubFinanceSummary, getPostgresReceivableEffectiveStatusDebug, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
 import { getPostgresHealth } from "../db/health.js";
 import { validatePostgresEnv } from "../config/env.js";
 import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "../services/comparisonService.js";
@@ -283,6 +283,16 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
         res.json(await getClubFinanceDebugFromGoogleSheets(members));
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
+        jsonError(res, 500, message);
+      }
+    });
+
+    router.get("/receivable-fees-effective-status-debug", async (_req, res) => {
+      try {
+        if (shouldUsePostgresDataSource()) return res.json(await getPostgresReceivableEffectiveStatusDebug());
+        jsonError(res, 404, "Debug de estados efectivos disponible solo con PostgreSQL.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "No se pudo leer el debug de cuotas por estado efectivo.";
         jsonError(res, 500, message);
       }
     });

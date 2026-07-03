@@ -386,6 +386,35 @@ export const getPostgresSummary = async () => {
   };
 };
 
+
+export interface ReceivableEffectiveStatusDebugRow {
+  effectiveStatus: string;
+  enrollmentsCount: number;
+  totalReceivableFee: number;
+  totalNormalizedFee: number;
+}
+
+export const getPostgresReceivableEffectiveStatusDebug = async (): Promise<{
+  businessRule: string;
+  rows: ReceivableEffectiveStatusDebugRow[];
+}> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<Record<string, unknown>>(
+    `select effective_status, enrollments_count, total_receivable_fee, total_normalized_fee
+     from miclub.v_receivable_fees_effective_status_debug
+     order by effective_status`,
+  );
+  return {
+    businessRule: "cuotas_a_cobrar incluye solo effective_status=adeudando; nuevo_inscripto queda excluido",
+    rows: result.rows.map((row) => ({
+      effectiveStatus: String(row.effective_status ?? ""),
+      enrollmentsCount: toNumber(row.enrollments_count),
+      totalReceivableFee: toNumber(row.total_receivable_fee),
+      totalNormalizedFee: toNumber(row.total_normalized_fee),
+    })),
+  };
+};
+
 export const getPostgresClubFinanceSummary =
   async (): Promise<ClubOperationsSummary> => {
     const pool = await getPostgresPool();

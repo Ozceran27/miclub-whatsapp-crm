@@ -25,8 +25,8 @@ export const normalizeOperationalStatus = (value: unknown): OperationalStatusKey
   if (normalized.includes("nuevo") && (normalized.includes("inscripto") || normalized.includes("inscrito"))) return "nuevo_inscripto";
   if (normalized.includes("abandon")) return "abandonado";
   if (normalized.includes("cancel")) return "cancelado";
-  if (normalized.includes("adeudando") || normalized.includes("adeud") || normalized.includes("deuda")) return "adeudando";
-  if (normalized.includes("al dia") || compact.includes("aldia")) return "al_dia";
+  if (normalized.includes("adeudando") || normalized.includes("adeud") || normalized.includes("deuda") || normalized.includes("pendiente")) return "adeudando";
+  if (normalized.includes("al dia") || compact.includes("aldia") || normalized.includes("aldia")) return "al_dia";
   return "otro";
 };
 

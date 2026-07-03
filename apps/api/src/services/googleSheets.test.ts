@@ -8,14 +8,19 @@ test('normalizeOperationalStatus normaliza estados operativos conocidos', () => 
   assert.equal(normalizeOperationalStatus('Nuevo Inscripto'), 'nuevo_inscripto');
   assert.equal(normalizeOperationalStatus('nuevo inscripto'), 'nuevo_inscripto');
   assert.equal(normalizeOperationalStatus('Adeudando'), 'adeudando');
+  assert.equal(normalizeOperationalStatus('Deuda'), 'adeudando');
+  assert.equal(normalizeOperationalStatus('Pendiente'), 'adeudando');
+  assert.equal(normalizeOperationalStatus('Péndiente'), 'adeudando');
   assert.equal(normalizeOperationalStatus('Abandonado'), 'abandonado');
   assert.equal(normalizeOperationalStatus('Cancelado'), 'cancelado');
   assert.equal(normalizeOperationalStatus(''), 'otro');
+  assert.equal(normalizeOperationalStatus('   '), 'otro');
 });
 
 test('normalizeOperationalStatus tolera espacios, saltos de línea y guiones', () => {
   assert.equal(normalizeOperationalStatus('  AL\nDÍA  '), 'al_dia');
   assert.equal(normalizeOperationalStatus('Nuevo - Inscripto'), 'nuevo_inscripto');
+  assert.equal(normalizeOperationalStatus('Nuevo inscrípto'), 'nuevo_inscripto');
   assert.equal(normalizeOperationalStatus('  abandonado  '), 'abandonado');
   assert.equal(normalizeOperationalStatus('Cancelado / baja'), 'cancelado');
 });
