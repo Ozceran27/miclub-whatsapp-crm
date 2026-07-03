@@ -3,7 +3,7 @@
 
 begin;
 
-create or replace function miclub.normalize_membership_fee_amount(value numeric)
+create or replace function miclub.normalize_enrollment_fee_amount(value numeric)
 returns numeric
 language sql
 immutable
@@ -23,10 +23,10 @@ as $$
 $$;
 
 update miclub.enrollments
-set fee_amount = miclub.normalize_membership_fee_amount(fee_amount),
+set fee_amount = miclub.normalize_enrollment_fee_amount(fee_amount),
     updated_at = now()
 where source = 'google_sheets'
-  and fee_amount <> miclub.normalize_membership_fee_amount(fee_amount);
+  and fee_amount <> miclub.normalize_enrollment_fee_amount(fee_amount);
 
 create or replace view miclub.v_enrollment_receivable_fees as
 select
@@ -49,7 +49,7 @@ join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
 join miclub.activities a on a.id = e.activity_id
 join miclub.sectors s on s.id = a.sector_id
 cross join lateral (
-  select miclub.normalize_membership_fee_amount(e.fee_amount) as normalized_fee_amount
+  select miclub.normalize_enrollment_fee_amount(e.fee_amount) as normalized_fee_amount
 ) normalized_fee
 cross join lateral (
   select case

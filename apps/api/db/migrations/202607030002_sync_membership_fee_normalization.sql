@@ -5,7 +5,7 @@
 
 begin;
 
-create or replace function miclub.normalize_membership_fee_amount(value numeric)
+create or replace function miclub.normalize_enrollment_fee_amount(value numeric)
 returns numeric
 language sql
 immutable
