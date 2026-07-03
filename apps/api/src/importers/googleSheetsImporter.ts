@@ -564,11 +564,13 @@ export const processMember = async (
     lastName: memberLastName,
     activityId,
   });
+  let enrollmentResult: { rows: { id: string }[] };
   if (matchedEnrollmentId) {
-    await pool.query(
+    enrollmentResult = await pool.query<{ id: string }>(
       `update miclub.enrollments
        set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, notes=$8::jsonb, raw_fee_amount_text=$9, raw_fee_amount=$10, normalized_fee_amount=$11, fee_normalization_reason=$12, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
-       where id=$1`,
+       where id=$1
+       returning id`,
       [
         matchedEnrollmentId,
         ext,
@@ -585,10 +587,11 @@ export const processMember = async (
       ],
     );
   } else {
-    await pool.query(
+    enrollmentResult = await pool.query<{ id: string }>(
       `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
        values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7,$8,$9,$10,$11,now())
-       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}`,
+       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
+       returning id`,
       [
         ext,
         personId,
@@ -597,6 +600,31 @@ export const processMember = async (
         enrollmentStatus,
         dueDate,
         notes,
+        rawFeeAmountText || null,
+        parsedFeeAmount ?? null,
+        normalizedFeeAmount,
+        feeNormalizationReason,
+      ],
+    );
+  }
+  const enrollmentId = enrollmentResult.rows[0]?.id;
+  if (enrollmentId) {
+    await pool.query(
+      `insert into miclub.enrollment_fee_audit (
+         import_batch_id, enrollment_id, source_sheet, source_row_number, raw_fee_text,
+         parsed_fee_amount, normalized_fee_amount, normalization_factor, normalization_reason,
+         commission_rate, receivable_fee
+       )
+       select $1, $2, $3, $4, $5, $6, $7,
+              case when coalesce($6::numeric, 0) = 0 then null else ($7::numeric / $6::numeric) end,
+              $8, coalesce(v.commission_rate, 0), coalesce(v.receivable_fee, 0)
+       from (select 1) seed
+       left join miclub.v_enrollment_receivable_fees v on v.enrollment_id = $2`,
+      [
+        summary.batchId,
+        enrollmentId,
+        row.sheet,
+        row.rowNumber,
         rawFeeAmountText || null,
         parsedFeeAmount ?? null,
         normalizedFeeAmount,

@@ -47,6 +47,31 @@ comment on column miclub.enrollments.fee_normalization_reason is
 comment on column miclub.enrollments.fee_normalized_at is
   'Fecha/hora en que se calculo normalized_fee_amount.';
 
+
+create table if not exists miclub.enrollment_fee_audit (
+  id uuid primary key default gen_random_uuid(),
+  import_batch_id uuid references miclub.import_batches(id) on delete set null,
+  enrollment_id uuid references miclub.enrollments(id) on delete cascade,
+  source_sheet text not null,
+  source_row_number integer not null,
+  raw_fee_text text,
+  parsed_fee_amount numeric(14,2),
+  normalized_fee_amount numeric(14,2) not null default 0,
+  normalization_factor numeric(14,6),
+  normalization_reason text not null,
+  commission_rate numeric(8,6) not null default 0,
+  receivable_fee numeric(14,2) not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists enrollment_fee_audit_import_batch_id_idx on miclub.enrollment_fee_audit (import_batch_id);
+create index if not exists enrollment_fee_audit_enrollment_id_idx on miclub.enrollment_fee_audit (enrollment_id);
+create index if not exists enrollment_fee_audit_source_sheet_idx on miclub.enrollment_fee_audit (source_sheet);
+create index if not exists enrollment_fee_audit_created_at_idx on miclub.enrollment_fee_audit (created_at desc);
+
+comment on table miclub.enrollment_fee_audit is
+  'Auditoria por importacion de la normalizacion de cuotas y calculo de comision/cuenta a cobrar.';
+
 update miclub.enrollments
 set raw_fee_amount = coalesce(raw_fee_amount, fee_amount),
     normalized_fee_amount = coalesce(
