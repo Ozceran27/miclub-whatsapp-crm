@@ -22,7 +22,11 @@ order by status;
 comment on view miclub.v_receivable_fees_effective_status_debug is
   'Debug previo a Cuotas a cobrar: conteo y monto por estado efectivo. Cuotas a cobrar debe tomar solo effective_status=adeudando; nuevo_inscripto queda excluido.';
 
-create or replace view miclub.v_dashboard_basic as
+-- DROP is required because PostgreSQL cannot CREATE OR REPLACE a view when the
+-- replacement changes existing column names/order (for example total_people -> total_income).
+drop view if exists miclub.v_dashboard_basic;
+
+create view miclub.v_dashboard_basic as
 with balances as (
   select
     coalesce(sum(case when movement_type = 'INGRESOS' and operational_status = 'COMPLETADO' then amount else 0 end), 0) as total_income,
