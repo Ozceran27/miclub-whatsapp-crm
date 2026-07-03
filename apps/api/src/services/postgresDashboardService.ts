@@ -393,8 +393,12 @@ export const getPostgresClubFinanceSummary =
           join miclub.sectors s on s.id = a.sector_id
           cross join lateral (
             select case
-              when abs(e.fee_amount) >= 100000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
-              when abs(e.fee_amount) >= 1000000 and abs(e.fee_amount) < 10000000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
+              when abs(e.fee_amount) > 10000000000 and mod(e.fee_amount, 1000000) = 0 then e.fee_amount / 1000000
+              when abs(e.fee_amount) > 1000000000 and mod(e.fee_amount, 100000) = 0 then e.fee_amount / 100000
+              when abs(e.fee_amount) > 100000000 and mod(e.fee_amount, 10000) = 0 then e.fee_amount / 10000
+              when abs(e.fee_amount) > 10000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
+              when abs(e.fee_amount) > 1000000 and mod(e.fee_amount, 100) = 0 then e.fee_amount / 100
+              when abs(e.fee_amount) > 100000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
               else e.fee_amount
             end as normalized_fee_amount
           ) normalized_fee

@@ -65,15 +65,15 @@ test('calculateProjectedBalance resta saldosAPagar como obligación futura', () 
 test('calculateReceivableFee normaliza cuotas infladas y aplica comisiones por sector y actividad', () => {
   const aulaCommissionMap = { 'arte ninos': 0.4 };
   assert.equal(calculateReceivableFee({ id: '1', nombre: 'Fit', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 30000, sourceSheet: 'FITNESS' }, aulaCommissionMap), 15000);
-  assert.equal(calculateReceivableFee({ id: '1b', nombre: 'Fit Inflado', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 8110000, sourceSheet: 'FITNESS' }, aulaCommissionMap), 405500);
+  assert.equal(calculateReceivableFee({ id: '1b', nombre: 'Fit Inflado', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 8110000, sourceSheet: 'FITNESS' }, aulaCommissionMap), 40550);
   assert.equal(calculateReceivableFee({ id: '2', nombre: 'Salon', apellido: '', telefono: '1', estado: 'Adeudando', cuota: 30000, sourceSheet: 'SALON' }, aulaCommissionMap), 0);
   assert.equal(calculateReceivableFee({ id: '3', nombre: 'Aula', apellido: '', telefono: '1', estado: 'Adeudando', actividad: 'Arte - Niños', cuota: 30000, sourceSheet: 'AULA' }, aulaCommissionMap), 12000);
 });
 
 test('normalizeSuspiciousArsFee corrige cuotas importadas con escala incorrecta', () => {
   assert.equal(normalizeSuspiciousArsFee(25_000), 25_000);
-  assert.equal(normalizeSuspiciousArsFee(8_110_000), 811_000);
-  assert.equal(normalizeSuspiciousArsFee(25_000_000_000), 25_000_000);
+  assert.equal(normalizeSuspiciousArsFee(8_110_000), 81_100);
+  assert.equal(normalizeSuspiciousArsFee(25_000_000_000), 25_000);
   assert.equal(normalizeSuspiciousArsFee(1_234_567), 1_234_567);
 });
 
