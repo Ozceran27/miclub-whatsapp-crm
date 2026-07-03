@@ -1,4 +1,4 @@
-import type { DebtorStatus, OperationalStatusKey } from "@miclub/shared";
+import { normalizeMembershipFeeUnit, normalizeMovementAmount, type DebtorStatus, type OperationalStatusKey } from "@miclub/shared";
 
 export const normalizeSheetText = (value: unknown): string =>
   String(value ?? "")
@@ -41,34 +41,7 @@ export const toMemberStatus = (value: unknown): DebtorStatus => {
   }
 };
 
-const countOccurrences = (value: string, character: string): number => value.split(character).length - 1;
-const parseSingleSeparatorNumber = (value: string, separator: "," | "."): string => {
-  const separatorIndex = value.indexOf(separator);
-  const integerPart = value.slice(0, separatorIndex);
-  const fractionalPart = value.slice(separatorIndex + 1);
-  if (fractionalPart.length === 3 && /^\d{1,3}$/.test(integerPart)) return `${integerPart}${fractionalPart}`;
-  if (fractionalPart.length >= 1 && fractionalPart.length <= 2) return `${integerPart}.${fractionalPart}`;
-  return `${integerPart}${fractionalPart}`;
-};
-
-export const normalizeMoney = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  const raw = String(value ?? "").trim();
-  if (!raw) return 0;
-  const isNegative = /[-−–—]/.test(raw) || /^\s*\(.*\)\s*$/.test(raw);
-  let cleaned = raw.replace(/[−–—]/g, "-").replace(/[^\d,.-]/g, "").replace(/-/g, "");
-  if (!/\d/.test(cleaned)) return 0;
-  const commaCount = countOccurrences(cleaned, ",");
-  const dotCount = countOccurrences(cleaned, ".");
-  if (commaCount > 0 && dotCount > 0) cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
-  else if (dotCount > 1) cleaned = cleaned.replace(/\./g, "");
-  else if (commaCount > 1) cleaned = cleaned.replace(/,/g, "");
-  else if (dotCount === 1) cleaned = parseSingleSeparatorNumber(cleaned, ".");
-  else if (commaCount === 1) cleaned = parseSingleSeparatorNumber(cleaned, ",");
-  const parsed = Number(cleaned);
-  if (!Number.isFinite(parsed)) return 0;
-  return isNegative && parsed !== 0 ? -parsed : parsed;
-};
+export const normalizeMoney = normalizeMovementAmount;
 
 export const normalizeFee = (value: unknown): number | undefined => {
   const normalized = normalizeMoney(value);
@@ -76,20 +49,9 @@ export const normalizeFee = (value: unknown): number | undefined => {
 };
 
 export const normalizeMembershipFeeAmount = (value: unknown): number | undefined => {
-  const normalized = normalizeFee(value);
-  if (normalized === undefined) return undefined;
-  let fee = normalized;
-  let abs = Math.abs(fee);
-
-  // Las cuotas mensuales del club son importes unitarios. Cuando llegan con
-  // escala corrida ($30.000 como 300.000, o $25.000 como 25.000.000),
-  // reducimos la escala hasta volver al rango operativo esperado.
-  while (abs > 100_000 && Number.isInteger(fee / 10)) {
-    fee /= 10;
-    abs = Math.abs(fee);
-  }
-
-  return fee;
+  const raw = String(value ?? "").trim();
+  if (raw === "") return undefined;
+  return normalizeMembershipFeeUnit(value);
 };
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
