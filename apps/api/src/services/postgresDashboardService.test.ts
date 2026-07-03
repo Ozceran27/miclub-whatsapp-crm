@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeMembershipFeeUnit, normalizeReceivableAggregate } from "@miclub/shared";
-import { calculateOperationalProjectedBalance, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
+import { buildEnrollmentReceivablesQuery, calculateOperationalProjectedBalance, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
 
 test("moneyNormalization normaliza cuotas unitarias y agregados compartidos", () => {
   assert.equal(normalizeMembershipFeeUnit("30.000"), 30_000);
@@ -81,4 +81,58 @@ test("selectCuotasACobrar usa fallback solo cuando v_dashboard_basic es null o f
   assert.equal(nullDashboard.source, "fallback");
   assert.equal(missingDashboard.cuotasACobrar, 430_500);
   assert.equal(missingDashboard.source, "fallback");
+});
+
+
+test("buildEnrollmentReceivablesQuery usa la vista v_enrollment_receivable_fees cuando existe", () => {
+  const query = buildEnrollmentReceivablesQuery({
+    capabilities: {
+      hasEnrollmentReceivableFeesView: true,
+      hasNormalizeMembershipFeeAmountFunction: true,
+    },
+    inactiveEnrollmentFilter: " and coalesce(e.inactive, false) = false",
+  });
+
+  assert.match(query, /from miclub\.v_enrollment_receivable_fees/);
+  assert.doesNotMatch(query, /from miclub\.enrollments e/);
+  assert.doesNotMatch(query, /normalize_membership_fee_amount\(e\.fee_amount\)/);
+});
+
+test("buildEnrollmentReceivablesQuery usa la función de normalización en fallback sin umbrales manuales", () => {
+  const query = buildEnrollmentReceivablesQuery({
+    capabilities: {
+      hasEnrollmentReceivableFeesView: false,
+      hasNormalizeMembershipFeeAmountFunction: true,
+    },
+    inactiveEnrollmentFilter: " and coalesce(e.inactive, false) = false",
+  });
+
+  assert.match(query, /from miclub\.enrollments e/);
+  assert.match(query, /miclub\.normalize_membership_fee_amount\(e\.fee_amount\)/);
+  assert.match(query, /coalesce\(e\.inactive, false\) = false/);
+  assert.doesNotMatch(query, /10000000000|1000000000|100000000|10000000|1000000|100000|mod\(/);
+});
+
+test("receivablesFallback coincide con una fila simulada de v_enrollment_receivable_fees", () => {
+  const simulatedViewRow = {
+    status: "adeudando",
+    dueDate: new Date("2026-07-15T00:00:00.000Z"),
+    receivableFee: 15_000,
+  };
+  const fallbackRow = {
+    status: "adeudando",
+    dueDate: simulatedViewRow.dueDate,
+    normalizedFeeAmount: normalizeMembershipFeeUnit(300_000),
+    commissionRate: 0.5,
+    receivableFee: normalizeMembershipFeeUnit(300_000) * 0.5,
+  };
+
+  assert.deepEqual(
+    {
+      status: fallbackRow.status,
+      dueDate: fallbackRow.dueDate,
+      receivableFee: fallbackRow.receivableFee,
+    },
+    simulatedViewRow,
+  );
 });

@@ -90,6 +90,83 @@ const unavailableMetric = (reason = "Pendiente de cálculo en PostgreSQL") => ({
 
 const CUOTAS_A_COBRAR_DIFF_THRESHOLD = 1_000;
 
+export interface PostgresDashboardCapabilities {
+  hasEnrollmentReceivableFeesView: boolean;
+  hasNormalizeMembershipFeeAmountFunction: boolean;
+}
+
+export const detectPostgresDashboardCapabilities = async (): Promise<PostgresDashboardCapabilities> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<PostgresDashboardCapabilities>(
+    `select
+       to_regclass('miclub.v_enrollment_receivable_fees') is not null as "hasEnrollmentReceivableFeesView",
+       exists (
+         select 1
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'miclub'
+           and p.proname = 'normalize_membership_fee_amount'
+       ) as "hasNormalizeMembershipFeeAmountFunction"`,
+  );
+  return {
+    hasEnrollmentReceivableFeesView: result.rows[0]?.hasEnrollmentReceivableFeesView === true,
+    hasNormalizeMembershipFeeAmountFunction: result.rows[0]?.hasNormalizeMembershipFeeAmountFunction === true,
+  };
+};
+
+const receivablesAggregateSql = (sourceSql: string): string => `with enrollment_receivables as (
+  ${sourceSql}
+)
+select
+  coalesce(sum(receivable_fee) filter (where status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
+  coalesce(sum(receivable_fee) filter (where status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_adeudadas,
+  coalesce(sum(receivable_fee) filter (where status = 'al_dia'::miclub.enrollment_status and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
+from enrollment_receivables`;
+
+export const buildEnrollmentReceivablesQuery = ({
+  capabilities,
+  inactiveEnrollmentFilter = "",
+}: {
+  capabilities: PostgresDashboardCapabilities;
+  inactiveEnrollmentFilter?: string;
+}): string => {
+  if (capabilities.hasEnrollmentReceivableFeesView) {
+    return receivablesAggregateSql(
+      `select status, due_date, receivable_fee
+   from miclub.v_enrollment_receivable_fees`,
+    );
+  }
+
+  const normalizedFeeExpression = capabilities.hasNormalizeMembershipFeeAmountFunction
+    ? "miclub.normalize_membership_fee_amount(e.fee_amount)"
+    : "e.fee_amount";
+
+  return receivablesAggregateSql(
+    `select
+    eos.effective_status as status,
+    eos.due_date,
+    case
+      when normalized_fee_amount <= 0 or eos.effective_status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
+      else normalized_fee_amount * case
+        when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
+        when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
+        when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) = 'AULA' then
+          greatest(0, least(1, case when coalesce(a.club_commission_percent, 0) > 1 then coalesce(a.club_commission_percent, 0) / 100 else coalesce(a.club_commission_percent, 0) end))
+        else 0
+      end
+    end as receivable_fee
+  from miclub.enrollments e
+  join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
+  join miclub.activities a on a.id = e.activity_id
+  join miclub.sectors s on s.id = a.sector_id
+  cross join lateral (
+    select ${normalizedFeeExpression} as normalized_fee_amount
+  ) normalized_fee
+  where true${inactiveEnrollmentFilter}`,
+  );
+};
+
+
 type CuotasACobrarSource = "v_dashboard_basic" | "fallback";
 
 export interface CuotasACobrarSelection {
@@ -313,6 +390,7 @@ export const getPostgresClubFinanceSummary =
   async (): Promise<ClubOperationsSummary> => {
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
+    const dashboardCapabilities = await detectPostgresDashboardCapabilities();
     const [
       dashboard,
       operationalBalances,
@@ -357,42 +435,10 @@ export const getPostgresClubFinanceSummary =
         [["fitness.settlement_balance", "salon.settlement_balance", "aula.settlement_balance", "local1.settlement_balance"]],
       ),
       pool.query<Record<string, unknown>>(
-        `with enrollment_receivables as (
-          select
-            eos.effective_status as status,
-            eos.due_date,
-            case
-              when normalized_fee_amount <= 0 or eos.effective_status in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status) then 0
-              else normalized_fee_amount * case
-                when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('FITNESS', 'ESPACIO_FITNESS') then 0.5
-                when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) in ('SALON', 'SALON_DE_EVENTOS') then 0
-                when upper(regexp_replace(coalesce(s.code, s.name, ''), '[^[:alnum:]]+', '_', 'g')) = 'AULA' then
-                  greatest(0, least(1, case when coalesce(a.club_commission_percent, 0) > 1 then coalesce(a.club_commission_percent, 0) / 100 else coalesce(a.club_commission_percent, 0) end))
-                else 0
-              end
-            end as receivable_fee
-          from miclub.enrollments e
-          join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
-          join miclub.activities a on a.id = e.activity_id
-          join miclub.sectors s on s.id = a.sector_id
-          cross join lateral (
-            select case
-              when abs(e.fee_amount) > 10000000000 and mod(e.fee_amount, 1000000) = 0 then e.fee_amount / 1000000
-              when abs(e.fee_amount) > 1000000000 and mod(e.fee_amount, 100000) = 0 then e.fee_amount / 100000
-              when abs(e.fee_amount) > 100000000 and mod(e.fee_amount, 10000) = 0 then e.fee_amount / 10000
-              when abs(e.fee_amount) > 10000000 and mod(e.fee_amount, 1000) = 0 then e.fee_amount / 1000
-              when abs(e.fee_amount) > 1000000 and mod(e.fee_amount, 100) = 0 then e.fee_amount / 100
-              when abs(e.fee_amount) > 100000 and mod(e.fee_amount, 10) = 0 then e.fee_amount / 10
-              else e.fee_amount
-            end as normalized_fee_amount
-          ) normalized_fee
-          where true${inactiveEnrollmentFilter}
-        )
-        select
-          coalesce(sum(receivable_fee) filter (where status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_a_cobrar,
-          coalesce(sum(receivable_fee) filter (where status = 'adeudando'::miclub.enrollment_status), 0) as cuotas_adeudadas,
-          coalesce(sum(receivable_fee) filter (where status = 'al_dia'::miclub.enrollment_status and due_date between current_date and (date_trunc('month', current_date)::date + interval '1 month - 1 day')::date), 0) as future_receivable_fees_until_month_end
-        from enrollment_receivables`,
+        buildEnrollmentReceivablesQuery({
+          capabilities: dashboardCapabilities,
+          inactiveEnrollmentFilter,
+        }),
       ),
       pool.query<Record<string, unknown>>(
         `select
