@@ -30,6 +30,7 @@ export const createFrontendRoutes = (webIndexPath: string) => {
       req.path.startsWith("/club-finance") ||
       req.path.startsWith("/admin-movements") ||
       req.path.startsWith("/payments-debug") ||
+      req.path.startsWith("/receivable-fees-effective-status-debug") ||
       req.path.startsWith("/comparison-debug") ||
       req.path.startsWith("/templates") ||
       req.path.startsWith("/history") ||
