@@ -10,7 +10,7 @@ comment on view miclub.v_enrollment_receivable_fees is
 create or replace view miclub.v_receivable_fees_effective_status_debug as
 select
   status as effective_status,
-  count(*)::integer as enrollments_count,
+  (count(*))::integer as enrollments_count,
   coalesce(sum(receivable_fee), 0)::numeric(14,2) as total_receivable_fee,
   coalesce(sum(normalized_fee_amount), 0)::numeric(14,2) as total_normalized_fee
 from miclub.v_enrollment_receivable_fees
