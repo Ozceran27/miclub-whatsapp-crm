@@ -10,7 +10,7 @@ comment on view miclub.v_enrollment_receivable_fees is
 create or replace view miclub.v_receivable_fees_effective_status_debug as
 select
   status as effective_status,
-  (count(*))::integer as enrollments_count,
+  count(1)::integer as enrollments_count,
   coalesce(sum(receivable_fee), 0)::numeric(14,2) as total_receivable_fee,
   coalesce(sum(normalized_fee_amount), 0)::numeric(14,2) as total_normalized_fee
 from miclub.v_enrollment_receivable_fees
@@ -61,8 +61,8 @@ select
   p.pending_income,
   p.pending_expenses,
   p.pending_income - p.pending_expenses as pending_net_balance,
-  (select count(*) from miclub.enrollments where status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])) as active_enrollments,
-  (select count(*) from miclub.v_enrollment_operational_status where effective_status = 'adeudando'::miclub.enrollment_status) as debtor_enrollments,
+  (select count(1) from miclub.enrollments where status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])) as active_enrollments,
+  (select count(1) from miclub.v_enrollment_operational_status where effective_status = 'adeudando'::miclub.enrollment_status) as debtor_enrollments,
   r.cuotas_a_cobrar + r.future_receivable_fees_until_month_end as receivables_total,
   s.saldos_a_pagar,
   r.cuotas_a_cobrar,
