@@ -1,13 +1,15 @@
-import type {
-  ClubOperationsSummary,
-  DebtorStatus,
-  Member,
-  SectorOperationalSummary,
-  SourceSheet,
-  StatusBreakdown,
+import {
+  normalizeMembershipFeeUnit,
+  normalizeMovementAmount,
+  normalizeReceivableAggregate,
+  type ClubOperationsSummary,
+  type DebtorStatus,
+  type Member,
+  type SectorOperationalSummary,
+  type SourceSheet,
+  type StatusBreakdown,
 } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
-import { normalizeMembershipFeeAmount } from "../importers/normalizers.js";
 import { normalizeOperationalStatus } from "./googleSheets.js";
 
 const SHEETS: SourceSheet[] = [
@@ -18,58 +20,7 @@ const SHEETS: SourceSheet[] = [
   "CANTINA",
   "ADMINISTRACION",
 ];
-const countOccurrences = (value: string, character: string): number =>
-  value.split(character).length - 1;
-
-const parseSingleSeparatorNumber = (
-  value: string,
-  separator: "," | ".",
-): string => {
-  const separatorIndex = value.indexOf(separator);
-  const integerPart = value.slice(0, separatorIndex);
-  const fractionalPart = value.slice(separatorIndex + 1);
-  if (fractionalPart.length === 3 && /^\d{1,3}$/.test(integerPart)) {
-    return `${integerPart}${fractionalPart}`;
-  }
-  if (fractionalPart.length >= 1 && fractionalPart.length <= 2) {
-    return `${integerPart}.${fractionalPart}`;
-  }
-  return `${integerPart}${fractionalPart}`;
-};
-
-const toNumber = (value: unknown): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string") {
-    const raw = value.trim();
-    if (!raw) return 0;
-
-    const isNegative = /[-−–—]/.test(raw) || /^\s*\(.*\)\s*$/.test(raw);
-    let cleaned = raw
-      .replace(/[−–—]/g, "-")
-      .replace(/[^\d,.-]/g, "")
-      .replace(/-/g, "");
-    if (!/\d/.test(cleaned)) return 0;
-
-    const commaCount = countOccurrences(cleaned, ",");
-    const dotCount = countOccurrences(cleaned, ".");
-    if (commaCount > 0 && dotCount > 0) {
-      const lastComma = cleaned.lastIndexOf(",");
-      const lastDot = cleaned.lastIndexOf(".");
-      cleaned = lastComma > lastDot
-        ? cleaned.replace(/\./g, "").replace(/,/g, ".")
-        : cleaned.replace(/,/g, "");
-    } else if (dotCount > 1) cleaned = cleaned.replace(/\./g, "");
-    else if (commaCount > 1) cleaned = cleaned.replace(/,/g, "");
-    else if (dotCount === 1) cleaned = parseSingleSeparatorNumber(cleaned, ".");
-    else if (commaCount === 1) cleaned = parseSingleSeparatorNumber(cleaned, ",");
-
-    const parsed = Number(cleaned);
-    if (!Number.isFinite(parsed)) return 0;
-    return isNegative && parsed !== 0 ? -parsed : parsed;
-  }
-  return 0;
-};
+const toNumber = (value: unknown): number => normalizeMovementAmount(value);
 const toStringValue = (value: unknown): string | undefined =>
   value == null ? undefined : String(value);
 const pick = (row: Record<string, unknown>, keys: string[]): unknown =>
@@ -111,21 +62,9 @@ const pickString = (
 const pickNumber = (row: Record<string, unknown>, keys: string[]): number =>
   toNumber(pick(row, keys));
 
-export const normalizeSuspiciousArsAmount = (value: number): number => {
-  if (!Number.isFinite(value)) return 0;
-  const abs = Math.abs(value);
-  // Algunas importaciones históricas dejaron cuotas de socios corridas por
-  // separadores/escala (ej.: $811.000 como 8.110.000, o $25.000 como
-  // 25.000.000). Normalizamos solo importes enteros con escala exacta:
-  // - miles de millones/millones muy altos: milésimos;
-  // - millones bajos: un decimal extra.
-  // Mantener el signo permite reutilizar el helper en ajustes o saldos.
-  if (abs >= 100_000_000 && Number.isInteger(value / 1000)) return value / 1000;
-  if (abs >= 1_000_000 && abs < 10_000_000 && Number.isInteger(value / 10)) return value / 10;
-  return value;
-};
+export const normalizeSuspiciousArsAmount = (value: number): number => normalizeReceivableAggregate(value);
 
-export const normalizeSuspiciousMembershipFee = (value: number): number => normalizeMembershipFeeAmount(value) ?? 0;
+export const normalizeSuspiciousMembershipFee = (value: number): number => normalizeMembershipFeeUnit(value);
 export const calculateOperationalProjectedBalance = ({
   liquidity,
   cuotasACobrar,

@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { normalizeMembershipFeeUnit, normalizeReceivableAggregate } from "@miclub/shared";
 import { calculateOperationalProjectedBalance, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee } from "./postgresDashboardService.js";
+
+test("moneyNormalization normaliza cuotas unitarias y agregados compartidos", () => {
+  assert.equal(normalizeMembershipFeeUnit("30.000"), 30_000);
+  assert.equal(normalizeMembershipFeeUnit("300.000"), 30_000);
+  assert.equal(normalizeReceivableAggregate(4_305_000), 430_500);
+  assert.equal(normalizeReceivableAggregate(4_055_000), 405_500);
+  assert.equal(normalizeReceivableAggregate(405_500), 405_500);
+  assert.equal(normalizeReceivableAggregate(430_500), 430_500);
+});
 
 test("normalizePostgresSourceSheet reconoce nombres acentuados y variantes operativas", () => {
   assert.equal(normalizePostgresSourceSheet("Salón"), "SALON");
