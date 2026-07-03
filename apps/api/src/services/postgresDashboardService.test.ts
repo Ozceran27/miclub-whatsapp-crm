@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeMembershipFeeUnit, normalizeReceivableAggregate } from "@miclub/shared";
-import { calculateOperationalProjectedBalance, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee } from "./postgresDashboardService.js";
+import { calculateOperationalProjectedBalance, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
 
 test("moneyNormalization normaliza cuotas unitarias y agregados compartidos", () => {
   assert.equal(normalizeMembershipFeeUnit("30.000"), 30_000);
@@ -53,4 +53,32 @@ test("normalizeSuspiciousMembershipFee corrige cuotas unitarias importadas con u
 test("normalizeStatusLabel respeta el estado explícito de la hoja para saldos", () => {
   assert.equal(normalizeStatusLabel("Nuevo Inscripto", "2026-01-01"), "Nuevo Inscripto");
   assert.equal(normalizeStatusLabel("Adeudando", "2026-12-31"), "Adeudando");
+});
+
+test("selectCuotasACobrar prioriza v_dashboard_basic aunque el fallback difiera", () => {
+  const result = selectCuotasACobrar({ dashboardValue: 405_500, fallbackValue: 430_500 });
+
+  assert.equal(result.cuotasACobrar, 405_500);
+  assert.equal(result.source, "v_dashboard_basic");
+  assert.equal(result.dashboardValue, 405_500);
+  assert.equal(result.fallbackValue, 430_500);
+  assert.equal(result.differsBeyondThreshold, true);
+});
+
+test("selectCuotasACobrar conserva cero legítimo de v_dashboard_basic", () => {
+  const result = selectCuotasACobrar({ dashboardValue: 0, fallbackValue: 0 });
+
+  assert.equal(result.cuotasACobrar, 0);
+  assert.equal(result.source, "v_dashboard_basic");
+  assert.equal(result.differsBeyondThreshold, false);
+});
+
+test("selectCuotasACobrar usa fallback solo cuando v_dashboard_basic es null o falta", () => {
+  const nullDashboard = selectCuotasACobrar({ dashboardValue: null, fallbackValue: 430_500 });
+  const missingDashboard = selectCuotasACobrar({ fallbackValue: 430_500 });
+
+  assert.equal(nullDashboard.cuotasACobrar, 430_500);
+  assert.equal(nullDashboard.source, "fallback");
+  assert.equal(missingDashboard.cuotasACobrar, 430_500);
+  assert.equal(missingDashboard.source, "fallback");
 });
