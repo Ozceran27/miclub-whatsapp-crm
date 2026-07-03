@@ -504,7 +504,12 @@ export const processMember = async (
     name: memberValue(row.row, memberIndexes, "actividad") || "Sin actividad",
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
     instructorId,
-    monthlyFee: normalizedFeeAmount,
+    monthlyFee: parsedFeeAmount === undefined ? undefined : normalizedFeeAmount,
+    monthlyFeeSource: "google_sheets_import",
+    monthlyFeeRawText: rawFeeAmountText || null,
+    monthlyFeeRawAmount: parsedFeeAmount,
+    monthlyFeeNormalizationReason: feeNormalizationReason,
+    importBatchId: summary.batchId,
   });
   summary.activitiesProcessed += 1;
   summary.attemptedWrites += 1;
