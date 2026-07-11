@@ -22,6 +22,7 @@ const SHEETS: SourceSheet[] = [
   "ADMINISTRACION",
 ];
 const toNumber = (value: unknown): number => normalizeMovementAmount(value);
+const money = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 const toStringValue = (value: unknown): string | undefined =>
   value == null ? undefined : String(value);
 const pick = (row: Record<string, unknown>, keys: string[]): unknown =>
@@ -451,7 +452,7 @@ export const getPostgresClubFinanceSummary =
         `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_settlement_balances where abs(settlement_balance) > 0 order by sector_name asc nulls last, sector_id asc nulls last`,
+        `select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`,
       ),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
         "INGRESOS",
@@ -497,7 +498,7 @@ export const getPostgresClubFinanceSummary =
       if (!Number.isFinite(amount) || amount === 0) return;
       const key = normalizePostgresSourceSheet(sector);
       if (!["FITNESS", "SALON", "AULA", "LOCAL_1"].includes(key)) return;
-      sectorBalancesByName.set(key, { sector, amount: Math.abs(amount) });
+      sectorBalancesByName.set(key, { sector, amount });
     };
     sectors.rows.forEach((sector) => {
       upsertSectorBalance(
@@ -537,7 +538,7 @@ export const getPostgresClubFinanceSummary =
     const remainingBreakdownItems = (total: number) =>
       Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
     const dashboardSaldosAPagar = pickNumber(row, ["saldos_a_pagar"]);
-    const effectiveSettlementBalance = derivedSettlementBalance || -Math.abs(dashboardSaldosAPagar);
+    const effectiveSettlementBalance = derivedSettlementBalance || money(dashboardSaldosAPagar * -1);
     const liquidity = pickNumber(row, [
       "liquidity",
       "cash_balance",

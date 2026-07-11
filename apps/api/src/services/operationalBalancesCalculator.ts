@@ -107,7 +107,7 @@ export const calculateSettlementBalance = (settlements: SettlementInput[]): { to
     const sector = normalizeSector(settlement.sector);
     if (!["LOCAL_1", "FITNESS", "SALON", "AULA"].includes(sector)) continue;
     if (values.has(sector)) continue;
-    values.set(sector, Math.abs(normalizeMovementAmount(settlement.amount)));
+    values.set(sector, normalizeMovementAmount(settlement.amount));
   }
   const fitness = money(values.get("FITNESS") ?? 0);
   const salon = money(values.get("SALON") ?? 0);
@@ -143,7 +143,7 @@ export const calculatePendingBalance = (movements: PendingMovementInput[]): { in
 export const calculateOperationalBalances = (input: OperationalBalancesInput) => {
   const liquidity = money(normalizeMovementAmount(input.liquidity));
   const feesToCollect = money(normalizeMovementAmount(input.feesToCollect));
-  const settlementBalance = -Math.abs(money(normalizeMovementAmount(input.settlementBalance)));
+  const settlementBalance = money(normalizeMovementAmount(input.settlementBalance));
   const pendingBalance = money(normalizeMovementAmount(input.pendingBalance));
   return {
     liquidity,
