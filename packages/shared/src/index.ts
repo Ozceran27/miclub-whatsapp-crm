@@ -373,6 +373,8 @@ export interface ClubOperationsSummary extends FinancialSummary {
   cuotasAdeudadas: number;
   cuotasACobrar: number;
   futureReceivableFeesUntilMonthEnd: number;
+  settlementBalance: number;
+  /** @deprecated Usar settlementBalance; se conserva temporalmente como alias compatible. */
   saldosAPagar: number;
   projectedBalance: number;
   sectorBalances: SectorBalance[];

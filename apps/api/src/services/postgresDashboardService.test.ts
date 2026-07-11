@@ -39,7 +39,7 @@ test("calculateOperationalProjectedBalance usa cuotas normalizadas como importe 
     liquidity: 2_779_900,
     cuotasACobrar,
     pendingNetBalance: 150_000,
-    saldosAPagar: 250_000,
+    settlementBalance: -250_000,
   }), 3_110_400);
 });
 
@@ -55,21 +55,21 @@ test("normalizeStatusLabel respeta el estado explícito de la hoja para saldos",
   assert.equal(normalizeStatusLabel("Adeudando", "2026-12-31"), "Adeudando");
 });
 
-test("selectCuotasACobrar prioriza v_dashboard_basic aunque el fallback difiera", () => {
+test("selectCuotasACobrar prioriza fallback autoritativo aunque v_dashboard_basic difiera", () => {
   const result = selectCuotasACobrar({ dashboardValue: 405_500, fallbackValue: 430_500 });
 
-  assert.equal(result.cuotasACobrar, 405_500);
-  assert.equal(result.source, "v_dashboard_basic");
+  assert.equal(result.cuotasACobrar, 430_500);
+  assert.equal(result.source, "fallback");
   assert.equal(result.dashboardValue, 405_500);
   assert.equal(result.fallbackValue, 430_500);
   assert.equal(result.differsBeyondThreshold, true);
 });
 
-test("selectCuotasACobrar conserva cero legítimo de v_dashboard_basic", () => {
+test("selectCuotasACobrar conserva cero legítimo del fallback", () => {
   const result = selectCuotasACobrar({ dashboardValue: 0, fallbackValue: 0 });
 
   assert.equal(result.cuotasACobrar, 0);
-  assert.equal(result.source, "v_dashboard_basic");
+  assert.equal(result.source, "fallback");
   assert.equal(result.differsBeyondThreshold, false);
 });
 

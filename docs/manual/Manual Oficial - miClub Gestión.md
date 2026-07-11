@@ -96,7 +96,7 @@ Cuotas a Cobrar: suma de receivable_fee de inscripciones cuyo estado efectivo es
 
 Saldos Pendientes: pendingNetBalance = pendingIncome - pendingExpenses. El SQL de la vista suma además futureReceivableFeesUntilMonthEnd, pero el servicio usa un fallback directo sobre v_movements_enriched filtrando source_payload.sheet = ADMINISTRACIÓN y estado operativo PENDIENTE o estado financiero pendiente; por eso el valor de la pantalla es neto de ingresos pendientes menos egresos pendientes administrativos.
 
-Saldos a Pagar: suma de saldos positivos a liquidar por sector. El servicio toma v_sector_settlement_balances con settlement_balance > 0 y complementa snapshots históricos fitness/salon/aula/local1. Se muestra con signo negativo porque representa obligación.
+Saldos a Liquidar: suma de saldos positivos a liquidar por sector. El servicio toma v_sector_settlement_balances con settlement_balance > 0 y complementa snapshots históricos fitness/salon/aula/local1. Se muestra con signo negativo porque representa obligación.
 
 Saldo Proyectado: fórmula crítica del backend: Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar. Cambia al modificar movimientos pendientes, pagos/estados de inscripciones, saldos de liquidación o liquidez.
 
@@ -164,7 +164,7 @@ CRM: total de miembros, activos, deudores y monto adeudado general. Es una tarje
 
 Interpretación Operativa
 
-Primero mirar Liquidez y Saldo proyectado: si ambos bajan, existe riesgo financiero. Luego revisar Saldos a Pagar para entender obligaciones próximas. Después analizar Cuotas a cobrar y Adeudados por actividad para detectar morosidad concentrada. Ingresos y egresos por sector muestran dónde se genera o consume dinero. Las tarjetas sectoriales permiten identificar qué unidad crece, cuál pierde rentabilidad y dónde conviene accionar. Un crecimiento sano combina más activos, ingresos completados y rentabilidad mensual positiva. Una alerta de morosidad aparece cuando aumentan Adeudando, Monto adeudado o Cuotas a cobrar sin mejora en liquidez. Una caída de ingresos se ve cuando el ranking de ingresos baja o cuando rentabilidad mensual queda pendiente, negativa o menor al patrón esperado.
+Primero mirar Liquidez y Saldo proyectado: si ambos bajan, existe riesgo financiero. Luego revisar Saldos a Liquidar para entender obligaciones próximas. Después analizar Cuotas a cobrar y Adeudados por actividad para detectar morosidad concentrada. Ingresos y egresos por sector muestran dónde se genera o consume dinero. Las tarjetas sectoriales permiten identificar qué unidad crece, cuál pierde rentabilidad y dónde conviene accionar. Un crecimiento sano combina más activos, ingresos completados y rentabilidad mensual positiva. Una alerta de morosidad aparece cuando aumentan Adeudando, Monto adeudado o Cuotas a cobrar sin mejora en liquidez. Una caída de ingresos se ve cuando el ranking de ingresos baja o cuando rentabilidad mensual queda pendiente, negativa o menor al patrón esperado.
 
 
 
@@ -176,7 +176,7 @@ Actualizar Inicio antes de tomar decisiones. Leer saldos proyectados como estima
 
 Errores comunes
 
-Confundir Saldos a Pagar con dinero disponible. Leer Cuotas a cobrar como efectivo confirmado. Comparar Dólares con pesos sin tipo de cambio. Tratar Google Sheets como backend actual. Ignorar métricas “pendiente de cálculo”.
+Confundir Saldos a Liquidar con dinero disponible. Leer Cuotas a cobrar como efectivo confirmado. Comparar Dólares con pesos sin tipo de cambio. Tratar Google Sheets como backend actual. Ignorar métricas “pendiente de cálculo”.
 
 
 

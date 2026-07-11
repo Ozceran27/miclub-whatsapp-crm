@@ -10,6 +10,7 @@ import {
   type StatusBreakdown,
 } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
+import { calculateOperationalBalances, calculateSettlementBalance } from "./operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "./googleSheets.js";
 
 const SHEETS: SourceSheet[] = [
@@ -69,13 +70,21 @@ export const calculateOperationalProjectedBalance = ({
   liquidity,
   cuotasACobrar,
   pendingNetBalance,
+  settlementBalance,
   saldosAPagar,
 }: {
   liquidity: number;
   cuotasACobrar: number;
   pendingNetBalance: number;
-  saldosAPagar: number;
-}): number => liquidity + cuotasACobrar + pendingNetBalance - saldosAPagar;
+  settlementBalance?: number;
+  /** @deprecated Usar settlementBalance con signo negativo. */
+  saldosAPagar?: number;
+}): number => calculateOperationalBalances({
+  liquidity,
+  feesToCollect: cuotasACobrar,
+  settlementBalance: settlementBalance ?? -(saldosAPagar ?? 0),
+  pendingBalance: pendingNetBalance,
+}).projectedBalance;
 const hasValue = (row: Record<string, unknown>, keys: string[]): boolean =>
   keys.some((key) => row[key] !== undefined && row[key] !== null);
 const pickNullableNumber = (
@@ -190,8 +199,8 @@ export const selectCuotasACobrar = ({
 }): CuotasACobrarSelection => {
   const normalizedDashboardValue = dashboardValue == null ? null : normalizeSuspiciousArsAmount(dashboardValue);
   const normalizedFallbackValue = fallbackValue == null ? null : normalizeSuspiciousArsAmount(fallbackValue);
-  const source: CuotasACobrarSource = normalizedDashboardValue == null ? "fallback" : "v_dashboard_basic";
-  const cuotasACobrar = source === "v_dashboard_basic" ? normalizedDashboardValue! : (normalizedFallbackValue ?? 0);
+  const source: CuotasACobrarSource = normalizedFallbackValue == null ? "v_dashboard_basic" : "fallback";
+  const cuotasACobrar = source === "fallback" ? normalizedFallbackValue! : (normalizedDashboardValue ?? 0);
   const difference = normalizedDashboardValue != null && normalizedFallbackValue != null
     ? Math.abs(normalizedDashboardValue - normalizedFallbackValue)
     : null;
@@ -422,7 +431,7 @@ export const getPostgresClubFinanceSummary =
     const dashboardCapabilities = await detectPostgresDashboardCapabilities();
     const [
       dashboard,
-      operationalBalances,
+      latestOperationalBalances,
       sectors,
       incomeBySector,
       expenseBySector,
@@ -442,7 +451,7 @@ export const getPostgresClubFinanceSummary =
         `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_settlement_balances where settlement_balance > 0 order by sector_name asc nulls last, sector_id asc nulls last`,
+        `select * from miclub.v_sector_settlement_balances where abs(settlement_balance) > 0 order by sector_name asc nulls last, sector_id asc nulls last`,
       ),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
         "INGRESOS",
@@ -481,13 +490,14 @@ export const getPostgresClubFinanceSummary =
     ]);
     const row = {
       ...(dashboard.rows[0] ?? {}),
-      ...(operationalBalances.rows[0] ?? {}),
+      ...(latestOperationalBalances.rows[0] ?? {}),
     };
     const sectorBalancesByName = new Map<string, { sector: string; amount: number }>();
     const upsertSectorBalance = (sector: string, amount: number) => {
-      if (!Number.isFinite(amount) || amount <= 0) return;
+      if (!Number.isFinite(amount) || amount === 0) return;
       const key = normalizePostgresSourceSheet(sector);
-      sectorBalancesByName.set(key, { sector, amount });
+      if (!["FITNESS", "SALON", "AULA", "LOCAL_1"].includes(key)) return;
+      sectorBalancesByName.set(key, { sector, amount: Math.abs(amount) });
     };
     sectors.rows.forEach((sector) => {
       upsertSectorBalance(
@@ -511,10 +521,8 @@ export const getPostgresClubFinanceSummary =
     const sectorBalances = Array.from(sectorBalancesByName.values()).sort(
       (a, b) => a.sector.localeCompare(b.sector, "es"),
     );
-    const derivedSaldosAPagar = sectorBalances.reduce(
-      (sum, sector) => sum + sector.amount,
-      0,
-    );
+    const settlementBreakdown = calculateSettlementBalance(sectorBalances.map((sector) => ({ sector: sector.sector, amount: sector.amount })));
+    const derivedSettlementBalance = settlementBreakdown.total;
     const breakdown = (rows: Record<string, unknown>[]) =>
       rows.map((item) => ({
         name: pickString(item, ["name"], "Sin datos"),
@@ -529,7 +537,7 @@ export const getPostgresClubFinanceSummary =
     const remainingBreakdownItems = (total: number) =>
       Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
     const dashboardSaldosAPagar = pickNumber(row, ["saldos_a_pagar"]);
-    const effectiveSaldosAPagar = dashboardSaldosAPagar || derivedSaldosAPagar;
+    const effectiveSettlementBalance = derivedSettlementBalance || -Math.abs(dashboardSaldosAPagar);
     const liquidity = pickNumber(row, [
       "liquidity",
       "cash_balance",
@@ -565,15 +573,16 @@ export const getPostgresClubFinanceSummary =
     const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
     const pendingExpenses = pickNumber(pendingFallbackRow, ["pending_expenses"]) || pickNumber(row, ["pending_expenses"]);
     const pendingNetBalance = pickNumber(pendingFallbackRow, ["pending_net_balance"]) || pickNumber(row, ["pending_net_balance"]);
-    // Regla crítica de equivalencia con ADMINISTRACIÓN:
-    // Saldo proyectado = Liquidez + Cuotas a cobrar + Saldos pendientes - Saldos a pagar.
-    // Los saldos a pagar son obligaciones y nunca se suman al proyectado.
-    const effectiveProjectedBalance = calculateOperationalProjectedBalance({
+    // Regla autoritativa de saldos operativos:
+    // Saldo proyectado = Liquidez + Cuotas a Cobrar + Saldos a Liquidar + Saldos Pendientes.
+    // Saldos a Liquidar ya llega con signo negativo, por eso se suma y no se vuelve a restar.
+    const calculatedOperationalBalances = calculateOperationalBalances({
       liquidity,
-      cuotasACobrar,
-      pendingNetBalance,
-      saldosAPagar: effectiveSaldosAPagar,
+      feesToCollect: cuotasACobrar,
+      settlementBalance: effectiveSettlementBalance,
+      pendingBalance: pendingNetBalance,
     });
+    const effectiveProjectedBalance = calculatedOperationalBalances.projectedBalance;
     return {
       metadata: {
         coverage: "complete",
@@ -594,7 +603,8 @@ export const getPostgresClubFinanceSummary =
       cuotasAdeudadas: cuotasACobrar,
       cuotasACobrar,
       futureReceivableFeesUntilMonthEnd: fallbackFutureReceivables,
-      saldosAPagar: effectiveSaldosAPagar,
+      settlementBalance: calculatedOperationalBalances.settlementBalance,
+      saldosAPagar: calculatedOperationalBalances.settlementBalance,
       projectedBalance: effectiveProjectedBalance,
       sectorBalances,
       incomeBySector: breakdown(incomeBySector.rows),
@@ -980,6 +990,7 @@ export const emptyPostgresClubFinanceSummary = (): ClubOperationsSummary => ({
   cuotasAdeudadas: 0,
   cuotasACobrar: 0,
   futureReceivableFeesUntilMonthEnd: 0,
+  settlementBalance: 0,
   saldosAPagar: 0,
   projectedBalance: 0,
   sectorBalances: [],

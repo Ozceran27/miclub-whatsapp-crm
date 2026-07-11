@@ -26,7 +26,7 @@ El dump contiene una base `miclub` ya alineada con las vistas operativas nuevas.
 
 Puntos relevantes:
 
-- `miclub.v_dashboard_basic` ya separa saldos reales de administración, pendientes, cuotas a cobrar, cuotas futuras hasta fin de mes, saldos a pagar y balance proyectado.
+- `miclub.v_dashboard_basic` ya separa saldos reales de administración, pendientes, cuotas a cobrar, cuotas futuras hasta fin de mes, saldos a liquidar y balance proyectado.
 - `miclub.v_sector_finance_summary` ya expone ingresos, egresos, balance operativo, `settlement_balance`, rentabilidad total y rentabilidad del mes actual por sector.
 - `miclub.sheet_metric_snapshots` existe para guardar métricas cuya fórmula de la planilla no se puede reconstruir todavía solo desde tablas normalizadas.
 - No hay errores de importación registrados en `miclub.import_errors` dentro del dump revisado.
@@ -48,7 +48,7 @@ La semántica esperada queda cubierta por `v_dashboard_basic`:
 - cuotas adeudadas = cuotas de inscripciones con estado `adeudando`;
 - cuotas a cobrar = cuotas adeudadas actuales;
 - cuotas futuras = inscripciones al día con vencimiento desde hoy hasta fin de mes;
-- balance proyectado = liquidez + cuotas a cobrar + pendientes netos + cuotas futuras - saldos a pagar.
+- balance proyectado = liquidez + cuotas a cobrar + saldos a liquidar + pendientes netos.
 
 ### Sectores
 
