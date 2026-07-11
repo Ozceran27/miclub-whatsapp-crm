@@ -67,6 +67,7 @@ export interface ClubFinanceDebugInfo {
   cuotasAdeudadas: number;
   cuotasACobrar: number;
   pendingNetBalance: number;
+  settlementBalance: number;
   saldosAPagar: number;
   projectedBalance: number;
   formula: string;
@@ -660,6 +661,7 @@ const buildEmptyClubOperationsSummary = (cuotasACobrar = 0, futureReceivableFees
   cuotasAdeudadas: cuotasACobrar,
   cuotasACobrar,
   futureReceivableFeesUntilMonthEnd,
+  settlementBalance: 0,
   saldosAPagar: 0,
   projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasACobrar, pendingNetBalance: futureReceivableFeesUntilMonthEnd, saldosAPagar: 0 }),
   sectorBalances: [],
@@ -714,7 +716,8 @@ const buildClubOperationsSummary = (movements: AdminMovement[], balanceRows: unk
     cuotasAdeudadas: cuotasACobrar,
     cuotasACobrar,
     futureReceivableFeesUntilMonthEnd,
-    saldosAPagar,
+    settlementBalance: -Math.abs(saldosAPagar),
+    saldosAPagar: -Math.abs(saldosAPagar),
     projectedBalance: calculateProjectedBalance({ liquidity, cuotasACobrar, pendingNetBalance, saldosAPagar }),
     sectorBalances,
     incomeBySector: allIncomeBySector.slice(0, 4),
@@ -807,6 +810,7 @@ export const getClubFinanceDebugFromGoogleSheets = async (members: Member[] = []
       cuotasAdeudadas: emptyCuotasACobrar,
       cuotasACobrar: emptyCuotasACobrar,
       pendingNetBalance: emptyFutureReceivables,
+      settlementBalance: 0,
       saldosAPagar: 0,
       projectedBalance: calculateProjectedBalance({ liquidity: 0, cuotasACobrar: emptyCuotasACobrar, pendingNetBalance: emptyFutureReceivables, saldosAPagar: 0 }),
       formula: PROJECTED_BALANCE_FORMULA,
@@ -866,7 +870,8 @@ export const getClubFinanceDebugFromGoogleSheets = async (members: Member[] = []
     cuotasAdeudadas: cuotasACobrar,
     cuotasACobrar,
     pendingNetBalance,
-    saldosAPagar,
+    settlementBalance: -Math.abs(saldosAPagar),
+    saldosAPagar: -Math.abs(saldosAPagar),
     projectedBalance,
     formula: PROJECTED_BALANCE_FORMULA,
     aulaCommissionMap,
