@@ -1,4 +1,3 @@
-import { EconomyComparisonCards } from './Economy/EconomyComparisonCards';
 import { EconomyDashboardState } from './Economy/EconomyDashboardState';
 import { EconomyInsights } from './Economy/EconomyInsights';
 import { EconomyMonthlyChart } from './Economy/EconomyMonthlyChart';
@@ -54,8 +53,7 @@ export default function EconomyModule() {
 
       {data && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero económico del club">
-          <EconomySummaryCards summary={data.summary} />
-          <EconomyComparisonCards comparison={data.comparison} />
+          <EconomySummaryCards summary={data.summary} comparison={data.comparison} />
           <EconomyInsights insights={data.insights.items} />
           <div className="economy-charts-grid">
             <EconomyMonthlyChart monthlyEvolution={data.monthlyEvolution} />

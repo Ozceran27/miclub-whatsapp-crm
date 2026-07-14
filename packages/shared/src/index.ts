@@ -231,9 +231,13 @@ export type EconomyFinancialStatus = "pendiente" | "pagado" | "cancelado" | stri
 export type EconomyOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | string;
 
 export interface EconomySummary {
+  month?: { label: string; income: number; expenses: number; balance: number };
+  current?: { liquidity: number; projectedBalance: number };
   income: number;
   expenses: number;
   balance: number;
+  liquidity?: number;
+  projectedBalance?: number;
   pendingBalance: number;
   completedMovements: number;
   totalMovements: number;
@@ -257,9 +261,15 @@ export interface EconomyComparisonMetric {
   label: string;
   current: number;
   previous: number;
-  variation: number | null;
-  direction: "up" | "down" | "flat" | "none" | string;
+  variation?: number | null;
+  percentageChange?: number | null;
+  absoluteChange?: number;
+  direction: "up" | "down" | "stable" | "flat" | "none" | string;
+  comparable?: boolean;
+  impact?: "favorable" | "unfavorable" | "neutral" | string;
   applies: boolean;
+  available?: boolean;
+  reason?: string;
 }
 
 export interface EconomyComparison {
@@ -343,7 +353,10 @@ export type EconomyInsightType = "positive" | "warning" | "info" | string;
 export interface EconomyInsight {
   key: string;
   type: EconomyInsightType;
+  title?: string;
   message: string;
+  metric?: string;
+  period?: string;
   value: number | null;
 }
 
