@@ -4,6 +4,7 @@ import {
   getBaseInsights,
   getEconomyDataQuality,
   getLiquiditySnapshotAtOrBefore,
+  getOldestLiquiditySnapshot,
   getMonthlySummary,
   getPaymentMethods as getPaymentMethodRows,
   getPendingMovements as getPendingMovementRows,
@@ -148,18 +149,47 @@ export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord>
 
 export const getComparison = async (): Promise<JsonRecord> => {
   const windows = getRolling30DayWindows();
-  const [rows, finance, previousLiquidityRows] = await Promise.all([
-    normalizeRows(await getRollingMovementSummary(windows.previousStart, windows.currentStart, windows.tomorrowStart, OPERATING_CATEGORIES)),
+  const [rows, finance, previousLiquidityRows, oldestLiquidityRows] = await Promise.all([
+    normalizeRows(await getRollingMovementSummary(windows.previousStart, windows.currentStart, windows.currentEnd, OPERATING_CATEGORIES)),
     getPostgresClubFinanceSummary(),
     getLiquiditySnapshotAtOrBefore(windows.currentStart),
+    getOldestLiquiditySnapshot(),
   ]);
   const previous = rows.find((row) => row.periodKey === "previous") ?? {};
   const current = rows.find((row) => row.periodKey === "current") ?? {};
   const metric = (key: string, label: string, field: string, inverseImpact = false): JsonRecord => ({ key, label, ...calculateVariation(toNumber(current[field]), toNumber(previous[field]), inverseImpact), applies: true });
   const liquiditySnapshot = previousLiquidityRows[0];
+  const oldestLiquiditySnapshot = oldestLiquidityRows[0];
   const liquidityVariation = liquiditySnapshot
-    ? { key: "liquidity", label: "Variación de Liquidez", ...calculateVariation(finance.liquidity, toNumber(liquiditySnapshot.liquidity)), applies: true, available: true, snapshotDate: liquiditySnapshot.cutoff_date ?? null }
-    : { key: "liquidity", label: "Variación de Liquidez", current: finance.liquidity, previous: 0, absoluteChange: 0, percentageChange: null, direction: "stable", comparable: false, applies: false, available: false, reason: "INSUFFICIENT_HISTORY", impact: "neutral" };
+    ? {
+        key: "liquidity",
+        label: "Variación de Liquidez",
+        ...calculateVariation(finance.liquidity, toNumber(liquiditySnapshot.liquidity)),
+        applies: true,
+        available: true,
+        currentDate: windows.current.dateTo,
+        previousDate: liquiditySnapshot.cutoff_date ?? windows.current.dateFrom,
+        targetDate: windows.current.dateFrom,
+        snapshotDate: liquiditySnapshot.cutoff_date ?? null,
+      }
+    : {
+        key: "liquidity",
+        label: "Variación de Liquidez",
+        current: finance.liquidity,
+        currentValue: finance.liquidity,
+        previous: 0,
+        absoluteChange: 0,
+        percentageChange: null,
+        direction: "stable",
+        comparable: false,
+        applies: true,
+        available: false,
+        reason: "INSUFFICIENT_HISTORY",
+        targetDate: windows.current.dateFrom,
+        oldestAvailableDate: oldestLiquiditySnapshot?.cutoff_date ?? null,
+        currentDate: windows.current.dateTo,
+        impact: "neutral",
+      };
   const items = [
     metric("income", "Variación de Ingresos", "income"),
     metric("expenses", "Variación de Egresos", "expenses", true),
@@ -167,7 +197,7 @@ export const getComparison = async (): Promise<JsonRecord> => {
     liquidityVariation,
     metric("operatingProfitability", "Rentabilidad Operativa", "operatingProfitability"),
   ];
-  return { currentPeriod: "Últimos 30 días", previousPeriod: "30 días anteriores", rolling30Days: { previousStart: windows.previousStart.toISOString(), currentStart: windows.currentStart.toISOString(), currentEnd: windows.tomorrowStart.toISOString() }, items, total: items.length };
+  return { currentPeriod: `${windows.current.labelFrom} al ${windows.current.labelTo}`, previousPeriod: `${windows.previous.labelFrom} al ${windows.previous.labelTo}`, rolling30Days: { previousStart: windows.previousStart.toISOString(), currentStart: windows.currentStart.toISOString(), currentEnd: windows.currentEnd.toISOString(), current: { from: windows.current.dateFrom, to: windows.current.dateTo }, previous: { from: windows.previous.dateFrom, to: windows.previous.dateTo }, timezone: windows.timezone }, items, total: items.length };
 };
 
 export const getInsights = async (): Promise<{ items: JsonRecord[]; total: number }> => {

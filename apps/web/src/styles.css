@@ -2111,6 +2111,9 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .economy-top-card .finance-card__header h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: clamp(0.78rem, 0.9vw, 0.9rem);
   line-height: 1.15;
 }
@@ -2121,11 +2124,32 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   line-height: 1.2;
 }
 
-.economy-top-card__value {
-  font-size: clamp(1.25rem, 1.8vw, 1.7rem);
-  line-height: 1.05;
-  overflow-wrap: anywhere;
+.economy-top-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  font-size: clamp(12px, 0.85vw, 14px);
+  line-height: 1;
 }
+
+.economy-top-card__value {
+  max-width: 100%;
+  font-size: clamp(14px, 1.05vw, 16px);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.economy-top-card--positive { --finance-accent: #76f0c3; --finance-accent-rgb: 118, 240, 195; }
+.economy-top-card--negative { --finance-accent: #ffad66; --finance-accent-rgb: 255, 173, 102; }
+.economy-top-card--utility { --finance-accent: #c9a7ff; --finance-accent-rgb: 201, 167, 255; }
+.economy-top-card--projected { --finance-accent: #8fd8ff; --finance-accent-rgb: 143, 216, 255; }
+
+.economy-top-card__value--favorable { color: #dfffee; }
+.economy-top-card__value--unfavorable { color: #ffe4c7; }
 
 .economy-top-card__detail {
   margin: 0.1rem 0 0;

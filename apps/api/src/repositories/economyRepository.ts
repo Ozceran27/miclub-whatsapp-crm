@@ -163,6 +163,17 @@ export const getRollingMovementSummary = async (previousStart: Date, currentStar
   return result.rows;
 };
 
+export const getOldestLiquiditySnapshot = async (): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<EconomyRow>(`
+    select cutoff_date
+    from miclub.operational_balances
+    order by cutoff_date asc, created_at asc
+    limit 1
+  `);
+  return result.rows;
+};
+
 export const getLiquiditySnapshotAtOrBefore = async (cutoff: Date): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
