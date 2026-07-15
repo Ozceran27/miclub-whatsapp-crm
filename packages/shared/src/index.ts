@@ -270,6 +270,12 @@ export interface EconomyComparisonMetric {
   applies: boolean;
   available?: boolean;
   reason?: string;
+  currentValue?: number;
+  targetDate?: string;
+  oldestAvailableDate?: string;
+  currentDate?: string;
+  previousDate?: string;
+  snapshotDate?: string | null;
 }
 
 export interface EconomyComparison {

@@ -39,6 +39,16 @@ const zonedParts = (date: Date) => {
 const utcFromArgentinaDay = (year: number, month: number, day: number): Date => new Date(Date.UTC(year, month - 1, day, 3, 0, 0));
 const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * 86_400_000);
 
+const formatArgentinaDate = (date: Date): string => {
+  const { year, month, day } = zonedParts(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
+const formatArgentinaLabel = (date: Date): string => {
+  const { year, month, day } = zonedParts(date);
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+};
+
 export const getCurrentMonthWindow = (reference = new Date()) => {
   const { year, month } = zonedParts(reference);
   const start = utcFromArgentinaDay(year, month, 1);
@@ -50,10 +60,19 @@ export const getCurrentMonthWindow = (reference = new Date()) => {
 
 export const getRolling30DayWindows = (reference = new Date()) => {
   const { year, month, day } = zonedParts(reference);
-  const tomorrowStart = addDays(utcFromArgentinaDay(year, month, day), 1);
-  const currentStart = addDays(tomorrowStart, -30);
-  const previousStart = addDays(currentStart, -30);
-  return { previousStart, currentStart, tomorrowStart };
+  const todayStart = utcFromArgentinaDay(year, month, day);
+  const currentStart = addDays(todayStart, -30);
+  const currentEnd = addDays(todayStart, 1);
+  const previousStart = addDays(currentStart, -31);
+  return {
+    previousStart,
+    currentStart,
+    currentEnd,
+    tomorrowStart: currentEnd,
+    current: { from: currentStart, to: currentEnd, labelFrom: formatArgentinaLabel(currentStart), labelTo: formatArgentinaLabel(todayStart), dateFrom: formatArgentinaDate(currentStart), dateTo: formatArgentinaDate(todayStart) },
+    previous: { from: previousStart, to: currentStart, labelFrom: formatArgentinaLabel(previousStart), labelTo: formatArgentinaLabel(addDays(currentStart, -1)), dateFrom: formatArgentinaDate(previousStart), dateTo: formatArgentinaDate(addDays(currentStart, -1)) },
+    timezone: ARGENTINA_TIME_ZONE,
+  };
 };
 
 export const calculateVariation = (currentInput: number, previousInput: number, inverseImpact = false): VariationResult => {
