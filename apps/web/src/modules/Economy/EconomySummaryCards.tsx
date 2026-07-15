@@ -52,7 +52,7 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
             <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span></h4>
             <p>{card.subtitle}</p>
           </div>
-          <p className={`home-kpi-value economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>
+          <p className={`economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>
           {card.detail && <p className="economy-top-card__detail">{card.detail}</p>}
         </article>
       ))}
