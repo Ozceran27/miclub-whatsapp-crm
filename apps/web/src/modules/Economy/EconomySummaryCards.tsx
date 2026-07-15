@@ -37,11 +37,11 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Economía Club', value: formatEconomyMoney(summary.balance), variant: 'utility' },
     { label: 'Liquidez actual', icon: '💰', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.liquidity ?? summary.current?.liquidity), variant: 'positive' },
     { label: 'Saldo Proyectado', icon: '📊', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.projectedBalance ?? summary.current?.projectedBalance), variant: 'projected' },
-    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('income')), variant: 'positive', detail: `Actual ${formatEconomyMoney(find('income')?.current)}`, metric: find('income') },
-    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('expenses')), variant: 'negative', detail: `Actual ${formatEconomyMoney(find('expenses')?.current)}`, metric: find('expenses') },
-    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('utility')), variant: 'utility', detail: `Actual ${formatEconomyMoney(find('utility')?.current)}`, metric: find('utility') },
-    { label: 'Variación de Liquidez', icon: '🔄', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(liquidity), variant: 'positive', detail: insufficientLiquidityDetail ?? `Actual ${formatEconomyMoney(liquidity?.current)}`, metric: liquidity },
-    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Variación últimos 30 días', value: formatVariation(find('operatingProfitability')), variant: 'projected', detail: `Actual ${formatEconomyMoney(find('operatingProfitability')?.current)}`, metric: find('operatingProfitability') },
+    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('income')), variant: 'positive' },
+    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('expenses')), variant: 'negative' },
+    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('utility')), variant: 'utility' },
+    { label: 'Variación de Liquidez', icon: '🔄', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(liquidity), variant: 'positive' },
+    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Variación últimos 30 días', value: formatVariation(find('operatingProfitability')), variant: 'projected' },
   ];
 
   return (
