@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateVariation, getCurrentMonthWindow, getRolling30DayWindows, isOperatingCategory } from "./economyDomain.js";
+import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getRolling30DayWindows, isOperatingCategory } from "./economyDomain.js";
 
 test("current month window uses Argentina timezone and month label", () => {
   const window = getCurrentMonthWindow(new Date("2026-07-14T12:00:00Z"));
@@ -11,15 +11,22 @@ test("current month window uses Argentina timezone and month label", () => {
 
 test("rolling windows cover two consecutive 30 day windows without overlap", () => {
   const windows = getRolling30DayWindows(new Date("2026-07-14T12:00:00Z"));
-  assert.equal(windows.currentStart.toISOString(), "2026-06-14T03:00:00.000Z");
-  assert.equal(windows.currentEnd.toISOString(), "2026-07-15T03:00:00.000Z");
-  assert.equal(windows.previousStart.toISOString(), "2026-05-14T03:00:00.000Z");
+  assert.equal(windows.currentStart.toISOString(), "2026-06-14T12:00:00.000Z");
+  assert.equal(windows.currentEnd.toISOString(), "2026-07-14T12:00:00.000Z");
+  assert.equal(windows.previousStart.toISOString(), "2026-05-15T12:00:00.000Z");
   assert.equal(windows.current.dateFrom, "2026-06-14");
   assert.equal(windows.current.dateTo, "2026-07-14");
   assert.equal(windows.current.labelFrom, "14/06/2026");
   assert.equal(windows.current.labelTo, "14/07/2026");
-  assert.equal((windows.currentEnd.getTime() - windows.currentStart.getTime()) / 86_400_000, 31);
-  assert.equal((windows.currentStart.getTime() - windows.previousStart.getTime()) / 86_400_000, 31);
+  assert.equal((windows.currentEnd.getTime() - windows.currentStart.getTime()) / 86_400_000, 30);
+  assert.equal((windows.currentStart.getTime() - windows.previousStart.getTime()) / 86_400_000, 30);
+});
+
+test("growth months always use the two most recently completed months", () => {
+  const months = getLastCompleteMonthWindows(new Date("2026-07-14T12:00:00Z"));
+  assert.equal(months.currentStart.toISOString(), "2026-06-01T03:00:00.000Z");
+  assert.equal(months.previousStart.toISOString(), "2026-05-01T03:00:00.000Z");
+  assert.equal(months.currentEnd.toISOString(), "2026-07-01T03:00:00.000Z");
 });
 
 test("variation handles zero base and negative crossings without infinity", () => {

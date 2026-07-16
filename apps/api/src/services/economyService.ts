@@ -3,8 +3,7 @@ import {
   getAnnualSummary as getAnnualSummaryRows,
   getBaseInsights,
   getEconomyDataQuality,
-  getLiquiditySnapshotAtOrBefore,
-  getOldestLiquiditySnapshot,
+  getGrowthSummary,
   getMonthlySummary,
   getPaymentMethods as getPaymentMethodRows,
   getPendingMovements as getPendingMovementRows,
@@ -16,7 +15,7 @@ import {
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
-import { calculateVariation, getCurrentMonthWindow, getRolling30DayWindows, OPERATING_CATEGORIES } from "./economyDomain.js";
+import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getRolling30DayWindows, OPERATING_CATEGORIES } from "./economyDomain.js";
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
@@ -149,52 +148,35 @@ export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord>
 
 export const getComparison = async (): Promise<JsonRecord> => {
   const windows = getRolling30DayWindows();
-  const [rows, finance, previousLiquidityRows, oldestLiquidityRows] = await Promise.all([
+  const growthMonths = getLastCompleteMonthWindows();
+  const [rows, growthRows] = await Promise.all([
     normalizeRows(await getRollingMovementSummary(windows.previousStart, windows.currentStart, windows.currentEnd, OPERATING_CATEGORIES)),
-    getPostgresClubFinanceSummary(),
-    getLiquiditySnapshotAtOrBefore(windows.currentStart),
-    getOldestLiquiditySnapshot(),
+    normalizeRows(await getGrowthSummary(growthMonths.previousStart, growthMonths.currentStart, growthMonths.currentEnd)),
   ]);
   const previous = rows.find((row) => row.periodKey === "previous") ?? {};
   const current = rows.find((row) => row.periodKey === "current") ?? {};
   const metric = (key: string, label: string, field: string, inverseImpact = false): JsonRecord => ({ key, label, ...calculateVariation(toNumber(current[field]), toNumber(previous[field]), inverseImpact), applies: true });
-  const liquiditySnapshot = previousLiquidityRows[0];
-  const oldestLiquiditySnapshot = oldestLiquidityRows[0];
-  const liquidityVariation = liquiditySnapshot
-    ? {
-        key: "liquidity",
-        label: "Variación de Liquidez",
-        ...calculateVariation(finance.liquidity, toNumber(liquiditySnapshot.liquidity)),
-        applies: true,
-        available: true,
-        currentDate: windows.current.dateTo,
-        previousDate: liquiditySnapshot.cutoff_date ?? windows.current.dateFrom,
-        targetDate: windows.current.dateFrom,
-        snapshotDate: liquiditySnapshot.cutoff_date ?? null,
-      }
-    : {
-        key: "liquidity",
-        label: "Variación de Liquidez",
-        current: finance.liquidity,
-        currentValue: finance.liquidity,
-        previous: 0,
-        absoluteChange: 0,
-        percentageChange: null,
-        direction: "stable",
-        comparable: false,
-        applies: true,
-        available: false,
-        reason: "INSUFFICIENT_HISTORY",
-        targetDate: windows.current.dateFrom,
-        oldestAvailableDate: oldestLiquiditySnapshot?.cutoff_date ?? null,
-        currentDate: windows.current.dateTo,
-        impact: "neutral",
-      };
+  const previousGrowth = growthRows.find((row) => row.periodKey === "previous") ?? {};
+  const currentGrowth = growthRows.find((row) => row.periodKey === "current") ?? {};
+  const economicGrowth = calculateVariation(toNumber(currentGrowth.income), toNumber(previousGrowth.income));
+  const clientGrowth = calculateVariation(toNumber(currentGrowth.enrollments), toNumber(previousGrowth.enrollments));
+  const growthComparable = economicGrowth.percentageChange !== null && clientGrowth.percentageChange !== null;
+  const growthPercentage = growthComparable
+    ? ((economicGrowth.percentageChange ?? 0) + (clientGrowth.percentageChange ?? 0)) / 2
+    : null;
+  const growth = {
+    key: "growth", label: "Crecimiento", current: growthPercentage ?? 0, previous: 0, absoluteChange: growthPercentage ?? 0,
+    percentageChange: growthPercentage, direction: growthPercentage === null || growthPercentage === 0 ? "stable" : growthPercentage > 0 ? "up" : "down",
+    comparable: growthComparable, available: growthComparable, applies: true,
+    impact: growthPercentage === null || growthPercentage === 0 ? "neutral" : growthPercentage > 0 ? "favorable" : "unfavorable",
+    currentPeriod: growthMonths.currentLabel, previousPeriod: growthMonths.previousLabel,
+    economicGrowth: economicGrowth.percentageChange, clientGrowth: clientGrowth.percentageChange,
+  };
   const items = [
     metric("income", "Variación de Ingresos", "income"),
     metric("expenses", "Variación de Egresos", "expenses", true),
     metric("utility", "Variación de Utilidad", "utility"),
-    liquidityVariation,
+    growth,
     metric("operatingProfitability", "Rentabilidad Operativa", "operatingProfitability"),
   ];
   return { currentPeriod: `${windows.current.labelFrom} al ${windows.current.labelTo}`, previousPeriod: `${windows.previous.labelFrom} al ${windows.previous.labelTo}`, rolling30Days: { previousStart: windows.previousStart.toISOString(), currentStart: windows.currentStart.toISOString(), currentEnd: windows.currentEnd.toISOString(), current: { from: windows.current.dateFrom, to: windows.current.dateTo }, previous: { from: windows.previous.dateFrom, to: windows.previous.dateTo }, timezone: windows.timezone }, items, total: items.length };
@@ -213,7 +195,6 @@ export const getInsights = async (): Promise<{ items: JsonRecord[]; total: numbe
   const income = metric("income");
   const expenses = metric("expenses");
   const utility = metric("utility");
-  const liquidity = metric("liquidity");
   const operating = metric("operatingProfitability");
   const quality = qualityRows[0] ?? {};
   const items: JsonRecord[] = [
@@ -221,7 +202,6 @@ export const getInsights = async (): Promise<{ items: JsonRecord[]; total: numbe
     { key: "income_rolling", type: income?.impact === "favorable" ? "positive" : income?.direction === "stable" ? "info" : "warning", title: "Ingresos móviles", message: income?.comparable === false ? "Ingresos sin base comparable en la ventana anterior" : `Ingresos ${income?.direction === "up" ? "en crecimiento" : income?.direction === "down" ? "en caída" : "estables"} en últimos 30 días`, metric: "rolling.income", period: "Últimos 30 días", value: income?.percentageChange ?? null },
     { key: "expense_rolling", type: expenses?.impact === "favorable" ? "positive" : expenses?.direction === "stable" ? "info" : "warning", title: "Egresos móviles", message: expenses?.comparable === false ? "Egresos sin base comparable en la ventana anterior" : `Egresos ${expenses?.direction === "up" ? "crecieron" : expenses?.direction === "down" ? "bajaron" : "estables"} contra los 30 días anteriores`, metric: "rolling.expenses", period: "Últimos 30 días", value: expenses?.percentageChange ?? null },
     { key: "utility_rolling", type: utility?.impact === "favorable" ? "positive" : utility?.direction === "stable" ? "info" : "warning", title: "Utilidad móvil", message: `Utilidad ${utility?.direction === "up" ? "mejoró" : utility?.direction === "down" ? "retrocedió" : "se mantuvo"} contra la ventana anterior`, metric: "rolling.utility", period: "Últimos 30 días", value: utility?.percentageChange ?? null },
-    { key: "liquidity_trend", type: liquidity?.available === false ? "info" : liquidity?.impact === "favorable" ? "positive" : "warning", title: "Liquidez", message: liquidity?.available === false ? "Sin historial suficiente de snapshots para comparar liquidez" : `Liquidez ${liquidity?.direction === "up" ? "en alza" : liquidity?.direction === "down" ? "en baja" : "estable"}`, metric: "liquidity", period: "Últimos 30 días", value: liquidity?.percentageChange ?? null },
     { key: "operating_profitability", type: toNumber(operating?.current) < 0 ? "warning" : operating?.impact === "favorable" ? "positive" : "info", title: "Rentabilidad operativa", message: toNumber(operating?.current) < 0 ? "Rentabilidad operativa negativa en los últimos 30 días" : `Rentabilidad operativa ${operating?.direction === "up" ? "en crecimiento" : operating?.direction === "down" ? "deteriorándose" : "estable"}`, metric: "rolling.operatingProfitability", period: "Últimos 30 días", value: operating?.percentageChange ?? null },
     { key: "pending_movements", type: pendingCount > 0 ? "warning" : "positive", title: "Pendientes", message: pendingCount > 0 ? `${pendingCount} movimientos pendientes requieren seguimiento` : "No hay movimientos pendientes", metric: "pending.count", period: "Actual", value: pendingCount },
     { key: "data_quality", type: toNumber(quality.missingSector) + toNumber(quality.missingCategory) + toNumber(quality.missingPaymentMethod) > 0 ? "warning" : "positive", title: "Calidad de datos", message: `Sin sector: ${toNumber(quality.missingSector)} · sin categoría: ${toNumber(quality.missingCategory)} · sin medio: ${toNumber(quality.missingPaymentMethod)}`, metric: "dataQuality", period: "Histórico", value: toNumber(quality.missingSector) + toNumber(quality.missingCategory) + toNumber(quality.missingPaymentMethod) },

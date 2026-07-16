@@ -27,10 +27,7 @@ const variationState = (item?: EconomyComparisonMetric) => item?.impact === 'fav
 export function EconomySummaryCards({ summary, comparison }: Props) {
   const monthLabel = summary.month?.label ?? 'actual';
   const find = (key: string) => comparison.items.find((item) => item.key === key);
-  const liquidity = find('liquidity');
-  const insufficientLiquidityDetail = liquidity?.available === false
-    ? `Sin historial suficiente${liquidity.oldestAvailableDate ? ` · desde ${liquidity.oldestAvailableDate}` : ''}`
-    : undefined;
+  const operatingProfitability = find('operatingProfitability');
   const cards: TopCard[] = [
     { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Economía Club', value: formatEconomyMoney(summary.income), variant: 'positive' },
     { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Economía Club', value: formatEconomyMoney(summary.expenses), variant: 'negative' },
@@ -40,8 +37,8 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('income')), variant: 'positive' },
     { label: 'Variación de Egresos', icon: '↘️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('expenses')), variant: 'negative' },
     { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('utility')), variant: 'utility' },
-    { label: 'Variación de Liquidez', icon: '🔄', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(liquidity), variant: 'positive' },
-    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Variación últimos 30 días', value: formatVariation(find('operatingProfitability')), variant: 'projected' },
+    { label: 'Crecimiento', icon: '🌱', subtitle: 'Últimos dos meses completos', value: formatVariation(find('growth')), variant: 'positive', metric: find('growth') },
+    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Últimos 30 días', value: formatEconomyMoney(operatingProfitability?.current), variant: 'projected', detail: `Variación: ${formatVariation(operatingProfitability)}`, metric: operatingProfitability },
   ];
 
   return (

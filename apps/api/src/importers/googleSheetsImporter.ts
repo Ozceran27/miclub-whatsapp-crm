@@ -539,6 +539,9 @@ export const processMember = async (
   const dueDate = formatDateOnlyForPostgres(
     memberValue(row.row, memberIndexes, "vence"),
   );
+  const enrollmentDate = formatDateOnlyForPostgres(
+    memberValue(row.row, memberIndexes, "fecha"),
+  );
   const archiveColumns = await getEnrollmentArchiveColumns(pool);
   const reactivateSetClauses = archiveColumns.has("inactive")
     ? [
@@ -568,7 +571,7 @@ export const processMember = async (
   if (matchedEnrollmentId) {
     enrollmentResult = await pool.query<{ id: string }>(
       `update miclub.enrollments
-       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, notes=$8::jsonb, raw_fee_amount_text=$9, raw_fee_amount=$10, normalized_fee_amount=$11, fee_normalization_reason=$12, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
+       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, enrollment_date=coalesce(enrollment_date, $8), notes=$9::jsonb, raw_fee_amount_text=$10, raw_fee_amount=$11, normalized_fee_amount=$12, fee_normalization_reason=$13, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
        where id=$1
        returning id`,
       [
@@ -579,6 +582,7 @@ export const processMember = async (
         feeAmount,
         enrollmentStatus,
         dueDate,
+        enrollmentDate,
         notes,
         rawFeeAmountText || null,
         parsedFeeAmount ?? null,
@@ -588,9 +592,9 @@ export const processMember = async (
     );
   } else {
     enrollmentResult = await pool.query<{ id: string }>(
-      `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
-       values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,'google_sheets',$7,$8,$9,$10,$11,now())
-       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
+      `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
+       values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,$7,'google_sheets',$8,$9,$10,$11,$12,now())
+       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
        returning id`,
       [
         ext,
@@ -599,6 +603,7 @@ export const processMember = async (
         feeAmount,
         enrollmentStatus,
         dueDate,
+        enrollmentDate,
         notes,
         rawFeeAmountText || null,
         parsedFeeAmount ?? null,
