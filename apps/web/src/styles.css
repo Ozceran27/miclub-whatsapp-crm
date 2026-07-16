@@ -1346,6 +1346,36 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   color: #ffe6a3;
 }
 
+.missing-inscriptions-review {
+  grid-column: 1 / -1;
+}
+
+.missing-inscriptions-review__actions {
+  align-items: center;
+  margin: 14px 0;
+}
+
+.missing-inscriptions-review__list {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #31476f;
+  border-radius: 10px;
+}
+
+.missing-inscriptions-review__row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(49, 71, 111, .65);
+  cursor: pointer;
+}
+
+.missing-inscriptions-review__row:last-child { border-bottom: 0; }
+.missing-inscriptions-review__row input { margin-top: 3px; }
+
+.danger-btn { background: #a83b48; }
+
 .economy-charts-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);

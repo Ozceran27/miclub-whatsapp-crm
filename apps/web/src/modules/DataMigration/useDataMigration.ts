@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getDbHealth,
+  deleteMissingInscriptions,
   getErrorMessage,
   getImportBatchErrors,
   getImportBatches,
@@ -26,6 +27,8 @@ export const useDataMigration = () => {
   const [isRunningImport, setIsRunningImport] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [batchErrors, setBatchErrors] = useState<EndpointState<ImportErrorsResponse>>({ loading: false });
+  const [isDeletingMissing, setIsDeletingMissing] = useState(false);
+  const [missingDeletionResult, setMissingDeletionResult] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     setDbHealth({ loading: true });
@@ -89,6 +92,31 @@ export const useDataMigration = () => {
     }
   };
 
+  const deleteSelectedMissing = async (enrollmentIds: string[]) => {
+    if (!lastImport?.batchId || enrollmentIds.length === 0) return { deletedIds: [] };
+    setActionError(null);
+    setMissingDeletionResult(null);
+    setIsDeletingMissing(true);
+    try {
+      const result = await deleteMissingInscriptions(lastImport.batchId, enrollmentIds);
+      setLastImport((current) => current ? {
+        ...current,
+        missingInscriptions: (current.missingInscriptions ?? []).filter((item) => !result.deletedIds.includes(item.id)),
+        missingEnrollments: Math.max(0, (current.missingEnrollments ?? 0) - result.deletedIds.length)
+      } : current);
+      setMissingDeletionResult(result.errors.length > 0
+        ? `${result.deletedCount} inscripciones eliminadas. ${result.skippedCount} no pudieron eliminarse.`
+        : `${result.deletedCount} inscripciones eliminadas correctamente.`);
+      await loadStatus();
+      return result;
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+      return { deletedIds: [] };
+    } finally {
+      setIsDeletingMissing(false);
+    }
+  };
+
   return {
     dbHealth,
     syncStatus,
@@ -101,9 +129,12 @@ export const useDataMigration = () => {
     selectedBatchId,
     selectedBatch,
     batchErrors,
+    isDeletingMissing,
+    missingDeletionResult,
     canRunImport,
     loadStatus,
     runImport,
-    loadBatchErrors
+    loadBatchErrors,
+    deleteSelectedMissing
   };
 };

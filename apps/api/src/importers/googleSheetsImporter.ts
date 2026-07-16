@@ -53,7 +53,20 @@ type ImportOptions = {
   batchSize?: number;
   missingEnrollmentStrategy?: MissingEnrollmentStrategy;
 };
-type ImportSummary = {
+export type MissingEnrollment = {
+  id: string;
+  name: string;
+  dni: string | null;
+  sector: string | null;
+  activity: string | null;
+  enrollmentDate: string | null;
+  feeAmount: number;
+  status: string | null;
+  source: "google_sheets";
+  reason: "missing_from_latest_import";
+};
+
+export type ImportSummary = {
   batchId: string;
   dryRun: boolean;
   read: number;
@@ -70,6 +83,7 @@ type ImportSummary = {
   operationalBalancesProcessed: number;
   sheetMetricSnapshotsProcessed: number;
   missingEnrollments: number;
+  missingInscriptions: MissingEnrollment[];
   missingEnrollmentsAction: MissingEnrollmentStrategy;
   errors: number;
   warnings: string[];
@@ -571,7 +585,7 @@ export const processMember = async (
   if (matchedEnrollmentId) {
     enrollmentResult = await pool.query<{ id: string }>(
       `update miclub.enrollments
-       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, enrollment_date=coalesce(enrollment_date, $8), notes=$9::jsonb, raw_fee_amount_text=$10, raw_fee_amount=$11, normalized_fee_amount=$12, fee_normalization_reason=$13, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
+       set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, enrollment_date=coalesce(enrollment_date, $8), notes=$9::jsonb, raw_fee_amount_text=$10, raw_fee_amount=$11, normalized_fee_amount=$12, fee_normalization_reason=$13, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
        where id=$1
        returning id`,
       [
@@ -594,7 +608,7 @@ export const processMember = async (
     enrollmentResult = await pool.query<{ id: string }>(
       `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
        values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,$7,'google_sheets',$8,$9,$10,$11,$12,now())
-       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), updated_at=now()${reactivateOnConflict}
+       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
        returning id`,
       [
         ext,
@@ -924,6 +938,7 @@ const reconcileMissingEnrollments = async (
 ): Promise<void> => {
   if (summary.dryRun) return;
   const result = await pool.query<{
+    id: string;
     external_id: string;
     dni: string | null;
     first_name: string | null;
@@ -931,8 +946,10 @@ const reconcileMissingEnrollments = async (
     activity: string | null;
     sector: string | null;
     status: string | null;
+    enrollment_date: string | null;
+    fee_amount: string | number | null;
   }>(
-    `select e.external_id, p.dni, p.first_name, p.last_name, a.name as activity, s.name as sector, e.status::text as status
+    `select e.id, e.external_id, p.dni, p.first_name, p.last_name, a.name as activity, s.name as sector, e.status::text as status, e.enrollment_date::text, e.fee_amount
      from miclub.enrollments e
      left join miclub.people p on p.id = e.person_id
      left join miclub.activities a on a.id = e.activity_id
@@ -961,7 +978,28 @@ const reconcileMissingEnrollments = async (
   );
   const missingExternalIds = result.rows.map((row) => row.external_id);
   summary.missingEnrollments = missingExternalIds.length;
+  summary.missingInscriptions = result.rows.map((row) => ({
+    id: row.id,
+    name: `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim() || "Sin nombre",
+    dni: row.dni,
+    sector: row.sector,
+    activity: row.activity,
+    enrollmentDate: row.enrollment_date,
+    feeAmount: Number(row.fee_amount ?? 0),
+    status: row.status,
+    source: "google_sheets",
+    reason: "missing_from_latest_import",
+  }));
   if (missingExternalIds.length === 0) return;
+
+  // Persiste el alcance de esta revisión para que la acción posterior no dependa
+  // de IDs que el cliente pueda alterar ni de un import más reciente.
+  await pool.query(
+    `update miclub.enrollments
+       set missing_from_import_batch_id = $1, updated_at = now()
+       where source = 'google_sheets' and external_id = any($2::text[])`,
+    [summary.batchId, missingExternalIds],
+  );
 
   const details = result.rows
     .slice(0, 20)
@@ -1062,6 +1100,7 @@ export const importGoogleSheets = async (
     operationalBalancesProcessed: 0,
     sheetMetricSnapshotsProcessed: 0,
     missingEnrollments: 0,
+    missingInscriptions: [],
     missingEnrollmentsAction: strategy,
     errors: 0,
     warnings: [],

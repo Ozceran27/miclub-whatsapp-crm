@@ -1,4 +1,5 @@
-import { type EndpointState, type ImportSummary } from '../services/api/importApi';
+import { useEffect, useState } from 'react';
+import { type EndpointState, type ImportSummary, type MissingInscription } from '../services/api/importApi';
 import { getBatchId, useDataMigration } from './DataMigration/useDataMigration';
 
 const SUMMARY_FIELDS: Array<{ key: keyof ImportSummary; label: string }> = [
@@ -53,6 +54,38 @@ const renderSummary = (summary: ImportSummary | null, title: string) => (
   </article>
 );
 
+const formatMoney = (amount: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount);
+
+const MissingInscriptionsReview = ({ items, deleting, result, onDelete }: { items: MissingInscription[]; deleting: boolean; result: string | null; onDelete: (ids: string[]) => Promise<{ deletedIds: string[] }> }) => {
+  const [selected, setSelected] = useState<string[]>([]);
+  useEffect(() => setSelected((current) => current.filter((id) => items.some((item) => item.id === id))), [items]);
+  if (items.length === 0) return null;
+  const allSelected = selected.length === items.length;
+  const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((currentId) => currentId !== id) : [...current, id]);
+  const remove = async () => {
+    if (!window.confirm(`Vas a eliminar ${selected.length} inscripciones de la base de datos. Esta acción puede afectar cálculos económicos, métricas e historial. ¿Querés continuar?`)) return;
+    const response = await onDelete(selected);
+    setSelected((current) => current.filter((id) => !response.deletedIds.includes(id)));
+  };
+  return <article className="card missing-inscriptions-review">
+    <h4>Inscripciones no encontradas en el último import</h4>
+    <p className="section-note">Estas inscripciones existen en la base de datos con origen Google Sheets, pero no aparecieron en el último import. Podés conservarlas o seleccionarlas para eliminarlas.</p>
+    <div className="actions-row missing-inscriptions-review__actions">
+      <button type="button" onClick={() => setSelected(allSelected ? [] : items.map((item) => item.id))} disabled={deleting}>{allSelected ? 'Deseleccionar todas' : 'Seleccionar todas'}</button>
+      <span className="section-note">{selected.length} seleccionadas</span>
+      <button type="button" className="danger-btn" onClick={() => void remove()} disabled={deleting || selected.length === 0}>{deleting ? 'Eliminando seleccionadas…' : 'Eliminar seleccionadas'}</button>
+      <button type="button" onClick={() => setSelected([])} disabled={deleting}>Conservar todas</button>
+    </div>
+    {result && <p className="section-note">{result}</p>}
+    <div className="missing-inscriptions-review__list">
+      {items.map((item) => <label className="missing-inscriptions-review__row" key={item.id}>
+        <input type="checkbox" checked={selected.includes(item.id)} disabled={deleting} onChange={() => toggle(item.id)} />
+        <span><strong>{item.name}</strong> · DNI {item.dni || '—'} · {item.sector || 'Sin sector'} · {item.activity || 'Sin actividad'} · {item.enrollmentDate || 'Sin fecha'} · {formatMoney(item.feeAmount)} · {item.status || 'Sin estado'}</span>
+      </label>)}
+    </div>
+  </article>;
+};
+
 export default function DataMigrationModule() {
   const {
     dbHealth,
@@ -66,10 +99,13 @@ export default function DataMigrationModule() {
     selectedBatchId,
     selectedBatch,
     batchErrors,
+    isDeletingMissing,
+    missingDeletionResult,
     canRunImport,
     loadStatus,
     runImport,
-    loadBatchErrors
+    loadBatchErrors,
+    deleteSelectedMissing
   } = useDataMigration();
   return (
     <main className="module-content">
@@ -109,6 +145,7 @@ export default function DataMigrationModule() {
         <div className="migration-summary-stack">
           {renderSummary(lastDryRun, 'Resumen del último dry-run')}
           {renderSummary(lastImport, 'Resumen de la última importación real')}
+          {lastImport && <MissingInscriptionsReview items={lastImport.missingInscriptions ?? []} deleting={isDeletingMissing} result={missingDeletionResult} onDelete={deleteSelectedMissing} />}
         </div>
       </section>
 

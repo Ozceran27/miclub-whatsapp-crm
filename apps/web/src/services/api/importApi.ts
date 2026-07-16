@@ -17,6 +17,29 @@ export type ImportSummary = {
   rolledBackWrites?: number;
   enrollmentsProcessed?: number;
   movementsProcessed?: number;
+  missingEnrollments?: number;
+  missingInscriptions?: MissingInscription[];
+};
+
+export type MissingInscription = {
+  id: string;
+  name: string;
+  dni: string | null;
+  sector: string | null;
+  activity: string | null;
+  enrollmentDate: string | null;
+  feeAmount: number;
+  status: string | null;
+  source: 'google_sheets';
+  reason: 'missing_from_latest_import';
+};
+
+export type DeleteMissingInscriptionsResult = {
+  ok: boolean;
+  deletedCount: number;
+  skippedCount: number;
+  deletedIds: string[];
+  errors: Array<{ id: string; message: string }>;
 };
 
 export type ImportBatch = {
@@ -82,6 +105,11 @@ export const getImportBatches = (limit = 10) => fetchJson<ImportBatchesResponse>
 export const runGoogleSheetsImport = (dryRun: boolean, batchSize = 50) => fetchJson<ImportSummary>('/api/import/google-sheets', {
   method: 'POST',
   body: JSON.stringify({ dryRun, batchSize })
+});
+
+export const deleteMissingInscriptions = (importId: string, enrollmentIds: string[]) => fetchJson<DeleteMissingInscriptionsResult>('/api/import/google-sheets/enrollments/delete-missing', {
+  method: 'POST',
+  body: JSON.stringify({ importId, enrollmentIds })
 });
 
 export const getImportBatchErrors = (batchId: string, limit = 100) => fetchJson<ImportErrorsResponse>(`/api/import/batches/${encodeURIComponent(batchId)}/errors?limit=${limit}` as `/${string}`);

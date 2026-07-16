@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import express from 'express';
-import importRoutes, { parseBatchSize } from './importRoutes.js';
+import importRoutes, { parseBatchSize, parseMissingEnrollmentDeletion } from './importRoutes.js';
 
 test('parseBatchSize acepta enteros positivos y strings numéricos', () => {
   assert.equal(parseBatchSize(25), 25);
@@ -18,6 +18,14 @@ test('parseBatchSize usa fallback para valores inválidos', () => {
 
 test('parseBatchSize limita valores mayores al máximo permitido', () => {
   assert.equal(parseBatchSize(250), 200);
+});
+
+test('parseMissingEnrollmentDeletion exige un batch y una selección de UUIDs válidos', () => {
+  const batchId = '11111111-1111-4111-8111-111111111111';
+  const enrollmentId = '22222222-2222-4222-8222-222222222222';
+  assert.deepEqual(parseMissingEnrollmentDeletion({ importId: batchId, enrollmentIds: [enrollmentId, enrollmentId] }), { importId: batchId, enrollmentIds: [enrollmentId] });
+  assert.equal(parseMissingEnrollmentDeletion({ importId: batchId, enrollmentIds: [] }), null);
+  assert.equal(parseMissingEnrollmentDeletion({ importId: batchId, enrollmentIds: ['manual-record'] }), null);
 });
 
 
