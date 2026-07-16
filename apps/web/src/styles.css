@@ -2106,8 +2106,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .economy-top-card {
   min-width: 0;
-  min-height: 142px;
-  padding: clamp(0.8rem, 1vw, 1rem);
+  padding: clamp(1.3rem, 1vw, 1rem);
 }
 
 .economy-top-card .finance-card__header h4 {
