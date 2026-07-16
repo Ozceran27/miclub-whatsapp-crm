@@ -1873,7 +1873,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .economy-ranking-chart {
   width: 100%;
-  min-height: 210px;
+  min-height: 10px;
   margin-bottom: 12px;
 }
 
@@ -2079,7 +2079,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   .economy-chart-card__canvas,
   .economy-payment-chart,
   .economy-ranking-chart {
-    min-height: 230px;
+    min-height: 10px;
   }
 
   .economy-payment-list li,
