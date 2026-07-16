@@ -275,6 +275,8 @@ export interface EconomyComparisonMetric {
   oldestAvailableDate?: string;
   currentDate?: string;
   previousDate?: string;
+  currentPeriod?: string;
+  previousPeriod?: string;
   snapshotDate?: string | null;
 }
 

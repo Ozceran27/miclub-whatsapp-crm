@@ -29,6 +29,15 @@ test("growth months always use the two most recently completed months", () => {
   assert.equal(months.currentEnd.toISOString(), "2026-07-01T03:00:00.000Z");
 });
 
+test("growth combines the prior two complete calendar months", () => {
+  const incomeGrowth = calculateVariation(5_622_517, 4_296_109);
+  const clientGrowth = calculateVariation(202, 163);
+
+  assert.ok(Math.abs((incomeGrowth.percentageChange ?? 0) - 30.8746356) < 0.0001);
+  assert.ok(Math.abs((clientGrowth.percentageChange ?? 0) - 23.9263804) < 0.0001);
+  assert.ok(Math.abs(((incomeGrowth.percentageChange ?? 0) + (clientGrowth.percentageChange ?? 0)) / 2 - 27.400508) < 0.0001);
+});
+
 test("variation handles zero base and negative crossings without infinity", () => {
   assert.deepEqual(calculateVariation(0, 0), { current: 0, previous: 0, absoluteChange: 0, percentageChange: 0, direction: "stable", comparable: true, impact: "neutral" });
   assert.equal(calculateVariation(100, 0).percentageChange, null);
@@ -41,5 +50,6 @@ test("operating categories are normalized exactly", () => {
   assert.equal(isOperatingCategory(" inscripción "), true);
   assert.equal(isOperatingCategory("COMISIÓN"), true);
   assert.equal(isOperatingCategory("cuota extra"), false);
+  assert.equal(isOperatingCategory("CMV"), false);
   assert.equal(isOperatingCategory("CAPITAL"), false);
 });
