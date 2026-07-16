@@ -2,7 +2,13 @@ import { getPostgresEnv, validatePostgresEnv } from "../config/env.js";
 
 type PgPool = {
   query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
+  connect: () => Promise<PgClient>;
   end: () => Promise<void>;
+};
+
+type PgClient = {
+  query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
+  release: () => void;
 };
 
 type PgPoolConstructor = new (config: Record<string, unknown>) => PgPool;
