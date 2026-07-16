@@ -34,7 +34,7 @@ const endpoints: { [K in keyof EconomyEndpointMap]: `/${string}` } = {
   bySector: '/api/economy/by-sector?limit=6',
   byCategory: '/api/economy/by-category?limit=6',
   paymentMethods: '/api/economy/payment-methods',
-  recentMovements: '/api/economy/recent-movements?limit=8',
+  recentMovements: '/api/economy/recent-movements?limit=10',
   pending: '/api/economy/pending?limit=8',
   annualSummary: '/api/economy/annual-summary',
   comparison: '/api/economy/comparison',

@@ -54,7 +54,10 @@ export default function EconomyModule() {
       {data && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero económico del club">
           <EconomySummaryCards summary={data.summary} comparison={data.comparison} />
-          <EconomyInsights insights={data.insights.items} />
+          <div className="economy-lower-grid">
+            <EconomyInsights insights={data.insights.items} />
+            <RecentMovementsPanel movements={data.recentMovements.items} />
+          </div>
           <div className="economy-charts-grid">
             <EconomyMonthlyChart monthlyEvolution={data.monthlyEvolution} />
             <EconomyProfitChart monthlyEvolution={data.monthlyEvolution} />
@@ -62,7 +65,6 @@ export default function EconomyModule() {
           <EconomyRankings bySector={data.bySector} byCategory={data.byCategory} />
           <EconomyPaymentMethodsChart paymentMethods={data.paymentMethods} />
           <div className="home-dashboard-row home-dashboard-row--primary">
-            <RecentMovementsPanel movements={data.recentMovements.items} />
             <PendingMovementsPanel pending={data.pending} />
           </div>
         </section>

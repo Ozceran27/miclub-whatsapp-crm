@@ -2136,6 +2136,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .economy-top-card__value {
   max-width: 100%;
   margin: 0;
+  text-align: center;
   color: #f4fbff;
   font-size: 16px;
   font-weight: 900;
@@ -2143,6 +2144,13 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.economy-lower-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
 }
 
 .economy-top-card--positive { --finance-accent: #76f0c3; --finance-accent-rgb: 118, 240, 195; }
@@ -2164,6 +2172,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 @media (max-width: 760px) {
   .economy-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .economy-lower-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {

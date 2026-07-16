@@ -60,19 +60,29 @@ export const getCurrentMonthWindow = (reference = new Date()) => {
 
 export const getRolling30DayWindows = (reference = new Date()) => {
   const { year, month, day } = zonedParts(reference);
-  const todayStart = utcFromArgentinaDay(year, month, day);
-  const currentStart = addDays(todayStart, -30);
-  const currentEnd = addDays(todayStart, 1);
-  const previousStart = addDays(currentStart, -31);
+  const currentEnd = new Date(reference);
+  const currentStart = addDays(currentEnd, -30);
+  const previousStart = addDays(currentStart, -30);
   return {
     previousStart,
     currentStart,
     currentEnd,
     tomorrowStart: currentEnd,
-    current: { from: currentStart, to: currentEnd, labelFrom: formatArgentinaLabel(currentStart), labelTo: formatArgentinaLabel(todayStart), dateFrom: formatArgentinaDate(currentStart), dateTo: formatArgentinaDate(todayStart) },
+    current: { from: currentStart, to: currentEnd, labelFrom: formatArgentinaLabel(currentStart), labelTo: formatArgentinaLabel(currentEnd), dateFrom: formatArgentinaDate(currentStart), dateTo: formatArgentinaDate(currentEnd) },
     previous: { from: previousStart, to: currentStart, labelFrom: formatArgentinaLabel(previousStart), labelTo: formatArgentinaLabel(addDays(currentStart, -1)), dateFrom: formatArgentinaDate(previousStart), dateTo: formatArgentinaDate(addDays(currentStart, -1)) },
     timezone: ARGENTINA_TIME_ZONE,
   };
+};
+
+export const getLastCompleteMonthWindows = (reference = new Date()) => {
+  const { year, month } = zonedParts(reference);
+  const currentMonthStart = utcFromArgentinaDay(year, month, 1);
+  const currentStart = month === 1 ? utcFromArgentinaDay(year - 1, 12, 1) : utcFromArgentinaDay(year, month - 1, 1);
+  const previousStart = currentStart.getUTCMonth() === 0
+    ? utcFromArgentinaDay(currentStart.getUTCFullYear() - 1, 12, 1)
+    : utcFromArgentinaDay(currentStart.getUTCFullYear(), currentStart.getUTCMonth(), 1);
+  const label = (date: Date) => new Intl.DateTimeFormat("es-AR", { timeZone: ARGENTINA_TIME_ZONE, month: "long", year: "numeric" }).format(date);
+  return { previousStart, currentStart, currentEnd: currentMonthStart, currentLabel: label(currentStart), previousLabel: label(previousStart) };
 };
 
 export const calculateVariation = (currentInput: number, previousInput: number, inverseImpact = false): VariationResult => {

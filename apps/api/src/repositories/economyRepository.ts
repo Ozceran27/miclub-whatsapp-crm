@@ -163,26 +163,35 @@ export const getRollingMovementSummary = async (previousStart: Date, currentStar
   return result.rows;
 };
 
-export const getOldestLiquiditySnapshot = async (): Promise<EconomyRow[]> => {
+export const getGrowthSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
-    select cutoff_date
-    from miclub.operational_balances
-    order by cutoff_date asc, created_at asc
-    limit 1
-  `);
-  return result.rows;
-};
-
-export const getLiquiditySnapshotAtOrBefore = async (cutoff: Date): Promise<EconomyRow[]> => {
-  const pool = await getPostgresPool();
-  const result = await pool.query<EconomyRow>(`
-    select liquidity, cutoff_date, created_at
-    from miclub.operational_balances
-    where cutoff_date <= ($1::timestamptz at time zone 'America/Argentina/Buenos_Aires')::date
-    order by cutoff_date desc, created_at desc
-    limit 1
-  `, [cutoff]);
+    with periods as (
+      select 'previous'::text as period_key, $1::timestamptz as start_at, $2::timestamptz as end_at
+      union all
+      select 'current'::text, $2::timestamptz, $3::timestamptz
+    )
+    select p.period_key,
+      coalesce((
+        select sum(m.amount)
+        from miclub.movements m
+        left join miclub.movement_categories c on c.id = m.category_id
+        where m.movement_date >= p.start_at and m.movement_date < p.end_at
+          and m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO'
+          and upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) <> 'CAPITAL'
+      ), 0) as income,
+      coalesce((
+        select count(e.id)::integer
+        from miclub.enrollments e
+        join miclub.activities a on a.id = e.activity_id
+        join miclub.sectors s on s.id = a.sector_id
+        where e.enrollment_date >= (p.start_at at time zone 'America/Argentina/Buenos_Aires')::date
+          and e.enrollment_date < (p.end_at at time zone 'America/Argentina/Buenos_Aires')::date
+          and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
+      ), 0) as enrollments
+    from periods p
+    order by case p.period_key when 'previous' then 1 else 2 end
+  `, [previousStart, currentStart, currentEnd]);
   return result.rows;
 };
 
