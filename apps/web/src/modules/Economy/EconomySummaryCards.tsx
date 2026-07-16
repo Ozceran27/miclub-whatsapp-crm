@@ -28,6 +28,10 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
   const monthLabel = summary.month?.label ?? 'actual';
   const find = (key: string) => comparison.items.find((item) => item.key === key);
   const operatingProfitability = find('operatingProfitability');
+  const growth = find('growth');
+  const growthSubtitle = growth?.currentPeriod && growth?.previousPeriod
+    ? `${growth.currentPeriod} vs ${growth.previousPeriod}`
+    : 'Último mes completo vs mes anterior';
   const cards: TopCard[] = [
     { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Economía Club', value: formatEconomyMoney(summary.income), variant: 'positive' },
     { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Economía Club', value: formatEconomyMoney(summary.expenses), variant: 'negative' },
@@ -37,7 +41,7 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('income')), variant: 'positive' },
     { label: 'Variación de Egresos', icon: '↘️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('expenses')), variant: 'negative' },
     { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('utility')), variant: 'utility' },
-    { label: 'Crecimiento', icon: '🌱', subtitle: 'Últimos dos meses completos', value: formatVariation(find('growth')), variant: 'positive', metric: find('growth') },
+    { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth },
     { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Últimos 30 días', value: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected' },
   ];
 
