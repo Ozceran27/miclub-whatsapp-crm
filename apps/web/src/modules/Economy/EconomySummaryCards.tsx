@@ -38,7 +38,7 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     { label: 'Variación de Egresos', icon: '↘️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('expenses')), variant: 'negative' },
     { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('utility')), variant: 'utility' },
     { label: 'Crecimiento', icon: '🌱', subtitle: 'Últimos dos meses completos', value: formatVariation(find('growth')), variant: 'positive', metric: find('growth') },
-    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Últimos 30 días', value: formatEconomyMoney(operatingProfitability?.current), variant: 'projected', detail: `Variación: ${formatVariation(operatingProfitability)}`, metric: operatingProfitability },
+    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Últimos 30 días', value: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected' },
   ];
 
   return (
