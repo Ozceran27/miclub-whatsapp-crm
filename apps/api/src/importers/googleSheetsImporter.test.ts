@@ -29,6 +29,7 @@ const createSummary = () => ({
   enrollmentsProcessed: 0,
   movementsProcessed: 0,
   missingEnrollments: 0,
+  missingInscriptions: [],
   missingEnrollmentsAction: 'warn' as const,
   errors: 0,
   warnings: [],
