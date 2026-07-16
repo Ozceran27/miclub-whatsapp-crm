@@ -53,7 +53,7 @@ router.post("/google-sheets", asyncHandler(async (req, res) => {
 // constrained to the exact missing-row set produced by a Google Sheets batch.
 router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req, res) => {
   const input = parseMissingEnrollmentDeletion(req.body);
-  if (!input) return res.status(400).json({ error: true, message: "importId y enrollmentIds deben ser UUIDs válidos y enrollmentIds no puede estar vacío." });
+  if (!input) return res.status(400).json({ ok: false, message: "Debe seleccionar al menos una inscripción válida para eliminar." });
 
   const pool = await getPostgresPool();
   const batch = await pool.query<{ id: string }>(
@@ -62,30 +62,47 @@ router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req
   );
   if (batch.rows.length === 0) return res.status(400).json({ error: true, message: "El import indicado no es una importación real de Google Sheets finalizada." });
 
-  const candidates = await pool.query<{ id: string; blocked_by_relation: boolean }>(
-    `select e.id,
-            (exists (select 1 from miclub.payment_allocations pa where pa.enrollment_id = e.id)
-             or exists (select 1 from miclub.receivables r where r.enrollment_id = e.id)) as blocked_by_relation
-       from miclub.enrollments e
-      where e.id = any($1::uuid[])
-        and e.source = 'google_sheets'
-        and e.missing_from_import_batch_id = $2`,
-    [input.enrollmentIds, input.importId],
-  );
-  const byId = new Map(candidates.rows.map((candidate) => [candidate.id, candidate]));
+  const client = await pool.connect();
   const errors: Array<{ id: string; message: string }> = [];
-  const deletable: string[] = [];
-  for (const id of input.enrollmentIds) {
-    const candidate = byId.get(id);
-    if (!candidate) errors.push({ id, message: "La inscripción no pertenece a los registros faltantes de este import o no tiene origen Google Sheets." });
-    else if (candidate.blocked_by_relation) errors.push({ id, message: "La inscripción tiene pagos o cuentas por cobrar asociadas y se conserva para no romper la integridad histórica." });
-    else deletable.push(id);
-  }
-
   let deletedIds: string[] = [];
-  if (deletable.length > 0) {
-    try {
-      const deleted = await pool.query<{ id: string }>(
+  let phase = "begin_transaction";
+  try {
+    await client.query("begin");
+    phase = "validate_candidates";
+    const candidates = await client.query<{ id: string; dependency_reason: string | null }>(
+      `select e.id,
+              case
+                when exists (
+                  select 1
+                    from miclub.payment_allocations pa
+                    join miclub.receivables r on r.id = pa.receivable_id
+                   where r.enrollment_id = e.id
+                ) then 'La inscripción tiene pagos asociados y se conserva para no romper la integridad histórica.'
+                when exists (select 1 from miclub.receivables r where r.enrollment_id = e.id)
+                  then 'La inscripción tiene cuentas por cobrar asociadas y se conserva para no romper la integridad histórica.'
+                when exists (select 1 from miclub.crm_message_history cmh where cmh.enrollment_id = e.id)
+                  then 'La inscripción tiene historial de mensajes asociado y se conserva para no romper la integridad histórica.'
+                else null
+              end as dependency_reason
+         from miclub.enrollments e
+        where e.id = any($1::uuid[])
+          and e.source = 'google_sheets'
+          and e.missing_from_import_batch_id = $2
+        for update`,
+      [input.enrollmentIds, input.importId],
+    );
+    const byId = new Map(candidates.rows.map((candidate) => [candidate.id, candidate]));
+    const deletable: string[] = [];
+    for (const id of input.enrollmentIds) {
+      const candidate = byId.get(id);
+      if (!candidate) errors.push({ id, message: "La inscripción no existe, no tiene origen Google Sheets o ya no está marcada como faltante para este import." });
+      else if (candidate.dependency_reason) errors.push({ id, message: candidate.dependency_reason });
+      else deletable.push(id);
+    }
+
+    if (deletable.length > 0) {
+      phase = "delete_enrollments";
+      const deleted = await client.query<{ id: string }>(
         `delete from miclub.enrollments
           where id = any($1::uuid[])
             and source = 'google_sheets'
@@ -95,12 +112,21 @@ router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req
       );
       deletedIds = deleted.rows.map((row) => row.id);
       for (const id of deletable.filter((id) => !deletedIds.includes(id))) errors.push({ id, message: "La inscripción cambió antes de poder eliminarla; actualizá la revisión." });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudo eliminar la inscripción.";
-      for (const id of deletable) errors.push({ id, message });
     }
+    phase = "commit_transaction";
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : undefined;
+    console.error("delete-missing enrollments failed", { endpoint: req.originalUrl, importId: input.importId, enrollmentIds: input.enrollmentIds, phase, code, message: error instanceof Error ? error.message : String(error) });
+    const message = code === "23503"
+      ? "No se pudo eliminar una o más inscripciones porque tienen datos relacionados. Actualizá la revisión e intentá nuevamente."
+      : "No se pudieron eliminar las inscripciones seleccionadas. Intentá nuevamente.";
+    return res.status(code === "23503" ? 409 : 500).json({ ok: false, message, deletedCount: 0, skippedCount: input.enrollmentIds.length, deletedIds: [], errors: input.enrollmentIds.map((id) => ({ id, message })) });
+  } finally {
+    client.release();
   }
-  res.json({ ok: errors.length === 0, deletedCount: deletedIds.length, skippedCount: errors.length, deletedIds, errors });
+  res.json({ ok: deletedIds.length > 0, deletedCount: deletedIds.length, skippedCount: errors.length, deletedIds, errors });
 }));
 
 

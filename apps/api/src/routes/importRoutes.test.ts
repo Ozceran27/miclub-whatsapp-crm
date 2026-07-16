@@ -69,3 +69,16 @@ test('POST /api/import/google-sheets rechaza batchSize inválido', async () => {
     assert.deepEqual(await response.json(), { error: true, message: 'batchSize debe ser un entero positivo.' });
   });
 });
+
+test('POST /api/import/google-sheets/enrollments/delete-missing rechaza una selección vacía sin consultar la base', async () => {
+  await withImportServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/import/google-sheets/enrollments/delete-missing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ importId: '11111111-1111-4111-8111-111111111111', enrollmentIds: [] })
+    });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { ok: false, message: 'Debe seleccionar al menos una inscripción válida para eliminar.' });
+  });
+});
