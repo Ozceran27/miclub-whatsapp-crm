@@ -1,7 +1,7 @@
 export const ARGENTINA_TIME_ZONE = "America/Argentina/Buenos_Aires";
 
 export const OPERATING_CATEGORIES = [
-  "INSCRIPCION", "CUOTA", "TURNOS", "COMISION", "EVENTOS", "VENTAS", "CLASES", "CURSOS", "KIOSCO", "BEBIDAS",
+  "INSCRIPCION", "CUOTA", "TURNOS", "COMISION", "ALQUILER", "EVENTOS", "VENTAS", "CLASES", "CURSOS", "KIOSCO", "BEBIDAS",
 ] as const;
 
 export type VariationDirection = "up" | "down" | "stable";
