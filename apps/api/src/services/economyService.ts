@@ -11,11 +11,11 @@ import {
   getRankingByCategory,
   getRankingBySector,
   getRecentMovements as getRecentMovementRows,
-  getRollingMovementSummary,
+  getCompletedMonthMovementSummary,
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
-import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getRolling30DayWindows, OPERATING_CATEGORIES } from "./economyDomain.js";
+import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, OPERATING_CATEGORIES } from "./economyDomain.js";
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
@@ -147,11 +147,12 @@ export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord>
 };
 
 export const getComparison = async (): Promise<JsonRecord> => {
-  const windows = getRolling30DayWindows();
-  const growthMonths = getLastCompleteMonthWindows();
+  // Todas las tarjetas de cabecera comparten el mismo reloj de negocio que Crecimiento:
+  // los dos últimos meses calendario completos, con límites semiabiertos [inicio, fin).
+  const months = getLastCompleteMonthWindows();
   const [rows, growthRows] = await Promise.all([
-    normalizeRows(await getRollingMovementSummary(windows.previousStart, windows.currentStart, windows.currentEnd, OPERATING_CATEGORIES)),
-    normalizeRows(await getGrowthSummary(growthMonths.previousStart, growthMonths.currentStart, growthMonths.currentEnd)),
+    normalizeRows(await getCompletedMonthMovementSummary(months.previousStart, months.currentStart, months.currentEnd, OPERATING_CATEGORIES)),
+    normalizeRows(await getGrowthSummary(months.previousStart, months.currentStart, months.currentEnd)),
   ]);
   const previous = rows.find((row) => row.periodKey === "previous") ?? {};
   const current = rows.find((row) => row.periodKey === "current") ?? {};
@@ -169,7 +170,7 @@ export const getComparison = async (): Promise<JsonRecord> => {
     percentageChange: growthPercentage, direction: growthPercentage === null || growthPercentage === 0 ? "stable" : growthPercentage > 0 ? "up" : "down",
     comparable: growthComparable, available: growthComparable, applies: true,
     impact: growthPercentage === null || growthPercentage === 0 ? "neutral" : growthPercentage > 0 ? "favorable" : "unfavorable",
-    currentPeriod: growthMonths.currentLabel, previousPeriod: growthMonths.previousLabel,
+    currentPeriod: months.currentLabel, previousPeriod: months.previousLabel,
     economicGrowth: economicGrowth.percentageChange, clientGrowth: clientGrowth.percentageChange,
   };
   const items = [
@@ -179,7 +180,18 @@ export const getComparison = async (): Promise<JsonRecord> => {
     growth,
     metric("operatingProfitability", "Rentabilidad Operativa", "operatingProfitability"),
   ];
-  return { currentPeriod: `${windows.current.labelFrom} al ${windows.current.labelTo}`, previousPeriod: `${windows.previous.labelFrom} al ${windows.previous.labelTo}`, rolling30Days: { previousStart: windows.previousStart.toISOString(), currentStart: windows.currentStart.toISOString(), currentEnd: windows.currentEnd.toISOString(), current: { from: windows.current.dateFrom, to: windows.current.dateTo }, previous: { from: windows.previous.dateFrom, to: windows.previous.dateTo }, timezone: windows.timezone }, items, total: items.length };
+  return {
+    currentPeriod: months.currentLabel,
+    previousPeriod: months.previousLabel,
+    completedMonthComparison: {
+      previousStart: months.previousStart.toISOString(),
+      currentStart: months.currentStart.toISOString(),
+      currentEnd: months.currentEnd.toISOString(),
+      timezone: "America/Argentina/Buenos_Aires",
+    },
+    items,
+    total: items.length,
+  };
 };
 
 export const getInsights = async (): Promise<{ items: JsonRecord[]; total: number }> => {

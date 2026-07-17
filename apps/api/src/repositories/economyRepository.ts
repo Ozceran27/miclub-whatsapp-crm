@@ -136,7 +136,7 @@ export const getAnnualSummary = async (year = new Date().getUTCFullYear()): Prom
 };
 
 
-export const getRollingMovementSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date, operatingCategories: readonly string[]): Promise<EconomyRow[]> => {
+export const getCompletedMonthMovementSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date, operatingCategories: readonly string[]): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with periods as (

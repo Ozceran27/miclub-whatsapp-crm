@@ -32,17 +32,20 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
   const growthSubtitle = growth?.currentPeriod && growth?.previousPeriod
     ? `${growth.currentPeriod} vs ${growth.previousPeriod}`
     : 'Último mes completo vs mes anterior';
+  const comparisonSubtitle = comparison.currentPeriod && comparison.previousPeriod
+    ? `${comparison.currentPeriod} vs ${comparison.previousPeriod}`
+    : 'Último mes completo vs mes anterior';
   const cards: TopCard[] = [
     { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Economía Club', value: formatEconomyMoney(summary.income), variant: 'positive' },
     { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Economía Club', value: formatEconomyMoney(summary.expenses), variant: 'negative' },
     { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Economía Club', value: formatEconomyMoney(summary.balance), variant: 'utility' },
     { label: 'Liquidez actual', icon: '💰', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.liquidity ?? summary.current?.liquidity), variant: 'positive' },
     { label: 'Saldo Proyectado', icon: '📊', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.projectedBalance ?? summary.current?.projectedBalance), variant: 'projected' },
-    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('income')), variant: 'positive' },
-    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('expenses')), variant: 'negative' },
-    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparison.currentPeriod || 'Últimos 30 días', value: formatVariation(find('utility')), variant: 'utility' },
+    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive' },
+    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative' },
+    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility' },
     { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth },
-    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: 'Últimos 30 días', value: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected' },
+    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: comparisonSubtitle, value: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected' },
   ];
 
   return (
