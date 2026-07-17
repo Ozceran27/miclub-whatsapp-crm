@@ -29,13 +29,13 @@ test("growth months always use the two most recently completed months", () => {
   assert.equal(months.currentEnd.toISOString(), "2026-07-01T03:00:00.000Z");
 });
 
-test("growth combines the prior two complete calendar months", () => {
-  const incomeGrowth = calculateVariation(5_622_517, 4_296_109);
-  const clientGrowth = calculateVariation(202, 163);
+test("growth averages monthly income with accumulated enrollments at each month end", () => {
+  const incomeGrowth = calculateVariation(5_600_000, 3_800_000);
+  const clientGrowth = calculateVariation(112, 86);
 
-  assert.ok(Math.abs((incomeGrowth.percentageChange ?? 0) - 30.8746356) < 0.0001);
-  assert.ok(Math.abs((clientGrowth.percentageChange ?? 0) - 23.9263804) < 0.0001);
-  assert.ok(Math.abs(((incomeGrowth.percentageChange ?? 0) + (clientGrowth.percentageChange ?? 0)) / 2 - 27.400508) < 0.0001);
+  assert.ok(Math.abs((incomeGrowth.percentageChange ?? 0) - 47.3684211) < 0.0001);
+  assert.ok(Math.abs((clientGrowth.percentageChange ?? 0) - 30.2325581) < 0.0001);
+  assert.ok(Math.abs(((incomeGrowth.percentageChange ?? 0) + (clientGrowth.percentageChange ?? 0)) / 2 - 38.8004896) < 0.0001);
 });
 
 test("variation handles zero base and negative crossings without infinity", () => {
@@ -49,6 +49,7 @@ test("variation handles zero base and negative crossings without infinity", () =
 test("operating categories are normalized exactly", () => {
   assert.equal(isOperatingCategory(" inscripción "), true);
   assert.equal(isOperatingCategory("COMISIÓN"), true);
+  assert.equal(isOperatingCategory(" alquiler "), true);
   assert.equal(isOperatingCategory("cuota extra"), false);
   assert.equal(isOperatingCategory("CMV"), false);
   assert.equal(isOperatingCategory("CAPITAL"), false);

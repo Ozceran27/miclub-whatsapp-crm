@@ -185,8 +185,7 @@ export const getGrowthSummary = async (previousStart: Date, currentStart: Date, 
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id
         join miclub.sectors s on s.id = a.sector_id
-        where e.enrollment_date >= (p.start_at at time zone 'America/Argentina/Buenos_Aires')::date
-          and e.enrollment_date < (p.end_at at time zone 'America/Argentina/Buenos_Aires')::date
+        where e.enrollment_date < (p.end_at at time zone 'America/Argentina/Buenos_Aires')::date
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
           and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
