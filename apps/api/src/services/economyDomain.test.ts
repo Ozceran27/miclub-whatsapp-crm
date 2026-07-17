@@ -22,11 +22,13 @@ test("rolling windows cover two consecutive 30 day windows without overlap", () 
   assert.equal((windows.currentStart.getTime() - windows.previousStart.getTime()) / 86_400_000, 30);
 });
 
-test("growth months always use the two most recently completed months", () => {
-  const months = getLastCompleteMonthWindows(new Date("2026-07-14T12:00:00Z"));
+test("completed month comparison uses June versus May on 17 July 2026", () => {
+  const months = getLastCompleteMonthWindows(new Date("2026-07-17T12:00:00Z"));
   assert.equal(months.currentStart.toISOString(), "2026-06-01T03:00:00.000Z");
   assert.equal(months.previousStart.toISOString(), "2026-05-01T03:00:00.000Z");
   assert.equal(months.currentEnd.toISOString(), "2026-07-01T03:00:00.000Z");
+  assert.equal(months.currentLabel, "junio de 2026");
+  assert.equal(months.previousLabel, "mayo de 2026");
 });
 
 test("growth averages monthly income with accumulated enrollments at each month end", () => {
@@ -36,6 +38,20 @@ test("growth averages monthly income with accumulated enrollments at each month 
   assert.ok(Math.abs((incomeGrowth.percentageChange ?? 0) - 47.3684211) < 0.0001);
   assert.ok(Math.abs((clientGrowth.percentageChange ?? 0) - 30.2325581) < 0.0001);
   assert.ok(Math.abs(((incomeGrowth.percentageChange ?? 0) + (clientGrowth.percentageChange ?? 0)) / 2 - 38.8004896) < 0.0001);
+});
+
+test("monthly comparison variations use the completed-month values", () => {
+  const income = calculateVariation(5_600_000, 3_800_000);
+  const expenses = calculateVariation(2_100_000, 1_400_000, true);
+  const utility = calculateVariation(3_500_000, 2_400_000);
+  const operatingProfitability = calculateVariation(2_800_000, 1_600_000);
+
+  assert.ok(Math.abs((income.percentageChange ?? 0) - 47.3684211) < 0.0001);
+  assert.equal(expenses.current, 2_100_000);
+  assert.equal(expenses.previous, 1_400_000);
+  assert.ok(Math.abs((utility.percentageChange ?? 0) - 45.8333333) < 0.0001);
+  assert.equal(operatingProfitability.current, 2_800_000);
+  assert.equal(operatingProfitability.previous, 1_600_000);
 });
 
 test("variation handles zero base and negative crossings without infinity", () => {
