@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getRolling30DayWindows, isOperatingCategory } from "./economyDomain.js";
+import { calculateSectorProfitability, calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getRolling30DayWindows, isCompletedMovementStatus, isOperatingCategory } from "./economyDomain.js";
 
 test("current month window uses Argentina timezone and month label", () => {
   const window = getCurrentMonthWindow(new Date("2026-07-14T12:00:00Z"));
@@ -83,4 +83,26 @@ test("sector ranking normalizes numeric fields and orders by profitability", asy
   assert.equal(result[0].expenses, 100);
   assert.equal(result[0].balance, 800);
   assert.equal(result[1].name, "Sector A");
+});
+
+
+test("completed status normalization accepts completed variants only", () => {
+  assert.equal(isCompletedMovementStatus(" Completado "), true);
+  assert.equal(isCompletedMovementStatus("completed"), true);
+  assert.equal(isCompletedMovementStatus("Pendiente"), false);
+});
+
+test("sector profitability uses completed operating income minus expenses", () => {
+  const result = calculateSectorProfitability([
+    { sector: "Fitness", movement_type: "INGRESOS", category: "CUOTA", operational_status: "Completado", amount: 1000 },
+    { sector: "Fitness", movement_type: "EGRESOS", category: "BEBIDAS", operational_status: "Completado", amount: 300 },
+    { sector: "Fitness", movement_type: "INGRESOS", category: "CUOTA", operational_status: "Pendiente", amount: 5000 },
+    { sector: "Fitness", movement_type: "INGRESOS", category: "CAPITAL", operational_status: "Completado", amount: 9000 },
+  ]);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].income, 1000);
+  assert.equal(result[0].expenses, 300);
+  assert.equal(result[0].balance, 700);
+  assert.equal(result[0].movements, 2);
 });
