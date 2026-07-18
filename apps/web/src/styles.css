@@ -2316,6 +2316,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .economy-monthly-row--total strong { grid-column: 1 / 6; }
 .economy-monthly-row__value--expense { color: #ff6b7a; }
 
+
 .economy-chart-card--growth {
   --finance-accent: #76f0c3;
   --finance-accent-rgb: 118, 240, 195;
