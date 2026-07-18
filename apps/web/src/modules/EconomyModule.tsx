@@ -1,6 +1,9 @@
 import { EconomyDashboardState } from './Economy/EconomyDashboardState';
 import { EconomyInsights } from './Economy/EconomyInsights';
+import { EconomyGrowthChart } from './Economy/EconomyGrowthChart';
 import { EconomyMonthlyChart } from './Economy/EconomyMonthlyChart';
+import { EconomyMonthlySummaryPanel } from './Economy/EconomyMonthlySummaryPanel';
+import { EconomyOperatingProfitabilityChart } from './Economy/EconomyOperatingProfitabilityChart';
 import { EconomyPaymentMethodsChart } from './Economy/EconomyPaymentMethodsChart';
 import { EconomyProfitChart } from './Economy/EconomyProfitChart';
 import { EconomyRankings } from './Economy/EconomyRankings';
@@ -56,16 +59,19 @@ export default function EconomyModule() {
           <EconomySummaryCards summary={data.summary} comparison={data.comparison} />
           <div className="economy-lower-grid">
             <EconomyInsights insights={data.insights.items} />
-            <RecentMovementsPanel movements={data.recentMovements.items} />
+            <EconomyMonthlySummaryPanel monthlyEvolution={data.monthlyEvolution} />
           </div>
           <div className="economy-charts-grid">
             <EconomyMonthlyChart monthlyEvolution={data.monthlyEvolution} />
             <EconomyProfitChart monthlyEvolution={data.monthlyEvolution} />
+            <EconomyGrowthChart monthlyEvolution={data.monthlyEvolution} />
+            <EconomyOperatingProfitabilityChart monthlyEvolution={data.monthlyEvolution} />
           </div>
           <EconomyRankings bySector={data.bySector} byCategory={data.byCategory} />
           <EconomyPaymentMethodsChart paymentMethods={data.paymentMethods} />
-          <div className="home-dashboard-row home-dashboard-row--primary">
+          <div className="economy-final-grid">
             <PendingMovementsPanel pending={data.pending} />
+            <RecentMovementsPanel movements={data.recentMovements.items} />
           </div>
         </section>
       )}

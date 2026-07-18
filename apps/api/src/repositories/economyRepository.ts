@@ -24,25 +24,63 @@ export const getMonthlySummary = async (from: Date, to: Date): Promise<EconomyRo
   return result.rows;
 };
 
-export const getAnnualEvolution = async (year = new Date().getUTCFullYear()): Promise<EconomyRow[]> => {
+export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), operatingCategories: readonly string[] = []): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with months as (
-      select generate_series(make_date($1::integer, 1, 1), make_date($1::integer, 12, 1), interval '1 month')::date as month_start
+      select generate_series(make_date(($1::integer - 1), 12, 1), make_date($1::integer, 12, 1), interval '1 month')::date as month_start
+    ), monthly as (
+      select
+        months.month_start,
+        coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO'), 0) as income,
+        coalesce(sum(m.amount) filter (where m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO'), 0) as expenses,
+        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
+        coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category <> 'CAPITAL'), 0) as growth_income,
+        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then -m.amount else 0 end), 0) as operating_profitability,
+        count(m.id)::integer as movements
+      from months
+      left join (
+        select m.*, upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
+        from miclub.movements m
+        left join miclub.movement_categories c on c.id = m.category_id
+      ) m on m.movement_date >= months.month_start and m.movement_date < months.month_start + interval '1 month'
+      group by months.month_start
     )
     select
-      extract(year from months.month_start)::integer as year,
-      extract(month from months.month_start)::integer as month,
-      to_char(months.month_start, 'YYYY-MM') as period,
-      coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as income,
-      coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as expenses,
-      coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
-      count(m.id)::integer as movements
-    from months
-    left join miclub.movements m on m.movement_date >= months.month_start and m.movement_date < months.month_start + interval '1 month'
-    group by months.month_start
-    order by months.month_start
-  `, [year]);
+      extract(year from monthly.month_start)::integer as year,
+      extract(month from monthly.month_start)::integer as month,
+      to_char(monthly.month_start, 'YYYY-MM') as period,
+      monthly.income,
+      monthly.expenses,
+      monthly.balance,
+      monthly.operating_profitability,
+      monthly.movements,
+      coalesce((
+        select count(e.id)::integer
+        from miclub.enrollments e
+        join miclub.activities a on a.id = e.activity_id
+        join miclub.sectors s on s.id = a.sector_id
+        where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
+          and coalesce(e.inactive, false) = false
+          and e.superseded_at is null
+          and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
+      ), 0) as cumulative_enrollments,
+      lag(monthly.growth_income) over (order by monthly.month_start) as previous_growth_income,
+      lag(coalesce((
+        select count(e.id)::integer
+        from miclub.enrollments e
+        join miclub.activities a on a.id = e.activity_id
+        join miclub.sectors s on s.id = a.sector_id
+        where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
+          and coalesce(e.inactive, false) = false
+          and e.superseded_at is null
+          and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
+      ), 0)) over (order by monthly.month_start) as previous_cumulative_enrollments,
+      monthly.growth_income
+    from monthly
+    where monthly.month_start >= make_date($1::integer, 1, 1)
+    order by monthly.month_start
+  `, [year, operatingCategories]);
   return result.rows;
 };
 

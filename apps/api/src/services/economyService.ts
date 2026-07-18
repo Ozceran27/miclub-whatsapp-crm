@@ -91,7 +91,21 @@ export const getSummary = async (): Promise<JsonRecord> => {
 };
 
 export const getMonthlyEvolution = async (yearQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = addVariation(normalizeRows(await getAnnualEvolution(parseYear(yearQuery))));
+  const baseItems = addVariation(normalizeRows(await getAnnualEvolution(parseYear(yearQuery), OPERATING_CATEGORIES)));
+  const items = baseItems.map((item) => {
+    const economicGrowth = calculateVariation(toNumber(item.growthIncome), toNumber(item.previousGrowthIncome));
+    const clientGrowth = calculateVariation(toNumber(item.cumulativeEnrollments), toNumber(item.previousCumulativeEnrollments));
+    const comparable = economicGrowth.percentageChange !== null && clientGrowth.percentageChange !== null;
+    return {
+      ...item,
+      utility: toNumber(item.balance),
+      operatingProfitability: toNumber(item.operatingProfitability),
+      growth: comparable ? ((economicGrowth.percentageChange ?? 0) + (clientGrowth.percentageChange ?? 0)) / 2 : null,
+      economicGrowth: economicGrowth.percentageChange,
+      clientGrowth: clientGrowth.percentageChange,
+      growthComparable: comparable,
+    };
+  });
   return { items, total: items.length };
 };
 
