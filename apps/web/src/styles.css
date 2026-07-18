@@ -2004,7 +2004,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   --finance-accent-rgb: 118, 240, 195;
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 48px;
   padding-block: 14px;
 }
 
