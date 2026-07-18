@@ -1,4 +1,3 @@
-import React from 'react';
 import { formatEconomyMoney } from './formatters';
 import type { EconomyDashboardCollection, EconomyMonthlyEvolutionItem } from './types';
 
@@ -54,27 +53,26 @@ export function EconomyMonthlySummaryPanel({ monthlyEvolution }: Props) {
             <div className={`economy-monthly-box economy-monthly-box--${section.tone}`} key={section.title}>
               <h5>{section.title}</h5>
               <div className="economy-monthly-box__table" role="table" aria-label={`${section.title} por mes`}>
-                <div className="economy-monthly-box__head" role="row"><span>Mes</span><span>Valor</span><span>Mes</span><span>Valor</span><span>Mes</span><span>Valor</span></div>
-                {monthBlocks[0].map((firstBlockItem, index) => {
-                  const rowItems = monthBlocks.map((block) => block[index]);
-                  return (
-                    <div className="economy-monthly-row" role="row" key={`${section.title}-${firstBlockItem.month}`}>
-                      {rowItems.map((item) => {
+                <div className="economy-monthly-box__blocks" role="rowgroup">
+                  {monthBlocks.map((block, blockIndex) => (
+                    <div className="economy-monthly-block" key={`${section.title}-block-${blockIndex}`} role="presentation">
+                      <div className="economy-monthly-block__head" role="row"><span>Mes</span><span>Valor</span></div>
+                      {block.map((item) => {
                         const value = section.getValue(item);
                         const valueClass = section.tone === 'negative'
                           ? 'economy-monthly-row__value--expense'
                           : value < 0 ? 'economy-chart-tooltip__negative' : value > 0 ? 'economy-chart-tooltip__positive' : undefined;
                         return (
-                          <React.Fragment key={`${section.title}-${item.month}`}>
+                          <div className="economy-monthly-row" role="row" key={`${section.title}-${item.month}`}>
                             <strong>{monthName(item.month)}</strong>
                             <span className={valueClass}>{safeMoney(value)}</span>
-                          </React.Fragment>
+                          </div>
                         );
                       })}
                     </div>
-                  );
-                })}
-                <div className="economy-monthly-row economy-monthly-row--total" role="row"><strong>TOTAL</strong><span className={section.tone === 'negative' ? 'economy-monthly-row__value--expense' : undefined}>{safeMoney(total)}</span></div>
+                  ))}
+                </div>
+                <div className="economy-monthly-row economy-monthly-row--total" role="row"><strong>TOTAL</strong><span className={section.tone === 'negative' ? 'economy-monthly-row__value--expense' : total < 0 ? 'economy-chart-tooltip__negative' : 'economy-chart-tooltip__positive'}>{safeMoney(total)}</span></div>
               </div>
             </div>
           );

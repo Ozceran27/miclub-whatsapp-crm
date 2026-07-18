@@ -70,3 +70,17 @@ test("operating categories are normalized exactly", () => {
   assert.equal(isOperatingCategory("CMV"), false);
   assert.equal(isOperatingCategory("CAPITAL"), false);
 });
+
+test("sector ranking normalizes numeric fields and orders by profitability", async () => {
+  const { normalizeRankingItems } = await import("./economyService.js");
+  const result = normalizeRankingItems([
+    { id: "a", name: "Sector A", income: "1000", expenses: "300", balance: "700", movements: "4" },
+    { id: "b", name: "Sector B", income: "900", expenses: "100", balance: "800", movements: "2" },
+  ]);
+
+  assert.equal(result[0].name, "Sector B");
+  assert.equal(result[0].income, 900);
+  assert.equal(result[0].expenses, 100);
+  assert.equal(result[0].balance, 800);
+  assert.equal(result[1].name, "Sector A");
+});
