@@ -13,6 +13,7 @@ type TopCard = {
   variant: TopCardVariant;
   detail?: string;
   metric?: EconomyComparisonMetric;
+  centerValue?: boolean;
 };
 
 const formatVariation = (item?: EconomyComparisonMetric) => {
@@ -41,23 +42,23 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Economía Club', value: formatEconomyMoney(summary.balance), variant: 'utility' },
     { label: 'Liquidez actual', icon: '💰', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.liquidity ?? summary.current?.liquidity), variant: 'positive' },
     { label: 'Saldo Proyectado', icon: '📊', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.projectedBalance ?? summary.current?.projectedBalance), variant: 'projected' },
-    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive' },
-    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative' },
-    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility' },
-    { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth },
+    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive', metric: find('income'), centerValue: true },
+    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative', metric: find('expenses'), centerValue: true },
+    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility', metric: find('utility'), centerValue: true },
+    { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth, centerValue: true },
     { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: operatingProfitability?.currentPeriod ?? comparison.currentPeriod ?? 'Último mes completo', value: formatEconomyMoney(operatingProfitability?.current), detail: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected' },
   ];
 
   return (
     <div className="economy-kpi-strip" aria-label="Resumen analítico de Economía Club">
       {cards.map((card) => (
-        <article className={`card home-kpi-card home-kpi-card--compact finance-card economy-top-card economy-top-card--${card.variant}`} key={card.label}>
+        <article className={`card home-kpi-card home-kpi-card--compact finance-card economy-top-card economy-top-card--${card.variant}${card.centerValue ? ' economy-top-card--center-value' : ''}`} key={card.label}>
           <div className="home-card-heading finance-card__header">
             <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span></h4>
             <p>{card.subtitle}</p>
           </div>
           <p className={`economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>
-          {card.detail && <p className="economy-top-card__detail">{card.detail}</p>}
+          {card.detail && <p className={`economy-top-card__detail economy-top-card__detail--${variationState(card.metric)}`}>{card.detail}</p>}
         </article>
       ))}
     </div>
