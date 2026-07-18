@@ -11,6 +11,7 @@ export type {
   EconomyPendingSummary,
   EconomyRecentMovement,
   EconomySectorBreakdownItem,
+  EconomySectorRankings,
   EconomySummary
 } from '@miclub/shared';
 

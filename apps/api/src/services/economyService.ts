@@ -51,6 +51,12 @@ const monthRange = (date = new Date()): { from: Date; to: Date } => {
   return { from, to };
 };
 
+
+const currentYearToDateRange = (date = new Date()): { from: Date; to: Date } => {
+  const from = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return { from, to: date };
+};
+
 const legacyVariation = (current: number, previous: number): number | null => calculateVariation(current, previous).percentageChange;
 
 const addVariation = (items: JsonRecord[]): JsonRecord[] =>
@@ -119,6 +125,21 @@ export const getByCategory = async (limitQuery?: unknown): Promise<{ items: Json
   const { start: from, end: to } = getCurrentMonthWindow();
   const items = normalizeRows(await getRankingByCategory(from, to, parseLimit(limitQuery)));
   return { items, total: items.length };
+};
+
+
+export const getSectorRankings = async (limitQuery?: unknown): Promise<JsonRecord> => {
+  const limit = parseLimit(limitQuery, 5);
+  const month = getCurrentMonthWindow();
+  const annual = currentYearToDateRange();
+  const [monthlyItems, annualItems] = await Promise.all([
+    getRankingBySector(month.start, new Date(), limit),
+    getRankingBySector(annual.from, annual.to, limit),
+  ]);
+  return {
+    monthly: { label: month.label, items: normalizeRows(monthlyItems), total: monthlyItems.length },
+    annual: { year: annual.from.getUTCFullYear(), items: normalizeRows(annualItems), total: annualItems.length },
+  };
 };
 
 export const getPaymentMethods = async (): Promise<{ items: JsonRecord[]; total: number }> => {

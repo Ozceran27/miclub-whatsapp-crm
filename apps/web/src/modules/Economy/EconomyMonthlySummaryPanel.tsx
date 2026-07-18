@@ -1,3 +1,4 @@
+import React from 'react';
 import { formatEconomyMoney } from './formatters';
 import type { EconomyDashboardCollection, EconomyMonthlyEvolutionItem } from './types';
 
@@ -41,8 +42,7 @@ const emptyMonthlyItem = (month: number): MonthlySummaryItem => ({
 export function EconomyMonthlySummaryPanel({ monthlyEvolution }: Props) {
   const byMonth = new Map(monthlyEvolution.items.map((item) => [item.month, item as MonthlySummaryItem]));
   const months = Array.from({ length: 12 }, (_, index) => byMonth.get(index + 1) ?? emptyMonthlyItem(index + 1));
-  const firstHalf = months.slice(0, 6);
-  const secondHalf = months.slice(6);
+  const monthBlocks = Array.from({ length: 3 }, (_, index) => months.slice(index * 4, index * 4 + 4));
 
   return (
     <article className="card home-kpi-card finance-card economy-monthly-summary-panel">
@@ -54,21 +54,27 @@ export function EconomyMonthlySummaryPanel({ monthlyEvolution }: Props) {
             <div className={`economy-monthly-box economy-monthly-box--${section.tone}`} key={section.title}>
               <h5>{section.title}</h5>
               <div className="economy-monthly-box__table" role="table" aria-label={`${section.title} por mes`}>
-                <div className="economy-monthly-box__head" role="row"><span>Mes</span><span>Valor</span><span>Mes</span><span>Valor</span></div>
-                {firstHalf.map((leftItem, index) => {
-                  const rightItem = secondHalf[index];
-                  const leftValue = section.getValue(leftItem);
-                  const rightValue = section.getValue(rightItem);
+                <div className="economy-monthly-box__head" role="row"><span>Mes</span><span>Valor</span><span>Mes</span><span>Valor</span><span>Mes</span><span>Valor</span></div>
+                {monthBlocks[0].map((firstBlockItem, index) => {
+                  const rowItems = monthBlocks.map((block) => block[index]);
                   return (
-                    <div className="economy-monthly-row" role="row" key={`${section.title}-${leftItem.month}-${rightItem.month}`}>
-                      <strong>{monthName(leftItem.month)}</strong>
-                      <span className={leftValue < 0 ? 'economy-chart-tooltip__negative' : leftValue > 0 ? 'economy-chart-tooltip__positive' : undefined}>{safeMoney(leftValue)}</span>
-                      <strong>{monthName(rightItem.month)}</strong>
-                      <span className={rightValue < 0 ? 'economy-chart-tooltip__negative' : rightValue > 0 ? 'economy-chart-tooltip__positive' : undefined}>{safeMoney(rightValue)}</span>
+                    <div className="economy-monthly-row" role="row" key={`${section.title}-${firstBlockItem.month}`}>
+                      {rowItems.map((item) => {
+                        const value = section.getValue(item);
+                        const valueClass = section.tone === 'negative'
+                          ? 'economy-monthly-row__value--expense'
+                          : value < 0 ? 'economy-chart-tooltip__negative' : value > 0 ? 'economy-chart-tooltip__positive' : undefined;
+                        return (
+                          <React.Fragment key={`${section.title}-${item.month}`}>
+                            <strong>{monthName(item.month)}</strong>
+                            <span className={valueClass}>{safeMoney(value)}</span>
+                          </React.Fragment>
+                        );
+                      })}
                     </div>
                   );
                 })}
-                <div className="economy-monthly-row economy-monthly-row--total" role="row"><strong>TOTAL</strong><span>{safeMoney(total)}</span></div>
+                <div className="economy-monthly-row economy-monthly-row--total" role="row"><strong>TOTAL</strong><span className={section.tone === 'negative' ? 'economy-monthly-row__value--expense' : undefined}>{safeMoney(total)}</span></div>
               </div>
             </div>
           );

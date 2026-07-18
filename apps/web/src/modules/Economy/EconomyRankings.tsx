@@ -1,22 +1,17 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatEconomyMoney } from './formatters';
-import type { EconomyCategoryBreakdownItem, EconomyDashboardCollection, EconomySectorBreakdownItem } from './types';
+import type { EconomySectorBreakdownItem, EconomySectorRankings } from './types';
 
-type RankingItem = EconomySectorBreakdownItem | EconomyCategoryBreakdownItem;
-
-type RankingCardProps<TItem extends RankingItem> = {
+type RankingCardProps = {
   title: string;
   subtitle: string;
-  items: TItem[];
-  accent: 'sector' | 'category';
+  items: EconomySectorBreakdownItem[];
+  accent: 'sector' | 'annual';
 };
 
-type Props = {
-  bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
-  byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
-};
+type Props = { sectorRankings: EconomySectorRankings };
 
-type TooltipPayload = { payload?: RankingItem; value?: number };
+type TooltipPayload = { payload?: EconomySectorBreakdownItem; value?: number };
 type TooltipProps = { active?: boolean; payload?: TooltipPayload[] };
 
 function RankingTooltip({ active, payload }: TooltipProps) {
@@ -26,7 +21,7 @@ function RankingTooltip({ active, payload }: TooltipProps) {
   return (
     <div className="economy-chart-tooltip">
       <strong>{item.name}</strong>
-      <span className={item.balance >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>Balance: {formatEconomyMoney(item.balance)}</span>
+      <span className={item.balance >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>Rentabilidad: {formatEconomyMoney(item.balance)}</span>
       <span>Ingresos: {formatEconomyMoney(item.income)}</span>
       <span>Egresos: {formatEconomyMoney(item.expenses)}</span>
       <span>{item.movements} movimientos</span>
@@ -35,8 +30,9 @@ function RankingTooltip({ active, payload }: TooltipProps) {
 }
 
 const getShortName = (name: string) => name.length > 16 ? `${name.slice(0, 15)}…` : name;
+const rankingValueClass = (balance: number) => balance > 0 ? 'economy-ranking-item__value--positive' : balance < 0 ? 'economy-ranking-item__value--negative' : 'economy-ranking-item__value--neutral';
 
-function RankingCard<TItem extends RankingItem>({ title, subtitle, items, accent }: RankingCardProps<TItem>) {
+function RankingCard({ title, subtitle, items, accent }: RankingCardProps) {
   const chartData = items.map((item) => ({ ...item, shortName: getShortName(item.name) }));
 
   return (
@@ -47,15 +43,15 @@ function RankingCard<TItem extends RankingItem>({ title, subtitle, items, accent
       </div>
       {items.length > 0 ? (
         <>
-          <div className="economy-ranking-chart" aria-label={`${title}: ranking agregado por balance`}>
+          <div className="economy-ranking-chart" aria-label={`${title}: ranking agregado por rentabilidad`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 2 }}>
                 <CartesianGrid stroke="rgba(143, 164, 200, 0.14)" horizontal={false} />
                 <XAxis type="number" hide />
                 <YAxis type="category" dataKey="shortName" tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} width={96} />
                 <Tooltip content={<RankingTooltip />} cursor={{ fill: 'rgba(143, 216, 255, 0.08)' }} />
-                <Bar dataKey="balance" name="Balance" radius={[0, 8, 8, 0]} barSize={16}>
-                  {chartData.map((item) => <Cell key={`${item.id ?? item.name}-${item.name}`} fill={item.balance >= 0 ? '#76f0c3' : '#ff8787'} />)}
+                <Bar dataKey="balance" name="Rentabilidad" radius={[0, 8, 8, 0]} barSize={16}>
+                  {chartData.map((item) => <Cell key={`${item.id ?? item.name}-${item.name}`} fill={item.balance >= 0 ? '#76f0c3' : '#ff6b7a'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -68,23 +64,23 @@ function RankingCard<TItem extends RankingItem>({ title, subtitle, items, accent
                   <strong className="economy-ranking-item__title">{item.name}</strong>
                   <span className="economy-ranking-item__meta">{item.movements} mov. · Ingresos {formatEconomyMoney(item.income)} · Egresos {formatEconomyMoney(item.expenses)}</span>
                 </span>
-                <span className="economy-ranking-item__value">{formatEconomyMoney(item.balance)}</span>
+                <span className={`economy-ranking-item__value ${rankingValueClass(item.balance)}`}>{formatEconomyMoney(item.balance)}</span>
               </li>
             ))}
           </ol>
         </>
       ) : (
-        <p className="economy-chart-empty">Sin datos agregados para el mes actual.</p>
+        <p className="economy-chart-empty">Sin datos de rentabilidad por sector para el período.</p>
       )}
     </article>
   );
 }
 
-export function EconomyRankings({ bySector, byCategory }: Props) {
+export function EconomyRankings({ sectorRankings }: Props) {
   return (
     <div className="economy-rankings-grid">
-      <RankingCard title="🏆 Ranking por sector" subtitle="Balance mensual agregado desde backend" items={bySector.items} accent="sector" />
-      <RankingCard title="🥇 Ranking por categoría" subtitle="Ingresos, egresos y movimientos agregados" items={byCategory.items} accent="category" />
+      <RankingCard title={`🏆 Ranking Sector mes de ${sectorRankings.monthly.label}`} subtitle="TOP 5 por rentabilidad del mes en curso" items={sectorRankings.monthly.items} accent="sector" />
+      <RankingCard title="🥇 Ranking Sector Anual" subtitle={`TOP 5 por rentabilidad ${sectorRankings.annual.year} hasta hoy`} items={sectorRankings.annual.items} accent="annual" />
     </div>
   );
 }
