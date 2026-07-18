@@ -302,6 +302,11 @@ export interface EconomySectorBreakdownItem {
   movements: number;
 }
 
+export interface EconomySectorRankings {
+  monthly: EconomyDashboardCollection<EconomySectorBreakdownItem> & { label: string };
+  annual: EconomyDashboardCollection<EconomySectorBreakdownItem> & { year: number };
+}
+
 export interface EconomyCategoryBreakdownItem {
   id: string | null;
   name: string;
@@ -384,6 +389,7 @@ export interface EconomyDashboardResponse {
   monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem>;
   bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
   byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
+  sectorRankings?: EconomySectorRankings;
   paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;
   recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
   pending: EconomyPendingSummary;

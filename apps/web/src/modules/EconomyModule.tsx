@@ -67,7 +67,7 @@ export default function EconomyModule() {
             <EconomyGrowthChart monthlyEvolution={data.monthlyEvolution} />
             <EconomyOperatingProfitabilityChart monthlyEvolution={data.monthlyEvolution} />
           </div>
-          <EconomyRankings bySector={data.bySector} byCategory={data.byCategory} />
+          <EconomyRankings sectorRankings={data.sectorRankings} />
           <EconomyPaymentMethodsChart paymentMethods={data.paymentMethods} />
           <div className="economy-final-grid">
             <PendingMovementsPanel pending={data.pending} />

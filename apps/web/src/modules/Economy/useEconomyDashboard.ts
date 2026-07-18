@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiUrl } from '../../api';
-import type { DashboardStatus, EconomyAnnualSummary, EconomyCategoryBreakdownItem, EconomyComparison, EconomyDashboardCollection, EconomyDashboardError, EconomyInsight, EconomyMonthlyEvolutionItem, EconomyPaymentMethodItem, EconomyPendingSummary, EconomyRecentMovement, EconomySectorBreakdownItem, EconomySummary } from './types';
+import type { DashboardStatus, EconomyAnnualSummary, EconomyCategoryBreakdownItem, EconomyComparison, EconomyDashboardCollection, EconomyDashboardError, EconomyInsight, EconomyMonthlyEvolutionItem, EconomyPaymentMethodItem, EconomyPendingSummary, EconomyRecentMovement, EconomySectorBreakdownItem, EconomySectorRankings, EconomySummary } from './types';
 
 type EconomyDashboardData = {
   summary: EconomySummary;
   monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem>;
   bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
   byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
+  sectorRankings: EconomySectorRankings;
   paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;
   recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
   pending: EconomyPendingSummary;
@@ -20,6 +21,7 @@ type EconomyEndpointMap = {
   monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem>;
   bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
   byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
+  sectorRankings: EconomySectorRankings;
   paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;
   recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
   pending: EconomyPendingSummary;
@@ -33,6 +35,7 @@ const endpoints: { [K in keyof EconomyEndpointMap]: `/${string}` } = {
   monthlyEvolution: '/api/economy/monthly-evolution',
   bySector: '/api/economy/by-sector?limit=6',
   byCategory: '/api/economy/by-category?limit=6',
+  sectorRankings: '/api/economy/sector-rankings?limit=5',
   paymentMethods: '/api/economy/payment-methods',
   recentMovements: '/api/economy/recent-movements?limit=10',
   pending: '/api/economy/pending?limit=8',
@@ -56,11 +59,12 @@ export function useEconomyDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [summary, monthlyEvolution, bySector, byCategory, paymentMethods, recentMovements, pending, annualSummary, comparison, insights] = await Promise.all([
+      const [summary, monthlyEvolution, bySector, byCategory, sectorRankings, paymentMethods, recentMovements, pending, annualSummary, comparison, insights] = await Promise.all([
         fetchEconomyResource('summary', signal),
         fetchEconomyResource('monthlyEvolution', signal),
         fetchEconomyResource('bySector', signal),
         fetchEconomyResource('byCategory', signal),
+        fetchEconomyResource('sectorRankings', signal),
         fetchEconomyResource('paymentMethods', signal),
         fetchEconomyResource('recentMovements', signal),
         fetchEconomyResource('pending', signal),
@@ -68,7 +72,7 @@ export function useEconomyDashboard() {
         fetchEconomyResource('comparison', signal),
         fetchEconomyResource('insights', signal)
       ]);
-      setData({ summary, monthlyEvolution, bySector, byCategory, paymentMethods, recentMovements, pending, annualSummary, comparison, insights });
+      setData({ summary, monthlyEvolution, bySector, byCategory, sectorRankings, paymentMethods, recentMovements, pending, annualSummary, comparison, insights });
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
       setError({ message: loadError instanceof Error ? loadError.message : 'Error desconocido al cargar economía.' });
