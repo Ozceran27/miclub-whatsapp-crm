@@ -2212,8 +2212,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .economy-top-card .economy-top-card__detail {
   margin: 0.1rem 0 0;
   color: var(--muted-text, #91a4c8);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.2;
   text-align: center;
 }
