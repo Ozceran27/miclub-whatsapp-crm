@@ -12,6 +12,7 @@ import {
 import { getPostgresPool } from "../db/postgres.js";
 import { calculateOperationalBalances, calculateSettlementBalance } from "./operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "./googleSheets.js";
+import { OPERATING_CATEGORIES } from "./economyDomain.js";
 
 const SHEETS: SourceSheet[] = [
   "FITNESS",
@@ -628,9 +629,36 @@ export const getPostgresSectorOperationalSummary =
     const members = await getPostgresMembers();
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
-    const [sectorResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
+    const [sectorResult, sectorProfitabilityResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_finance_summary`,
+      ),
+
+      pool.query<Record<string, unknown>>(
+        `with normalized_movements as (
+          select
+            upper(regexp_replace(translate(trim(coalesce(s.code, s.name, 'SIN_SECTOR')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) as sector_key,
+            m.movement_type,
+            coalesce(m.amount, 0) as amount,
+            m.movement_date,
+            upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
+          from miclub.movements m
+          left join miclub.sectors s on s.id = m.sector_id
+          left join miclub.movement_categories c on c.id = m.category_id
+          where upper(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) in ('COMPLETADO', 'COMPLETED')
+            and m.movement_type in ('INGRESOS', 'EGRESOS')
+            and upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) = any($1::text[])
+        ), current_month as (
+          select date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') at time zone 'America/Argentina/Buenos_Aires' as start_at
+        )
+        select
+          sector_key,
+          coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as total_profitability,
+          coalesce(sum(case when movement_date >= current_month.start_at and movement_type = 'INGRESOS' then amount when movement_date >= current_month.start_at and movement_type = 'EGRESOS' then -amount else 0 end), 0) as current_month_profitability
+        from normalized_movements
+        cross join current_month
+        group by sector_key`,
+        [OPERATING_CATEGORIES],
       ),
       pool.query<Record<string, unknown>>(
         `with relevant as (
@@ -707,6 +735,12 @@ export const getPostgresSectorOperationalSummary =
               '',
               'g'
             ) = 'cantina'
+            and regexp_replace(
+              translate(lower(coalesce(operational_status::text, '')), 'áéíóúüñ', 'aeiouun'),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            ) in ('completado', 'completed')
         ), cantina_components as (
           select
             coalesce(sum(amount) filter (
@@ -803,6 +837,16 @@ export const getPostgresSectorOperationalSummary =
         pickNumber(row, ["metric_value"]),
       ]),
     );
+    const profitabilityBySector = Object.fromEntries(
+      sectorProfitabilityResult.rows.map((row) => [
+        pickString(row, ["sector_key"]),
+        {
+          total: pickNumber(row, ["total_profitability"]),
+          currentMonth: pickNumber(row, ["current_month_profitability"]),
+        },
+      ]),
+    );
+    const sectorProfitability = (sector: SourceSheet) => profitabilityBySector[sector] ?? { total: 0, currentMonth: 0 };
     const sourceCompleteness: Record<string, ReturnType<typeof unavailableMetric>> = {};
     const markUnavailable = (path: string) => {
       sourceCompleteness[path] = unavailableMetric();
@@ -869,24 +913,19 @@ export const getPostgresSectorOperationalSummary =
             ),
             date: pickString(local1Special, ["highlighted_income_date"], ""),
           };
-    const fitnessTotalProfitability = snapshotMetric("fitness.totalProfitability", "fitness.total_profitability");
-    const fitnessCurrentMonthProfitability = snapshotMetric("fitness.currentMonthProfitability", "fitness.current_month_profitability");
+    const fitnessTotalProfitability = sectorProfitability("FITNESS").total;
+    const fitnessCurrentMonthProfitability = sectorProfitability("FITNESS").currentMonth;
     const fitnessSettlementBalance = snapshotMetric("fitness.settlementBalance", "fitness.settlement_balance");
     const fitnessDebt = debtMetric("FITNESS");
-    const salonTotalProfitability = snapshotMetric("salon.totalProfitability", "salon.total_profitability");
-    const salonCurrentMonthProfitability = snapshotMetric("salon.currentMonthProfitability", "salon.current_month_profitability");
-    const aulaTotalProfitability = snapshotMetric("aula.totalProfitability", "aula.total_profitability");
-    const aulaCurrentMonthProfitability = snapshotMetric("aula.currentMonthProfitability", "aula.current_month_profitability");
+    const salonTotalProfitability = sectorProfitability("SALON").total;
+    const salonCurrentMonthProfitability = sectorProfitability("SALON").currentMonth;
+    const aulaTotalProfitability = sectorProfitability("AULA").total;
+    const aulaCurrentMonthProfitability = sectorProfitability("AULA").currentMonth;
     const aulaAverageCommission = snapshotMetric("aula.averageCommission", "aula.average_commission");
     const salonSettlementBalance = snapshotMetric("salon.settlementBalance", "salon.settlement_balance");
     const aulaSettlementBalance = snapshotMetric("aula.settlementBalance", "aula.settlement_balance");
-    const local1TotalProfitability = snapshotMetric("local1.totalProfitability", "local1.total_profitability") ?? queriedMetric("local1.totalProfitability", finance("LOCAL_1"), [
-      "total_profitability",
-      "profitability",
-    ]);
-    const local1CurrentMonthProfitability = snapshotMetric("local1.currentMonthProfitability", "local1.current_month_profitability") ?? queriedMetric("local1.currentMonthProfitability", finance("LOCAL_1"), [
-      "current_month_profitability",
-    ]);
+    const local1TotalProfitability = sectorProfitability("LOCAL_1").total;
+    const local1CurrentMonthProfitability = sectorProfitability("LOCAL_1").currentMonth;
     const local1SettlementBalance = snapshotMetric("local1.settlementBalance", "local1.settlement_balance") ?? queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
     const preferSnapshotUnlessZero = (snapshot: number | null, fallback: number): number =>
       snapshot == null || (snapshot === 0 && fallback > 0) ? fallback : snapshot;
@@ -894,7 +933,7 @@ export const getPostgresSectorOperationalSummary =
     const cantinaDrinksIncome = preferSnapshotUnlessZero(snapshotMetric("cantina.drinksIncome", "cantina.drinks_income"), pickNumber(cantinaSpecial, ["drinks_income"]));
     const cantinaCmv = preferSnapshotUnlessZero(snapshotMetric("cantina.cmv", "cantina.cmv"), pickNumber(cantinaSpecial, ["cmv"]));
     const fallbackCantinaProfitability = cantinaKioskIncome + cantinaDrinksIncome - cantinaCmv;
-    const cantinaTotalProfitability = preferSnapshotUnlessZero(snapshotMetric("cantina.totalProfitability", "cantina.total_profitability"), fallbackCantinaProfitability);
+    const cantinaTotalProfitability = sectorProfitability("CANTINA").total || fallbackCantinaProfitability;
     return {
       metadata: {
         coverage: Object.keys(sourceCompleteness).length > 0 ? "partial" : "complete",

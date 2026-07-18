@@ -29,6 +29,53 @@ export const normalizeCategoryName = (value: unknown): string => String(value ??
 export const isOperatingCategory = (value: unknown): boolean =>
   (OPERATING_CATEGORIES as readonly string[]).includes(normalizeCategoryName(value));
 
+export const normalizeMovementStatus = (value: unknown): string => normalizeCategoryName(value);
+
+export const isCompletedMovementStatus = (value: unknown): boolean =>
+  ["COMPLETADO", "COMPLETED"].includes(normalizeMovementStatus(value));
+
+export type SectorProfitabilityMovement = {
+  sector?: unknown;
+  sectorName?: unknown;
+  sector_name?: unknown;
+  movement_type?: unknown;
+  movementType?: unknown;
+  tipo?: unknown;
+  category?: unknown;
+  categoria?: unknown;
+  categoryName?: unknown;
+  operational_status?: unknown;
+  operationalStatus?: unknown;
+  estado?: unknown;
+  amount?: unknown;
+  monto?: unknown;
+};
+
+const toFiniteNumber = (value: unknown): number => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+export const calculateSectorProfitability = (movements: SectorProfitabilityMovement[]) => {
+  const sectors = new Map<string, { name: string; income: number; expenses: number; balance: number; movements: number }>();
+  for (const movement of movements) {
+    const status = movement.operational_status ?? movement.operationalStatus ?? movement.estado;
+    const category = movement.category ?? movement.categoryName ?? movement.categoria;
+    if (!isCompletedMovementStatus(status) || !isOperatingCategory(category)) continue;
+    const type = normalizeCategoryName(movement.movement_type ?? movement.movementType ?? movement.tipo);
+    if (type !== "INGRESOS" && type !== "INGRESO" && type !== "EGRESOS" && type !== "EGRESO") continue;
+    const name = String(movement.sectorName ?? movement.sector_name ?? movement.sector ?? "").trim() || "Sin sector";
+    const current = sectors.get(name) ?? { name, income: 0, expenses: 0, balance: 0, movements: 0 };
+    const amount = toFiniteNumber(movement.amount ?? movement.monto);
+    if (type.startsWith("INGRESO")) current.income += amount;
+    if (type.startsWith("EGRESO")) current.expenses += amount;
+    current.balance = current.income - current.expenses;
+    current.movements += 1;
+    sectors.set(name, current);
+  }
+  return Array.from(sectors.values()).sort((a, b) => b.balance - a.balance || b.income - a.income);
+};
+
 const zonedParts = (date: Date) => {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: ARGENTINA_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" })
     .formatToParts(date)
