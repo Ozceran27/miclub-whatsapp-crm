@@ -13,13 +13,34 @@ function GrowthTooltip({ active, payload }: TooltipProps) {
   return <div className="economy-chart-tooltip"><strong>{item.label} {item.year}</strong><span>Crecimiento: {formatPercent(item.growth)}</span><span>Crec. económico: {formatPercent(item.economicGrowth)}</span><span>Crec. inscriptos: {formatPercent(item.clientGrowth)}</span></div>;
 }
 
-export const filterGrowthEvolutionUntilCurrentMonth = (items: EconomyMonthlyEvolutionItem[], now = new Date()) => {
+export const buildGrowthEvolutionUntilCurrentMonth = (items: EconomyMonthlyEvolutionItem[], now = new Date()) => {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-  return items.filter((item) => item.year < currentYear || (item.year === currentYear && item.month <= currentMonth));
+  const byCurrentYearMonth = new Map(items.filter((item) => item.year === currentYear).map((item) => [item.month, item]));
+
+  return Array.from({ length: currentMonth }, (_, index) => {
+    const month = index + 1;
+    const item = byCurrentYearMonth.get(month) ?? {
+      year: currentYear,
+      month,
+      period: `${currentYear}-${String(month).padStart(2, '0')}`,
+      income: 0,
+      expenses: 0,
+      balance: 0,
+      utility: 0,
+      movements: 0,
+      incomeVariation: null,
+      expensesVariation: null,
+      balanceVariation: null,
+      growth: null,
+      economicGrowth: null,
+      clientGrowth: null,
+    };
+    return { ...item, label: getMonthLabel(item), growth: typeof item.growth === 'number' && Number.isFinite(item.growth) ? item.growth : null };
+  });
 };
 
 export function EconomyGrowthChart({ monthlyEvolution }: Props) {
-  const data = filterGrowthEvolutionUntilCurrentMonth(monthlyEvolution.items).map((item) => ({ ...item, label: getMonthLabel(item), growth: typeof item.growth === 'number' && Number.isFinite(item.growth) ? item.growth : null }));
+  const data = buildGrowthEvolutionUntilCurrentMonth(monthlyEvolution.items);
   return <article className="card home-kpi-card finance-card economy-chart-card economy-chart-card--growth"><div className="home-card-heading finance-card__header"><h4>🌱 Crecimiento mensual</h4><p>Ingresos e inscriptos acumulados vs mes anterior</p></div>{data.length > 0 ? <div className="economy-chart-card__canvas" aria-label="Gráfico de crecimiento mensual"><ResponsiveContainer width="100%" height="100%"><LineChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}><CartesianGrid stroke="rgba(143, 164, 200, 0.16)" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} tickFormatter={(value: number) => `${Number(value).toFixed(0)}%`} width={58} /><Tooltip content={<GrowthTooltip />} cursor={{ stroke: 'rgba(143, 216, 255, 0.35)' }} /><Line type="monotone" dataKey="growth" name="Crecimiento" stroke="#76f0c3" strokeWidth={3} dot={{ r: 3, fill: '#76f0c3' }} connectNulls /></LineChart></ResponsiveContainer></div> : <p className="economy-chart-empty">Sin crecimiento mensual disponible.</p>}</article>;
 }

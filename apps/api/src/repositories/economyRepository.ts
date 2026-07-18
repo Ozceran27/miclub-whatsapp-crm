@@ -37,7 +37,7 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
         coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
         coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category <> 'CAPITAL'), 0) as growth_income,
         coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then -m.amount else 0 end), 0) as operating_profitability,
-        count(m.id)::integer as movements
+        count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
       from months
       left join (
         select m.*, upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
@@ -90,7 +90,7 @@ const rankingQuery = (dimensionSql: string, idSql: string, tableSql: string) => 
          coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as income,
          coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as expenses,
          coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
-         count(m.id)::integer as movements
+         count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
   from miclub.movements m
   ${tableSql}
   where m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
@@ -114,7 +114,7 @@ export const getPaymentMethods = async (from: Date, to: Date): Promise<EconomyRo
   const result = await pool.query<EconomyRow>(`
     select pm.id, coalesce(pm.name, 'Sin método') as name,
            coalesce(sum(case when m.movement_type = 'INGRESOS' then m.amount when m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as amount,
-           count(m.id)::integer as movements
+           count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
     from miclub.movements m
     left join miclub.payment_methods pm on pm.id = m.payment_method_id
     where m.operational_status = 'COMPLETADO' and m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz

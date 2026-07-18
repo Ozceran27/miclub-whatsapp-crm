@@ -59,6 +59,22 @@ const currentYearToDateRange = (date = new Date()): { from: Date; to: Date } => 
 
 const legacyVariation = (current: number, previous: number): number | null => calculateVariation(current, previous).percentageChange;
 
+
+export const normalizeRankingItems = (rows: EconomyRow[] | JsonRecord[]): JsonRecord[] => normalizeRows(rows as EconomyRow[]).map((item) => {
+  const income = toNumber(item.income);
+  const expenses = toNumber(item.expenses);
+  const balance = item.balance === undefined || item.balance === null ? income - expenses : toNumber(item.balance);
+  return {
+    ...item,
+    id: item.id ?? null,
+    name: String(item.name || "Sin clasificar"),
+    income,
+    expenses,
+    balance,
+    movements: toInteger(item.movements),
+  };
+}).sort((a, b) => toNumber(b.balance) - toNumber(a.balance) || toNumber(b.income) - toNumber(a.income));
+
 const addVariation = (items: JsonRecord[]): JsonRecord[] =>
   items.map((item, index) => {
     const previous = index > 0 ? items[index - 1] : undefined;
@@ -117,13 +133,13 @@ export const getMonthlyEvolution = async (yearQuery?: unknown): Promise<{ items:
 
 export const getBySector = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
   const { start: from, end: to } = getCurrentMonthWindow();
-  const items = normalizeRows(await getRankingBySector(from, to, parseLimit(limitQuery)));
+  const items = normalizeRankingItems(await getRankingBySector(from, to, parseLimit(limitQuery)));
   return { items, total: items.length };
 };
 
 export const getByCategory = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
   const { start: from, end: to } = getCurrentMonthWindow();
-  const items = normalizeRows(await getRankingByCategory(from, to, parseLimit(limitQuery)));
+  const items = normalizeRankingItems(await getRankingByCategory(from, to, parseLimit(limitQuery)));
   return { items, total: items.length };
 };
 
@@ -137,8 +153,8 @@ export const getSectorRankings = async (limitQuery?: unknown): Promise<JsonRecor
     getRankingBySector(annual.from, annual.to, limit),
   ]);
   return {
-    monthly: { label: month.label, items: normalizeRows(monthlyItems), total: monthlyItems.length },
-    annual: { year: annual.from.getUTCFullYear(), items: normalizeRows(annualItems), total: annualItems.length },
+    monthly: { label: month.label, items: normalizeRankingItems(monthlyItems), total: monthlyItems.length },
+    annual: { year: annual.from.getUTCFullYear(), items: normalizeRankingItems(annualItems), total: annualItems.length },
   };
 };
 
