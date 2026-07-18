@@ -250,6 +250,12 @@ export interface EconomyMonthlyEvolutionItem {
   income: number;
   expenses: number;
   balance: number;
+  utility?: number;
+  operatingProfitability?: number;
+  growth?: number | null;
+  economicGrowth?: number | null;
+  clientGrowth?: number | null;
+  cumulativeEnrollments?: number;
   movements: number;
   incomeVariation: number | null;
   expensesVariation: number | null;

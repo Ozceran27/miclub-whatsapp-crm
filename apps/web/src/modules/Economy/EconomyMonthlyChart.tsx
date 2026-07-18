@@ -14,7 +14,7 @@ const getMonthLabel = (item: EconomyMonthlyEvolutionItem) => {
 
 const chartColors = { income: '#76f0c3', expenses: '#ffad66', balance: '#8fd8ff' };
 
-type TooltipPayload = { name?: string; value?: number; color?: string };
+type TooltipPayload = { name?: string; value?: number | string | null; color?: string; dataKey?: string; payload?: EconomyMonthlyEvolutionItem };
 
 type TooltipProps = { active?: boolean; payload?: TooltipPayload[]; label?: string };
 
@@ -26,7 +26,7 @@ function EconomyChartTooltip({ active, payload, label }: TooltipProps) {
       <strong>{label}</strong>
       {payload.map((entry) => (
         <span key={entry.name} style={{ color: entry.color }}>
-          {entry.name}: {formatEconomyMoney(entry.value)}
+          {entry.name}: {formatEconomyMoney(typeof entry.value === 'number' ? entry.value : Number(entry.value ?? entry.payload?.[String(entry.dataKey ?? '') as keyof EconomyMonthlyEvolutionItem] ?? 0))}
         </span>
       ))}
     </div>

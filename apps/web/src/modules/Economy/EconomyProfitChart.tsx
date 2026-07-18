@@ -12,18 +12,19 @@ const getMonthLabel = (item: EconomyMonthlyEvolutionItem) => {
   return monthFormatter.format(date);
 };
 
-type TooltipPayload = { payload?: { balance: number; label: string; year: number } };
+type TooltipPayload = { payload?: { balance?: number | string | null; utility?: number | string | null; label: string; year: number } };
 type TooltipProps = { active?: boolean; payload?: TooltipPayload[] };
 
 function EconomyProfitTooltip({ active, payload }: TooltipProps) {
   const item = payload?.[0]?.payload;
   if (!active || !item) return null;
+  const balance = typeof item.balance === 'number' ? item.balance : Number(item.balance ?? item.utility ?? 0);
 
   return (
     <div className="economy-chart-tooltip">
       <strong>{item.label} {item.year}</strong>
-      <span className={item.balance >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>
-        Utilidad: {formatEconomyMoney(item.balance)}
+      <span className={balance >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>
+        Utilidad: {formatEconomyMoney(balance)}
       </span>
     </div>
   );

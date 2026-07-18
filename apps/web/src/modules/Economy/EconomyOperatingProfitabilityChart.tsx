@@ -1,0 +1,13 @@
+import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { formatEconomyMoney } from './formatters';
+import type { EconomyDashboardCollection, EconomyMonthlyEvolutionItem } from './types';
+
+type Props = { monthlyEvolution: EconomyDashboardCollection<EconomyMonthlyEvolutionItem> };
+const monthFormatter = new Intl.DateTimeFormat('es-AR', { month: 'short' });
+const getMonthLabel = (item: EconomyMonthlyEvolutionItem) => monthFormatter.format(new Date(item.year, item.month - 1, 1));
+type TooltipProps = { active?: boolean; payload?: Array<{ payload?: EconomyMonthlyEvolutionItem & { label: string } }> };
+function OperatingTooltip({ active, payload }: TooltipProps) { const item = payload?.[0]?.payload; if (!active || !item) return null; const value = item.operatingProfitability ?? 0; return <div className="economy-chart-tooltip"><strong>{item.label} {item.year}</strong><span className={value >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>Rentabilidad Operativa: {formatEconomyMoney(value)}</span></div>; }
+export function EconomyOperatingProfitabilityChart({ monthlyEvolution }: Props) {
+  const data = monthlyEvolution.items.map((item) => ({ ...item, label: getMonthLabel(item), operatingProfitability: item.operatingProfitability ?? 0 }));
+  return <article className="card home-kpi-card finance-card economy-chart-card economy-chart-card--operating"><div className="home-card-heading finance-card__header"><h4>⚙️ Rentabilidad Operativa mensual</h4><p>Ingresos menos egresos de categorías operativas</p></div>{data.length > 0 ? <div className="economy-chart-card__canvas" aria-label="Gráfico de rentabilidad operativa mensual"><ResponsiveContainer width="100%" height="100%"><BarChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}><CartesianGrid stroke="rgba(143, 164, 200, 0.16)" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} tickFormatter={(value: number) => formatEconomyMoney(Number(value))} width={86} /><ReferenceLine y={0} stroke="rgba(244, 248, 255, 0.34)" /><Tooltip content={<OperatingTooltip />} cursor={{ fill: 'rgba(143, 216, 255, 0.08)' }} /><Bar dataKey="operatingProfitability" name="Rentabilidad Operativa" radius={[8, 8, 8, 8]} barSize={24}>{data.map((item) => <Cell key={item.period} fill={(item.operatingProfitability ?? 0) >= 0 ? '#8fd8ff' : '#ff6b7a'} />)}</Bar></BarChart></ResponsiveContainer></div> : <p className="economy-chart-empty">Sin rentabilidad operativa mensual disponible.</p>}</article>;
+}
