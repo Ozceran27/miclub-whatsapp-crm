@@ -34,6 +34,7 @@ export const normalizeCategoryName = (value: unknown): string => String(value ??
   .replace(/[\u0300-\u036f]/g, "")
   .trim()
   .replace(/\s+/g, " ")
+  .replace(/\.+$/g, "")
   .toUpperCase();
 
 export const normalizeCategory = normalizeCategoryName;
@@ -74,6 +75,18 @@ export const getOperatingCategories = (): readonly string[] => OPERATING_PROFIT_
 
 export const isOperatingCategory = (value: unknown): boolean =>
   (OPERATING_CATEGORIES as readonly string[]).includes(normalizeCategoryName(value));
+
+export const isNonOperatingExpenseCategory = (value: unknown): boolean =>
+  (NON_OPERATING_EXPENSE_CATEGORY_KEYS as readonly string[]).includes(normalizeCategoryName(value));
+
+export const isServiceCategory = (value: unknown): boolean =>
+  (SERVICE_CATEGORY_KEYS as readonly string[]).includes(normalizeCategoryName(value));
+
+export const isTaxCategory = (value: unknown): boolean =>
+  (TAX_CATEGORY_KEYS as readonly string[]).includes(normalizeCategoryName(value));
+
+export const isDebtCategory = (value: unknown): boolean =>
+  (DEBT_LIABILITY_CATEGORY_KEYS as readonly string[]).includes(normalizeCategoryName(value));
 
 export const normalizeMovementStatus = (value: unknown): string => normalizeCategoryName(value);
 

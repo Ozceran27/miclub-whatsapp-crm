@@ -41,7 +41,7 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
         count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
       from months
       left join (
-        select m.*, upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
+        select m.*, upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
         from miclub.movements m
         left join miclub.movement_categories c on c.id = m.category_id
       ) m on m.movement_date >= months.month_start and m.movement_date < months.month_start + interval '1 month'
@@ -97,7 +97,7 @@ const rankingQuery = (dimensionSql: string, idSql: string, tableSql: string) => 
   left join miclub.movement_categories ranking_category on ranking_category.id = m.category_id
   where m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
     and upper(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) in ('COMPLETADO', 'COMPLETED')
-    and upper(regexp_replace(translate(trim(coalesce(ranking_category.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) = any($4::text[])
+    and upper(regexp_replace(regexp_replace(translate(trim(coalesce(ranking_category.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($4::text[])
     and m.movement_type in ('INGRESOS', 'EGRESOS')
   group by ${idSql}, ${dimensionSql}
   order by balance desc, income desc
@@ -140,7 +140,7 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
       select 'annual'::text, $2::timestamptz, $3::timestamptz
     ), movements as (
       select p.period_key, m.movement_type, abs(m.amount) as amount,
-        upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
+        upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
       from periods p
       left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
         and m.operational_status = 'COMPLETADO'
@@ -163,7 +163,7 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
 export const getMovementStatusCounts = async (from: Date, to: Date): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
-    select upper(regexp_replace(translate(trim(coalesce(operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g')) as status,
+    select upper(regexp_replace(regexp_replace(translate(trim(coalesce(operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g'), '\.+$', '', 'g')) as status,
       count(*)::integer as movements
     from miclub.movements
     where movement_date >= $1::timestamptz and movement_date < $2::timestamptz
@@ -230,7 +230,7 @@ export const getCompletedMonthMovementSummary = async (previousStart: Date, curr
       union all
       select 'current' as period_key, $2::timestamptz as start_at, $3::timestamptz as end_at
     ), movements as (
-      select p.period_key, m.movement_type, m.amount, upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
+      select p.period_key, m.movement_type, m.amount, upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
       from periods p
       left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
         and m.operational_status = 'COMPLETADO'
@@ -264,7 +264,7 @@ export const getGrowthSummary = async (previousStart: Date, currentStart: Date, 
         left join miclub.movement_categories c on c.id = m.category_id
         where m.movement_date >= p.start_at and m.movement_date < p.end_at
           and m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO'
-          and upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) <> 'CAPITAL'
+          and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) <> 'CAPITAL'
       ), 0) as income,
       coalesce((
         select count(e.id)::integer
