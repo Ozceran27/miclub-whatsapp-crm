@@ -1,7 +1,17 @@
 export const ARGENTINA_TIME_ZONE = "America/Argentina/Buenos_Aires";
 
-export const OPERATING_CATEGORIES = [
-  "INSCRIPCION", "CUOTA", "TURNOS", "COMISION", "ALQUILER", "EVENTOS", "VENTAS", "CLASES", "CURSOS", "KIOSCO", "BEBIDAS",
+export const OPERATING_PROFIT_CATEGORIES = [
+  "INSCRIPCIÓN",
+  "CUOTA",
+  "TURNOS",
+  "COMISIÓN",
+  "ALQUILER",
+  "EVENTOS",
+  "VENTAS",
+  "CLASES",
+  "CURSOS",
+  "KIOSCO",
+  "BEBIDAS",
 ] as const;
 
 export type VariationDirection = "up" | "down" | "stable";
@@ -25,6 +35,16 @@ export const normalizeCategoryName = (value: unknown): string => String(value ??
   .trim()
   .replace(/\s+/g, " ")
   .toUpperCase();
+
+export const normalizeCategory = normalizeCategoryName;
+
+export const OPERATING_CATEGORIES = OPERATING_PROFIT_CATEGORIES.map((category) =>
+  normalizeCategoryName(category),
+);
+
+
+export const getOperatingCategories = (): readonly string[] => OPERATING_PROFIT_CATEGORIES;
+
 
 export const isOperatingCategory = (value: unknown): boolean =>
   (OPERATING_CATEGORIES as readonly string[]).includes(normalizeCategoryName(value));
@@ -51,9 +71,52 @@ export type SectorProfitabilityMovement = {
   monto?: unknown;
 };
 
-const toFiniteNumber = (value: unknown): number => {
-  const numeric = typeof value === "number" ? value : Number(value);
+export const isCompletedMovement = (movement: SectorProfitabilityMovement): boolean =>
+  isCompletedMovementStatus(movement.operational_status ?? movement.operationalStatus ?? movement.estado);
+
+export const normalizeMovementType = (value: unknown): string => normalizeCategoryName(value);
+
+export const isIncomeMovement = (movement: SectorProfitabilityMovement): boolean =>
+  normalizeMovementType(movement.movement_type ?? movement.movementType ?? movement.tipo).startsWith("INGRESO") ||
+  normalizeMovementType(movement.movement_type ?? movement.movementType ?? movement.tipo) === "INCOME";
+
+export const isExpenseMovement = (movement: SectorProfitabilityMovement): boolean =>
+  normalizeMovementType(movement.movement_type ?? movement.movementType ?? movement.tipo).startsWith("EGRESO") ||
+  normalizeMovementType(movement.movement_type ?? movement.movementType ?? movement.tipo) === "EXPENSE";
+
+export const normalizeAmount = (value: unknown): number => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value !== "string") return 0;
+  const normalized = value.replace(/[$\s]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+  const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : 0;
+};
+const toFiniteNumber = normalizeAmount;
+
+export const calculateOperatingProfitability = (movements: SectorProfitabilityMovement[], options: { sector?: unknown } = {}) => {
+  const sectorFilter = options.sector == null ? null : normalizeCategoryName(options.sector);
+  let income = 0;
+  let expenses = 0;
+  let movementsCount = 0;
+  for (const movement of movements) {
+    const category = movement.category ?? movement.categoryName ?? movement.categoria;
+    if (!isCompletedMovement(movement) || !isOperatingCategory(category)) continue;
+    if (sectorFilter) {
+      const sector = movement.sectorName ?? movement.sector_name ?? movement.sector;
+      if (normalizeCategoryName(sector) !== sectorFilter) continue;
+    }
+    const amount = Math.abs(normalizeAmount(movement.amount ?? movement.monto));
+    if (isIncomeMovement(movement)) income += amount;
+    else if (isExpenseMovement(movement)) expenses += amount;
+    else continue;
+    movementsCount += 1;
+  }
+  return { income: roundMoney(income), expenses: roundMoney(expenses), expense: roundMoney(expenses), profitability: roundMoney(income - expenses), movementsCount };
+};
+
+export const calculateOperatingProfitabilityBySector = (movements: SectorProfitabilityMovement[], options: { sector?: unknown } = {}) => {
+  const result = calculateOperatingProfitability(movements, options);
+  return { sector: String(options.sector ?? "Sin sector"), ...result };
 };
 
 export const calculateSectorProfitability = (movements: SectorProfitabilityMovement[]) => {
@@ -63,12 +126,12 @@ export const calculateSectorProfitability = (movements: SectorProfitabilityMovem
     const category = movement.category ?? movement.categoryName ?? movement.categoria;
     if (!isCompletedMovementStatus(status) || !isOperatingCategory(category)) continue;
     const type = normalizeCategoryName(movement.movement_type ?? movement.movementType ?? movement.tipo);
-    if (type !== "INGRESOS" && type !== "INGRESO" && type !== "EGRESOS" && type !== "EGRESO") continue;
+    if (!isIncomeMovement(movement) && !isExpenseMovement(movement)) continue;
     const name = String(movement.sectorName ?? movement.sector_name ?? movement.sector ?? "").trim() || "Sin sector";
     const current = sectors.get(name) ?? { name, income: 0, expenses: 0, balance: 0, movements: 0 };
-    const amount = toFiniteNumber(movement.amount ?? movement.monto);
-    if (type.startsWith("INGRESO")) current.income += amount;
-    if (type.startsWith("EGRESO")) current.expenses += amount;
+    const amount = Math.abs(toFiniteNumber(movement.amount ?? movement.monto));
+    if (isIncomeMovement(movement)) current.income += amount;
+    if (isExpenseMovement(movement)) current.expenses += amount;
     current.balance = current.income - current.expenses;
     current.movements += 1;
     sectors.set(name, current);

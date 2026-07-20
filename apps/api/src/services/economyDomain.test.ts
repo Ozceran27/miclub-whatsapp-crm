@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateSectorProfitability, calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getRolling30DayWindows, isCompletedMovementStatus, isOperatingCategory } from "./economyDomain.js";
+import { calculateOperatingProfitability, calculateOperatingProfitabilityBySector, calculateSectorProfitability, calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getOperatingCategories, getRolling30DayWindows, isCompletedMovementStatus, isOperatingCategory, normalizeAmount, normalizeCategory } from "./economyDomain.js";
 
 test("current month window uses Argentina timezone and month label", () => {
   const window = getCurrentMonthWindow(new Date("2026-07-14T12:00:00Z"));
@@ -105,4 +105,65 @@ test("sector profitability uses completed operating income minus expenses", () =
   assert.equal(result[0].expenses, 300);
   assert.equal(result[0].balance, 700);
   assert.equal(result[0].movements, 2);
+});
+
+test("canonical operating profitability categories keep UI accents and normalize internally", () => {
+  assert.deepEqual(getOperatingCategories(), [
+    "INSCRIPCIÓN",
+    "CUOTA",
+    "TURNOS",
+    "COMISIÓN",
+    "ALQUILER",
+    "EVENTOS",
+    "VENTAS",
+    "CLASES",
+    "CURSOS",
+    "KIOSCO",
+    "BEBIDAS",
+  ]);
+  assert.equal(normalizeCategory(" comisión "), "COMISION");
+  assert.equal(isOperatingCategory("inscripcion"), true);
+  assert.equal(isOperatingCategory("DEPÓSITOS"), false);
+});
+
+test("operating profitability excludes non-operating categories and pending movements", () => {
+  const result = calculateOperatingProfitability([
+    { sector: "Fitness", movement_type: "INGRESO", category: "DEPÓSITOS", operational_status: "Completado", amount: 100_000 },
+    { sector: "Fitness", movement_type: "INGRESO", category: "CUOTA", operational_status: "Pendiente", amount: 100_000 },
+    { sector: "Fitness", movement_type: "INGRESO", category: "CUOTA", operational_status: "Completado", amount: 100_000 },
+    { sector: "Cantina", movement_type: "EGRESO", category: "BEBIDAS", operational_status: "Completado", amount: 20_000 },
+  ]);
+
+  assert.equal(result.income, 100_000);
+  assert.equal(result.expenses, 20_000);
+  assert.equal(result.profitability, 80_000);
+  assert.equal(result.movementsCount, 2);
+});
+
+test("operating profitability by sector applies the same official filters", () => {
+  const result = calculateOperatingProfitabilityBySector([
+    { sector: "Fitness", movement_type: "INGRESO", category: "CUOTA", operational_status: "Completado", amount: 100_000 },
+    { sector: "Fitness", movement_type: "EGRESO", category: "CLASES", operational_status: "Completado", amount: 30_000 },
+    { sector: "Fitness", movement_type: "INGRESO", category: "DEPÓSITOS", operational_status: "Completado", amount: 500_000 },
+    { sector: "Fitness", movement_type: "INGRESO", category: "CUOTA", operational_status: "Pendiente", amount: 90_000 },
+    { sector: "Cantina", movement_type: "INGRESO", category: "BEBIDAS", operational_status: "Completado", amount: 10_000 },
+  ], { sector: "fitness" });
+
+  assert.equal(result.sector, "fitness");
+  assert.equal(result.income, 100_000);
+  assert.equal(result.expenses, 30_000);
+  assert.equal(result.profitability, 70_000);
+  assert.equal(result.movementsCount, 2);
+});
+
+test("operating profitability normalizes signed and formatted amounts without double subtracting", () => {
+  assert.equal(normalizeAmount("$ 1.200,50"), 1200.5);
+  const result = calculateOperatingProfitability([
+    { movement_type: "income", category: "CUOTA", operational_status: "completed", amount: "$ 1.200,50" },
+    { movement_type: "expense", category: "BEBIDAS", operational_status: "completed", amount: -200 },
+  ]);
+
+  assert.equal(result.income, 1200.5);
+  assert.equal(result.expenses, 200);
+  assert.equal(result.profitability, 1000.5);
 });

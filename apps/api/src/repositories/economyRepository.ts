@@ -37,7 +37,7 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
         coalesce(sum(m.amount) filter (where m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO'), 0) as expenses,
         coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
         coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category <> 'CAPITAL'), 0) as growth_income,
-        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then -m.amount else 0 end), 0) as operating_profitability,
+        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then abs(m.amount) when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then -abs(m.amount) else 0 end), 0) as operating_profitability,
         count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
       from months
       left join (
@@ -88,9 +88,9 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
 const rankingQuery = (dimensionSql: string, idSql: string, tableSql: string) => `
   select ${idSql} as id,
          coalesce(${dimensionSql}, 'Sin clasificar') as name,
-         coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS'), 0) as income,
-         coalesce(sum(m.amount) filter (where m.movement_type = 'EGRESOS'), 0) as expenses,
-         coalesce(sum(case when m.movement_type = 'INGRESOS' then m.amount when m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as balance,
+         coalesce(sum(abs(m.amount)) filter (where m.movement_type = 'INGRESOS'), 0) as income,
+         coalesce(sum(abs(m.amount)) filter (where m.movement_type = 'EGRESOS'), 0) as expenses,
+         coalesce(sum(case when m.movement_type = 'INGRESOS' then abs(m.amount) when m.movement_type = 'EGRESOS' then -abs(m.amount) else 0 end), 0) as balance,
          count(m.id)::integer as movements
   from miclub.movements m
   ${tableSql}
@@ -198,7 +198,7 @@ export const getCompletedMonthMovementSummary = async (previousStart: Date, curr
       coalesce(sum(amount) filter (where movement_type = 'INGRESOS' and normalized_category <> 'CAPITAL'), 0) as income,
       coalesce(sum(amount) filter (where movement_type = 'EGRESOS' and normalized_category <> 'CAPITAL'), 0) as expenses,
       coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category <> 'CAPITAL' then amount when movement_type = 'EGRESOS' and normalized_category <> 'CAPITAL' then -amount else 0 end), 0) as utility,
-      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($4::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($4::text[]) then -amount else 0 end), 0) as operating_profitability
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($4::text[]) then abs(amount) when movement_type = 'EGRESOS' and normalized_category = any($4::text[]) then -abs(amount) else 0 end), 0) as operating_profitability
     from movements
     group by period_key
     order by case period_key when 'previous' then 1 else 2 end

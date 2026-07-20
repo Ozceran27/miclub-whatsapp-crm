@@ -653,8 +653,8 @@ export const getPostgresSectorOperationalSummary =
         )
         select
           sector_key,
-          coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as total_profitability,
-          coalesce(sum(case when movement_date >= current_month.start_at and movement_type = 'INGRESOS' then amount when movement_date >= current_month.start_at and movement_type = 'EGRESOS' then -amount else 0 end), 0) as current_month_profitability
+          coalesce(sum(case when movement_type = 'INGRESOS' then abs(amount) when movement_type = 'EGRESOS' then -abs(amount) else 0 end), 0) as total_profitability,
+          coalesce(sum(case when movement_date >= current_month.start_at and movement_type = 'INGRESOS' then abs(amount) when movement_date >= current_month.start_at and movement_type = 'EGRESOS' then -abs(amount) else 0 end), 0) as current_month_profitability
         from normalized_movements
         cross join current_month
         group by sector_key`,
@@ -743,15 +743,15 @@ export const getPostgresSectorOperationalSummary =
             ) in ('completado', 'completed')
         ), cantina_components as (
           select
-            coalesce(sum(amount) filter (
+            coalesce(sum(abs(amount)) filter (
               where normalized_type like 'ingreso%'
                 and normalized_category in ('kiosco', 'kiosk', 'quiosco')
             ), 0) as kiosk_income,
-            coalesce(sum(amount) filter (
+            coalesce(sum(abs(amount)) filter (
               where normalized_type like 'ingreso%'
                 and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
             ), 0) as drinks_income,
-            coalesce(sum(amount) filter (
+            coalesce(sum(abs(amount)) filter (
               where normalized_type like 'egreso%'
                 and normalized_category in ('bebidas', 'bebida', 'drink', 'drinks')
             ), 0) as cmv
