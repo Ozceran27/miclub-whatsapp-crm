@@ -641,13 +641,13 @@ export const getPostgresSectorOperationalSummary =
             m.movement_type,
             coalesce(m.amount, 0) as amount,
             m.movement_date,
-            upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
+            upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
           from miclub.movements m
           left join miclub.sectors s on s.id = m.sector_id
           left join miclub.movement_categories c on c.id = m.category_id
-          where upper(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) in ('COMPLETADO', 'COMPLETED')
+          where upper(regexp_replace(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) in ('COMPLETADO', 'COMPLETED')
             and m.movement_type in ('INGRESOS', 'EGRESOS')
-            and upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) = any($1::text[])
+            and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($1::text[])
         ), current_month as (
           select date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') at time zone 'America/Argentina/Buenos_Aires' as start_at
         )

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateCategoryBalance, calculateOperatingProfitability, calculateOperatingProfitabilityBySector, calculateSectorProfitability, calculateVariation, DEBT_LIABILITY_CATEGORIES, getCurrentMonthWindow, getLastCompleteMonthWindows, getOperatingCategories, getRolling30DayWindows, isCompletedMovementStatus, isOperatingCategory, NON_OPERATING_EXPENSE_CATEGORIES, normalizeAmount, normalizeCategory } from "./economyDomain.js";
+import { calculateCategoryBalance, calculateOperatingProfitability, calculateOperatingProfitabilityBySector, calculateSectorProfitability, calculateVariation, DEBT_LIABILITY_CATEGORIES, getCurrentMonthWindow, getLastCompleteMonthWindows, getOperatingCategories, getRolling30DayWindows, isCompletedMovement, isCompletedMovementStatus, isDebtCategory, isNonOperatingExpenseCategory, isOperatingCategory, isServiceCategory, isTaxCategory, NON_OPERATING_EXPENSE_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, normalizeAmount, normalizeCategory } from "./economyDomain.js";
 
 test("current month window uses Argentina timezone and month label", () => {
   const window = getCurrentMonthWindow(new Date("2026-07-14T12:00:00Z"));
@@ -193,4 +193,67 @@ test("debt liability balances include DEUDA and DEUDAS variants only", () => {
   assert.equal(debt.expenses, 150_000);
   assert.equal(debt.balance, -100_000);
   assert.equal(debt.movementsCount, 2);
+});
+
+test("official category helpers normalize accents, spaces, terminal dots and debt variants", () => {
+  assert.equal(normalizeCategory(" MANTENIM. "), "MANTENIM");
+  assert.equal(isNonOperatingExpenseCategory("depositos"), true);
+  assert.equal(isNonOperatingExpenseCategory("VIÁTICOS"), true);
+  assert.equal(isNonOperatingExpenseCategory("MANTENIM"), true);
+  assert.equal(isNonOperatingExpenseCategory("DEUDA"), false);
+  assert.equal(isServiceCategory(" internet "), true);
+  assert.equal(isTaxCategory("impuestos"), true);
+  assert.equal(isDebtCategory("deudas"), true);
+});
+
+test("completed movement helper accepts only consolidated statuses", () => {
+  assert.equal(isCompletedMovement({ operational_status: "COMPLETADO" }), true);
+  assert.equal(isCompletedMovement({ operationalStatus: " Completed " }), true);
+  assert.equal(isCompletedMovement({ estado: "completado" }), true);
+  assert.equal(isCompletedMovement({ estado: "Pendiente" }), false);
+  assert.equal(isCompletedMovement({ estado: "Anulado" }), false);
+  assert.equal(isCompletedMovement({ estado: "Cancelado" }), false);
+});
+
+test("requested final audit examples calculate balances by official completed categories", () => {
+  const operating = calculateOperatingProfitability([
+    { movement_type: "INGRESO", category: "CUOTA", operational_status: "Completado", amount: 100_000 },
+    { movement_type: "EGRESO", category: "CLASES", operational_status: "Completado", amount: 30_000 },
+    { movement_type: "INGRESO", category: "PUBLICIDAD", operational_status: "Completado", amount: 50_000 },
+    { movement_type: "INGRESO", category: "CUOTA", operational_status: "Pendiente", amount: 90_000 },
+  ]);
+  assert.equal(operating.profitability, 70_000);
+
+  const nonOperating = calculateCategoryBalance([
+    { movement_type: "INGRESO", category: "PUBLICIDAD", operational_status: "Completado", amount: 100_000 },
+    { movement_type: "EGRESO", category: "PUBLICIDAD", operational_status: "Completado", amount: 300_000 },
+    { movement_type: "EGRESO", category: "DEUDA", operational_status: "Completado", amount: 50_000 },
+  ], NON_OPERATING_EXPENSE_CATEGORIES);
+  assert.equal(nonOperating.balance, -200_000);
+
+  const debt = calculateCategoryBalance([
+    { movement_type: "INGRESO", category: "DEUDA", operational_status: "Completado", amount: 20_000 },
+    { movement_type: "EGRESO", category: "DEUDA", operational_status: "Completado", amount: 100_000 },
+  ], DEBT_LIABILITY_CATEGORIES);
+  assert.equal(debt.balance, -80_000);
+
+  const services = calculateCategoryBalance([
+    { movement_type: "INGRESO", category: "INTERNET", operational_status: "Completado", amount: 10_000 },
+    { movement_type: "EGRESO", category: "LUZ", operational_status: "Completado", amount: 40_000 },
+    { movement_type: "EGRESO", category: "AGUA", operational_status: "Completado", amount: 20_000 },
+  ], SERVICE_CATEGORIES);
+  assert.equal(services.balance, -50_000);
+
+  const taxes = calculateCategoryBalance([
+    { movement_type: "EGRESO", category: "IMPUESTOS", operational_status: "Completado", amount: 30_000 },
+  ], TAX_CATEGORIES);
+  assert.equal(taxes.balance, -30_000);
+
+  const fitness = calculateOperatingProfitabilityBySector([
+    { sector: "Fitness", movement_type: "INGRESO", category: "CUOTA", operational_status: "Completado", amount: 100_000 },
+    { sector: "Fitness", movement_type: "EGRESO", category: "CLASES", operational_status: "Completado", amount: 30_000 },
+    { sector: "Fitness", movement_type: "INGRESO", category: "PUBLICIDAD", operational_status: "Completado", amount: 50_000 },
+    { sector: "Fitness", movement_type: "INGRESO", category: "CUOTA", operational_status: "Pendiente", amount: 90_000 },
+  ], { sector: "Fitness" });
+  assert.equal(fitness.profitability, 70_000);
 });
