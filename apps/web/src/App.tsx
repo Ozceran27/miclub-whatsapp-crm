@@ -7,6 +7,7 @@ import ModuleNav, { type ModuleDefinition, type ModuleId } from './modules/Modul
 import PlaceholderModule from './modules/PlaceholderModule';
 import LoginScreen from './LoginScreen';
 import { apiUrl } from './api';
+import { useTheme } from './theme';
 
 
 const MODULES: ModuleDefinition[] = [
@@ -55,6 +56,7 @@ export default function App() {
   const [authEnabled, setAuthEnabled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     const originalFetch = window.fetch.bind(window);
@@ -130,11 +132,17 @@ export default function App() {
           <h1>miClub Gestión</h1>
           <p>Panel operativo y CRM del club</p>
         </div>
-        {authEnabled && (
-          <button className="ghost-btn logout-btn" type="button" onClick={handleLogout}>
-            Cerrar sesión{username ? ` · ${username}` : ''}
+        <div className="app-header__actions">
+          <button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>
+            <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
           </button>
-        )}
+          {authEnabled && (
+            <button className="ghost-btn logout-btn" type="button" onClick={handleLogout}>
+              Cerrar sesión{username ? ` · ${username}` : ''}
+            </button>
+          )}
+        </div>
       </header>
 
       <ModuleNav modules={MODULES} currentModule={currentModule} onSelect={setCurrentModule} />
