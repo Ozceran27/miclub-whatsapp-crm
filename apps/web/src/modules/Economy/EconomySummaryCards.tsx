@@ -1,3 +1,5 @@
+import { InfoTooltip } from './InfoTooltip';
+import { economyMetricTooltips } from './economyMetricTooltips';
 import { formatEconomyMoney } from './formatters';
 import type { EconomyComparison, EconomyComparisonMetric, EconomySummary } from './types';
 
@@ -14,6 +16,7 @@ type TopCard = {
   detail?: string;
   metric?: EconomyComparisonMetric;
   centerValue?: boolean;
+  tooltip?: string;
 };
 
 const formatVariation = (item?: EconomyComparisonMetric) => {
@@ -37,16 +40,16 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     ? `${comparison.currentPeriod} vs ${comparison.previousPeriod}`
     : 'Último mes completo vs mes anterior';
   const cards: TopCard[] = [
-    { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Economía Club', value: formatEconomyMoney(summary.income), variant: 'positive' },
-    { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Economía Club', value: formatEconomyMoney(summary.expenses), variant: 'negative' },
-    { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Economía Club', value: formatEconomyMoney(summary.balance), variant: 'utility' },
-    { label: 'Liquidez actual', icon: '💰', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.liquidity ?? summary.current?.liquidity), variant: 'positive' },
-    { label: 'Saldo Proyectado', icon: '📊', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.projectedBalance ?? summary.current?.projectedBalance), variant: 'projected' },
-    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive', metric: find('income'), centerValue: true },
-    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative', metric: find('expenses'), centerValue: true },
-    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility', metric: find('utility'), centerValue: true },
-    { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth, centerValue: true },
-    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: operatingProfitability?.currentPeriod ?? comparison.currentPeriod ?? 'Último mes completo', value: formatEconomyMoney(operatingProfitability?.current), detail: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected' },
+    { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Economía Club', value: formatEconomyMoney(summary.income), variant: 'positive', tooltip: economyMetricTooltips.monthlyIncome },
+    { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Economía Club', value: formatEconomyMoney(summary.expenses), variant: 'negative', tooltip: economyMetricTooltips.monthlyExpenses },
+    { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Economía Club', value: formatEconomyMoney(summary.balance), variant: 'utility', tooltip: economyMetricTooltips.monthlyBalance },
+    { label: 'Liquidez actual', icon: '💰', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.liquidity ?? summary.current?.liquidity), variant: 'positive', tooltip: economyMetricTooltips.liquidity },
+    { label: 'Saldo Proyectado', icon: '📊', subtitle: 'Fuente INICIO', value: formatEconomyMoney(summary.projectedBalance ?? summary.current?.projectedBalance), variant: 'projected', tooltip: economyMetricTooltips.projectedBalance },
+    { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive', metric: find('income'), centerValue: true, tooltip: economyMetricTooltips.incomeVariation },
+    { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative', metric: find('expenses'), centerValue: true, tooltip: economyMetricTooltips.expensesVariation },
+    { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility', metric: find('utility'), centerValue: true, tooltip: economyMetricTooltips.utilityVariation },
+    { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth, centerValue: true, tooltip: economyMetricTooltips.growth },
+    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: operatingProfitability?.currentPeriod ?? comparison.currentPeriod ?? 'Último mes completo', value: formatEconomyMoney(operatingProfitability?.current), detail: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected', tooltip: economyMetricTooltips.operatingProfitability },
   ];
 
   return (
@@ -54,7 +57,7 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
       {cards.map((card) => (
         <article className={`card home-kpi-card home-kpi-card--compact finance-card economy-top-card economy-top-card--${card.variant}${card.centerValue ? ' economy-top-card--center-value' : ''}`} key={card.label}>
           <div className="home-card-heading finance-card__header">
-            <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span></h4>
+            <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span>{card.tooltip && <InfoTooltip content={card.tooltip} label={`Ayuda sobre ${card.label}`} />}</h4>
             <p>{card.subtitle}</p>
           </div>
           <p className={`economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>

@@ -25,7 +25,6 @@ export default function EconomyModule() {
           <p>Resumen financiero, movimientos recientes y pendientes operativos.</p>
         </div>
         <div className="home-sync-badges economy-module-actions" aria-label="Acciones de economía">
-          <span className="home-sync-badge hero-sync-badge--compact home-sync-badge--muted">/api/economy</span>
           <button className="icon-btn home-sync-button" onClick={() => void dashboard.loadEconomyDashboard()} disabled={dashboard.loading}>{dashboard.loading ? 'Actualizando…' : 'Actualizar'}</button>
         </div>
       </section>

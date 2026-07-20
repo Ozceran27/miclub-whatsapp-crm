@@ -1,3 +1,5 @@
+import { InfoTooltip } from './InfoTooltip';
+import { economyMetricTooltips } from './economyMetricTooltips';
 import { formatEconomyMoney } from './formatters';
 import type { EconomyPaymentMethodItem, EconomyPaymentMethodsSummary } from './types';
 
@@ -43,12 +45,12 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
         </div>
         <div className="economy-finance-section economy-finance-section--split">
           <div>
-            <strong className="economy-finance-subtitle">📉 Gastos no Operativos</strong>
+            <strong className="economy-finance-subtitle">📉 Gastos no Operativos <InfoTooltip content={economyMetricTooltips.nonOperatingExpenses} label="Ayuda sobre Gastos no Operativos" /></strong>
             <PeriodValue label="Mes actual" value={nonOperating?.monthly.amount ?? 0} />
             <PeriodValue label="Acumulado anual" value={nonOperating?.annual.amount ?? 0} />
           </div>
           <div>
-            <strong className="economy-finance-subtitle">💳 Deudas/Pasivos</strong>
+            <strong className="economy-finance-subtitle">💳 Deudas/Pasivos <InfoTooltip content={economyMetricTooltips.debtLiabilities} label="Ayuda sobre Deudas/Pasivos" /></strong>
             <PeriodValue label="Mes actual" value={debtLiabilities?.monthly.amount ?? 0} />
             <PeriodValue label="Acumulado anual" value={debtLiabilities?.annual.amount ?? 0} />
           </div>
@@ -62,12 +64,12 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
         </div>
         <div className="economy-finance-section economy-finance-section--split">
           <div>
-            <strong className="economy-finance-subtitle">🧾 Servicios</strong>
+            <strong className="economy-finance-subtitle">🧾 Servicios <InfoTooltip content={economyMetricTooltips.services} label="Ayuda sobre Servicios" /></strong>
             <PeriodValue label="Mes actual" value={servicesAndTaxes?.services.monthly ?? 0} />
             <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.services.annual ?? 0} />
           </div>
           <div>
-            <strong className="economy-finance-subtitle">🏛️ Impuestos</strong>
+            <strong className="economy-finance-subtitle">🏛️ Impuestos <InfoTooltip content={economyMetricTooltips.taxes} label="Ayuda sobre Impuestos" /></strong>
             <PeriodValue label="Mes actual" value={servicesAndTaxes?.taxes.monthly ?? 0} />
             <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.taxes.annual ?? 0} />
           </div>

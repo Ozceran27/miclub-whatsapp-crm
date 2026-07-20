@@ -21,13 +21,6 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
           <p>Resumen ejecutivo e indicadores generales.</p>
         </div>
         <div className="home-sync-badges" aria-label="Sincronización del inicio">
-          <span
-            className={dashboard.syncStatus?.error ? 'home-sync-badge hero-sync-badge--compact home-sync-badge--warning' : 'home-sync-badge hero-sync-badge--compact'}
-            title={dashboard.syncStatus?.error}
-          >
-            {dashboard.syncBadgeLabel}
-          </span>
-          <span className="home-sync-badge hero-sync-badge--compact home-sync-badge--muted">{dashboard.lastSyncLabel}</span>
           <button className="icon-btn home-sync-button" onClick={() => void dashboard.loadHome()} disabled={dashboard.loading}>Sincronizar</button>
         </div>
       </section>

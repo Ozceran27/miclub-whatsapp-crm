@@ -1,0 +1,16 @@
+export const economyMetricTooltips = {
+  monthlyIncome: 'Total de ingresos completados del mes indicado. Suma movimientos de tipo INGRESOS con estado COMPLETADO dentro del período mensual correspondiente.',
+  monthlyExpenses: 'Total de egresos completados del mes indicado. Suma movimientos de tipo EGRESOS con estado COMPLETADO dentro del período mensual correspondiente.',
+  monthlyBalance: 'Resultado financiero del mes indicado. Se calcula como ingresos completados del mes menos egresos completados del mes. Fórmula: Balance = Ingresos - Egresos.',
+  liquidity: 'Disponibilidad actual estimada del club. Se toma desde los balances operativos vigentes y representa el saldo disponible al momento del cálculo.',
+  projectedBalance: 'Saldo estimado considerando liquidez, cuotas a cobrar, saldos a liquidar y saldos pendientes. Fórmula operativa: liquidity + feesToCollect + settlementBalance + pendingBalance.',
+  incomeVariation: 'Compara los ingresos completados del último mes completo contra el mes anterior. Fórmula: ((Ingresos mes actual - Ingresos mes anterior) / Ingresos mes anterior) × 100.',
+  expensesVariation: 'Compara los egresos completados del último mes completo contra el mes anterior. Fórmula: ((Egresos mes actual - Egresos mes anterior) / Egresos mes anterior) × 100.',
+  utilityVariation: 'Compara la utilidad del último mes completo contra el mes anterior. La utilidad se calcula como Ingresos - Egresos. Fórmula: ((Utilidad actual - Utilidad anterior) / Utilidad anterior) × 100.',
+  growth: 'Mide el crecimiento general del club combinando evolución económica y evolución de clientes. Crecimiento Económico: variación de ingresos del último mes completo contra el mes anterior. Crecimiento de Clientes: variación de inscriptos acumulados al cierre de cada mes. Fórmula: (Crecimiento Económico + Crecimiento de Clientes) / 2.',
+  operatingProfitability: 'Mide el resultado operativo del club. Se calcula como ingresos completados menos egresos completados, tomando solo categorías operativas: Inscripción, Cuota, Turnos, Comisión, Alquiler, Eventos, Ventas, Clases, Cursos, Kiosco y Bebidas. Fórmula: Rentabilidad Operativa = Ingresos operativos - Egresos operativos.',
+  nonOperatingExpenses: 'Mide el balance de categorías no operativas. Se calcula como ingresos completados menos egresos completados de: Publicidad, Salarios, Mantenim., Depósitos, Extracciones, Reparaciones, Viáticos, Ganancia, Pérdida, CMV, Seguros, Limpieza, Librería y Otros.',
+  services: 'Agrupa el balance de servicios básicos. Se calcula como ingresos completados menos egresos completados de las categorías Luz, Agua e Internet.',
+  taxes: 'Balance de movimientos completados de la categoría Impuestos. Fórmula: Ingresos - Egresos.',
+  debtLiabilities: 'Balance de movimientos completados de la categoría Deuda/Deudas. Fórmula: Ingresos - Egresos.',
+} as const;
