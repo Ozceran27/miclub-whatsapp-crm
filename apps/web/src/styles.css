@@ -1671,6 +1671,40 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   background: rgba(9, 18, 34, 0.48);
 }
 
+.economy-ranking-item {
+  --sector-accent: var(--finance-accent, #8fd8ff);
+  --sector-accent-rgb: var(--finance-accent-rgb, 143, 216, 255);
+  min-height: 58px;
+  border-color: rgba(var(--sector-accent-rgb), 0.2);
+  border-radius: 15px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(var(--sector-accent-rgb), 0.1), rgba(9, 18, 34, 0.5) 42%, rgba(9, 18, 34, 0.72));
+  transition: border-color .18s ease, transform .18s ease, background .18s ease;
+}
+
+.economy-ranking-item:hover {
+  border-color: rgba(var(--sector-accent-rgb), 0.34);
+  background: linear-gradient(135deg, rgba(var(--sector-accent-rgb), 0.14), rgba(11, 22, 41, 0.64) 48%, rgba(9, 18, 34, 0.78));
+  transform: translateY(-1px);
+}
+
+.economy-ranking-item--fitness { --sector-accent: #7dd3fc; --sector-accent-rgb: 125, 211, 252; }
+.economy-ranking-item--local1 { --sector-accent: #fbbf24; --sector-accent-rgb: 251, 191, 36; }
+.economy-ranking-item--salon { --sector-accent: #fbbf24; --sector-accent-rgb: 251, 191, 36; }
+.economy-ranking-item--aula { --sector-accent: #a78bfa; --sector-accent-rgb: 167, 139, 250; }
+.economy-ranking-item--cantina { --sector-accent: #f87171; --sector-accent-rgb: 248, 113, 113; }
+.economy-ranking-item--crm { --sector-accent: #76f0c3; --sector-accent-rgb: 118, 240, 195; }
+.economy-ranking-item--default { --sector-accent: #91a4c8; --sector-accent-rgb: 145, 164, 200; }
+
+.economy-ranking-item__left {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .economy-ranking-item__position {
   display: inline-flex;
   align-items: center;
@@ -1680,9 +1714,21 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   height: 28px;
   border-radius: 999px;
   color: #08111f;
-  background: linear-gradient(135deg, #8fd8ff, #76f0c3);
+  background: linear-gradient(135deg, var(--sector-accent), #76f0c3);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
+  box-shadow: 0 0 0 4px rgba(var(--sector-accent-rgb), 0.1);
+}
+
+.economy-ranking-item__sector-icon {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(var(--sector-accent-rgb), 0.25);
+  border-radius: 12px;
+  background: rgba(var(--sector-accent-rgb), 0.12);
+  font-size: 18px;
 }
 
 .economy-ranking-item__content,
@@ -1701,6 +1747,11 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   white-space: nowrap;
 }
 
+.economy-ranking-item__title {
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
 .economy-ranking-item__meta,
 .economy-insight-item__meta {
   display: block;
@@ -1710,6 +1761,11 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   font-weight: 650;
 }
 
+.economy-ranking-item__meta {
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .economy-ranking-item__value,
 .economy-insight-item__value {
   color: #e5efff;
@@ -1717,6 +1773,11 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   font-weight: 850;
   text-align: right;
   white-space: nowrap;
+}
+
+.economy-ranking-item__value {
+  font-size: 14px;
+  font-weight: 650;
 }
 
 .economy-table-wrap {
@@ -1909,7 +1970,26 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .economy-ranking-list--compact .economy-ranking-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   white-space: normal;
+}
+
+.economy-ranking-item__meta span + span::before {
+  content: '·';
+  margin-right: 8px;
+  color: rgba(143, 164, 200, 0.7);
+}
+
+.economy-ranking-item__meta-income {
+  color: #9eeacb;
+  font-weight: 500;
+}
+
+.economy-ranking-item__meta-expense {
+  color: #ff9aa5;
+  font-weight: 500;
 }
 
 .economy-ranking-item__value--positive { color: #76f0c3; }
@@ -2131,7 +2211,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   .economy-ranking-item__value {
     width: 100%;
     text-align: left;
-    padding-left: 40px;
+    padding-left: 82px;
   }
 }
 

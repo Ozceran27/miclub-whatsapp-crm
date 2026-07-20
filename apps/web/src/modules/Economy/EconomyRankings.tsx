@@ -1,6 +1,7 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatEconomyMoney } from './formatters';
 import type { EconomySectorBreakdownItem, EconomySectorRankings } from './types';
+import { getSectorVisualMeta } from '../sectorVisualMeta';
 
 type RankingCardProps = {
   title: string;
@@ -57,16 +58,27 @@ function RankingCard({ title, subtitle, items, accent }: RankingCardProps) {
             </ResponsiveContainer>
           </div>
           <ol className="economy-ranking-list economy-ranking-list--compact">
-            {items.map((item, index) => (
-              <li className="economy-ranking-item" key={`${item.id ?? item.name}-${index}`}>
-                <span className="economy-ranking-item__position">{index + 1}</span>
-                <span className="economy-ranking-item__content">
-                  <strong className="economy-ranking-item__title">{item.name}</strong>
-                  <span className="economy-ranking-item__meta">{item.movements} mov. · Ingresos {formatEconomyMoney(item.income)} · Egresos {formatEconomyMoney(item.expenses)}</span>
-                </span>
-                <span className={`economy-ranking-item__value ${rankingValueClass(item.balance)}`}>{formatEconomyMoney(item.balance)}</span>
-              </li>
-            ))}
+            {items.map((item, index) => {
+              const sectorMeta = getSectorVisualMeta(item.name);
+
+              return (
+                <li className={`economy-ranking-item economy-ranking-item--${sectorMeta.accent}`} key={`${item.id ?? item.name}-${index}`}>
+                  <span className="economy-ranking-item__left">
+                    <span className="economy-ranking-item__position">{index + 1}</span>
+                    <span className="economy-ranking-item__sector-icon" aria-hidden="true">{sectorMeta.icon}</span>
+                    <span className="economy-ranking-item__content">
+                      <strong className="economy-ranking-item__title">{item.name}</strong>
+                      <span className="economy-ranking-item__meta">
+                        <span>{item.movements} mov.</span>
+                        <span className="economy-ranking-item__meta-income">Ing. {formatEconomyMoney(item.income)}</span>
+                        <span className="economy-ranking-item__meta-expense">Egr. {formatEconomyMoney(item.expenses)}</span>
+                      </span>
+                    </span>
+                  </span>
+                  <span className={`economy-ranking-item__value ${rankingValueClass(item.balance)}`}>{formatEconomyMoney(item.balance)}</span>
+                </li>
+              );
+            })}
           </ol>
         </>
       ) : (
