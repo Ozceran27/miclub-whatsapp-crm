@@ -1,5 +1,5 @@
 import { getPostgresPool } from "../db/postgres.js";
-import { OPERATING_CATEGORIES } from "../services/economyDomain.js";
+import { NON_OPERATING_EXPENSE_CATEGORY_KEYS, OPERATING_CATEGORIES, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS } from "../services/economyDomain.js";
 
 export type EconomyRow = Record<string, unknown>;
 
@@ -118,13 +118,54 @@ export const getPaymentMethods = async (from: Date, to: Date): Promise<EconomyRo
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select pm.id, coalesce(pm.name, 'Sin método') as name,
-           coalesce(sum(case when m.movement_type = 'INGRESOS' then m.amount when m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as amount,
-           count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
+           coalesce(sum(abs(m.amount)) filter (where m.movement_type = 'INGRESOS'), 0) as amount,
+           count(m.id) filter (where m.movement_type = 'INGRESOS')::integer as movements
     from miclub.movements m
     left join miclub.payment_methods pm on pm.id = m.payment_method_id
-    where m.operational_status = 'COMPLETADO' and m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
+    where m.operational_status = 'COMPLETADO'
+      and m.movement_type = 'INGRESOS'
+      and m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
     group by pm.id, pm.name
     order by amount desc
+  `, [from, to]);
+  return result.rows;
+};
+
+export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date, to: Date): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<EconomyRow>(`
+    with periods as (
+      select 'monthly'::text as period_key, $1::timestamptz as start_at, $3::timestamptz as end_at
+      union all
+      select 'annual'::text, $2::timestamptz, $3::timestamptz
+    ), movements as (
+      select p.period_key, m.movement_type, abs(m.amount) as amount,
+        upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g')) as normalized_category
+      from periods p
+      left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
+        and m.operational_status = 'COMPLETADO'
+        and m.movement_type in ('INGRESOS', 'EGRESOS')
+      left join miclub.movement_categories c on c.id = m.category_id
+    )
+    select period_key,
+      coalesce(sum(amount) filter (where movement_type = 'EGRESOS' and normalized_category = any($4::text[])), 0) as non_operating_expenses,
+      count(*) filter (where movement_type = 'EGRESOS' and normalized_category = any($4::text[]))::integer as non_operating_movements,
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($5::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($5::text[]) then -amount else 0 end), 0) as services_balance,
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($6::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($6::text[]) then -amount else 0 end), 0) as taxes_balance
+    from movements
+    group by period_key
+  `, [monthFrom, yearFrom, to, NON_OPERATING_EXPENSE_CATEGORY_KEYS, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS]);
+  return result.rows;
+};
+
+export const getMovementStatusCounts = async (from: Date, to: Date): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<EconomyRow>(`
+    select upper(regexp_replace(translate(trim(coalesce(operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g')) as status,
+      count(*)::integer as movements
+    from miclub.movements
+    where movement_date >= $1::timestamptz and movement_date < $2::timestamptz
+    group by status
   `, [from, to]);
   return result.rows;
 };
