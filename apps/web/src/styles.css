@@ -2429,3 +2429,111 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   .economy-monthly-row { font-size: 0.76rem; }
   .economy-final-grid { grid-template-columns: 1fr; }
 }
+
+.economy-finance-triptych {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.economy-mini-finance-card {
+  min-height: 100%;
+  --finance-accent: #8fd8ff;
+  --finance-accent-rgb: 143, 216, 255;
+}
+
+.economy-mini-finance-card--expenses {
+  --finance-accent: #ffad66;
+  --finance-accent-rgb: 255, 173, 102;
+}
+
+.economy-mini-finance-card--services {
+  --finance-accent: #76f0c3;
+  --finance-accent-rgb: 118, 240, 195;
+}
+
+.economy-finance-section,
+.economy-payment-periods {
+  display: grid;
+  gap: 12px;
+}
+
+.economy-finance-section--split > div {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(92, 122, 166, 0.24);
+  border-radius: 14px;
+  padding: 11px;
+  background: rgba(9, 18, 34, 0.42);
+}
+
+.economy-finance-subtitle {
+  color: #f4f8ff;
+  font-size: 13px;
+  letter-spacing: .01em;
+}
+
+.economy-finance-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(92, 122, 166, 0.22);
+  border-radius: 12px;
+  padding: 10px 11px;
+  background: rgba(9, 18, 34, 0.46);
+  color: #dce8ff;
+}
+
+.economy-finance-row strong {
+  color: #9fb4d8;
+  font-size: 12px;
+}
+
+.economy-finance-row span:last-child {
+  font-weight: 900;
+  text-align: right;
+}
+
+.economy-finance-row--muted span:last-child {
+  color: #9fb4d8;
+  font-size: 12px;
+}
+
+.economy-finance-value--positive { color: #76f0c3; }
+.economy-finance-value--negative { color: #ff6b7a; }
+.economy-finance-value--neutral { color: #dce8ff; }
+
+.economy-payment-periods section {
+  display: grid;
+  gap: 8px;
+}
+
+.economy-payment-list--compact li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 8px 9px;
+}
+
+.economy-status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.economy-status-badges span {
+  border: 1px solid rgba(143, 164, 200, 0.22);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(143, 216, 255, 0.08);
+  color: #c7d7f2;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .economy-finance-triptych {
+    grid-template-columns: 1fr;
+  }
+}

@@ -321,6 +321,37 @@ export interface EconomyPaymentMethodItem {
   name: string;
   amount: number;
   movements: number;
+  percentage?: number;
+}
+
+export interface EconomyPaymentMethodPeriod {
+  label?: string;
+  year?: number;
+  items: EconomyPaymentMethodItem[];
+  total: number;
+}
+
+export interface EconomyPaymentMethodStatusCounts {
+  completed: number;
+  pending: number;
+  canceled: number;
+  review?: number;
+  other?: number;
+}
+
+export interface EconomyPaymentMethodsSummary extends EconomyDashboardCollection<EconomyPaymentMethodItem> {
+  monthly?: EconomyPaymentMethodPeriod;
+  annual?: EconomyPaymentMethodPeriod;
+  statusCounts?: EconomyPaymentMethodStatusCounts;
+  nonOperatingExpenses?: {
+    categories: string[];
+    monthly: { amount: number; movements: number };
+    annual: { amount: number; movements: number };
+  };
+  servicesAndTaxes?: {
+    services: { categories: string[]; monthly: number; annual: number };
+    taxes: { categories: string[]; monthly: number; annual: number };
+  };
 }
 
 export interface EconomyRecentMovement {
@@ -390,7 +421,7 @@ export interface EconomyDashboardResponse {
   bySector: EconomyDashboardCollection<EconomySectorBreakdownItem>;
   byCategory: EconomyDashboardCollection<EconomyCategoryBreakdownItem>;
   sectorRankings?: EconomySectorRankings;
-  paymentMethods: EconomyDashboardCollection<EconomyPaymentMethodItem>;
+  paymentMethods: EconomyPaymentMethodsSummary;
   recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
   pending: EconomyPendingSummary;
   annualSummary: EconomyAnnualSummary;

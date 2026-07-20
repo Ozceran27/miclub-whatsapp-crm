@@ -42,6 +42,31 @@ export const OPERATING_CATEGORIES = OPERATING_PROFIT_CATEGORIES.map((category) =
   normalizeCategoryName(category),
 );
 
+export const NON_OPERATING_EXPENSE_CATEGORIES = [
+  "PUBLICIDAD",
+  "SALARIOS",
+  "MANTENIM.",
+  "DEPÓSITOS",
+  "EXTRACCIONES",
+  "REPARACIONES",
+  "VIÁTICOS",
+  "GANANCIA",
+  "PÉRDIDA",
+  "CMV",
+  "SEGUROS",
+  "LIMPIEZA",
+  "LIBRERÍA",
+  "DEUDA",
+  "OTROS",
+] as const;
+
+export const SERVICE_CATEGORIES = ["LUZ", "AGUA", "INTERNET"] as const;
+export const TAX_CATEGORIES = ["IMPUESTOS"] as const;
+
+export const NON_OPERATING_EXPENSE_CATEGORY_KEYS = NON_OPERATING_EXPENSE_CATEGORIES.map((category) => normalizeCategoryName(category));
+export const SERVICE_CATEGORY_KEYS = SERVICE_CATEGORIES.map((category) => normalizeCategoryName(category));
+export const TAX_CATEGORY_KEYS = TAX_CATEGORIES.map((category) => normalizeCategoryName(category));
+
 
 export const getOperatingCategories = (): readonly string[] => OPERATING_PROFIT_CATEGORIES;
 

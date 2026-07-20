@@ -8,6 +8,7 @@ export type {
   EconomyInsight,
   EconomyMonthlyEvolutionItem,
   EconomyPaymentMethodItem,
+  EconomyPaymentMethodsSummary,
   EconomyPendingSummary,
   EconomyRecentMovement,
   EconomySectorBreakdownItem,

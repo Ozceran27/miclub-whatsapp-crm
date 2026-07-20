@@ -6,6 +6,8 @@ import {
   getGrowthSummary,
   getMonthlySummary,
   getPaymentMethods as getPaymentMethodRows,
+  getEconomyAuxiliarySummary,
+  getMovementStatusCounts,
   getPendingMovements as getPendingMovementRows,
   getPendingSummary as getPendingSummaryRows,
   getRankingByCategory,
@@ -15,7 +17,7 @@ import {
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
-import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, OPERATING_CATEGORIES } from "./economyDomain.js";
+import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, NON_OPERATING_EXPENSE_CATEGORIES, OPERATING_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES } from "./economyDomain.js";
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
@@ -158,10 +160,62 @@ export const getSectorRankings = async (limitQuery?: unknown): Promise<JsonRecor
   };
 };
 
-export const getPaymentMethods = async (): Promise<{ items: JsonRecord[]; total: number }> => {
-  const { start: from, end: to } = getCurrentMonthWindow();
-  const items = normalizeRows(await getPaymentMethodRows(from, to));
-  return { items, total: items.length };
+const normalizePaymentItems = (rows: EconomyRow[] | JsonRecord[]): JsonRecord[] => {
+  const items = normalizeRows(rows as EconomyRow[]).map((item) => ({
+    ...item,
+    id: item.id ?? null,
+    name: String(item.name || "Sin método"),
+    amount: toNumber(item.amount),
+    movements: toInteger(item.movements),
+  }));
+  const totalAmount = items.reduce((sum, item) => sum + toNumber(item.amount), 0);
+  return items.map((item) => ({
+    ...item,
+    percentage: totalAmount > 0 ? (toNumber(item.amount) / totalAmount) * 100 : 0,
+  }));
+};
+
+export const getPaymentMethods = async (): Promise<JsonRecord> => {
+  const month = getCurrentMonthWindow();
+  const now = new Date();
+  const annual = currentYearToDateRange(now);
+  const [monthlyRows, annualRows, auxiliaryRows, statusRows] = await Promise.all([
+    getPaymentMethodRows(month.start, now),
+    getPaymentMethodRows(annual.from, annual.to),
+    getEconomyAuxiliarySummary(month.start, annual.from, now),
+    getMovementStatusCounts(month.start, now),
+  ]);
+  const auxiliary = normalizeRows(auxiliaryRows);
+  const auxiliaryByPeriod = new Map(auxiliary.map((row) => [String(row.periodKey), row]));
+  const period = (key: string) => auxiliaryByPeriod.get(key) ?? {};
+  const statusCounts = { completed: 0, pending: 0, canceled: 0, review: 0, other: 0 };
+  for (const row of normalizeRows(statusRows)) {
+    const status = String(row.status ?? "");
+    const count = toInteger(row.movements);
+    if (["COMPLETADO", "COMPLETED"].includes(status)) statusCounts.completed += count;
+    else if (["PENDIENTE", "PENDING"].includes(status)) statusCounts.pending += count;
+    else if (["ANULADO", "CANCELADO", "CANCELED", "CANCELLED"].includes(status)) statusCounts.canceled += count;
+    else if (["A REVISAR", "REVISION", "REVISAR"].includes(status)) statusCounts.review += count;
+    else statusCounts.other += count;
+  }
+  const monthlyItems = normalizePaymentItems(monthlyRows);
+  const annualItems = normalizePaymentItems(annualRows);
+  return {
+    items: monthlyItems,
+    total: monthlyItems.length,
+    monthly: { label: month.label, items: monthlyItems, total: monthlyItems.length },
+    annual: { year: annual.from.getUTCFullYear(), items: annualItems, total: annualItems.length },
+    statusCounts,
+    nonOperatingExpenses: {
+      categories: [...NON_OPERATING_EXPENSE_CATEGORIES],
+      monthly: { amount: toNumber(period("monthly").nonOperatingExpenses), movements: toInteger(period("monthly").nonOperatingMovements) },
+      annual: { amount: toNumber(period("annual").nonOperatingExpenses), movements: toInteger(period("annual").nonOperatingMovements) },
+    },
+    servicesAndTaxes: {
+      services: { categories: [...SERVICE_CATEGORIES], monthly: toNumber(period("monthly").servicesBalance), annual: toNumber(period("annual").servicesBalance) },
+      taxes: { categories: [...TAX_CATEGORIES], monthly: toNumber(period("monthly").taxesBalance), annual: toNumber(period("annual").taxesBalance) },
+    },
+  };
 };
 
 export const getRecentMovements = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
