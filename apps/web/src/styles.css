@@ -2688,13 +2688,14 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .info-tooltip__content--portal {
   position: fixed;
-  z-index: 9999;
+  z-index: 99999;
   display: block;
   width: max-content;
-  max-width: min(320px, calc(100vw - 24px));
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 9px 11px;
+  min-width: min(180px, calc(100vw - 24px));
+  max-width: min(280px, calc(100vw - 24px));
+  border: 1px solid var(--color-border-strong, var(--color-border));
+  border-radius: 10px;
+  padding: 8px 10px;
   background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-lg);
@@ -2702,6 +2703,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   font-weight: 650;
   line-height: 1.35;
   white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
   pointer-events: none;
   opacity: 1;
   animation: infoTooltipFade .16s ease both;
@@ -2727,13 +2730,27 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .economy-top-card {
   position: relative;
-  padding-bottom: 34px;
+}
+
+.economy-top-card__header {
+  min-width: 0;
+}
+
+.economy-top-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.economy-top-card__title-row h4 {
+  min-width: 0;
+  padding-right: 8px;
 }
 
 .info-tooltip--metric-corner {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
+  margin-left: auto;
 }
 
 .economy-finance-subtitle-row {

@@ -56,13 +56,15 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     <div className="economy-kpi-strip" aria-label="Resumen analítico de Economía Club">
       {cards.map((card) => (
         <article className={`card home-kpi-card home-kpi-card--compact finance-card economy-top-card economy-top-card--${card.variant}${card.centerValue ? ' economy-top-card--center-value' : ''}`} key={card.label}>
-          <div className="home-card-heading finance-card__header">
-            <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span></h4>
+          <div className="home-card-heading finance-card__header economy-top-card__header">
+            <div className="economy-top-card__title-row">
+              <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span></h4>
+              {card.tooltip && <InfoTooltip className="info-tooltip--metric-corner" content={card.tooltip} label={`Ayuda sobre ${card.label}`} />}
+            </div>
             <p>{card.subtitle}</p>
           </div>
           <p className={`economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>
           {card.detail && <p className={`economy-top-card__detail economy-top-card__detail--${variationState(card.metric)}`}>{card.detail}</p>}
-          {card.tooltip && <InfoTooltip className="info-tooltip--metric-corner" content={card.tooltip} label={`Ayuda sobre ${card.label}`} />}
         </article>
       ))}
     </div>

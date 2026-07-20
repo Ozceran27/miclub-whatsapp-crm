@@ -15,13 +15,13 @@ type TooltipPosition = {
 
 const TOOLTIP_GAP = 10;
 const VIEWPORT_MARGIN = 12;
-const MAX_TOOLTIP_WIDTH = 320;
+const MAX_TOOLTIP_WIDTH = 280;
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
 
 export function InfoTooltip({ content, label = 'Ver ayuda', className = '' }: InfoTooltipProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<TooltipPosition | null>(null);
@@ -34,17 +34,19 @@ export function InfoTooltip({ content, label = 'Ver ayuda', className = '' }: In
       if (!trigger) return;
 
       const triggerRect = trigger.getBoundingClientRect();
-      const tooltipWidth = Math.min(tooltipRef.current?.offsetWidth ?? MAX_TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
-      const tooltipHeight = tooltipRef.current?.offsetHeight ?? 0;
-      const hasSpaceAbove = triggerRect.top >= tooltipHeight + TOOLTIP_GAP + VIEWPORT_MARGIN;
-      const placement: TooltipPosition['placement'] = hasSpaceAbove ? 'top' : 'bottom';
-      const top = placement === 'top'
+      const tooltip = tooltipRef.current;
+      const tooltipWidth = Math.min(tooltip?.offsetWidth ?? MAX_TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
+      const tooltipHeight = tooltip?.offsetHeight ?? 0;
+      const spaceAbove = triggerRect.top - VIEWPORT_MARGIN;
+      const spaceBelow = window.innerHeight - triggerRect.bottom - VIEWPORT_MARGIN;
+      const placement: TooltipPosition['placement'] = spaceAbove >= tooltipHeight + TOOLTIP_GAP || spaceAbove > spaceBelow ? 'top' : 'bottom';
+      const desiredTop = placement === 'top'
         ? triggerRect.top - tooltipHeight - TOOLTIP_GAP
         : triggerRect.bottom + TOOLTIP_GAP;
       const centeredLeft = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
 
       setPosition({
-        top: clamp(top, VIEWPORT_MARGIN, window.innerHeight - tooltipHeight - VIEWPORT_MARGIN),
+        top: clamp(desiredTop, VIEWPORT_MARGIN, window.innerHeight - tooltipHeight - VIEWPORT_MARGIN),
         left: clamp(centeredLeft, VIEWPORT_MARGIN, window.innerWidth - tooltipWidth - VIEWPORT_MARGIN),
         placement
       });
@@ -79,15 +81,15 @@ export function InfoTooltip({ content, label = 'Ver ayuda', className = '' }: In
         ?
       </button>
       {isOpen && createPortal(
-        <span
+        <div
           ref={tooltipRef}
           id={tooltipId}
           className={`info-tooltip__content info-tooltip__content--portal info-tooltip__content--${position?.placement ?? 'top'}`}
           role="tooltip"
-          style={position ? { top: position.top, left: position.left } : undefined}
+          style={position ? { top: position.top, left: position.left } : { top: 0, left: 0, visibility: 'hidden' }}
         >
           {content}
-        </span>,
+        </div>,
         document.body
       )}
     </span>
