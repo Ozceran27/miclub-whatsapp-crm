@@ -348,6 +348,11 @@ export interface EconomyPaymentMethodsSummary extends EconomyDashboardCollection
     monthly: { amount: number; movements: number };
     annual: { amount: number; movements: number };
   };
+  debtLiabilities?: {
+    categories: string[];
+    monthly: { amount: number; movements: number };
+    annual: { amount: number; movements: number };
+  };
   servicesAndTaxes?: {
     services: { categories: string[]; monthly: number; annual: number };
     taxes: { categories: string[]; monthly: number; annual: number };

@@ -56,16 +56,17 @@ export const NON_OPERATING_EXPENSE_CATEGORIES = [
   "SEGUROS",
   "LIMPIEZA",
   "LIBRERÍA",
-  "DEUDA",
   "OTROS",
 ] as const;
 
+export const DEBT_LIABILITY_CATEGORIES = ["DEUDA", "DEUDAS"] as const;
 export const SERVICE_CATEGORIES = ["LUZ", "AGUA", "INTERNET"] as const;
 export const TAX_CATEGORIES = ["IMPUESTOS"] as const;
+export const TAX_CATEGORY_KEYS = TAX_CATEGORIES.map((category) => normalizeCategoryName(category));
 
 export const NON_OPERATING_EXPENSE_CATEGORY_KEYS = NON_OPERATING_EXPENSE_CATEGORIES.map((category) => normalizeCategoryName(category));
+export const DEBT_LIABILITY_CATEGORY_KEYS = DEBT_LIABILITY_CATEGORIES.map((category) => normalizeCategoryName(category));
 export const SERVICE_CATEGORY_KEYS = SERVICE_CATEGORIES.map((category) => normalizeCategoryName(category));
-export const TAX_CATEGORY_KEYS = TAX_CATEGORIES.map((category) => normalizeCategoryName(category));
 
 
 export const getOperatingCategories = (): readonly string[] => OPERATING_PROFIT_CATEGORIES;
@@ -117,6 +118,24 @@ export const normalizeAmount = (value: unknown): number => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 const toFiniteNumber = normalizeAmount;
+
+
+export const calculateCategoryBalance = (movements: SectorProfitabilityMovement[], categories: readonly string[]) => {
+  const categoryKeys = new Set(categories.map((category) => normalizeCategoryName(category)));
+  let income = 0;
+  let expenses = 0;
+  let movementsCount = 0;
+  for (const movement of movements) {
+    const category = movement.category ?? movement.categoryName ?? movement.categoria;
+    if (!isCompletedMovement(movement) || !categoryKeys.has(normalizeCategoryName(category))) continue;
+    const amount = Math.abs(normalizeAmount(movement.amount ?? movement.monto));
+    if (isIncomeMovement(movement)) income += amount;
+    else if (isExpenseMovement(movement)) expenses += amount;
+    else continue;
+    movementsCount += 1;
+  }
+  return { income: roundMoney(income), expenses: roundMoney(expenses), balance: roundMoney(income - expenses), movementsCount };
+};
 
 export const calculateOperatingProfitability = (movements: SectorProfitabilityMovement[], options: { sector?: unknown } = {}) => {
   const sectorFilter = options.sector == null ? null : normalizeCategoryName(options.sector);

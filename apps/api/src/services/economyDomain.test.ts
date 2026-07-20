@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateOperatingProfitability, calculateOperatingProfitabilityBySector, calculateSectorProfitability, calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, getOperatingCategories, getRolling30DayWindows, isCompletedMovementStatus, isOperatingCategory, normalizeAmount, normalizeCategory } from "./economyDomain.js";
+import { calculateCategoryBalance, calculateOperatingProfitability, calculateOperatingProfitabilityBySector, calculateSectorProfitability, calculateVariation, DEBT_LIABILITY_CATEGORIES, getCurrentMonthWindow, getLastCompleteMonthWindows, getOperatingCategories, getRolling30DayWindows, isCompletedMovementStatus, isOperatingCategory, NON_OPERATING_EXPENSE_CATEGORIES, normalizeAmount, normalizeCategory } from "./economyDomain.js";
 
 test("current month window uses Argentina timezone and month label", () => {
   const window = getCurrentMonthWindow(new Date("2026-07-14T12:00:00Z"));
@@ -166,4 +166,31 @@ test("operating profitability normalizes signed and formatted amounts without do
   assert.equal(result.income, 1200.5);
   assert.equal(result.expenses, 200);
   assert.equal(result.profitability, 1000.5);
+});
+
+test("category balances use completed income minus expenses and normalized names", () => {
+  const nonOperating = calculateCategoryBalance([
+    { movement_type: "INGRESOS", category: " publicidad ", operational_status: "Completado", amount: 100_000 },
+    { movement_type: "EGRESOS", category: "PUBLICIDAD", operational_status: "Completado", amount: 300_000 },
+    { movement_type: "EGRESOS", category: "DEUDA", operational_status: "Completado", amount: 150_000 },
+    { movement_type: "INGRESOS", category: "VIATICOS", operational_status: "Pendiente", amount: 999_000 },
+  ], NON_OPERATING_EXPENSE_CATEGORIES);
+
+  assert.equal(nonOperating.income, 100_000);
+  assert.equal(nonOperating.expenses, 300_000);
+  assert.equal(nonOperating.balance, -200_000);
+  assert.equal(nonOperating.movementsCount, 2);
+});
+
+test("debt liability balances include DEUDA and DEUDAS variants only", () => {
+  const debt = calculateCategoryBalance([
+    { movement_type: "INGRESOS", category: "deuda", operational_status: "Completado", amount: 50_000 },
+    { movement_type: "EGRESOS", category: "DEUDAS", operational_status: "Completado", amount: 150_000 },
+    { movement_type: "EGRESOS", category: "PUBLICIDAD", operational_status: "Completado", amount: 500_000 },
+  ], DEBT_LIABILITY_CATEGORIES);
+
+  assert.equal(debt.income, 50_000);
+  assert.equal(debt.expenses, 150_000);
+  assert.equal(debt.balance, -100_000);
+  assert.equal(debt.movementsCount, 2);
 });
