@@ -2471,6 +2471,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .economy-finance-subtitle {
   color: #f4f8ff;
   font-size: 13px;
+  font-weight: 650;
   letter-spacing: .01em;
 }
 
@@ -2492,7 +2493,9 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .economy-finance-row span:last-child {
-  font-weight: 900;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
   text-align: right;
 }
 
@@ -2513,6 +2516,11 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .economy-payment-list--compact li {
   grid-template-columns: auto minmax(0, 1fr) auto;
   padding: 8px 9px;
+}
+
+.economy-payment-list--compact span:last-child {
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .economy-status-badges {

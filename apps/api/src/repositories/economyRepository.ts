@@ -1,5 +1,5 @@
 import { getPostgresPool } from "../db/postgres.js";
-import { NON_OPERATING_EXPENSE_CATEGORY_KEYS, OPERATING_CATEGORIES, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS } from "../services/economyDomain.js";
+import { DEBT_LIABILITY_CATEGORY_KEYS, NON_OPERATING_EXPENSE_CATEGORY_KEYS, OPERATING_CATEGORIES, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS } from "../services/economyDomain.js";
 
 export type EconomyRow = Record<string, unknown>;
 
@@ -140,7 +140,7 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
       select 'annual'::text, $2::timestamptz, $3::timestamptz
     ), movements as (
       select p.period_key, m.movement_type, abs(m.amount) as amount,
-        upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g')) as normalized_category
+        upper(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) as normalized_category
       from periods p
       left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
         and m.operational_status = 'COMPLETADO'
@@ -148,13 +148,15 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
       left join miclub.movement_categories c on c.id = m.category_id
     )
     select period_key,
-      coalesce(sum(amount) filter (where movement_type = 'EGRESOS' and normalized_category = any($4::text[])), 0) as non_operating_expenses,
-      count(*) filter (where movement_type = 'EGRESOS' and normalized_category = any($4::text[]))::integer as non_operating_movements,
-      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($5::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($5::text[]) then -amount else 0 end), 0) as services_balance,
-      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($6::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($6::text[]) then -amount else 0 end), 0) as taxes_balance
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($4::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($4::text[]) then -amount else 0 end), 0) as non_operating_balance,
+      count(*) filter (where movement_type in ('INGRESOS', 'EGRESOS') and normalized_category = any($4::text[]))::integer as non_operating_movements,
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($5::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($5::text[]) then -amount else 0 end), 0) as debt_liability_balance,
+      count(*) filter (where movement_type in ('INGRESOS', 'EGRESOS') and normalized_category = any($5::text[]))::integer as debt_liability_movements,
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($6::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($6::text[]) then -amount else 0 end), 0) as services_balance,
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($7::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($7::text[]) then -amount else 0 end), 0) as taxes_balance
     from movements
     group by period_key
-  `, [monthFrom, yearFrom, to, NON_OPERATING_EXPENSE_CATEGORY_KEYS, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS]);
+  `, [monthFrom, yearFrom, to, NON_OPERATING_EXPENSE_CATEGORY_KEYS, DEBT_LIABILITY_CATEGORY_KEYS, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS]);
   return result.rows;
 };
 

@@ -17,7 +17,7 @@ import {
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
-import { calculateVariation, getCurrentMonthWindow, getLastCompleteMonthWindows, NON_OPERATING_EXPENSE_CATEGORIES, OPERATING_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES } from "./economyDomain.js";
+import { calculateVariation, DEBT_LIABILITY_CATEGORIES, getCurrentMonthWindow, getLastCompleteMonthWindows, NON_OPERATING_EXPENSE_CATEGORIES, OPERATING_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES } from "./economyDomain.js";
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
@@ -208,8 +208,13 @@ export const getPaymentMethods = async (): Promise<JsonRecord> => {
     statusCounts,
     nonOperatingExpenses: {
       categories: [...NON_OPERATING_EXPENSE_CATEGORIES],
-      monthly: { amount: toNumber(period("monthly").nonOperatingExpenses), movements: toInteger(period("monthly").nonOperatingMovements) },
-      annual: { amount: toNumber(period("annual").nonOperatingExpenses), movements: toInteger(period("annual").nonOperatingMovements) },
+      monthly: { amount: toNumber(period("monthly").nonOperatingBalance), movements: toInteger(period("monthly").nonOperatingMovements) },
+      annual: { amount: toNumber(period("annual").nonOperatingBalance), movements: toInteger(period("annual").nonOperatingMovements) },
+    },
+    debtLiabilities: {
+      categories: [...DEBT_LIABILITY_CATEGORIES],
+      monthly: { amount: toNumber(period("monthly").debtLiabilityBalance), movements: toInteger(period("monthly").debtLiabilityMovements) },
+      annual: { amount: toNumber(period("annual").debtLiabilityBalance), movements: toInteger(period("annual").debtLiabilityMovements) },
     },
     servicesAndTaxes: {
       services: { categories: [...SERVICE_CATEGORIES], monthly: toNumber(period("monthly").servicesBalance), annual: toNumber(period("annual").servicesBalance) },

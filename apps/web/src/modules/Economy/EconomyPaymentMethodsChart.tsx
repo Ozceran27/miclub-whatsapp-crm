@@ -30,6 +30,7 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
   const monthlyPayments = paymentMethods.monthly?.items ?? paymentMethods.items ?? [];
   const annualPayments = paymentMethods.annual?.items ?? [];
   const nonOperating = paymentMethods.nonOperatingExpenses;
+  const debtLiabilities = paymentMethods.debtLiabilities;
   const servicesAndTaxes = paymentMethods.servicesAndTaxes;
   const status = paymentMethods.statusCounts ?? { completed: 0, pending: 0, canceled: 0 };
 
@@ -37,13 +38,20 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
     <div className="economy-finance-triptych" aria-label="Indicadores complementarios de Economía Club">
       <article className="card home-kpi-card finance-card economy-mini-finance-card economy-mini-finance-card--expenses">
         <div className="home-card-heading finance-card__header">
-          <h4>⚠️ Gastos no Operativos</h4>
-          <p>EGRESOS completados de categorías no operativas</p>
+          <h4>⚠️ Gastos</h4>
+          <p>Balances de categorías no operativas y pasivos</p>
         </div>
-        <div className="economy-finance-section">
-          <PeriodValue label="Mes actual" value={nonOperating?.monthly.amount ?? 0} className="economy-finance-value--negative" />
-          <PeriodValue label="Acumulado anual" value={nonOperating?.annual.amount ?? 0} className="economy-finance-value--negative" />
-          <span className="economy-finance-row economy-finance-row--muted"><strong>Movimientos</strong><span>{nonOperating?.monthly.movements ?? 0} mes · {nonOperating?.annual.movements ?? 0} año</span></span>
+        <div className="economy-finance-section economy-finance-section--split">
+          <div>
+            <strong className="economy-finance-subtitle">📉 Gastos no Operativos</strong>
+            <PeriodValue label="Mes actual" value={nonOperating?.monthly.amount ?? 0} />
+            <PeriodValue label="Acumulado anual" value={nonOperating?.annual.amount ?? 0} />
+          </div>
+          <div>
+            <strong className="economy-finance-subtitle">💳 Deudas/Pasivos</strong>
+            <PeriodValue label="Mes actual" value={debtLiabilities?.monthly.amount ?? 0} />
+            <PeriodValue label="Acumulado anual" value={debtLiabilities?.annual.amount ?? 0} />
+          </div>
         </div>
       </article>
 
@@ -54,12 +62,12 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
         </div>
         <div className="economy-finance-section economy-finance-section--split">
           <div>
-            <strong className="economy-finance-subtitle">Servicios</strong>
+            <strong className="economy-finance-subtitle">🧾 Servicios</strong>
             <PeriodValue label="Mes actual" value={servicesAndTaxes?.services.monthly ?? 0} />
             <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.services.annual ?? 0} />
           </div>
           <div>
-            <strong className="economy-finance-subtitle">Impuestos</strong>
+            <strong className="economy-finance-subtitle">🏛️ Impuestos</strong>
             <PeriodValue label="Mes actual" value={servicesAndTaxes?.taxes.monthly ?? 0} />
             <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.taxes.annual ?? 0} />
           </div>
