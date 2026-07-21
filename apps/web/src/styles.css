@@ -582,7 +582,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   color: #dce8ff;
   box-shadow: var(--shadow-elevated), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 350;
   line-height: 1.35;
   white-space: normal;
   opacity: 0;
