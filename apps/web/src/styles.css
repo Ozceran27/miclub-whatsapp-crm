@@ -2755,21 +2755,34 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   min-width: 0;
 }
 
-.economy-top-card__subtitle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
 .economy-top-card__subtitle {
   min-width: 0;
 }
 
+.economy-top-card__value-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.economy-top-card__value-row .economy-top-card__value {
+  max-width: calc(100% - 28px);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.economy-top-card__tooltip-slot {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .info-tooltip--metric-corner {
   flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .economy-finance-subtitle-row {

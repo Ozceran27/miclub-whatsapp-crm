@@ -60,12 +60,16 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
             <div className="economy-top-card__title-row">
               <h4><span className="economy-top-card__icon" aria-hidden="true">{card.icon}</span><span>{card.label}</span></h4>
             </div>
-            <div className="economy-top-card__subtitle-row">
-              <p className="economy-top-card__subtitle">{card.subtitle}</p>
-              {card.tooltip && <InfoTooltip className="info-tooltip--metric-corner" content={card.tooltip} label={`Ayuda sobre ${card.label}`} />}
-            </div>
+            <p className="economy-top-card__subtitle">{card.subtitle}</p>
           </div>
-          <p className={`economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>
+          <div className="economy-top-card__value-row">
+            <p className={`economy-top-card__value economy-top-card__value--${variationState(card.metric)}`}>{card.value}</p>
+            {card.tooltip && (
+              <span className="economy-top-card__tooltip-slot">
+                <InfoTooltip className="info-tooltip--metric-corner" content={card.tooltip} label={`Ayuda sobre ${card.label}`} />
+              </span>
+            )}
+          </div>
           {card.detail && <p className={`economy-top-card__detail economy-top-card__detail--${variationState(card.metric)}`}>{card.detail}</p>}
         </article>
       ))}
