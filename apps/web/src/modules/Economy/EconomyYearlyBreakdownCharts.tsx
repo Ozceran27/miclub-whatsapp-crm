@@ -8,23 +8,23 @@ const INCOME_COLORS: Record<string, string> = {
 };
 const EXPENSE_COLORS: Record<string, string> = { OPERATING: '#ffad66', NON_OPERATING: '#ff6b7a', DEBT: '#c6a6ff', SERVICES: '#8fd8ff', TAXES: '#ffcf66' };
 
-type ChartRow = { month: string; [key: string]: string | number };
+type ChartRow = { month: string; fullLabel: string; [key: string]: string | number };
 type Props = { yearlyBreakdown: EconomyYearlyBreakdown };
-type TooltipEntry = { name?: string; value?: number | string | null; color?: string; dataKey?: string };
+type TooltipEntry = { name?: string; value?: number | string | null; color?: string; dataKey?: string; payload?: { fullLabel?: string } };
 type TooltipProps = { active?: boolean; payload?: TooltipEntry[]; label?: string };
 
-const toChartData = (months: string[], series: EconomyYearlySeries[]): ChartRow[] => months.map((month, index) => {
-  const row: ChartRow = { month };
+const toChartData = (months: EconomyYearlyBreakdown["months"], series: EconomyYearlySeries[]): ChartRow[] => months.map((month, index) => {
+  const row: ChartRow = { month: month.label, fullLabel: month.fullLabel ?? month.label };
   for (const item of series) row[item.key] = item.values[index] ?? 0;
   return row;
 });
 
 function MultiSeriesTooltip({ active, payload, label }: TooltipProps) {
   if (!active || !payload?.length) return null;
-  return <div className="economy-chart-tooltip"><strong>{label}</strong>{payload.map((entry) => <span key={entry.dataKey ?? entry.name} style={{ color: entry.color }}>{entry.name}: {formatEconomyMoney(Number(entry.value ?? 0))}</span>)}</div>;
+  return <div className="economy-chart-tooltip"><strong>{payload[0]?.payload?.fullLabel ?? label}</strong>{payload.map((entry) => <span key={entry.dataKey ?? entry.name} style={{ color: entry.color }}>{entry.name}: {formatEconomyMoney(Number(entry.value ?? 0))}</span>)}</div>;
 }
 
-function EconomyMultiSeriesLineChart({ title, subtitle, emptyMessage, series, months, colors, ariaLabel, note }: { title: string; subtitle: string; emptyMessage: string; series: EconomyYearlySeries[]; months: string[]; colors: Record<string, string>; ariaLabel: string; note?: string }) {
+function EconomyMultiSeriesLineChart({ title, subtitle, emptyMessage, series, months, colors, ariaLabel, note }: { title: string; subtitle: string; emptyMessage: string; series: EconomyYearlySeries[]; months: EconomyYearlyBreakdown["months"]; colors: Record<string, string>; ariaLabel: string; note?: string }) {
   const data = toChartData(months, series);
   const hasData = series.some((item) => item.values.some((value) => value !== 0));
   return (
@@ -55,10 +55,13 @@ function EconomyMultiSeriesLineChart({ title, subtitle, emptyMessage, series, mo
 
 export function EconomyYearlyBreakdownCharts({ yearlyBreakdown }: Props) {
   const unclassified = yearlyBreakdown.metadata?.unclassifiedExpenseCount ?? 0;
+  const firstMonth = yearlyBreakdown.months[0]?.label;
+  const lastMonth = yearlyBreakdown.months[yearlyBreakdown.months.length - 1]?.label;
+  const subtitle = firstMonth && lastMonth ? `Evolución interanual · ${firstMonth} a ${lastMonth}` : 'Evolución interanual';
   return (
     <div className="economy-yearly-breakdown-grid" aria-label="Gráficos analíticos anuales de Economía Club">
-      <EconomyMultiSeriesLineChart title="📈 Ingresos Operativos por Categoría" subtitle={`Evolución mensual · ${yearlyBreakdown.year}`} emptyMessage="Sin ingresos operativos para el período seleccionado." series={yearlyBreakdown.operatingIncomeByCategory} months={yearlyBreakdown.months} colors={INCOME_COLORS} ariaLabel="Gráfico de ingresos operativos por categoría" />
-      <EconomyMultiSeriesLineChart title="📉 Gastos por Tipo" subtitle={`Evolución mensual · ${yearlyBreakdown.year}`} emptyMessage="Sin gastos clasificados para el período seleccionado." series={yearlyBreakdown.expensesByType} months={yearlyBreakdown.months} colors={EXPENSE_COLORS} ariaLabel="Gráfico de gastos por tipo" note={unclassified > 0 ? `${unclassified} movimientos de egreso sin clasificación no fueron incluidos.` : undefined} />
+      <EconomyMultiSeriesLineChart title="📈 Ingresos Operativos por Categoría" subtitle={subtitle} emptyMessage="Sin ingresos operativos para el período seleccionado." series={yearlyBreakdown.operatingIncomeByCategory} months={yearlyBreakdown.months} colors={INCOME_COLORS} ariaLabel="Gráfico de ingresos operativos por categoría" />
+      <EconomyMultiSeriesLineChart title="📉 Gastos por Tipo" subtitle={subtitle} emptyMessage="Sin gastos clasificados para el período seleccionado." series={yearlyBreakdown.expensesByType} months={yearlyBreakdown.months} colors={EXPENSE_COLORS} ariaLabel="Gráfico de gastos por tipo" note={unclassified > 0 ? `${unclassified} movimientos de egreso sin clasificación no fueron incluidos.` : undefined} />
     </div>
   );
 }

@@ -406,9 +406,26 @@ export interface EconomyOperatingIncomeCategorySeries extends EconomyYearlySerie
   annualTotal: number;
 }
 
-export interface EconomyYearlyBreakdown {
+export interface EconomyYearlyBreakdownMonth {
+  key: string;
+  label: string;
+  fullLabel?: string;
   year: number;
-  months: string[];
+  month: number;
+}
+
+export interface EconomyYearlyBreakdownPeriod {
+  from: string;
+  toExclusive: string;
+  fromMonth: string;
+  toMonth: string;
+  timezone: string;
+  monthCount: number;
+}
+
+export interface EconomyYearlyBreakdown {
+  period: EconomyYearlyBreakdownPeriod;
+  months: EconomyYearlyBreakdownMonth[];
   operatingIncomeByCategory: EconomyOperatingIncomeCategorySeries[];
   expensesByType: EconomyYearlySeries[];
   metadata: {

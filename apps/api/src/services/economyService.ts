@@ -18,7 +18,7 @@ import {
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
-import { ARGENTINA_TIME_ZONE, calculateVariation, classifyExpenseCategory, DEBT_LIABILITY_CATEGORIES, EXPENSE_TYPE_KEYS, EXPENSE_TYPE_LABELS, getArgentinaYearWindow, getCurrentMonthWindow, getLastCompleteMonthWindows, MONTH_LABELS_ES, NON_OPERATING_EXPENSE_CATEGORIES, normalizeCategoryName, OPERATING_CATEGORIES, OPERATING_PROFIT_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, type ExpenseTypeKey } from "./economyDomain.js";
+import { ARGENTINA_TIME_ZONE, calculateVariation, classifyExpenseCategory, DEBT_LIABILITY_CATEGORIES, EXPENSE_TYPE_KEYS, EXPENSE_TYPE_LABELS, getCurrentMonthWindow, getLastCompleteMonthWindows, getRollingInterannualMonthWindow, NON_OPERATING_EXPENSE_CATEGORIES, normalizeCategoryName, OPERATING_CATEGORIES, OPERATING_PROFIT_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, type ExpenseTypeKey } from "./economyDomain.js";
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
@@ -137,6 +137,7 @@ export const getMonthlyEvolution = async (yearQuery?: unknown): Promise<{ items:
 
 
 type YearlyBreakdownAggregateRow = {
+  year?: unknown;
   month?: unknown;
   normalizedCategory?: unknown;
   normalized_category?: unknown;
@@ -160,20 +161,22 @@ const expenseValueForMovement = (group: ExpenseTypeKey, movementType: string, am
   return 0;
 };
 
-export const buildYearlyBreakdown = (year: number, rows: YearlyBreakdownAggregateRow[]): JsonRecord => {
+export const buildYearlyBreakdown = (window: ReturnType<typeof getRollingInterannualMonthWindow>, rows: YearlyBreakdownAggregateRow[]): JsonRecord => {
+  const monthIndexByKey = new Map(window.months.map((month, index) => [month.key, index]));
   const incomeByCategory = new Map<string, { key: string; label: string; annualTotal: number; values: number[] }>();
   for (const category of OPERATING_CATEGORIES) {
-    incomeByCategory.set(category, { key: category, label: labelForOperatingCategory(category), annualTotal: 0, values: Array(12).fill(0) });
+    incomeByCategory.set(category, { key: category, label: labelForOperatingCategory(category), annualTotal: 0, values: Array(window.months.length).fill(0) });
   }
   const expenses = new Map<string, { key: string; label: string; values: number[] }>();
-  for (const key of EXPENSE_TYPE_KEYS) expenses.set(key, { key, label: EXPENSE_TYPE_LABELS[key], values: Array(12).fill(0) });
+  for (const key of EXPENSE_TYPE_KEYS) expenses.set(key, { key, label: EXPENSE_TYPE_LABELS[key], values: Array(window.months.length).fill(0) });
   const unclassified = new Map<string, number>();
   let consideredMovements = 0;
 
   for (const raw of rows) {
+    const year = toInteger(raw.year);
     const month = toInteger(raw.month);
-    if (month < 1 || month > 12) continue;
-    const monthIndex = month - 1;
+    const monthIndex = monthIndexByKey.get(`${year}-${String(month).padStart(2, '0')}`);
+    if (monthIndex === undefined) continue;
     const category = normalizeCategoryName(raw.normalizedCategory ?? raw.normalized_category ?? raw.categoryLabel ?? raw.category_label);
     const movementType = normalizeCategoryName(raw.movementType ?? raw.movement_type);
     const amount = toNumber(raw.amount);
@@ -204,8 +207,15 @@ export const buildYearlyBreakdown = (year: number, rows: YearlyBreakdownAggregat
     .sort((a, b) => b.annualTotal - a.annualTotal || a.label.localeCompare(b.label, 'es-AR'));
 
   return {
-    year,
-    months: [...MONTH_LABELS_ES],
+    period: {
+      from: window.fromMonth,
+      toExclusive: window.toExclusive,
+      fromMonth: window.months[0]?.key,
+      toMonth: window.months[window.months.length - 1]?.key,
+      timezone: window.timezone,
+      monthCount: window.months.length,
+    },
+    months: window.months.map((month) => ({ key: month.key, label: month.label, fullLabel: month.fullLabel, year: month.year, month: month.month })),
     operatingIncomeByCategory,
     expensesByType: Array.from(expenses.values()).map((series) => ({ ...series, values: roundValues(series.values) })),
     metadata: {
@@ -219,10 +229,26 @@ export const buildYearlyBreakdown = (year: number, rows: YearlyBreakdownAggregat
   };
 };
 
-export const getYearlyBreakdown = async (yearQuery?: unknown): Promise<JsonRecord> => {
-  const year = parseYear(yearQuery);
-  const window = getArgentinaYearWindow(year);
-  return buildYearlyBreakdown(year, normalizeRows(await getYearlyBreakdownRows(window.start, window.end)));
+const parseAsOfDate = (value: unknown): Date => {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const parsed = new Date(`${raw}T12:00:00-03:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  if (typeof raw === 'string' && /^\d{4}$/.test(raw)) {
+    const now = new Date();
+    const monthDay = new Intl.DateTimeFormat('en-CA', { timeZone: ARGENTINA_TIME_ZONE, month: '2-digit', day: '2-digit' })
+      .formatToParts(now)
+      .reduce<Record<string, string>>((acc, part) => ({ ...acc, [part.type]: part.value }), {});
+    const parsed = new Date(`${raw}-${monthDay.month}-${monthDay.day}T12:00:00-03:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+};
+
+export const getYearlyBreakdown = async (asOfQuery?: unknown): Promise<JsonRecord> => {
+  const window = getRollingInterannualMonthWindow(parseAsOfDate(asOfQuery));
+  return buildYearlyBreakdown(window, normalizeRows(await getYearlyBreakdownRows(window.start, window.end)));
 };
 
 export const getBySector = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {

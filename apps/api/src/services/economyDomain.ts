@@ -109,6 +109,37 @@ export const MONTH_LABELS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ] as const;
 
+export type RollingInterannualMonth = { year: number; month: number; key: string; label: string; fullLabel: string };
+
+const addArgentinaMonths = (year: number, month: number, offset: number): { year: number; month: number } => {
+  const zeroBased = year * 12 + (month - 1) + offset;
+  return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 };
+};
+
+export const getRollingInterannualMonthWindow = (reference = new Date()) => {
+  const current = zonedParts(reference);
+  const start = { year: current.year - 1, month: current.month };
+  const endExclusive = addArgentinaMonths(current.year, current.month, 1);
+  const shortFormatter = new Intl.DateTimeFormat("es-AR", { timeZone: ARGENTINA_TIME_ZONE, month: "short", year: "numeric" });
+  const fullFormatter = new Intl.DateTimeFormat("es-AR", { timeZone: ARGENTINA_TIME_ZONE, month: "long", year: "numeric" });
+  const months: RollingInterannualMonth[] = [];
+  for (let offset = 0; offset <= 12; offset += 1) {
+    const part = addArgentinaMonths(start.year, start.month, offset);
+    const date = utcFromArgentinaDay(part.year, part.month, 1);
+    const label = shortFormatter.format(date).replace(/\.$/, "").replace(/^./, (char) => char.toLocaleUpperCase("es-AR"));
+    const fullLabel = fullFormatter.format(date).replace(/^./, (char) => char.toLocaleUpperCase("es-AR"));
+    months.push({ year: part.year, month: part.month, key: `${part.year}-${String(part.month).padStart(2, "0")}`, label, fullLabel });
+  }
+  return {
+    fromMonth: `${start.year}-${String(start.month).padStart(2, "0")}-01`,
+    toExclusive: `${endExclusive.year}-${String(endExclusive.month).padStart(2, "0")}-01`,
+    start: utcFromArgentinaDay(start.year, start.month, 1),
+    end: utcFromArgentinaDay(endExclusive.year, endExclusive.month, 1),
+    timezone: ARGENTINA_TIME_ZONE,
+    months,
+  };
+};
+
 export const isOperatingCategory = (value: unknown): boolean =>
   (OPERATING_CATEGORIES as readonly string[]).includes(normalizeCategoryName(value));
 

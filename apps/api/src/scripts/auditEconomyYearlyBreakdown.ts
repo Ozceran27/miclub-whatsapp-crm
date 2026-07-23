@@ -2,18 +2,18 @@ import "dotenv/config";
 import { closePostgresPool } from "../db/postgres.js";
 import { getYearlyBreakdownRows } from "../repositories/economyRepository.js";
 import { buildYearlyBreakdown } from "../services/economyService.js";
-import { getArgentinaYearWindow } from "../services/economyDomain.js";
+import { getRollingInterannualMonthWindow } from "../services/economyDomain.js";
 
-const yearArg = process.argv.find((arg) => /^--year=\d{4}$/.test(arg));
-const year = yearArg ? Number(yearArg.split("=")[1]) : new Date().getUTCFullYear();
-const window = getArgentinaYearWindow(year);
+const asOfArg = process.argv.find((arg) => /^--asOf=\d{4}-\d{2}-\d{2}$/.test(arg));
+const asOf = asOfArg ? new Date(`${asOfArg.split("=")[1]}T12:00:00-03:00`) : new Date();
+const window = getRollingInterannualMonthWindow(asOf);
 
 getYearlyBreakdownRows(window.start, window.end)
   .then((rows) => {
-    const breakdown = buildYearlyBreakdown(year, rows) as any;
+    const breakdown = buildYearlyBreakdown(window, rows) as any;
     console.log(JSON.stringify({
-      year,
-      period: { from: window.start.toISOString(), to: window.end.toISOString() },
+      period: breakdown.period,
+      months: breakdown.months,
       operatingIncomeByCategory: breakdown.operatingIncomeByCategory,
       expensesByType: breakdown.expensesByType,
       unclassifiedExpenses: breakdown.metadata.unclassifiedExpenseCategories ?? [],
