@@ -14,10 +14,11 @@ import {
   getRankingBySector,
   getRecentMovements as getRecentMovementRows,
   getCompletedMonthMovementSummary,
+  getYearlyBreakdownRows,
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
-import { calculateVariation, DEBT_LIABILITY_CATEGORIES, getCurrentMonthWindow, getLastCompleteMonthWindows, NON_OPERATING_EXPENSE_CATEGORIES, OPERATING_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES } from "./economyDomain.js";
+import { ARGENTINA_TIME_ZONE, calculateVariation, classifyExpenseCategory, DEBT_LIABILITY_CATEGORIES, EXPENSE_TYPE_KEYS, EXPENSE_TYPE_LABELS, getArgentinaYearWindow, getCurrentMonthWindow, getLastCompleteMonthWindows, MONTH_LABELS_ES, NON_OPERATING_EXPENSE_CATEGORIES, normalizeCategoryName, OPERATING_CATEGORIES, OPERATING_PROFIT_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, type ExpenseTypeKey } from "./economyDomain.js";
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
@@ -131,6 +132,97 @@ export const getMonthlyEvolution = async (yearQuery?: unknown): Promise<{ items:
     };
   });
   return { items, total: items.length };
+};
+
+
+
+type YearlyBreakdownAggregateRow = {
+  month?: unknown;
+  normalizedCategory?: unknown;
+  normalized_category?: unknown;
+  categoryLabel?: unknown;
+  category_label?: unknown;
+  movementType?: unknown;
+  movement_type?: unknown;
+  amount?: unknown;
+  movements?: unknown;
+};
+
+const labelForOperatingCategory = (key: string): string => {
+  const canonical = (OPERATING_PROFIT_CATEGORIES as readonly string[]).find((category) => normalizeCategoryName(category) === key) ?? key;
+  return canonical.charAt(0) + canonical.slice(1).toLocaleLowerCase('es-AR');
+};
+
+const expenseValueForMovement = (group: ExpenseTypeKey, movementType: string, amount: number): number => {
+  if (group === 'OPERATING' || group === 'NON_OPERATING') return movementType === 'EGRESOS' ? amount : 0;
+  // Convención de gastos: egresos - ingresos. El signo se preserva para reintegros o reducciones netas.
+  if (group === 'DEBT' || group === 'SERVICES' || group === 'TAXES') return movementType === 'EGRESOS' ? amount : movementType === 'INGRESOS' ? -amount : 0;
+  return 0;
+};
+
+export const buildYearlyBreakdown = (year: number, rows: YearlyBreakdownAggregateRow[]): JsonRecord => {
+  const incomeByCategory = new Map<string, { key: string; label: string; annualTotal: number; values: number[] }>();
+  for (const category of OPERATING_CATEGORIES) {
+    incomeByCategory.set(category, { key: category, label: labelForOperatingCategory(category), annualTotal: 0, values: Array(12).fill(0) });
+  }
+  const expenses = new Map<string, { key: string; label: string; values: number[] }>();
+  for (const key of EXPENSE_TYPE_KEYS) expenses.set(key, { key, label: EXPENSE_TYPE_LABELS[key], values: Array(12).fill(0) });
+  const unclassified = new Map<string, number>();
+  let consideredMovements = 0;
+
+  for (const raw of rows) {
+    const month = toInteger(raw.month);
+    if (month < 1 || month > 12) continue;
+    const monthIndex = month - 1;
+    const category = normalizeCategoryName(raw.normalizedCategory ?? raw.normalized_category ?? raw.categoryLabel ?? raw.category_label);
+    const movementType = normalizeCategoryName(raw.movementType ?? raw.movement_type);
+    const amount = toNumber(raw.amount);
+    const movements = toInteger(raw.movements);
+    consideredMovements += movements;
+
+    if (movementType === 'INGRESOS' && category !== 'CAPITAL' && (OPERATING_CATEGORIES as readonly string[]).includes(category)) {
+      const series = incomeByCategory.get(category);
+      if (series) {
+        series.values[monthIndex] += amount;
+        series.annualTotal += amount;
+      }
+    }
+
+    const group = classifyExpenseCategory(category);
+    if (group === 'UNCLASSIFIED') {
+      if (movementType === 'EGRESOS') unclassified.set(category || 'SIN CLASIFICAR', (unclassified.get(category || 'SIN CLASIFICAR') ?? 0) + movements);
+      continue;
+    }
+    const expenseSeries = expenses.get(group);
+    if (expenseSeries) expenseSeries.values[monthIndex] += expenseValueForMovement(group, movementType, amount);
+  }
+
+  const roundValues = (values: number[]) => values.map((value) => Math.round(value * 100) / 100);
+  const operatingIncomeByCategory = Array.from(incomeByCategory.values())
+    .map((series) => ({ ...series, annualTotal: Math.round(series.annualTotal * 100) / 100, values: roundValues(series.values) }))
+    .filter((series) => series.annualTotal > 0)
+    .sort((a, b) => b.annualTotal - a.annualTotal || a.label.localeCompare(b.label, 'es-AR'));
+
+  return {
+    year,
+    months: [...MONTH_LABELS_ES],
+    operatingIncomeByCategory,
+    expensesByType: Array.from(expenses.values()).map((series) => ({ ...series, values: roundValues(series.values) })),
+    metadata: {
+      unclassifiedExpenseCount: Array.from(unclassified.values()).reduce((sum, count) => sum + count, 0),
+      unclassifiedExpenseCategories: Array.from(unclassified.entries()).map(([category, count]) => ({ category, count })),
+      generatedAt: new Date().toISOString(),
+      timezone: ARGENTINA_TIME_ZONE,
+      signConvention: 'EXPENSES_MINUS_INCOME_FOR_DEBT_SERVICES_TAXES',
+      consideredMovements,
+    },
+  };
+};
+
+export const getYearlyBreakdown = async (yearQuery?: unknown): Promise<JsonRecord> => {
+  const year = parseYear(yearQuery);
+  const window = getArgentinaYearWindow(year);
+  return buildYearlyBreakdown(year, normalizeRows(await getYearlyBreakdownRows(window.start, window.end)));
 };
 
 export const getBySector = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {

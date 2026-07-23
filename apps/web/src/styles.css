@@ -2878,3 +2878,28 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
     justify-content: flex-start;
   }
 }
+
+.economy-yearly-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.economy-chart-card--yearly-breakdown .recharts-legend-wrapper {
+  max-height: 58px;
+  overflow-y: auto;
+}
+
+.economy-chart-note {
+  margin-top: 8px;
+  color: #ffcf66;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 980px) {
+  .economy-yearly-breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -257,3 +257,46 @@ test("requested final audit examples calculate balances by official completed ca
   ], { sector: "Fitness" });
   assert.equal(fitness.profitability, 70_000);
 });
+
+test("expense classifier is exclusive and prioritizes specific groups", async () => {
+  const { classifyExpenseCategory } = await import("./economyDomain.js");
+  assert.equal(classifyExpenseCategory(" deuda "), "DEBT");
+  assert.equal(classifyExpenseCategory("luz"), "SERVICES");
+  assert.equal(classifyExpenseCategory("impuesto"), "TAXES");
+  assert.equal(classifyExpenseCategory("CUOTA"), "OPERATING");
+  assert.equal(classifyExpenseCategory("CMV"), "NON_OPERATING");
+  assert.equal(classifyExpenseCategory("categoría fantasma"), "UNCLASSIFIED");
+});
+
+test("yearly breakdown returns twelve positions, filters operating income and preserves expense balance signs", async () => {
+  const { buildYearlyBreakdown } = await import("./economyService.js");
+  const result = buildYearlyBreakdown(2026, [
+    { month: 1, normalized_category: "CUOTA", category_label: "Cuota", movement_type: "INGRESOS", amount: 1000, movements: 1 },
+    { month: 3, normalized_category: "CUOTA", category_label: "Cuota", movement_type: "INGRESOS", amount: 2500, movements: 1 },
+    { month: 3, normalized_category: "BEBIDAS", category_label: "Bebidas", movement_type: "EGRESOS", amount: 300, movements: 1 },
+    { month: 3, normalized_category: "CAPITAL", category_label: "Capital", movement_type: "INGRESOS", amount: 9999, movements: 1 },
+    { month: 4, normalized_category: "CUOTA", category_label: "Cuota", movement_type: "EGRESOS", amount: 700, movements: 1 },
+    { month: 5, normalized_category: "CMV", category_label: "CMV", movement_type: "EGRESOS", amount: 200, movements: 1 },
+    { month: 6, normalized_category: "DEUDA", category_label: "Deuda", movement_type: "EGRESOS", amount: 500, movements: 1 },
+    { month: 6, normalized_category: "DEUDA", category_label: "Deuda", movement_type: "INGRESOS", amount: 800, movements: 1 },
+    { month: 7, normalized_category: "LUZ", category_label: "Luz", movement_type: "EGRESOS", amount: 400, movements: 1 },
+    { month: 7, normalized_category: "LUZ", category_label: "Luz", movement_type: "INGRESOS", amount: 50, movements: 1 },
+    { month: 8, normalized_category: "IMPUESTO", category_label: "Impuesto", movement_type: "EGRESOS", amount: 600, movements: 1 },
+    { month: 9, normalized_category: "RARA", category_label: "Rara", movement_type: "EGRESOS", amount: 99, movements: 1 },
+  ]) as any;
+  const cuota = (result.operatingIncomeByCategory as any[]).find((item) => item.key === "CUOTA");
+  assert.equal(cuota.annualTotal, 3500);
+  assert.equal(cuota.values.length, 12);
+  assert.equal(cuota.values[0], 1000);
+  assert.equal(cuota.values[1], 0);
+  assert.equal(cuota.values[2], 2500);
+  assert.equal((result.operatingIncomeByCategory as any[]).some((item) => item.key === "CAPITAL"), false);
+  const expenses = new Map((result.expensesByType as any[]).map((item) => [item.key, item.values]));
+  assert.equal((expenses.get("OPERATING") as number[])[2], 300);
+  assert.equal((expenses.get("OPERATING") as number[])[3], 700);
+  assert.equal((expenses.get("NON_OPERATING") as number[])[4], 200);
+  assert.equal((expenses.get("DEBT") as number[])[5], -300);
+  assert.equal((expenses.get("SERVICES") as number[])[6], 350);
+  assert.equal((expenses.get("TAXES") as number[])[7], 600);
+  assert.equal(result.metadata.unclassifiedExpenseCount, 1);
+});

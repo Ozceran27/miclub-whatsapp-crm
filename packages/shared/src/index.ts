@@ -395,6 +395,32 @@ export interface EconomyPendingSummary {
   total: number;
 }
 
+
+export interface EconomyYearlySeries {
+  key: string;
+  label: string;
+  values: number[];
+}
+
+export interface EconomyOperatingIncomeCategorySeries extends EconomyYearlySeries {
+  annualTotal: number;
+}
+
+export interface EconomyYearlyBreakdown {
+  year: number;
+  months: string[];
+  operatingIncomeByCategory: EconomyOperatingIncomeCategorySeries[];
+  expensesByType: EconomyYearlySeries[];
+  metadata: {
+    unclassifiedExpenseCount: number;
+    unclassifiedExpenseCategories?: { category: string; count: number }[];
+    generatedAt: string;
+    timezone: string;
+    signConvention?: string;
+    consideredMovements?: number;
+  };
+}
+
 export interface EconomyAnnualSummary {
   year: number;
   income: number;
@@ -430,6 +456,7 @@ export interface EconomyDashboardResponse {
   recentMovements: EconomyDashboardCollection<EconomyRecentMovement>;
   pending: EconomyPendingSummary;
   annualSummary: EconomyAnnualSummary;
+  yearlyBreakdown?: EconomyYearlyBreakdown;
   comparison: EconomyComparison;
   insights: EconomyDashboardCollection<EconomyInsight>;
 }

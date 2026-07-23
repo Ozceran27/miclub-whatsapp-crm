@@ -1,6 +1,6 @@
 import { Router } from "express";
 import asyncHandler from "./asyncHandler.js";
-import { getAnnualSummary, getByCategory, getBySector, getComparison, getInsights, getMonthlyEvolution, getPaymentMethods, getPending, getRecentMovements, getSectorRankings, getSummary } from "../services/economyService.js";
+import { getAnnualSummary, getYearlyBreakdown, getByCategory, getBySector, getComparison, getInsights, getMonthlyEvolution, getPaymentMethods, getPending, getRecentMovements, getSectorRankings, getSummary } from "../services/economyService.js";
 
 const router = Router();
 
@@ -13,6 +13,7 @@ router.get("/payment-methods", asyncHandler(async (_req, res) => res.json(await 
 router.get("/recent-movements", asyncHandler(async (req, res) => res.json(await getRecentMovements(req.query.limit))));
 router.get("/pending", asyncHandler(async (req, res) => res.json(await getPending(req.query.limit))));
 router.get("/annual-summary", asyncHandler(async (req, res) => res.json(await getAnnualSummary(req.query.year))));
+router.get("/yearly-breakdown", asyncHandler(async (req, res) => res.json(await getYearlyBreakdown(req.query.year))));
 router.get("/comparison", asyncHandler(async (_req, res) => res.json(await getComparison())));
 router.get("/insights", asyncHandler(async (_req, res) => res.json(await getInsights())));
 

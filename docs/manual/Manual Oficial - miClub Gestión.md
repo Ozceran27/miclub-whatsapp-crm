@@ -196,3 +196,13 @@ Inconsistencias detectadas
 
 4. Rutas legacy raíz: el frontend consume /summary, /members, /debtors y no rutas /api. Impacto: contrato heredado; solución: documentar y migrar con compatibilidad.
 
+
+## Economía Club · gráficos analíticos anuales
+
+La fila analítica anual de Economía Club utiliza `GET /api/economy/yearly-breakdown?year=AAAA` y trabaja siempre con doce meses calendario de enero a diciembre en zona `America/Argentina/Buenos_Aires`. El backend filtra movimientos consolidados con `operational_status = COMPLETADO`, usa `movement_date`, excluye pendientes/cancelados/anulados por estado operativo y no modifica datos históricos.
+
+Categorías operativas para ingresos y gastos operativos: INSCRIPCIÓN, CUOTA, TURNOS, COMISIÓN, ALQUILER, EVENTOS, VENTAS, CLASES, CURSOS, KIOSCO y BEBIDAS. El gráfico de ingresos operativos incluye solo `movement_type = INGRESOS`, excluye CAPITAL y publica únicamente categorías con total anual mayor que cero.
+
+El clasificador único de gastos aplica prioridad DEBT, SERVICES, TAXES, OPERATING, NON_OPERATING y UNCLASSIFIED. Las categorías no operativas son PUBLICIDAD, SALARIOS, MANTENIM., DEPÓSITOS, EXTRACCIONES, DÓLARES, REPARACIONES, VIÁTICOS, GANANCIA, PÉRDIDA, CMV, SEGUROS, LIMPIEZA, LIBRERÍA y OTROS. Deudas/Pasivos usa DEUDA y DEUDAS; Servicios usa LUZ, AGUA e INTERNET; Impuestos usa IMPUESTO e IMPUESTOS.
+
+Convención de signos del gráfico “Gastos por Tipo”: para Gastos Operativos y Gastos No Operativos se suman únicamente EGRESOS; para Deudas/Pasivos, Servicios e Impuestos se calcula EGRESOS - INGRESOS y se preserva el signo sin `ABS()`. Un valor negativo representa ingreso/reintegro neto superior al egreso del mes. Los movimientos no clasificados se reportan en metadata y en el script `npm run audit:economy-yearly-breakdown -- --year=AAAA` sin reclasificarlos como OTROS.

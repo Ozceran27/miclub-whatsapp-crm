@@ -15,7 +15,8 @@
     "check": "npm run typecheck && npm run build && npm run test -w @miclub/api",
     "import:sheets": "tsx apps/api/src/scripts/importGoogleSheetsToPostgres.ts",
     "import:sheets:dry": "tsx apps/api/src/scripts/importGoogleSheetsToPostgres.ts --dry-run",
-    "audit:postgres": "tsx apps/api/src/scripts/auditPostgres.ts"
+    "audit:postgres": "tsx apps/api/src/scripts/auditPostgres.ts",
+    "audit:economy-yearly-breakdown": "tsx apps/api/src/scripts/auditEconomyYearlyBreakdown.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

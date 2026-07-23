@@ -8,6 +8,7 @@ import { EconomyPaymentMethodsChart } from './Economy/EconomyPaymentMethodsChart
 import { EconomyProfitChart } from './Economy/EconomyProfitChart';
 import { EconomyRankings } from './Economy/EconomyRankings';
 import { EconomySummaryCards } from './Economy/EconomySummaryCards';
+import { EconomyYearlyBreakdownCharts } from './Economy/EconomyYearlyBreakdownCharts';
 import { PendingMovementsPanel } from './Economy/PendingMovementsPanel';
 import { RecentMovementsPanel } from './Economy/RecentMovementsPanel';
 import { useEconomyDashboard } from './Economy/useEconomyDashboard';
@@ -66,6 +67,7 @@ export default function EconomyModule() {
             <EconomyGrowthChart monthlyEvolution={data.monthlyEvolution} />
             <EconomyOperatingProfitabilityChart monthlyEvolution={data.monthlyEvolution} />
           </div>
+          <EconomyYearlyBreakdownCharts yearlyBreakdown={data.yearlyBreakdown} />
           <EconomyRankings sectorRankings={data.sectorRankings} />
           <EconomyPaymentMethodsChart paymentMethods={data.paymentMethods} />
           <div className="economy-final-grid">
