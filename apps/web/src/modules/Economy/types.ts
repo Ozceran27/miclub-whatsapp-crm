@@ -13,7 +13,9 @@ export type {
   EconomyRecentMovement,
   EconomySectorBreakdownItem,
   EconomySectorRankings,
-  EconomySummary
+  EconomySummary,
+  EconomyYearlyBreakdown,
+  EconomyYearlySeries
 } from '@miclub/shared';
 
 export type DashboardStatus = 'loading' | 'error' | 'empty' | 'ready';

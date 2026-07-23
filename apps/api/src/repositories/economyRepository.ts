@@ -303,3 +303,25 @@ export const getBaseInsights = async (): Promise<EconomyRow[]> => {
 };
 
 export const getCurrentPreviousMonthComparison = async (): Promise<EconomyRow[]> => [];
+
+export const getYearlyBreakdownRows = async (from: Date, to: Date): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<EconomyRow>(`
+    select
+      extract(month from (m.movement_date at time zone 'America/Argentina/Buenos_Aires'))::integer as month,
+      upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category,
+      coalesce(nullif(trim(c.name), ''), 'Sin clasificar') as category_label,
+      m.movement_type,
+      coalesce(sum(m.amount), 0) as amount,
+      count(m.id)::integer as movements
+    from miclub.movements m
+    left join miclub.movement_categories c on c.id = m.category_id
+    where m.movement_date >= $1::timestamptz
+      and m.movement_date < $2::timestamptz
+      and m.operational_status = 'COMPLETADO'
+      and m.movement_type in ('INGRESOS', 'EGRESOS')
+    group by 1, 2, 3, 4
+    order by 1, 2, 4
+  `, [from, to]);
+  return result.rows;
+};

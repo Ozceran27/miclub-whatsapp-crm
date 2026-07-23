@@ -49,6 +49,7 @@ export const NON_OPERATING_EXPENSE_CATEGORIES = [
   "MANTENIM.",
   "DEPÓSITOS",
   "EXTRACCIONES",
+  "DÓLARES",
   "REPARACIONES",
   "VIÁTICOS",
   "GANANCIA",
@@ -62,7 +63,7 @@ export const NON_OPERATING_EXPENSE_CATEGORIES = [
 
 export const DEBT_LIABILITY_CATEGORIES = ["DEUDA", "DEUDAS"] as const;
 export const SERVICE_CATEGORIES = ["LUZ", "AGUA", "INTERNET"] as const;
-export const TAX_CATEGORIES = ["IMPUESTOS"] as const;
+export const TAX_CATEGORIES = ["IMPUESTO", "IMPUESTOS"] as const;
 export const TAX_CATEGORY_KEYS = TAX_CATEGORIES.map((category) => normalizeCategoryName(category));
 
 export const NON_OPERATING_EXPENSE_CATEGORY_KEYS = NON_OPERATING_EXPENSE_CATEGORIES.map((category) => normalizeCategoryName(category));
@@ -72,6 +73,41 @@ export const SERVICE_CATEGORY_KEYS = SERVICE_CATEGORIES.map((category) => normal
 
 export const getOperatingCategories = (): readonly string[] => OPERATING_PROFIT_CATEGORIES;
 
+
+
+export const EXPENSE_TYPE_KEYS = ["OPERATING", "NON_OPERATING", "DEBT", "SERVICES", "TAXES"] as const;
+export type ExpenseTypeKey = typeof EXPENSE_TYPE_KEYS[number] | "UNCLASSIFIED";
+
+export const EXPENSE_TYPE_LABELS: Record<Exclude<ExpenseTypeKey, "UNCLASSIFIED">, string> = {
+  OPERATING: "Gastos Operativos",
+  NON_OPERATING: "Gastos No Operativos",
+  DEBT: "Deudas / Pasivos",
+  SERVICES: "Servicios",
+  TAXES: "Impuestos",
+};
+
+export const classifyExpenseCategory = (value: unknown): ExpenseTypeKey => {
+  const normalized = normalizeCategoryName(value);
+  if ((DEBT_LIABILITY_CATEGORY_KEYS as readonly string[]).includes(normalized)) return "DEBT";
+  if ((SERVICE_CATEGORY_KEYS as readonly string[]).includes(normalized)) return "SERVICES";
+  if ((TAX_CATEGORY_KEYS as readonly string[]).includes(normalized)) return "TAXES";
+  if ((OPERATING_CATEGORIES as readonly string[]).includes(normalized)) return "OPERATING";
+  if ((NON_OPERATING_EXPENSE_CATEGORY_KEYS as readonly string[]).includes(normalized)) return "NON_OPERATING";
+  return "UNCLASSIFIED";
+};
+
+export const getArgentinaCalendarYear = (reference = new Date()): number => zonedParts(reference).year;
+
+export const getArgentinaYearWindow = (year = getArgentinaCalendarYear()) => ({
+  start: utcFromArgentinaDay(year, 1, 1),
+  end: utcFromArgentinaDay(year + 1, 1, 1),
+  year,
+});
+
+export const MONTH_LABELS_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+] as const;
 
 export const isOperatingCategory = (value: unknown): boolean =>
   (OPERATING_CATEGORIES as readonly string[]).includes(normalizeCategoryName(value));
