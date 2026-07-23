@@ -308,6 +308,7 @@ export const getYearlyBreakdownRows = async (from: Date, to: Date): Promise<Econ
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select
+      extract(year from (m.movement_date at time zone 'America/Argentina/Buenos_Aires'))::integer as year,
       extract(month from (m.movement_date at time zone 'America/Argentina/Buenos_Aires'))::integer as month,
       upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category,
       coalesce(nullif(trim(c.name), ''), 'Sin clasificar') as category_label,
@@ -320,8 +321,8 @@ export const getYearlyBreakdownRows = async (from: Date, to: Date): Promise<Econ
       and m.movement_date < $2::timestamptz
       and m.operational_status = 'COMPLETADO'
       and m.movement_type in ('INGRESOS', 'EGRESOS')
-    group by 1, 2, 3, 4
-    order by 1, 2, 4
+    group by 1, 2, 3, 4, 5
+    order by 1, 2, 3, 5
   `, [from, to]);
   return result.rows;
 };
