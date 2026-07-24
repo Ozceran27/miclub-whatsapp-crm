@@ -40,7 +40,7 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
     <div className="economy-finance-triptych" aria-label="Indicadores complementarios de Economía Club">
       <article className="card home-kpi-card finance-card economy-mini-finance-card economy-mini-finance-card--expenses">
         <div className="home-card-heading finance-card__header">
-          <h4>⚠️ Gastos</h4>
+          <h4>⚠️ Balance de Gastos</h4>
           <p>Balances de categorías no operativas y pasivos</p>
         </div>
         <div className="economy-finance-section economy-finance-section--split">
