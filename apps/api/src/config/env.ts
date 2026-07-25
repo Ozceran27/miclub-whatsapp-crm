@@ -72,3 +72,24 @@ export const warnIfProductionCrmSourceIsNotPostgres = (isProduction: boolean): v
 
   console.warn(`CRM_SOURCE debería ser postgres en producción. Valor actual: ${crmSource}. Se mantiene el comportamiento legacy/local sin bloquear el arranque.`);
 };
+
+export const validateRuntimeConfig = ({ isProduction }: { isProduction: boolean }): void => {
+  if (!isProduction) return;
+  const errors: string[] = [];
+  if (process.env.AUTH_ENABLED !== "true") errors.push("AUTH_ENABLED debe ser true");
+  if ((process.env.SESSION_SECRET?.trim().length ?? 0) < 32) errors.push("SESSION_SECRET debe tener al menos 32 caracteres");
+  if (process.env.BOOTSTRAP_DIRECTOR_ENABLED === "true") errors.push("BOOTSTRAP_DIRECTOR_ENABLED debe estar deshabilitado");
+  errors.push(...validatePostgresEnv());
+  const publicUrl = readOptional("PUBLIC_APP_URL");
+  if (!publicUrl || !publicUrl.startsWith("https://")) errors.push("PUBLIC_APP_URL debe ser una URL HTTPS");
+  if (publicUrl) {
+    try {
+      const origin = new URL(publicUrl).origin;
+      const allowed = new Set([publicUrl, ...(process.env.CORS_ORIGINS ?? "").split(",")].map((value) => value.trim()).filter(Boolean).map((value) => {
+        try { return new URL(value).origin; } catch { return ""; }
+      }));
+      if (!allowed.has(origin)) errors.push("CORS_ORIGINS/PUBLIC_APP_URL debe permitir el origen oficial");
+    } catch { errors.push("PUBLIC_APP_URL no es válida"); }
+  }
+  if (errors.length) throw new Error(`Configuración de producción insegura:\n- ${errors.join("\n- ")}`);
+};

@@ -25,6 +25,17 @@ No se hidrata un snapshot local.
 
 ## Reproducción y causas raíz
 
+Con `AUTH_ENABLED=false`, `POST /auth/login` devolvía `200` y
+`authenticated:true` **antes de leer el body**, `/auth/me` devolvía el mismo
+principal sintético y `createAuthProtection` ejecutaba `next()` para todas las
+rutas. Por eso cualquier credencial abría el frontend, F5 volvía a autenticar y
+los repositories legacy terminaban mostrando el único dataset disponible. No
+era una comparación defectuosa del hash: el flujo no llegaba a PostgreSQL ni a
+`verifyPassword`. El modo corregido nunca autentica con el flag apagado:
+login/me y rutas privadas fallan cerradas; en producción el proceso ni inicia.
+Sólo `NODE_ENV=test` conserva un bypass explícito para fixtures de rutas, y los
+endpoints de autenticación siguen sin simular login incluso allí.
+
 El estado previo puede reproducirse enviando dos cookies `miclub_session` en el
 mismo header (una válida de `/` y otra legacy de `/api`). `parseCookies` usaba
 `Object.fromEntries`, por lo que una reemplazaba a la otra según un orden que el
@@ -64,10 +75,12 @@ backend aceptaba la cookie sobreviviente.
 * La sesión v2 exige `userId`, `personId`, `membershipId`, `clubId` y rol. Una
   contraseña válida sin esa cadena recibe `MEMBERSHIP_REQUIRED` y no obtiene
   cookie ni acceso al panel.
-* El dump del 24/07 contiene miClub y la persona Fernando Ramos, pero muestra
-  `miclub.users` y `miclub.user_club_memberships` vacías y no contiene un rol
-  DIRECTOR. La CLI `npm run bootstrap:director` completa esa cadena de manera
-  transaccional e idempotente con una contraseña temporal del entorno.
+* El backup `dump-miclub_gestion-202607251603` contiene exactamente una identidad
+  `miclub.posadas@gmail.com`, una membresía activa y miClub; el hash tiene el
+  formato oficial `scrypt` (el informe nunca lo reproduce). La verificación
+  online sigue siendo obligatoria antes del despliegue. La nueva CLI
+  `AUTH_NEW_PASSWORD=... npm run auth:set-password -- --email ...` cambia sólo
+  `password_hash`, exige una coincidencia única y nunca imprime la contraseña.
 
 ## Verificación manual pendiente de entorno externo
 

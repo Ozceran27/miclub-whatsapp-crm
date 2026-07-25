@@ -30,6 +30,7 @@ export const getActiveMembershipContext = async (userId: string, membershipId: s
             ucm.permissions, ucm.sector_ids, u.session_revoked_before
        from miclub.user_club_memberships ucm
        join miclub.users u on u.id=ucm.user_id and u.status='active'
+       join miclub.clubs c on c.id=ucm.club_id and c.is_active=true
        join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
       where ucm.id=$1 and ucm.user_id=$2 and ucm.status='active'`,
     [membershipId, userId],
@@ -50,7 +51,7 @@ export const listActiveMemberships = async (userId: string) => {
   const result = await pool.query<{ membershipId: string; clubId: string; clubName: string; role: string }>(
     `select ucm.id as "membershipId", ucm.club_id as "clubId", c.name as "clubName", r.code as role
        from miclub.user_club_memberships ucm
-       join miclub.clubs c on c.id=ucm.club_id
+       join miclub.clubs c on c.id=ucm.club_id and c.is_active=true
        join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
       where ucm.user_id=$1 and ucm.status='active' order by c.name, ucm.created_at`, [userId],
   );
@@ -88,6 +89,7 @@ export const postgresUserRepository: UserRepository = {
          SELECT ucm.id, ucm.club_id, r.code AS role_code, person.id AS person_id,
                 ucm.permissions, ucm.sector_ids
          FROM miclub.user_club_memberships ucm
+         JOIN miclub.clubs c ON c.id = ucm.club_id AND c.is_active = true
          JOIN miclub.roles r ON r.id = ucm.role_id AND r.club_id = ucm.club_id
          JOIN miclub.people person ON person.user_id = u.id AND person.club_id = ucm.club_id
          WHERE ucm.user_id = u.id AND ucm.status = 'active'

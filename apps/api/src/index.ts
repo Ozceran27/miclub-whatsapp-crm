@@ -53,8 +53,8 @@ import { createCrmRoutes } from "./routes/crmRoutes.js";
 import { createLegacyCompatRoutes, getMembersSource, isDebtorMember } from "./routes/legacyCompatRoutes.js";
 import { createFrontendRoutes } from "./routes/frontendRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
-import { warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
-import { authEnabled, createAuthProtection, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
+import { validateRuntimeConfig, warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
+import { createAuthProtection, isExplicitTestAuthBypass, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
 import { rejectClientClubId, requireAuth, requireMembership } from "./middleware/authorization.js";
 import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importMutationRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
 
@@ -119,18 +119,14 @@ app.use((req, res, next) => {
 app.use(createAuthProtection({ isProduction }));
 app.use((req, res, next) => {
   if (isTenantScopedPath(req.path)) {
-    if (authEnabled) {
-      return requireAuth(req, res, (error?: unknown) => {
-        if (error) return next(error);
-        requireMembership(req, res, (membershipError?: unknown) => {
-          if (membershipError) return next(membershipError);
-          rejectClientClubId(req, res, next);
-        });
+    if (isExplicitTestAuthBypass()) return next();
+    return requireAuth(req, res, (error?: unknown) => {
+      if (error) return next(error);
+      requireMembership(req, res, (membershipError?: unknown) => {
+        if (membershipError) return next(membershipError);
+        rejectClientClubId(req, res, next);
       });
-    }
-    if (req.params.clubId !== undefined || req.query.clubId !== undefined || (req.body as Record<string, unknown> | undefined)?.clubId !== undefined) {
-      return rejectClientClubId(req, res, next);
-    }
+    });
   }
   next();
 });
@@ -154,6 +150,7 @@ app.use(errorHandler);
 
 
 export const startServer = async () => {
+  validateRuntimeConfig({ isProduction });
   await seedDefaultTemplates();
   app.listen(port, () => {
     console.log(`API running at http://localhost:${port}`);
