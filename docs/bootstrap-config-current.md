@@ -24,7 +24,8 @@ git branch -D feature/postgres-migration-foundation
 | --- | --- | --- |
 | `PORT` | `4000` | Puerto donde escucha la API Express y, en producción local, la app compilada. |
 | `PUBLIC_APP_URL` | Vacía por defecto | URL pública de la app, por ejemplo una URL `https://...` de Cloudflare Tunnel. También ayuda a decidir si la cookie de sesión debe marcarse como `secure`. |
-| `AUTH_ENABLED` | `false` | `false` mantiene acceso directo local. `true` exige login con cookie `httpOnly` y requiere `AUTH_USER`, `AUTH_PASSWORD` y `SESSION_SECRET`. |
+| `AUTH_ENABLED` | `false` | `false` mantiene acceso directo local. `true` exige login con cookie `httpOnly` contra `miclub.users` y requiere `SESSION_SECRET`. |
+| `LEGACY_AUTH_ENABLED` | `false` | Habilita temporalmente el fallback a `AUTH_USER`/`AUTH_PASSWORD` mientras las cuentas migran a `miclub.users`. Desactivar al completar la transición. |
 | `VITE_API_URL` | Vacía en `.env.example`; `http://localhost:4000` recomendado para desarrollo split con Vite | Base URL que usa el frontend para llamar a la API. Vacía usa rutas relativas same-origin, recomendado para producción local detrás del mismo servidor/API y Cloudflare Tunnel. |
 
 ## Cloudflare Tunnel

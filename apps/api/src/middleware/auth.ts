@@ -1,82 +1,34 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import type express from "express";
+import { setAuthenticatedContext } from "../auth/context.js";
+import { createSession, parseCookies, readSession, sessionCookieName, sessionMaxAgeMs } from "../auth/sessionService.js";
+import type { AuthenticatedContext } from "../auth/types.js";
 
 export const authEnabled = process.env.AUTH_ENABLED === "true";
 export const authUser = process.env.AUTH_USER ?? "";
 export const authPassword = process.env.AUTH_PASSWORD ?? "";
+export const legacyAuthEnabled = process.env.LEGACY_AUTH_ENABLED === "true";
 export const sessionSecret = process.env.SESSION_SECRET ?? "";
 export const publicAppUrl = process.env.PUBLIC_APP_URL ?? "";
-export const sessionCookieName = "miclub_session";
-export const sessionMaxAgeMs = 12 * 60 * 60 * 1000;
 
 if (authEnabled && !sessionSecret) {
   throw new Error("SESSION_SECRET es obligatorio cuando AUTH_ENABLED=true.");
 }
 
-if (authEnabled && (!authUser || !authPassword)) {
-  throw new Error("AUTH_USER y AUTH_PASSWORD son obligatorios cuando AUTH_ENABLED=true.");
+if (authEnabled && legacyAuthEnabled && (!authUser || !authPassword)) {
+  throw new Error("AUTH_USER y AUTH_PASSWORD son obligatorios cuando LEGACY_AUTH_ENABLED=true.");
 }
+export { parseCookies, sessionCookieName, sessionMaxAgeMs };
 
-type SessionPayload = {
-  username: string;
-  expiresAt: number;
-};
-
-const base64UrlEncode = (value: string): string => Buffer.from(value, "utf8").toString("base64url");
-const base64UrlDecode = (value: string): string => Buffer.from(value, "base64url").toString("utf8");
-
-const signSessionPayload = (payload: string): string =>
-  createHmac("sha256", sessionSecret).update(payload).digest("base64url");
-
-export const createSessionCookieValue = (username: string): string => {
-  const payload = base64UrlEncode(JSON.stringify({ username, expiresAt: Date.now() + sessionMaxAgeMs } satisfies SessionPayload));
-  return `${payload}.${signSessionPayload(payload)}`;
-};
-
-export const safeEqual = (a: string, b: string): boolean => {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
-  return aBuffer.length === bBuffer.length && timingSafeEqual(aBuffer, bBuffer);
-};
-
-export const parseCookies = (cookieHeader: string | undefined): Record<string, string> => {
-  if (!cookieHeader) return {};
-  return Object.fromEntries(
-    cookieHeader
-      .split(";")
-      .map((cookie) => cookie.trim())
-      .filter(Boolean)
-      .map((cookie) => {
-        const separatorIndex = cookie.indexOf("=");
-        if (separatorIndex === -1) return [cookie, ""];
-        return [cookie.slice(0, separatorIndex), decodeURIComponent(cookie.slice(separatorIndex + 1))];
-      })
-  );
-};
-
-export const getSession = (req: express.Request): SessionPayload | null => {
+export const getSession = (req: express.Request) => {
   if (!authEnabled || !sessionSecret) return null;
-  const cookieValue = parseCookies(req.headers.cookie)[sessionCookieName];
-  if (!cookieValue) return null;
-
-  const [payload, signature] = cookieValue.split(".");
-  if (!payload || !signature || !safeEqual(signature, signSessionPayload(payload))) return null;
-
-  try {
-    const session = JSON.parse(base64UrlDecode(payload)) as Partial<SessionPayload>;
-    if (typeof session.username !== "string" || typeof session.expiresAt !== "number") return null;
-    if (session.expiresAt <= Date.now()) return null;
-    return { username: session.username, expiresAt: session.expiresAt };
-  } catch {
-    return null;
-  }
+  return readSession(parseCookies(req.headers.cookie)[sessionCookieName], sessionSecret);
 };
 
 export const shouldUseSecureCookie = (req: express.Request): boolean =>
   req.secure || req.get("x-forwarded-proto") === "https" || publicAppUrl.startsWith("https://");
 
-export const setSessionCookie = (req: express.Request, res: express.Response, username: string) => {
-  res.cookie(sessionCookieName, createSessionCookieValue(username), {
+export const setSessionCookie = (req: express.Request, res: express.Response, context: AuthenticatedContext) => {
+  res.cookie(sessionCookieName, createSession(context, sessionSecret), {
     httpOnly: true,
     sameSite: "lax",
     secure: shouldUseSecureCookie(req),
@@ -142,7 +94,11 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
   return (req, res, next) => {
     if (!authEnabled) return next();
     if (req.path.startsWith("/auth/") || req.path === "/health") return next();
-    if (getSession(req)) return next();
+    const session = getSession(req);
+    if (session) {
+      setAuthenticatedContext(req, { userId: session.userId, email: session.email, legacy: session.legacy });
+      return next();
+    }
 
     if (isFrontendNavigation(req)) return next();
     return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
