@@ -125,6 +125,10 @@ const rateLimit = (options: RateLimitOptions, scope: string) => process.env.RATE
 export const authRateLimit = rateLimit({ windowMs: 15 * 60_000, max: 10, message: "Demasiados intentos de autenticación. Intente nuevamente más tarde." }, "auth");
 export const importRateLimit = rateLimit({ windowMs: 15 * 60_000, max: 5, message: "Demasiadas solicitudes de importación. Intente nuevamente más tarde." }, "import");
 
+/** Status/history reads must not consume the small mutation budget. */
+export const importMutationRateLimit: RequestHandler = (req, res, next) =>
+  MUTATING_METHODS.has(req.method) ? importRateLimit(req, res, next) : next();
+
 const hasSessionCookie = (req: Request): boolean =>
   (req.headers.cookie ?? "").split(";").some((cookie) => cookie.trim().startsWith(`${sessionCookieName}=`));
 

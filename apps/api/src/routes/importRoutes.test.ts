@@ -31,7 +31,9 @@ test('parseMissingEnrollmentDeletion exige un batch y una selecciÃ³n de UUIDs vÃ
 
 const withImportServer = async (fn: (baseUrl: string) => Promise<void>) => {
   const previousFlag = process.env.IMPORT_ENDPOINTS_ENABLED;
+  const previousOperator = process.env.IMPORT_OPERATOR_USER;
   process.env.IMPORT_ENDPOINTS_ENABLED = 'true';
+  process.env.IMPORT_OPERATOR_USER = 'owner@example.com';
 
   const app = express();
   app.use(express.json());
@@ -58,6 +60,8 @@ const withImportServer = async (fn: (baseUrl: string) => Promise<void>) => {
     } else {
       process.env.IMPORT_ENDPOINTS_ENABLED = previousFlag;
     }
+    if (previousOperator === undefined) delete process.env.IMPORT_OPERATOR_USER;
+    else process.env.IMPORT_OPERATOR_USER = previousOperator;
   }
 };
 

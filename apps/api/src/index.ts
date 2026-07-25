@@ -56,7 +56,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import { warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
 import { authEnabled, createAuthProtection, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
 import { rejectClientClubId, requireAuth, requireMembership } from "./middleware/authorization.js";
-import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
+import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importMutationRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -99,7 +99,7 @@ const seedDefaultTemplates = async () => {
 
 app.use(["/auth/login", "/auth/register"], authRateLimit);
 app.use("/auth", authRoutes);
-app.use(createAuthProtection({ isProduction }));
+// Set this before authentication so reverse proxies never retain a stale 401.
 app.use((req, res, next) => {
   if (isProtectedApiPath(req.path)) {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -107,6 +107,10 @@ app.use((req, res, next) => {
     res.set("Expires", "0");
     res.set("Surrogate-Control", "no-store");
   }
+  next();
+});
+app.use(createAuthProtection({ isProduction }));
+app.use((req, res, next) => {
   if (isTenantScopedPath(req.path)) {
     if (authEnabled) {
       return requireAuth(req, res, (error?: unknown) => {
@@ -123,7 +127,7 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use("/api/import", importRateLimit, importRoutes);
+app.use("/api/import", importMutationRateLimit, importRoutes);
 app.use("/api/db", dbRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api", catalogRoutes);

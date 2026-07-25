@@ -7,7 +7,8 @@ type SessionValue = {
   authEnabled: boolean;
   isAuthenticated: boolean;
   username: string | null;
-  authenticate: (username: string | null) => void;
+  canAccessDataMigration: boolean;
+  authenticate: (username: string | null, canAccessDataMigration?: boolean) => void;
   logout: () => Promise<void>;
 };
 
@@ -17,15 +18,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [authEnabled, setAuthEnabled] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [canAccessDataMigration, setCanAccessDataMigration] = useState(false);
 
-  const authenticate = useCallback((nextUsername: string | null) => {
+  const authenticate = useCallback((nextUsername: string | null, migrationAccess = false) => {
     setUsername(nextUsername);
+    setCanAccessDataMigration(migrationAccess);
     setStatus('authenticated');
   }, []);
 
   const expireSession = useCallback(() => {
     setAuthEnabled(true);
     setUsername(null);
+    setCanAccessDataMigration(false);
     setStatus('anonymous');
   }, []);
 
@@ -44,9 +48,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const checkSession = async () => {
       try {
         const response = await fetch(apiUrl('/auth/me'));
-        const payload = await response.json() as { authenticated: boolean; authEnabled?: boolean; username?: string | null };
+        const payload = await response.json() as { authenticated: boolean; authEnabled?: boolean; username?: string | null; canAccessDataMigration?: boolean };
         setAuthEnabled(Boolean(payload.authEnabled));
         setUsername(payload.username ?? null);
+        setCanAccessDataMigration(Boolean(payload.canAccessDataMigration));
         setStatus(payload.authenticated ? 'authenticated' : 'anonymous');
       } catch {
         setAuthEnabled(false);
@@ -62,8 +67,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [expireSession]);
 
   const value = useMemo(() => ({
-    status, authEnabled, isAuthenticated: status === 'authenticated', username, authenticate, logout
-  }), [authEnabled, authenticate, logout, status, username]);
+    status, authEnabled, isAuthenticated: status === 'authenticated', username, canAccessDataMigration, authenticate, logout
+  }), [authEnabled, authenticate, canAccessDataMigration, logout, status, username]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
