@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import CrmModule from '../modules/CrmModule';
 import DataMigrationModule from '../modules/DataMigrationModule';
 import EconomyModule from '../modules/EconomyModule';
@@ -27,14 +28,23 @@ const isModuleId = (value: string): value is ModuleId => MODULES.some(({ id }) =
 export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
   const pathModule = path.split('/')[2] ?? 'home';
-  const { authEnabled, username, canAccessDataMigration, logout } = useSession();
+  const { username, canAccessDataMigration, logout } = useSession();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const visibleModules = canAccessDataMigration ? MODULES : MODULES.filter(({ id }) => id !== 'dataMigration');
   const requestedModule: ModuleId = isModuleId(pathModule) ? pathModule : 'home';
   const currentModule: ModuleId = requestedModule === 'dataMigration' && !canAccessDataMigration ? 'home' : requestedModule;
   const { theme, toggleTheme } = useTheme();
 
   const selectModule = (module: ModuleId) => navigate(module === 'home' ? '/app' : `/app/${module}`);
-  const handleLogout = async () => { await logout(); navigate('/login', { replace: true }); };
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
   const renderModule = () => {
     if (currentModule === 'home') return <HomeModule onOpenModule={selectModule} />;
     if (currentModule === 'economy') return <EconomyModule />;
@@ -50,7 +60,9 @@ export default function ProtectedAppShell() {
         <div><h1>miClub Gestión</h1><p>Panel operativo y CRM del club</p></div>
         <div className="app-header__actions">
           <button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}><span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</button>
-          {authEnabled && <button className="ghost-btn logout-btn" type="button" onClick={handleLogout}>Cerrar sesión{username ? ` · ${username}` : ''}</button>}
+          <button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>
+            {isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}
+          </button>
         </div>
       </header>
       <ModuleNav modules={visibleModules} currentModule={currentModule} onSelect={selectModule} />

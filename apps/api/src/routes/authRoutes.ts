@@ -83,13 +83,28 @@ router.post("/clubs/select", asyncHandler(async (req, res) => {
   res.json({ authenticated: true, user: context });
 }));
 
-router.get("/me", (req, res) => {
+router.get("/me", asyncHandler(async (req, res) => {
   if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
 
   const session = getSession(req);
   if (!session) return res.json({ authenticated: false, authEnabled: true });
-  const user = { userId: session.userId, email: session.email, legacy: session.legacy, clubId: session.clubId, membershipId: session.membershipId, role: session.role, permissions: session.permissions ?? [] };
-  return res.json({ authenticated: true, authEnabled: true, username: session.email, canAccessDataMigration: isImportOperator(session), user });
-});
+
+  // Membership permissions can change while the signed cookie is alive. Always
+  // resolve the current authorization before advertising modules to the SPA.
+  // This also upgrades cookies issued before tenant permissions were added.
+  let context = session;
+  if (session.userId && session.membershipId) {
+    const membership = await getActiveMembershipContext(session.userId, session.membershipId);
+    if (!membership) {
+      clearSessionCookie(req, res);
+      return res.json({ authenticated: false, authEnabled: true });
+    }
+    context = { ...session, clubId: membership.club_id, membershipId: membership.membership_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids };
+    setSessionCookie(req, res, context);
+  }
+
+  const user = { userId: context.userId, email: context.email, legacy: context.legacy, clubId: context.clubId, membershipId: context.membershipId, role: context.role, permissions: context.permissions ?? [] };
+  return res.json({ authenticated: true, authEnabled: true, username: context.email, canAccessDataMigration: isImportOperator(context), user });
+}));
 
 export default router;

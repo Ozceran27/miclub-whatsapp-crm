@@ -62,8 +62,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch(apiUrl('/auth/logout'), { method: 'POST' });
-    expireSession();
+    try {
+      await fetch(apiUrl('/auth/logout'), { method: 'POST' });
+    } finally {
+      // A network failure must never leave private UI mounted with stale local
+      // session state. The server cookie will be retried/validated on reload.
+      expireSession();
+    }
   }, [expireSession]);
 
   const value = useMemo(() => ({
