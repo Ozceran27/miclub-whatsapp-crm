@@ -22,12 +22,17 @@ const main = async (): Promise<void> => {
   const missingEnrollmentStrategy = parseMissingEnrollmentStrategy(readStringFlag("--missing-enrollment-strategy"));
   const clubId = process.env.GOOGLE_SHEETS_IMPORT_CLUB_ID;
   if (!clubId) throw new Error("GOOGLE_SHEETS_IMPORT_CLUB_ID es obligatorio para la importación manual legacy.");
+  const userId = process.env.GOOGLE_SHEETS_IMPORT_USER_ID;
+  const personId = process.env.GOOGLE_SHEETS_IMPORT_PERSON_ID;
+  const membershipId = process.env.GOOGLE_SHEETS_IMPORT_MEMBERSHIP_ID;
+  if (!userId || !personId || !membershipId) throw new Error("La importación manual requiere GOOGLE_SHEETS_IMPORT_USER_ID, GOOGLE_SHEETS_IMPORT_PERSON_ID y GOOGLE_SHEETS_IMPORT_MEMBERSHIP_ID reales.");
   const summary = await importGoogleSheets({
-    userId: null,
+    userId,
+    personId,
     email: "google-sheets-manual-import@localhost",
     legacy: true,
     clubId,
-    membershipId: "manual-import",
+    membershipId,
     role: "admin",
     permissions: [],
     sectorIds: [],

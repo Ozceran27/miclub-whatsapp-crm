@@ -8,8 +8,6 @@ import { requireMembership, requirePermission } from "../middleware/authorizatio
 
 // migración/debug: paths bajo /api/db; no renombrar sin migración frontend.
 const router = Router();
-router.use(requireMembership);
-
 router.get("/health", async (_req, res) => {
   const postgresEnabled = isPostgresEnabled();
   const dataSource = getConfiguredDataSource();
@@ -36,6 +34,8 @@ router.get("/health", async (_req, res) => {
     return res.status(503).json({ ok: false, postgresEnabled: true, dataSource, message });
   }
 });
+
+router.use(requireMembership);
 
 router.get("/enrollment-fee-audit", requirePermission("finance:write"), async (req, res) => {
   try {

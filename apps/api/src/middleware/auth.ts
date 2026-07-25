@@ -5,9 +5,6 @@ import type { AuthenticatedContext } from "../auth/types.js";
 import { getActiveMembershipContext } from "../auth/userRepository.js";
 
 export const authEnabled = process.env.AUTH_ENABLED === "true";
-export const authUser = process.env.AUTH_USER ?? "";
-export const authPassword = process.env.AUTH_PASSWORD ?? "";
-export const legacyAuthEnabled = process.env.LEGACY_AUTH_ENABLED === "true";
 export const sessionSecret = process.env.SESSION_SECRET ?? "";
 export const publicAppUrl = process.env.PUBLIC_APP_URL ?? "";
 export const sessionCookiePath = "/";
@@ -17,9 +14,6 @@ if (authEnabled && !sessionSecret) {
   throw new Error("SESSION_SECRET es obligatorio cuando AUTH_ENABLED=true.");
 }
 
-if (authEnabled && legacyAuthEnabled && (!authUser || !authPassword)) {
-  throw new Error("AUTH_USER y AUTH_PASSWORD son obligatorios cuando LEGACY_AUTH_ENABLED=true.");
-}
 export { parseCookies, sessionCookieName, sessionMaxAgeMs };
 
 export const getSession = (req: express.Request) => {
@@ -136,8 +130,8 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
           return next();
         } catch (error) { return next(error); }
       }
-      setAuthenticatedContext(req, session);
-      return next();
+      clearSessionCookie(req, res);
+      return res.status(401).json({ authenticated: false, code: "SESSION_LEGACY", message: "La sesión debe renovarse" });
     }
 
     if (isFrontendNavigation(req)) return next();

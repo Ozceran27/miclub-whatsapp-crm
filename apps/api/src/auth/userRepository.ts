@@ -14,6 +14,7 @@ type UserRow = {
   role_code: string | null;
   permissions: string[] | null;
   sector_ids: string[] | null;
+  person_id: string | null;
 };
 
 export interface UserRepository {
@@ -64,7 +65,8 @@ const mapUser = (row: UserRow): AuthUser => ({
   failedLoginAttempts: row.failed_login_attempts,
   lockedUntil: row.locked_until,
   lastLoginAt: row.last_login_at,
-  tenant: row.membership_id && row.club_id && row.role_code ? {
+  tenant: row.membership_id && row.club_id && row.role_code && row.person_id ? {
+    personId: row.person_id,
     membershipId: row.membership_id,
     clubId: row.club_id,
     role: row.role_code,
@@ -80,13 +82,14 @@ export const postgresUserRepository: UserRepository = {
       `SELECT u.id, u.email, u.password_hash, u.status, u.failed_login_attempts,
               u.locked_until, u.last_login_at, membership.id AS membership_id,
               membership.club_id, membership.role_code, membership.permissions,
-              membership.sector_ids
+              membership.sector_ids, membership.person_id
        FROM miclub.users u
        LEFT JOIN LATERAL (
-         SELECT ucm.id, ucm.club_id, r.code AS role_code,
+         SELECT ucm.id, ucm.club_id, r.code AS role_code, person.id AS person_id,
                 ucm.permissions, ucm.sector_ids
          FROM miclub.user_club_memberships ucm
          JOIN miclub.roles r ON r.id = ucm.role_id AND r.club_id = ucm.club_id
+         JOIN miclub.people person ON person.user_id = u.id AND person.club_id = ucm.club_id
          WHERE ucm.user_id = u.id AND ucm.status = 'active'
          ORDER BY ucm.created_at ASC
          LIMIT 1
