@@ -29,10 +29,10 @@ test('parseMissingEnrollmentDeletion exige un batch y una selección de UUIDs v�
 });
 
 
-const withImportServer = async (fn: (baseUrl: string) => Promise<void>) => {
+const withImportServer = async (fn: (baseUrl: string) => Promise<void>, importEnabled = true) => {
   const previousFlag = process.env.IMPORT_ENDPOINTS_ENABLED;
   const previousOperator = process.env.IMPORT_OPERATOR_USER;
-  process.env.IMPORT_ENDPOINTS_ENABLED = 'true';
+  process.env.IMPORT_ENDPOINTS_ENABLED = String(importEnabled);
   process.env.IMPORT_OPERATOR_USER = 'owner@example.com';
 
   const app = express();
@@ -89,4 +89,17 @@ test('POST /api/import/google-sheets/enrollments/delete-missing rechaza una sele
     assert.equal(response.status, 400);
     assert.deepEqual(await response.json(), { ok: false, message: 'Debe seleccionar al menos una inscripción válida para eliminar.' });
   });
+});
+
+test('feature de importación deshabilitada devuelve código localizado sin alterar auth', async () => {
+  await withImportServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/import/google-sheets`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dryRun: true })
+    });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      code: 'IMPORT_DISABLED',
+      message: 'La ejecución de importaciones está deshabilitada fuera de la ventana operativa.'
+    });
+  }, false);
 });

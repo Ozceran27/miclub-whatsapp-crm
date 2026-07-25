@@ -1,6 +1,6 @@
 import type express from "express";
 import { setAuthenticatedContext } from "../auth/context.js";
-import { createSession, parseCookies, readSession, sessionCookieName, sessionMaxAgeMs } from "../auth/sessionService.js";
+import { createSession, getCookieValues, isSessionRevoked, parseCookies, readSession, sessionCookieName, sessionMaxAgeMs } from "../auth/sessionService.js";
 import type { AuthenticatedContext } from "../auth/types.js";
 import { getActiveMembershipContext } from "../auth/userRepository.js";
 
@@ -10,6 +10,8 @@ export const authPassword = process.env.AUTH_PASSWORD ?? "";
 export const legacyAuthEnabled = process.env.LEGACY_AUTH_ENABLED === "true";
 export const sessionSecret = process.env.SESSION_SECRET ?? "";
 export const publicAppUrl = process.env.PUBLIC_APP_URL ?? "";
+export const sessionCookiePath = "/";
+export const sessionCookieSameSite = "lax" as const;
 
 if (authEnabled && !sessionSecret) {
   throw new Error("SESSION_SECRET es obligatorio cuando AUTH_ENABLED=true.");
@@ -22,7 +24,14 @@ export { parseCookies, sessionCookieName, sessionMaxAgeMs };
 
 export const getSession = (req: express.Request) => {
   if (!authEnabled || !sessionSecret) return null;
-  return readSession(parseCookies(req.headers.cookie)[sessionCookieName], sessionSecret);
+  // RFC 6265 no define el orden cuando coexisten cookies del mismo nombre con
+  // distinto Path. Validar todas evita que una cookie legacy /api o /auth tape
+  // la cookie oficial `/` durante su ventana de retiro.
+  for (const value of getCookieValues(req.headers.cookie, sessionCookieName)) {
+    const session = readSession(value, sessionSecret);
+    if (session) return session;
+  }
+  return null;
 };
 
 export const shouldUseSecureCookie = (req: express.Request): boolean =>
@@ -31,20 +40,30 @@ export const shouldUseSecureCookie = (req: express.Request): boolean =>
 export const setSessionCookie = (req: express.Request, res: express.Response, context: AuthenticatedContext) => {
   res.cookie(sessionCookieName, createSession(context, sessionSecret), {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: sessionCookieSameSite,
     secure: shouldUseSecureCookie(req),
     maxAge: sessionMaxAgeMs,
-    path: "/"
+    path: sessionCookiePath
   });
 };
 
 export const clearSessionCookie = (req: express.Request, res: express.Response) => {
-  res.clearCookie(sessionCookieName, {
+  const officialOptions = {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: sessionCookieSameSite,
     secure: shouldUseSecureCookie(req),
-    path: "/"
-  });
+    path: sessionCookiePath
+  } as const;
+  res.clearCookie(sessionCookieName, officialOptions);
+
+  // Compatibilidad temporal: versiones anteriores emitieron la misma cookie
+  // bajo /auth, /api y el dominio padre. Retirar después de 2026-10-25.
+  for (const path of ["/auth", "/api"]) res.clearCookie(sessionCookieName, { ...officialOptions, path });
+  if (req.hostname === "gestion.meclub.com.ar" || req.hostname.endsWith(".meclub.com.ar")) {
+    for (const path of ["/", "/auth", "/api"]) {
+      res.clearCookie(sessionCookieName, { ...officialOptions, path, domain: ".meclub.com.ar" });
+    }
+  }
 };
 
 export const protectedApiPrefixes = [
@@ -109,9 +128,9 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
       if (session.userId && session.membershipId) {
         try {
           const membership = await getActiveMembershipContext(session.userId, session.membershipId);
-          if (!membership) {
+          if (!membership || isSessionRevoked(session, membership.session_revoked_before)) {
             clearSessionCookie(req, res);
-            return res.status(401).json({ authenticated: false, message: "La sesión fue revocada" });
+            return res.status(401).json({ authenticated: false, code: "SESSION_EXPIRED", message: "La sesión fue revocada" });
           }
           setAuthenticatedContext(req, { ...session, membershipId: membership.membership_id, clubId: membership.club_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids });
           return next();
@@ -122,7 +141,7 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
     }
 
     if (isFrontendNavigation(req)) return next();
-    return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
+    return res.status(401).json({ authenticated: false, code: "AUTHENTICATION_REQUIRED", message: "Sesión requerida" });
   };
 };
 

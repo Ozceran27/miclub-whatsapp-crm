@@ -1,8 +1,8 @@
 import type { Request, RequestHandler } from "express";
 import type { AuthenticatedContext } from "../auth/types.js";
 
-const reject = (status: 401 | 403, message: string): RequestHandler =>
-  (_req, res) => res.status(status).json({ message });
+const reject = (status: 401 | 403, message: string, code = status === 401 ? "AUTHENTICATION_REQUIRED" : "FORBIDDEN"): RequestHandler =>
+  (_req, res) => res.status(status).json({ code, message });
 
 export const requireAuth: RequestHandler = (req, res, next) => {
   if (!req.auth?.userId) return reject(401, "Autenticación requerida")(req, res, next);
@@ -11,7 +11,7 @@ export const requireAuth: RequestHandler = (req, res, next) => {
 
 export const requireMembership: RequestHandler = (req, res, next) => {
   if (!req.auth?.clubId || !req.auth.membershipId) {
-    return reject(req.auth ? 403 : 401, "Membresía de club requerida")(req, res, next);
+    return reject(req.auth ? 403 : 401, "Membresía de club requerida", req.auth ? "TENANT_CONTEXT_REQUIRED" : "AUTHENTICATION_REQUIRED")(req, res, next);
   }
   next();
 };

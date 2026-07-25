@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { hashPassword, verifyPassword } from "./passwordHasher.js";
 import { login, maxFailedLoginAttempts } from "./loginService.js";
-import { createSession, readSession } from "./sessionService.js";
+import { createSession, getCookieValues, isSessionRevoked, readSession } from "./sessionService.js";
 import type { AuthUser } from "./types.js";
 import type { UserRepository } from "./userRepository.js";
 
@@ -17,9 +17,15 @@ test("hashPassword genera hashes scrypt verificables con sal aleatoria", async (
 test("las sesiones firmadas preservan el contexto y rechazan alteraciones", () => {
   const context = { userId: "user-1", email: "admin@miclub.test", legacy: false };
   const session = createSession(context, "un-secreto-largo", 1_000);
-  assert.deepEqual(readSession(session, "un-secreto-largo", 2_000), { ...context, expiresAt: 1_000 + 12 * 60 * 60 * 1_000 });
+  assert.deepEqual(readSession(session, "un-secreto-largo", 2_000), { ...context, issuedAt: 1_000, expiresAt: 1_000 + 12 * 60 * 60 * 1_000 });
   assert.equal(readSession(`${session}alterado`, "un-secreto-largo", 2_000), null);
   assert.equal(readSession(session, "otro-secreto", 2_000), null);
+});
+
+test("logout revoca una cookie capturada y cookies duplicadas se pueden auditar sin depender del orden", () => {
+  const token = createSession({ userId: "user-1", email: "admin@miclub.test", legacy: false }, "secret", 1_000);
+  assert.equal(isSessionRevoked(readSession(token, "secret", 1_001)!, new Date(1_000)), true);
+  assert.deepEqual(getCookieValues(`miclub_session=legacy; other=1; miclub_session=${encodeURIComponent(token)}`, "miclub_session"), ["legacy", token]);
 });
 
 test("login registra éxito y aplica bloqueo después de cinco fallos", async () => {

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { getPostgresPool } from "../db/postgres.js";
 import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
@@ -31,7 +31,14 @@ const parsePagination = (query: Record<string, unknown>) => ({
 
 router.use(requireMembership);
 
-router.post("/google-sheets", asyncHandler(async (req, res) => {
+const requireImportFeature: RequestHandler = (_req, res, next) => {
+  if (process.env.IMPORT_ENDPOINTS_ENABLED !== "true") {
+    return res.status(503).json({ code: "IMPORT_DISABLED", message: "La ejecución de importaciones está deshabilitada fuera de la ventana operativa." });
+  }
+  next();
+};
+
+router.post("/google-sheets", requireImportFeature, asyncHandler(async (req, res) => {
   const dryRun = req.body?.dryRun !== false;
   const batchSizeValue = req.body?.batchSize;
   const batchSize = parseBatchSize(batchSizeValue, Number.NaN);
@@ -47,7 +54,7 @@ router.post("/google-sheets", asyncHandler(async (req, res) => {
 
 // This intentionally is not the generic enrollment delete route. Its scope is
 // constrained to the exact missing-row set produced by a Google Sheets batch.
-router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req, res) => {
+router.post("/google-sheets/enrollments/delete-missing", requireImportFeature, asyncHandler(async (req, res) => {
   const input = parseMissingEnrollmentDeletion(req.body);
   if (!input) return res.status(400).json({ ok: false, message: "Debe seleccionar al menos una inscripción válida para eliminar." });
   const clubId = req.auth!.clubId;

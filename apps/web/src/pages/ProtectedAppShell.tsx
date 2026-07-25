@@ -27,7 +27,8 @@ const isModuleId = (value: string): value is ModuleId => MODULES.some(({ id }) =
 
 export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
-  const pathModule = path.split('/')[2] ?? 'home';
+  const rawPathModule = path.split('/')[2] ?? 'home';
+  const pathModule = rawPathModule === 'migration' ? 'dataMigration' : rawPathModule;
   const { username, logout } = useSession();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
