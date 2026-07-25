@@ -1,6 +1,9 @@
 /* miClub — diagnóstico forense SOLO LECTURA. PostgreSQL/DBeaver.
    Resultado esperado: schema miclub presente; una cadena user/person/membership/club/role.
    Este archivo no abre transacción ni ejecuta DDL/DML. */
+-- Limpia una transacción que DBeaver haya dejado abortada por una ejecución anterior.
+-- PostgreSQL sólo permite continuar después de ROLLBACK (SQLSTATE 25P02).
+ROLLBACK;
 SELECT current_database() database_name, current_user database_user, version();
 SELECT table_schema, table_name FROM information_schema.tables
  WHERE table_schema='miclub' ORDER BY table_name;
@@ -21,8 +24,8 @@ SELECT u.id user_id, p.id person_id, m.id membership_id, m.status membership_sta
  WHERE lower(u.email)=lower('miclub.posadas@gmail.com');
 
 SELECT 'duplicate_user_email' issue, lower(email) key, count(*) rows FROM miclub.users GROUP BY lower(email) HAVING count(*)>1
-UNION ALL SELECT 'duplicate_person_dni', club_id||':'||normalized_dni, count(*) FROM miclub.people WHERE normalized_dni IS NOT NULL GROUP BY club_id,normalized_dni HAVING count(*)>1
-UNION ALL SELECT 'duplicate_membership', user_id||':'||club_id, count(*) FROM miclub.user_club_memberships GROUP BY user_id,club_id HAVING count(*)>1;
+UNION ALL SELECT 'duplicate_person_dni', club_id::text||':'||normalized_dni, count(*) FROM miclub.people WHERE normalized_dni IS NOT NULL GROUP BY club_id,normalized_dni HAVING count(*)>1
+UNION ALL SELECT 'duplicate_membership', user_id::text||':'||club_id::text, count(*) FROM miclub.user_club_memberships GROUP BY user_id,club_id HAVING count(*)>1;
 SELECT * FROM miclub.user_club_memberships WHERE status<>'active';
 
 /* Inventario universal de columnas tenant y FKs: sirve para detectar tablas reales sin asumirlas. */
@@ -46,4 +49,4 @@ FROM information_schema.columns WHERE table_schema='miclub' AND column_name='clu
 SELECT 'enrollment_person' relation,e.id child_id,e.club_id child_club,p.club_id parent_club FROM miclub.enrollments e JOIN miclub.people p ON p.id=e.person_id WHERE e.club_id IS DISTINCT FROM p.club_id
 UNION ALL SELECT 'enrollment_activity',e.id,e.club_id,a.club_id FROM miclub.enrollments e JOIN miclub.activities a ON a.id=e.activity_id WHERE e.club_id IS DISTINCT FROM a.club_id
 UNION ALL SELECT 'activity_sector',a.id,a.club_id,s.club_id FROM miclub.activities a JOIN miclub.sectors s ON s.id=a.sector_id WHERE a.club_id IS DISTINCT FROM s.club_id
-UNION ALL SELECT 'import_error_batch',ie.id,ie.club_id,ib.club_id FROM miclub.import_errors ie JOIN miclub.import_batches ib ON ib.id=ie.import_batch_id WHERE ie.club_id IS DISTINCT FROM ib.club_id;
+UNION ALL SELECT 'import_error_batch',ie.id,ie.club_id,ib.club_id FROM miclub.import_errors ie JOIN miclub.import_batches ib ON ib.id=ie.batch_id WHERE ie.club_id IS DISTINCT FROM ib.club_id;

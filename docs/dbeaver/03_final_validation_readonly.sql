@@ -1,4 +1,7 @@
 /* Validación final SOLO LECTURA. Cada fila debe indicar PASS. */
+-- Permite ejecutar este archivo inmediatamente después de cualquier error
+-- anterior en DBeaver, sin arrastrar SQLSTATE 25P02.
+ROLLBACK;
 WITH official AS (
  SELECT u.id user_id,p.id person_id,m.id membership_id,c.id club_id,r.code,m.status
  FROM miclub.users u JOIN miclub.user_club_memberships m ON m.user_id=u.id
@@ -20,8 +23,8 @@ SELECT check_name,CASE WHEN passed THEN 'PASS' ELSE 'FAIL' END result FROM check
 
 /* Totales financieros autoritativos para comparar con el snapshot previo. No altera montos/fechas. */
 SELECT club_id,count(*) movement_count,
- sum(amount) FILTER(WHERE upper(type)='INGRESOS') ingresos,
- sum(amount) FILTER(WHERE upper(type)='EGRESOS') egresos
+ sum(amount) FILTER(WHERE upper(movement_type::text)='INGRESOS') ingresos,
+ sum(amount) FILTER(WHERE upper(movement_type::text)='EGRESOS') egresos
 FROM miclub.movements GROUP BY club_id ORDER BY club_id;
 SELECT club_id,count(*) FROM miclub.enrollments GROUP BY club_id ORDER BY club_id;
 SELECT club_id,count(*) FROM miclub.people GROUP BY club_id ORDER BY club_id;
