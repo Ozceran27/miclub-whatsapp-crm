@@ -53,6 +53,8 @@ type ImportOptions = {
   dryRun?: boolean;
   batchSize?: number;
   missingEnrollmentStrategy?: MissingEnrollmentStrategy;
+  requestId?: string;
+  onProgress?: (step: string, details?: Record<string, unknown>) => void;
 };
 export type MissingEnrollment = {
   id: string;
@@ -90,6 +92,14 @@ export type ImportSummary = {
   errors: number;
   warnings: string[];
   movementFallbacks: { safeColumn: number; fullLayout: number };
+  mode: "dry-run" | "real";
+  status: "COMPLETED" | "COMPLETED_WITH_ERRORS";
+  rowsRead: number;
+  writesAttempted: number;
+  writesPersisted: number;
+  writesReverted: number;
+  durationMs: number;
+  warningMessages: string[];
 };
 type SheetRow = {
   kind: "members" | "movements";
@@ -242,12 +252,13 @@ const readRows = async (): Promise<{
     config.adminBalancesRange,
     ...metricRangeNames,
   ];
+  const timeout = Math.min(Math.max(Number(process.env.GOOGLE_SHEETS_TIMEOUT_MS ?? 45_000), 5_000), 120_000);
   const response = await client.spreadsheets.values.batchGet({
     spreadsheetId: config.sheetId,
     ranges,
     majorDimension: "ROWS",
     valueRenderOption: "FORMATTED_VALUE",
-  });
+  }, { timeout, retry: false });
   const rows: SheetRow[] = [];
   const memberIndexesBySheet: Record<
     string,
@@ -1097,14 +1108,33 @@ export const importGoogleSheets = async (
   const dryRun = options.dryRun ?? true;
   const batchSize = options.batchSize ?? 50;
   const pool = await getPostgresPool();
+  const startedAt = Date.now();
+  const progress = (step: string, details: Record<string, unknown> = {}) => options.onProgress?.(step, details);
   const strategy =
     options.missingEnrollmentStrategy ?? parseMissingEnrollmentStrategy();
-  const batchId = await createImportBatch(pool, {
+  const client = await pool.connect();
+  // All importer helpers only require `query`; retaining their historical Pool
+  // type while binding them to this dedicated client makes transactions real.
+  const transaction = client as unknown as Pool;
+  let lockAcquired = false;
+  let batchId = "";
+  try {
+    const lock = await client.query<{ acquired: boolean }>("select pg_try_advisory_lock(hashtext($1)) as acquired", [`google_sheets:${clubId}`]);
+    lockAcquired = lock.rows[0]?.acquired === true;
+    if (!lockAcquired) {
+      const conflict = new Error("Ya existe una importación en curso para este club.") as Error & { status?: number; code?: string; retryable?: boolean };
+      conflict.status = 409;
+      conflict.code = "IMPORT_ALREADY_RUNNING";
+      conflict.retryable = true;
+      throw conflict;
+    }
+    batchId = await createImportBatch(pool, {
     clubId,
     source: "google_sheets",
     dryRun,
     notes: dryRun ? "Dry run: solo valida y revierte entidades." : undefined,
-  });
+    });
+    progress("batch_created", { batchId });
   const summary: ImportSummary = {
     clubId,
     batchId,
@@ -1128,27 +1158,38 @@ export const importGoogleSheets = async (
     errors: 0,
     warnings: [],
     movementFallbacks: { safeColumn: 0, fullLayout: 0 },
+    mode: dryRun ? "dry-run" : "real",
+    status: "COMPLETED",
+    rowsRead: 0,
+    writesAttempted: 0,
+    writesPersisted: 0,
+    writesReverted: 0,
+    durationMs: 0,
+    warningMessages: [],
   };
   const processedEnrollmentExternalIds = new Set<string>();
   try {
+    progress("source_read_started");
     const { rows, adminBalanceRows, metricRanges } = await readRows();
     summary.read = rows.length;
+    summary.rowsRead = rows.length;
+    progress("source_read_completed", { rowsRead: rows.length });
     const balanceAttemptedWritesStart = summary.attemptedWrites;
-    await pool.query("begin");
+    await client.query("begin");
     try {
-      await upsertOperationalBalances(pool, adminBalanceRows, summary);
-      await upsertSheetMetricSnapshots(pool, metricRanges, summary);
+      await upsertOperationalBalances(transaction, adminBalanceRows, summary);
+      await upsertSheetMetricSnapshots(transaction, metricRanges, summary);
       if (dryRun) {
-        await pool.query("rollback");
+        await client.query("rollback");
         summary.rolledBackWrites +=
           summary.attemptedWrites - balanceAttemptedWritesStart;
       } else {
-        await pool.query("commit");
+        await client.query("commit");
         summary.persistedWrites +=
           summary.attemptedWrites - balanceAttemptedWritesStart;
       }
     } catch (error) {
-      await pool.query("rollback");
+      await client.query("rollback");
       summary.rolledBackWrites +=
         summary.attemptedWrites - balanceAttemptedWritesStart;
       throw error;
@@ -1156,35 +1197,35 @@ export const importGoogleSheets = async (
     for (const group of chunk(rows, batchSize)) {
       const groupErrors: Array<{ row: SheetRow; error: unknown }> = [];
       const groupAttemptedWritesStart = summary.attemptedWrites;
-      await pool.query("begin");
+      await client.query("begin");
       try {
         for (const row of group) {
           try {
             if (row.kind === "members") {
               const enrollmentExternalId = await processMember(
-                pool,
+                transaction,
                 row,
                 summary,
               );
               if (enrollmentExternalId)
                 processedEnrollmentExternalIds.add(enrollmentExternalId);
-            } else await processMovement(pool, row, summary);
+            } else await processMovement(transaction, row, summary);
           } catch (error) {
             summary.errors += 1;
             groupErrors.push({ row, error });
           }
         }
         if (dryRun) {
-          await pool.query("rollback");
+          await client.query("rollback");
           summary.rolledBackWrites +=
             summary.attemptedWrites - groupAttemptedWritesStart;
         } else {
-          await pool.query("commit");
+          await client.query("commit");
           summary.persistedWrites +=
             summary.attemptedWrites - groupAttemptedWritesStart;
         }
       } catch (error) {
-        await pool.query("rollback");
+        await client.query("rollback");
         summary.rolledBackWrites +=
           summary.attemptedWrites - groupAttemptedWritesStart;
         throw error;
@@ -1200,29 +1241,36 @@ export const importGoogleSheets = async (
         });
     }
     const commissionAttemptedWritesStart = summary.attemptedWrites;
-    await pool.query("begin");
+    await client.query("begin");
     try {
-      await upsertAulaActivityCommissions(pool, metricRanges, summary);
+      await upsertAulaActivityCommissions(transaction, metricRanges, summary);
       if (dryRun) {
-        await pool.query("rollback");
+        await client.query("rollback");
         summary.rolledBackWrites +=
           summary.attemptedWrites - commissionAttemptedWritesStart;
       } else {
-        await pool.query("commit");
+        await client.query("commit");
         summary.persistedWrites +=
           summary.attemptedWrites - commissionAttemptedWritesStart;
       }
     } catch (error) {
-      await pool.query("rollback");
+      await client.query("rollback");
       summary.rolledBackWrites +=
         summary.attemptedWrites - commissionAttemptedWritesStart;
       throw error;
     }
     await reconcileMissingEnrollments(
-      pool,
+      transaction,
       processedEnrollmentExternalIds,
       summary,
     );
+    summary.status = summary.errors > 0 ? "COMPLETED_WITH_ERRORS" : "COMPLETED";
+    summary.writesAttempted = summary.attemptedWrites;
+    summary.writesPersisted = summary.persistedWrites;
+    summary.writesReverted = summary.rolledBackWrites;
+    summary.durationMs = Date.now() - startedAt;
+    summary.warningMessages = summary.warnings;
+    progress("simulation_completed", { errors: summary.errors, durationMs: summary.durationMs });
     await finishImportBatch(
       pool,
       clubId,
@@ -1236,6 +1284,7 @@ export const importGoogleSheets = async (
     );
     return summary;
   } catch (error) {
+    await client.query("rollback").catch(() => undefined);
     await finishImportBatch(
       pool,
       clubId,
@@ -1243,7 +1292,31 @@ export const importGoogleSheets = async (
       "failed",
       error instanceof Error ? error.message : String(error),
     );
+    if (error instanceof Error) {
+      const operationalError = error as Error & { code?: string; status?: number; retryable?: boolean; batchId?: string; expose?: boolean };
+      operationalError.batchId = batchId;
+      operationalError.retryable ??= true;
+      if (!operationalError.code) {
+        const text = error.message.toLowerCase();
+        operationalError.code = text.includes("timeout") || text.includes("timed out")
+          ? "GOOGLE_SHEETS_TIMEOUT"
+          : text.includes("credential") || text.includes("credencial")
+            ? "GOOGLE_SHEETS_CREDENTIALS_INVALID"
+            : "IMPORT_FAILED";
+      }
+      operationalError.status ??= operationalError.code === "GOOGLE_SHEETS_CREDENTIALS_INVALID" ? 422 : 502;
+      operationalError.expose = true;
+      operationalError.message = operationalError.code === "GOOGLE_SHEETS_TIMEOUT"
+        ? "Google Sheets no respondió dentro del tiempo permitido. Podés reintentar."
+        : operationalError.code === "GOOGLE_SHEETS_CREDENTIALS_INVALID"
+          ? "No se pudo autenticar la fuente de Google Sheets. Revisá la configuración del servidor."
+          : "La importación no pudo completarse. Podés reintentar.";
+    }
     throw error;
+  }
+  } finally {
+    if (lockAcquired) await client.query("select pg_advisory_unlock(hashtext($1))", [`google_sheets:${clubId}`]).catch(() => undefined);
+    client.release();
   }
 };
 

@@ -17,6 +17,20 @@ export const finishImportBatch = async (pool: Pool, clubId: string, batchId: str
   await pool.query(`update miclub.import_batches set status = $3, finished_at = now(), notes = coalesce($4, notes) where club_id = $1 and id = $2`, [clubId, batchId, status, notes ?? null]);
 };
 
+export const hasRecentSuccessfulDryRun = async (pool: Pool, clubId: string, maxAgeMinutes = 30): Promise<boolean> => {
+  const result = await pool.query<{ valid: boolean }>(
+    `select exists (
+       select 1 from miclub.import_batches
+        where club_id = $1 and source = 'google_sheets' and status = 'dry_run'
+          and finished_at >= now() - make_interval(mins => $2)
+          and notes like '{%'
+          and coalesce((notes::jsonb ->> 'errors')::int, 1) = 0
+     ) as valid`,
+    [clubId, maxAgeMinutes],
+  );
+  return result.rows[0]?.valid === true;
+};
+
 export const logImportError = async (pool: Pool, input: { clubId: string; batchId: string; sourceTable: string; sourceRow: string; error: unknown; rawPayload?: unknown }): Promise<void> => {
   const message = input.error instanceof Error ? input.error.message : String(input.error);
   await pool.query(
