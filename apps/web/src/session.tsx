@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { apiUrl } from './api';
+import { apiFetch } from './api';
 
-type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
+type SessionStatus = 'loading' | 'authenticated' | 'anonymous' | 'error';
 type SessionValue = {
   status: SessionStatus;
   authEnabled: boolean;
@@ -18,13 +18,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [authEnabled, setAuthEnabled] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const sessionChannel = useRef<BroadcastChannel | null>(null);
+  const authGeneration = useRef(0);
 
   const authenticate = useCallback((nextUsername: string | null) => {
+    authGeneration.current += 1;
     setUsername(nextUsername);
     setStatus('authenticated');
   }, []);
 
   const expireSession = useCallback(() => {
+    authGeneration.current += 1;
     setAuthEnabled(true);
     setUsername(null);
     setStatus('anonymous');
@@ -44,35 +47,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [expireSession]);
 
   useEffect(() => {
-    const originalFetch = window.fetch.bind(window);
-    window.fetch = async (input, init = {}) => {
-      const response = await originalFetch(input, { credentials: 'include', ...init });
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      if (response.status === 401 && !url.includes('/auth/')) expireSession();
-      return response;
-    };
-    return () => { window.fetch = originalFetch; };
+    window.addEventListener('miclub:session-expired', expireSession);
+    return () => window.removeEventListener('miclub:session-expired', expireSession);
   }, [expireSession]);
 
   useEffect(() => {
     const checkSession = async () => {
+      const generation = authGeneration.current;
       try {
-        const response = await fetch(apiUrl('/auth/me'), { cache: 'no-store' });
-        if (!response.ok) throw new Error(`No se pudo validar la sesión (${response.status})`);
+        const response = await apiFetch('/auth/me', { cache: 'no-store' }, { revalidate401: false });
         const payload = await response.json() as { authenticated: boolean; authEnabled?: boolean; username?: string | null };
+        if (generation !== authGeneration.current) return;
         setAuthEnabled(Boolean(payload.authEnabled));
         setUsername(payload.username ?? null);
-        setStatus(payload.authenticated ? 'authenticated' : 'anonymous');
+        setStatus(response.ok && payload.authenticated ? 'authenticated' : 'anonymous');
       } catch {
-        // Nunca convertir un error de red, proxy o JSON en una sesión válida.
-        expireSession();
+        if (generation !== authGeneration.current) return;
+        setStatus('error');
       }
     };
     void checkSession();
   }, [expireSession]);
 
   const logout = useCallback(async () => {
-    const response = await fetch(apiUrl('/auth/logout'), { method: 'POST', cache: 'no-store' });
+    const response = await apiFetch('/auth/logout', { method: 'POST', cache: 'no-store' }, { revalidate401: false });
     if (!response.ok) throw new Error(`No se pudo cerrar la sesión (${response.status})`);
     expireSession();
     sessionChannel.current?.postMessage('logout');

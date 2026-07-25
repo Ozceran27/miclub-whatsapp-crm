@@ -11,12 +11,13 @@ function AppRoutes() {
   const { status, isAuthenticated } = useSession();
 
   useEffect(() => {
-    if (status === 'loading') return;
+    if (status === 'loading' || status === 'error') return;
     if (path.startsWith('/app') && !isAuthenticated) navigate('/login', { replace: true });
     if ((path === '/login' || path === '/register') && isAuthenticated) navigate('/app', { replace: true });
   }, [isAuthenticated, navigate, path, status]);
 
   if (status === 'loading') return <div className="auth-loading">Cargando acceso seguro…</div>;
+  if (status === 'error') return <div className="auth-loading" role="alert">No se pudo validar la sesión. Revisá la conexión e intentá nuevamente.</div>;
   if (path.startsWith('/app')) return isAuthenticated ? <ProtectedAppShell /> : null;
   if (path === '/login') return isAuthenticated ? null : <LoginPage />;
   if (path === '/register') return isAuthenticated ? null : <RegisterPage />;

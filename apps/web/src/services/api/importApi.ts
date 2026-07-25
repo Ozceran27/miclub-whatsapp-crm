@@ -1,4 +1,4 @@
-import { apiUrl } from '../../api';
+import { apiFetch, readApiError } from '../../api';
 
 export type EndpointState<T> = {
   loading: boolean;
@@ -82,16 +82,12 @@ export type ImportErrorsResponse = {
 export const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Error desconocido';
 
 const fetchJson = async <T,>(path: `/${string}`, init?: RequestInit): Promise<T> => {
-  const response = await fetch(apiUrl(path), {
+  const response = await apiFetch(path, {
     headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
     ...init
   });
-  const payload = await response.json().catch(() => undefined) as T | { message?: string } | undefined;
-
-  if (!response.ok) {
-    const message = payload && typeof payload === 'object' && 'message' in payload ? payload.message : undefined;
-    throw new Error(message || `HTTP ${response.status}`);
-  }
+  if (!response.ok) throw await readApiError(response);
+  const payload = await response.json().catch(() => undefined) as T | undefined;
 
   return payload as T;
 };

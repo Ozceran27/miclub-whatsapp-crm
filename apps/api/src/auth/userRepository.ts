@@ -24,15 +24,24 @@ export interface UserRepository {
 
 export const getActiveMembershipContext = async (userId: string, membershipId: string) => {
   const pool = await getPostgresPool();
-  const result = await pool.query<{ membership_id: string; club_id: string; role: string; permissions: string[]; sector_ids: string[] }>(
+  const result = await pool.query<{ membership_id: string; club_id: string; role: string; permissions: string[]; sector_ids: string[]; session_revoked_before: Date | null }>(
     `select ucm.id as membership_id, ucm.club_id, r.code as role,
-            ucm.permissions, ucm.sector_ids
+            ucm.permissions, ucm.sector_ids, u.session_revoked_before
        from miclub.user_club_memberships ucm
+       join miclub.users u on u.id=ucm.user_id and u.status='active'
        join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
       where ucm.id=$1 and ucm.user_id=$2 and ucm.status='active'`,
     [membershipId, userId],
   );
   return result.rows[0] ?? null;
+};
+
+export const revokeUserSessions = async (userId: string, revokedAt = new Date()): Promise<void> => {
+  const pool = await getPostgresPool();
+  await pool.query(
+    `update miclub.users set session_revoked_before=$2, updated_at=now() where id=$1`,
+    [userId, revokedAt],
+  );
 };
 
 export const listActiveMemberships = async (userId: string) => {

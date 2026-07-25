@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { login } from "../auth/loginService.js";
-import { getActiveMembershipContext, listActiveMemberships, postgresUserRepository } from "../auth/userRepository.js";
+import { getActiveMembershipContext, listActiveMemberships, postgresUserRepository, revokeUserSessions } from "../auth/userRepository.js";
+import { isSessionRevoked } from "../auth/sessionService.js";
 import { authEnabled, authPassword, authUser, clearSessionCookie, getSession, legacyAuthEnabled, setSessionCookie } from "../middleware/auth.js";
 import asyncHandler from "./asyncHandler.js";
 import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
@@ -60,6 +61,7 @@ router.post("/register", asyncHandler(async (req, res) => {
 
 router.post("/logout", asyncHandler(async (req, res) => {
   const session = getSession(req);
+  if (session?.userId) await revokeUserSessions(session.userId);
   clearSessionCookie(req, res);
   if (session?.userId) await auditService.logout({ action: "auth.logout", result: "success", userId: session.userId, clubId: session.clubId, membershipId: session.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el logout", error));
   return res.json({ authenticated: false });
@@ -68,6 +70,13 @@ router.post("/logout", asyncHandler(async (req, res) => {
 router.get("/clubs", asyncHandler(async (req, res) => {
   const session = getSession(req);
   if (!session?.userId) return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
+  if (session.membershipId) {
+    const current = await getActiveMembershipContext(session.userId, session.membershipId);
+    if (!current || isSessionRevoked(session, current.session_revoked_before)) {
+      clearSessionCookie(req, res);
+      return res.status(401).json({ authenticated: false, code: "SESSION_EXPIRED", message: "La sesión fue revocada" });
+    }
+  }
   res.json({ clubs: await listActiveMemberships(session.userId), selectedMembershipId: session.membershipId ?? null });
 }));
 
@@ -75,6 +84,13 @@ router.post("/clubs/select", asyncHandler(async (req, res) => {
   const session = getSession(req);
   const membershipId = typeof req.body?.membershipId === "string" ? req.body.membershipId : "";
   if (!session?.userId) return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
+  if (session.membershipId) {
+    const current = await getActiveMembershipContext(session.userId, session.membershipId);
+    if (!current || isSessionRevoked(session, current.session_revoked_before)) {
+      clearSessionCookie(req, res);
+      return res.status(401).json({ authenticated: false, code: "SESSION_EXPIRED", message: "La sesión fue revocada" });
+    }
+  }
   const membership = await getActiveMembershipContext(session.userId, membershipId);
   if (!membership) return res.status(403).json({ authenticated: false, message: "Membresía no autorizada" });
   const context = { ...session, clubId: membership.club_id, membershipId: membership.membership_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids };
@@ -86,7 +102,7 @@ router.get("/me", asyncHandler(async (req, res) => {
   if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
 
   const session = getSession(req);
-  if (!session) return res.json({ authenticated: false, authEnabled: true });
+  if (!session) return res.status(401).json({ authenticated: false, authEnabled: true, code: "AUTHENTICATION_REQUIRED" });
 
   // Membership permissions can change while the signed cookie is alive. Always
   // resolve the current authorization before advertising modules to the SPA.
@@ -94,9 +110,9 @@ router.get("/me", asyncHandler(async (req, res) => {
   let context = session;
   if (session.userId && session.membershipId) {
     const membership = await getActiveMembershipContext(session.userId, session.membershipId);
-    if (!membership) {
+    if (!membership || isSessionRevoked(session, membership.session_revoked_before)) {
       clearSessionCookie(req, res);
-      return res.json({ authenticated: false, authEnabled: true });
+      return res.status(401).json({ authenticated: false, authEnabled: true, code: "SESSION_EXPIRED" });
     }
     context = { ...session, clubId: membership.club_id, membershipId: membership.membership_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids };
     setSessionCookie(req, res, context);
