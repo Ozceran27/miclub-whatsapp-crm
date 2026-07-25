@@ -354,7 +354,7 @@ const upsertPerson = async (
   const normalizedPhone = normalizePhone(input.phone);
   const found = dni
     ? await pool.query<{ id: string }>(
-        "select id from miclub.people where club_id=$1 and dni=$2 limit 1",
+        "select id from miclub.people where club_id=$1 and normalized_dni=$2 limit 1",
         [clubId, dni],
       )
     : await pool.query<{ id: string }>(
@@ -445,7 +445,7 @@ const findActiveEnrollmentByImportedIdentity = async (
        where e.club_id = $5
          and e.source = 'google_sheets'
          and e.activity_id = $4
-         and p.dni = $1
+         and p.normalized_dni = $1
          and lower(p.first_name) = lower($2)
          and lower(p.last_name) = lower($3)
          and e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])

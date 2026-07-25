@@ -8,7 +8,7 @@ negocio pertenece al club; las claves técnicas pueden continuar siendo globales
 
 | Tabla | Constraint/índice anterior | Reemplazo por club |
 | --- | --- | --- |
-| `people` | `dni` | `(club_id, dni)` parcial cuando `dni is not null` |
+| `people` | `dni` | `(club_id, normalized_dni)` parcial cuando `normalized_dni is not null` |
 | `person_kind_links` | `(person_id, kind)` | `(club_id, person_id, kind)` |
 | `sectors` | `code`, `lower(code)`, `lower(name)` | `(club_id, lower(code))` y `(club_id, lower(name))` |
 | `instructors` | `person_id` (y `code` en instalaciones creadas por la migración inicial) | `(club_id, person_id)` y `(club_id, lower(code))` si existe la columna |
@@ -30,7 +30,7 @@ técnicas, se referencian ampliamente y no representan nombres de negocio. Tambi
 permanecen globales `currencies.code` (ISO/moneda compartida),
 `import_amount_normalization_rules.context` (configuración del importador) y las
 claves de `system_months` (catálogo calendario). `clubs.code` es global porque
-identifica al tenant. `app_users.email` permanece global porque identifica la cuenta
+identifica al tenant. `users.email` permanece global porque identifica la cuenta
 de autenticación, que puede acceder a más de un club. Las claves primarias de tablas
 hijas de una entidad globalmente identificada
 (`activity_fee_cleanup_candidates.activity_id`) permanecen globales.
@@ -50,3 +50,10 @@ nulo o si aparecen duplicados dentro de un club, y **recién después** elimina 
 restricciones globales y crea sus reemplazos compuestos. Finalmente hace `club_id`
 obligatorio. De ese modo nunca existe una ventana en que la unicidad quede relajada
 antes de validar los datos.
+
+`202607250006_scope_people_and_link_global_users.sql` completa el diseño separando
+la identidad de acceso global (`users`) del perfil personal y privado de cada club
+(`people`). Agrega el vínculo opcional `people.user_id`, admite un perfil distinto
+por usuario y club, y deriva `normalized_dni` para que diferencias de puntuación no
+eludan la unicidad. Antes de reemplazar `(club_id, dni)`, la migración aborta si la
+normalización revela duplicados dentro de un club.
