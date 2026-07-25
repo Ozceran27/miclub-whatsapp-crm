@@ -38,7 +38,6 @@ const isProduction = process.env.NODE_ENV === "production" || __dirname.includes
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
-import cors from "cors";
 import db from "./lib/sqlite.js";
 import { templates } from "./data/mockData.js";
 import dbRoutes from "./routes/dbRoutes.js";
@@ -57,14 +56,19 @@ import errorHandler from "./middleware/errorHandler.js";
 import { warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
 import { authEnabled, createAuthProtection, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
 import { rejectClientClubId, requireAuth, requireMembership } from "./middleware/authorization.js";
+import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const debugEndpointsEnabled = process.env.DEBUG_ENDPOINTS_ENABLED === "true";
 warnIfProductionCrmSourceIsNotPostgres(isProduction);
 app.set("trust proxy", true);
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+const allowedOrigins = getAllowedOrigins();
+app.use(requestId);
+app.use(helmet);
+app.use(cors(corsOptions(allowedOrigins)));
+app.use(express.json({ limit: jsonBodyLimit }));
+app.use(csrfProtection(allowedOrigins));
 app.use("/api/db", dbRoutes);
 
 
@@ -96,6 +100,7 @@ const seedDefaultTemplates = async () => {
   }
 };
 
+app.use(["/auth/login", "/auth/register"], authRateLimit);
 app.use("/auth", authRoutes);
 app.use(createAuthProtection({ isProduction }));
 app.use((req, res, next) => {
@@ -121,7 +126,7 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use("/api/import", importRoutes);
+app.use("/api/import", importRateLimit, importRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api", catalogRoutes);
 app.use("/api", peopleRoutes);
@@ -132,11 +137,11 @@ app.use("/api", dashboardRoutes);
 app.use(createLegacyCompatRoutes(debugEndpointsEnabled));
 app.use(createCrmRoutes({ getMembersSource, isDebtorMember }));
 
-app.use(errorHandler);
-
 if (isProduction) {
   app.use(createFrontendRoutes(webIndexPath));
 }
+
+app.use(errorHandler);
 
 
 export const startServer = async () => {
