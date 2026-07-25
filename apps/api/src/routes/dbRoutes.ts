@@ -4,9 +4,11 @@ import { validatePostgresEnv } from "../config/env.js";
 import { getPostgresHealth } from "../db/health.js";
 import { getPostgresPool } from "../db/postgres.js";
 import { auditSqliteCrmData, migrateCrmToPostgres } from "../services/crmService.js";
+import { requireMembership, requirePermission } from "../middleware/authorization.js";
 
 // migración/debug: paths bajo /api/db; no renombrar sin migración frontend.
 const router = Router();
+router.use(requireMembership);
 
 router.get("/health", async (_req, res) => {
   const postgresEnabled = isPostgresEnabled();
@@ -35,7 +37,7 @@ router.get("/health", async (_req, res) => {
   }
 });
 
-router.get("/enrollment-fee-audit", async (req, res) => {
+router.get("/enrollment-fee-audit", requirePermission("finance:write"), async (req, res) => {
   try {
     const pool = await getPostgresPool();
     const params: unknown[] = [];
@@ -85,7 +87,7 @@ router.get("/enrollment-fee-audit", async (req, res) => {
   }
 });
 
-router.get("/crm/audit", async (_req, res) => {
+router.get("/crm/audit", requirePermission("crm:write"), async (_req, res) => {
   try {
     res.json(await auditSqliteCrmData());
   } catch (error) {
@@ -94,11 +96,11 @@ router.get("/crm/audit", async (_req, res) => {
   }
 });
 
-router.post("/crm/migrate", async (req, res) => {
+router.post("/crm/migrate", requirePermission("crm:write"), async (req, res) => {
   const dryRun = req.body?.dryRun !== false;
   const phase = ["templates", "history", "all"].includes(req.body?.phase) ? req.body.phase : "all";
   try {
-    res.json(await migrateCrmToPostgres({ dryRun, phase }));
+    res.json(await migrateCrmToPostgres({ dryRun, phase, clubId: req.auth!.clubId }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo migrar CRM a PostgreSQL.";
     res.status(500).json({ error: true, message });

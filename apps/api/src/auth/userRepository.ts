@@ -22,6 +22,31 @@ export interface UserRepository {
   recordSuccessfulLogin(userId: string, loggedInAt: Date): Promise<void>;
 }
 
+export const getActiveMembershipContext = async (userId: string, membershipId: string) => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<{ membership_id: string; club_id: string; role: string; permissions: string[]; sector_ids: string[] }>(
+    `select ucm.id as membership_id, ucm.club_id, r.code as role,
+            ucm.permissions, ucm.sector_ids
+       from miclub.user_club_memberships ucm
+       join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
+      where ucm.id=$1 and ucm.user_id=$2 and ucm.status='active'`,
+    [membershipId, userId],
+  );
+  return result.rows[0] ?? null;
+};
+
+export const listActiveMemberships = async (userId: string) => {
+  const pool = await getPostgresPool();
+  const result = await pool.query<{ membershipId: string; clubId: string; clubName: string; role: string }>(
+    `select ucm.id as "membershipId", ucm.club_id as "clubId", c.name as "clubName", r.code as role
+       from miclub.user_club_memberships ucm
+       join miclub.clubs c on c.id=ucm.club_id
+       join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
+      where ucm.user_id=$1 and ucm.status='active' order by c.name, ucm.created_at`, [userId],
+  );
+  return result.rows;
+};
+
 const mapUser = (row: UserRow): AuthUser => ({
   id: row.id,
   email: row.email,

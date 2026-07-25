@@ -69,9 +69,6 @@ app.use(helmet);
 app.use(cors(corsOptions(allowedOrigins)));
 app.use(express.json({ limit: jsonBodyLimit }));
 app.use(csrfProtection(allowedOrigins));
-app.use("/api/db", dbRoutes);
-
-
 if (isProduction) {
   app.use(express.static(webDistPath));
 }
@@ -127,6 +124,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use("/api/import", importRateLimit, importRoutes);
+app.use("/api/db", dbRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api", catalogRoutes);
 app.use("/api", peopleRoutes);

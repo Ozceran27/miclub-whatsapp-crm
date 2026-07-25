@@ -3,6 +3,7 @@ import { getPostgresPool } from "../db/postgres.js";
 import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
 import asyncHandler from "./asyncHandler.js";
+import { requireMembership, requirePermission } from "../middleware/authorization.js";
 
 // migración: importadores bajo /api/import; no renombrar sin migración frontend.
 const router = Router();
@@ -34,6 +35,7 @@ const parsePagination = (query: Record<string, unknown>) => ({
 });
 
 router.use(requireImportEndpointsEnabled);
+router.use(requireMembership, requirePermission("imports:run"));
 
 router.post("/google-sheets", asyncHandler(async (req, res) => {
   const dryRun = req.body?.dryRun !== false;
