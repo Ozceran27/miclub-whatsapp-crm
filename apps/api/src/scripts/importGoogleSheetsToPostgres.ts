@@ -20,7 +20,18 @@ const main = async (): Promise<void> => {
   const dryRun = hasFlag("--dry-run") || hasFlag("--dry");
   const batchSize = readNumberFlag("--batch-size", 50);
   const missingEnrollmentStrategy = parseMissingEnrollmentStrategy(readStringFlag("--missing-enrollment-strategy"));
-  const summary = await importGoogleSheets({ dryRun, batchSize, missingEnrollmentStrategy });
+  const clubId = process.env.GOOGLE_SHEETS_IMPORT_CLUB_ID;
+  if (!clubId) throw new Error("GOOGLE_SHEETS_IMPORT_CLUB_ID es obligatorio para la importación manual legacy.");
+  const summary = await importGoogleSheets({
+    userId: null,
+    email: "google-sheets-manual-import@localhost",
+    legacy: true,
+    clubId,
+    membershipId: "manual-import",
+    role: "admin",
+    permissions: [],
+    sectorIds: [],
+  }, { dryRun, batchSize, missingEnrollmentStrategy });
   console.log(JSON.stringify(summary, null, 2));
 };
 

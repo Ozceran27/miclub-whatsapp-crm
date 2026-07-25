@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import type { RequestAuthContext } from "../auth/types.js";
 import { getPostgresPool } from "../db/postgres.js";
 import {
   adminMovementFallbackIndexes,
@@ -67,6 +68,7 @@ export type MissingEnrollment = {
 };
 
 export type ImportSummary = {
+  clubId: string;
   batchId: string;
   dryRun: boolean;
   read: number;
@@ -126,7 +128,7 @@ const getSheetsClient = (config: ReturnType<typeof getGoogleSheetsConfig>) => {
 
 const importEnabled = (): boolean =>
   ["true", "1", "yes", "on"].includes(
-    (process.env.GOOGLE_SHEETS_IMPORT_ENABLED ?? "true").toLowerCase(),
+    (process.env.GOOGLE_SHEETS_IMPORT_ENABLED ?? "false").toLowerCase(),
   );
 
 export const parseMissingEnrollmentStrategy = (
@@ -335,6 +337,7 @@ const readRows = async (): Promise<{
 
 const upsertPerson = async (
   pool: Pool,
+  clubId: string,
   input: {
     firstName: string;
     lastName?: string;
@@ -351,19 +354,20 @@ const upsertPerson = async (
   const normalizedPhone = normalizePhone(input.phone);
   const found = dni
     ? await pool.query<{ id: string }>(
-        "select id from miclub.people where dni=$1 limit 1",
-        [dni],
+        "select id from miclub.people where club_id=$1 and dni=$2 limit 1",
+        [clubId, dni],
       )
     : await pool.query<{ id: string }>(
-        "select id from miclub.people where lower(first_name)=lower($1) and lower(last_name)=lower($2) and coalesce(normalized_phone,'')=$3 limit 1",
-        [firstName, lastName, normalizedPhone],
+        "select id from miclub.people where club_id=$1 and lower(first_name)=lower($2) and lower(last_name)=lower($3) and coalesce(normalized_phone,'')=$4 limit 1",
+        [clubId, firstName, lastName, normalizedPhone],
       );
   const id =
     found.rows[0]?.id ??
     (
       await pool.query<{ id: string }>(
-        "insert into miclub.people (first_name,last_name,dni,phone,normalized_phone,notes) values ($1,$2,$3,$4,$5,$6) returning id",
+        "insert into miclub.people (club_id,first_name,last_name,dni,phone,normalized_phone,notes) values ($1,$2,$3,$4,$5,$6,$7) returning id",
         [
+          clubId,
           firstName,
           lastName,
           dni,
@@ -375,31 +379,32 @@ const upsertPerson = async (
     ).rows[0]?.id;
   if (!id) throw new Error("No se pudo crear persona.");
   await pool.query(
-    "update miclub.people set first_name=$2,last_name=$3,phone=coalesce($4,phone),normalized_phone=coalesce($5,normalized_phone),updated_at=now() where id=$1",
-    [id, firstName, lastName, input.phone ?? null, normalizedPhone || null],
+    "update miclub.people set first_name=$2,last_name=$3,phone=coalesce($4,phone),normalized_phone=coalesce($5,normalized_phone),updated_at=now() where id=$1 and club_id=$6",
+    [id, firstName, lastName, input.phone ?? null, normalizedPhone || null, clubId],
   );
   await pool.query(
-    "insert into miclub.person_kind_links (person_id, kind) values ($1, $2::miclub.person_kind) on conflict do nothing",
-    [id, input.kind],
+    "insert into miclub.person_kind_links (club_id, person_id, kind) values ($1, $2, $3::miclub.person_kind) on conflict do nothing",
+    [clubId, id, input.kind],
   );
   return id;
 };
 
 const upsertCategory = async (
   pool: Pool,
+  clubId: string,
   name: string,
 ): Promise<string | null> => {
   const clean = normalizeSheetText(name) || "Sin categoría";
   const found = await pool.query<{ id: string }>(
-    "select id from miclub.movement_categories where lower(name)=lower($1) limit 1",
-    [clean],
+    "select id from miclub.movement_categories where club_id=$1 and lower(name)=lower($2) limit 1",
+    [clubId, clean],
   );
   if (found.rows[0]) return found.rows[0].id;
   return (
     (
       await pool.query<{ id: string }>(
-        "insert into miclub.movement_categories (name) values ($1) returning id",
-        [clean],
+        "insert into miclub.movement_categories (club_id, name) values ($1, $2) returning id",
+        [clubId, clean],
       )
     ).rows[0]?.id ?? null
   );
@@ -407,6 +412,7 @@ const upsertCategory = async (
 
 const upsertPaymentMethod = async (
   pool: Pool,
+  clubId: string,
   name: string,
 ): Promise<string | null> => {
   const clean = normalizeSheetText(name);
@@ -414,8 +420,8 @@ const upsertPaymentMethod = async (
   return (
     (
       await pool.query<{ id: string }>(
-        "insert into miclub.payment_methods (name) values ($1) on conflict (name) do update set name=excluded.name returning id",
-        [clean],
+        "insert into miclub.payment_methods (club_id, name) values ($1, $2) on conflict (club_id, lower(name)) do update set name=excluded.name returning id",
+        [clubId, clean],
       )
     ).rows[0]?.id ?? null
   );
@@ -423,6 +429,7 @@ const upsertPaymentMethod = async (
 
 const findActiveEnrollmentByImportedIdentity = async (
   pool: Pool,
+  clubId: string,
   input: {
     dni: string | null;
     firstName: string;
@@ -435,7 +442,8 @@ const findActiveEnrollmentByImportedIdentity = async (
     `select e.id
        from miclub.enrollments e
        join miclub.people p on p.id = e.person_id
-       where e.source = 'google_sheets'
+       where e.club_id = $5
+         and e.source = 'google_sheets'
          and e.activity_id = $4
          and p.dni = $1
          and lower(p.first_name) = lower($2)
@@ -459,7 +467,7 @@ const findActiveEnrollmentByImportedIdentity = async (
              or to_jsonb(e)->>'superseded_at' is null)
        order by e.updated_at desc
        limit 1`,
-    [input.dni, input.firstName, input.lastName, input.activityId],
+    [input.dni, input.firstName, input.lastName, input.activityId, clubId],
   );
   return result.rows[0]?.id ?? null;
 };
@@ -476,18 +484,19 @@ export const processMember = async (
   const memberIndexes = row.memberIndexes ?? {};
   const firstName = memberValue(row.row, memberIndexes, "nombre");
   if (!firstName) return null;
-  const sectorId = await upsertSector(pool, row.sheet);
+  const sectorId = await upsertSector(pool, summary.clubId, row.sheet);
   summary.sectorsProcessed += 1;
   summary.attemptedWrites += 1;
   const instructorName =
     memberValue(row.row, memberIndexes, "instructor") || "Sin instructor";
-  const instructorPersonId = await upsertPerson(pool, {
+  const instructorPersonId = await upsertPerson(pool, summary.clubId, {
     firstName: instructorName,
     kind: "instructor",
     source: `${row.sheet}:${row.rowNumber}`,
   });
   const instructorId = await upsertInstructor(
     pool,
+    summary.clubId,
     instructorPersonId,
     instructorName,
   );
@@ -514,6 +523,7 @@ export const processMember = async (
     });
   }
   const activityId = await upsertActivity(pool, {
+    clubId: summary.clubId,
     sectorId,
     name: memberValue(row.row, memberIndexes, "actividad") || "Sin actividad",
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
@@ -530,7 +540,7 @@ export const processMember = async (
   const memberFirstName = normalizeSheetText(firstName);
   const memberLastName = normalizeSheetText(memberValue(row.row, memberIndexes, "apellido")) || " ";
   const memberDni = normalizeDni(memberValue(row.row, memberIndexes, "dni")) || null;
-  const personId = await upsertPerson(pool, {
+  const personId = await upsertPerson(pool, summary.clubId, {
     firstName,
     lastName: memberLastName,
     dni: memberDni,
@@ -575,7 +585,7 @@ export const processMember = async (
   const notes = JSON.stringify({
     modality: memberValue(row.row, memberIndexes, "modalidad") || null,
   });
-  const matchedEnrollmentId = await findActiveEnrollmentByImportedIdentity(pool, {
+  const matchedEnrollmentId = await findActiveEnrollmentByImportedIdentity(pool, summary.clubId, {
     dni: memberDni,
     firstName: memberFirstName,
     lastName: memberLastName,
@@ -586,7 +596,7 @@ export const processMember = async (
     enrollmentResult = await pool.query<{ id: string }>(
       `update miclub.enrollments
        set external_id=$2, person_id=$3, activity_id=$4, fee_amount=$5, status=$6::miclub.enrollment_status, due_date=$7, enrollment_date=coalesce(enrollment_date, $8), notes=$9::jsonb, raw_fee_amount_text=$10, raw_fee_amount=$11, normalized_fee_amount=$12, fee_normalization_reason=$13, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
-       where id=$1
+       where id=$1 and club_id=$14
        returning id`,
       [
         matchedEnrollmentId,
@@ -602,15 +612,17 @@ export const processMember = async (
         parsedFeeAmount ?? null,
         normalizedFeeAmount,
         feeNormalizationReason,
+        summary.clubId,
       ],
     );
   } else {
     enrollmentResult = await pool.query<{ id: string }>(
-      `insert into miclub.enrollments (external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
-       values ($1,$2,$3,$4,$5::miclub.enrollment_status,$6,$7,'google_sheets',$8,$9,$10,$11,$12,now())
-       on conflict (external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
+      `insert into miclub.enrollments (club_id, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
+       values ($1,$2,$3,$4,$5,$6::miclub.enrollment_status,$7,$8,'google_sheets',$9,$10,$11,$12,$13,now())
+       on conflict (club_id, external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
        returning id`,
       [
+        summary.clubId,
         ext,
         personId,
         activityId,
@@ -630,16 +642,17 @@ export const processMember = async (
   if (enrollmentId) {
     await pool.query(
       `insert into miclub.enrollment_fee_audit (
-         import_batch_id, enrollment_id, source_sheet, source_row_number, raw_fee_text,
+         club_id, import_batch_id, enrollment_id, source_sheet, source_row_number, raw_fee_text,
          parsed_fee_amount, normalized_fee_amount, normalization_factor, normalization_reason,
          commission_rate, receivable_fee
        )
-       select $1, $2, $3, $4, $5, $6, $7,
-              case when coalesce($6::numeric, 0) = 0 then null else ($7::numeric / $6::numeric) end,
-              $8, coalesce(v.commission_rate, 0), coalesce(v.receivable_fee, 0)
+       select $1, $2, $3, $4, $5, $6, $7, $8,
+              case when coalesce($7::numeric, 0) = 0 then null else ($8::numeric / $7::numeric) end,
+              $9, coalesce(v.commission_rate, 0), coalesce(v.receivable_fee, 0)
        from (select 1) seed
-       left join miclub.v_enrollment_receivable_fees v on v.enrollment_id = $2`,
+       left join miclub.v_enrollment_receivable_fees v on v.enrollment_id = $3`,
       [
+        summary.clubId,
         summary.batchId,
         enrollmentId,
         row.sheet,
@@ -711,18 +724,21 @@ export const processMovement = async (
     );
   const sectorId = await upsertSector(
     pool,
+    summary.clubId,
     movementValue(row.row, movementIndexes, "sector") || row.sheet,
   );
   summary.sectorsProcessed += 1;
   summary.attemptedWrites += 1;
   const categoryId = await upsertCategory(
     pool,
+    summary.clubId,
     movementValue(row.row, movementIndexes, "categoria"),
   );
   summary.movementCategoriesProcessed += 1;
   summary.attemptedWrites += 1;
   const paymentMethodId = await upsertPaymentMethod(
     pool,
+    summary.clubId,
     movementValue(row.row, movementIndexes, "medioPago"),
   );
   if (paymentMethodId) summary.attemptedWrites += 1;
@@ -737,10 +753,11 @@ export const processMovement = async (
       amount,
     );
   await pool.query(
-    `insert into miclub.movements (external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
-     values ($1,$2,$3::miclub.movement_type,$4,$5,$6,$7,$8,$9,$10,$11::miclub.financial_status,$12::miclub.movement_status,'google_sheets',$13::jsonb)
-     on conflict (external_id) do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
+    `insert into miclub.movements (club_id,external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
+     values ($1,$2,$3,$4::miclub.movement_type,$5,$6,$7,$8,$9,$10,$11,$12::miclub.financial_status,$13::miclub.movement_status,'google_sheets',$14::jsonb)
+     on conflict (club_id, external_id) do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
     [
+      summary.clubId,
       externalId("google_sheets", "movement", ext),
       movementDate,
       movementType,
@@ -798,10 +815,11 @@ const upsertOperationalBalances = async (
     return;
   }
   await pool.query(
-    `insert into miclub.operational_balances (cutoff_date, liquidity, cash, bank, dollars, source, source_payload)
-     values (current_date, $1, $2, $3, $4, 'google_sheets', $5::jsonb)
-     on conflict (source, cutoff_date) do update set liquidity=excluded.liquidity, cash=excluded.cash, bank=excluded.bank, dollars=excluded.dollars, source_payload=excluded.source_payload, updated_at=now()`,
+    `insert into miclub.operational_balances (club_id, cutoff_date, liquidity, cash, bank, dollars, source, source_payload)
+     values ($1, current_date, $2, $3, $4, $5, 'google_sheets', $6::jsonb)
+     on conflict (club_id, source, cutoff_date) do update set liquidity=excluded.liquidity, cash=excluded.cash, bank=excluded.bank, dollars=excluded.dollars, source_payload=excluded.source_payload, updated_at=now()`,
     [
+      summary.clubId,
       balances.liquidity,
       balances.cash,
       balances.bank,
@@ -872,9 +890,9 @@ const upsertSheetMetricSnapshots = async (
       continue;
     }
     await pool.query(
-      `insert into miclub.sheet_metric_snapshots (metric_key, metric_value, source, source_range, source_payload)
-       values ($1, $2, 'google_sheets', $3, $4::jsonb)`,
-      [metric.metricKey, metric.metricValue, metric.sourceRange, JSON.stringify({ range: metric.sourceRange, rows: metricRanges[metric.sourceRange] ?? [] })],
+      `insert into miclub.sheet_metric_snapshots (club_id, metric_key, metric_value, source, source_range, source_payload)
+       values ($1, $2, $3, 'google_sheets', $4, $5::jsonb)`,
+      [summary.clubId, metric.metricKey, metric.metricValue, metric.sourceRange, JSON.stringify({ range: metric.sourceRange, rows: metricRanges[metric.sourceRange] ?? [] })],
     );
     summary.sheetMetricSnapshotsProcessed += 1;
     summary.attemptedWrites += 1;
@@ -894,13 +912,13 @@ const upsertAulaActivityCommissions = async (
     summary.warnings.push("No se detectaron comisiones EC de AULA para actualizar actividades.");
     return;
   }
-  const sectorId = await upsertSector(pool, "AULA");
+  const sectorId = await upsertSector(pool, summary.clubId, "AULA");
   for (const [activityKey, rate] of entries) {
     const result = await pool.query<{ id: string }>(
       `update miclub.activities
           set club_commission_percent = $3,
               updated_at = now()
-        where sector_id = $1
+        where sector_id = $1 and club_id = $4
           and trim(regexp_replace(
                 translate(lower(coalesce(name, '')), 'áéíóúüñ', 'aeiouun'),
                 '[^a-z0-9]+',
@@ -908,7 +926,7 @@ const upsertAulaActivityCommissions = async (
                 'g'
               )) = $2
         returning id`,
-      [sectorId, normalizeActivityName(activityKey), rate],
+      [sectorId, normalizeActivityName(activityKey), rate, summary.clubId],
     );
     summary.activitiesProcessed += result.rows.length;
     summary.attemptedWrites += 1;
@@ -951,11 +969,12 @@ const reconcileMissingEnrollments = async (
   }>(
     `select e.id, e.external_id, p.dni, p.first_name, p.last_name, a.name as activity, s.name as sector, e.status::text as status, e.enrollment_date::text, e.fee_amount
      from miclub.enrollments e
-     left join miclub.people p on p.id = e.person_id
-     left join miclub.activities a on a.id = e.activity_id
-     left join miclub.sectors s on s.id = a.sector_id
-     where e.source = 'google_sheets'
-       and e.external_id <> all($1::text[])
+     left join miclub.people p on p.id = e.person_id and p.club_id = e.club_id
+     left join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+     left join miclub.sectors s on s.id = a.sector_id and s.club_id = e.club_id
+     where e.club_id = $1
+       and e.source = 'google_sheets'
+       and e.external_id <> all($2::text[])
        and e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])
        and (not exists (
              select 1
@@ -974,7 +993,7 @@ const reconcileMissingEnrollments = async (
            )
            or to_jsonb(e)->>'superseded_at' is null)
      order by s.name nulls last, a.name nulls last, p.last_name nulls last, p.first_name nulls last`,
-    [[...processedExternalIds]],
+    [summary.clubId, [...processedExternalIds]],
   );
   const missingExternalIds = result.rows.map((row) => row.external_id);
   summary.missingEnrollments = missingExternalIds.length;
@@ -997,8 +1016,8 @@ const reconcileMissingEnrollments = async (
   await pool.query(
     `update miclub.enrollments
        set missing_from_import_batch_id = $1, updated_at = now()
-       where source = 'google_sheets' and external_id = any($2::text[])`,
-    [summary.batchId, missingExternalIds],
+       where club_id = $2 and source = 'google_sheets' and external_id = any($3::text[])`,
+    [summary.batchId, summary.clubId, missingExternalIds],
   );
 
   const details = result.rows
@@ -1021,9 +1040,9 @@ const reconcileMissingEnrollments = async (
     await pool.query(
       `update miclub.enrollments
        set status = 'abandonado'::miclub.enrollment_status, updated_at = now()
-       where source = 'google_sheets'
-         and external_id = any($1::text[])`,
-      [missingExternalIds],
+       where club_id = $1 and source = 'google_sheets'
+         and external_id = any($2::text[])`,
+      [summary.clubId, missingExternalIds],
     );
     summary.attemptedWrites += 1;
     summary.persistedWrites += 1;
@@ -1060,9 +1079,9 @@ const reconcileMissingEnrollments = async (
     await pool.query(
       `update miclub.enrollments
        set ${setClauses.join(", ")}
-       where source = 'google_sheets'
-         and external_id = any($1::text[])`,
-      [missingExternalIds],
+       where club_id = $1 and source = 'google_sheets'
+         and external_id = any($2::text[])`,
+      [summary.clubId, missingExternalIds],
     );
     summary.attemptedWrites += 1;
     summary.persistedWrites += 1;
@@ -1071,19 +1090,23 @@ const reconcileMissingEnrollments = async (
 };
 
 export const importGoogleSheets = async (
+  auth: RequestAuthContext,
   options: ImportOptions = {},
 ): Promise<ImportSummary> => {
+  const clubId = auth.clubId;
   const dryRun = options.dryRun ?? true;
   const batchSize = options.batchSize ?? 50;
   const pool = await getPostgresPool();
   const strategy =
     options.missingEnrollmentStrategy ?? parseMissingEnrollmentStrategy();
   const batchId = await createImportBatch(pool, {
+    clubId,
     source: "google_sheets",
     dryRun,
     notes: dryRun ? "Dry run: solo valida y revierte entidades." : undefined,
   });
   const summary: ImportSummary = {
+    clubId,
     batchId,
     dryRun,
     read: 0,
@@ -1168,6 +1191,7 @@ export const importGoogleSheets = async (
       }
       for (const { row, error } of groupErrors)
         await logImportError(pool, {
+          clubId,
           batchId,
           sourceTable: row.kind,
           sourceRow: `${row.sheet}:${row.rowNumber}`,
@@ -1201,6 +1225,7 @@ export const importGoogleSheets = async (
     );
     await finishImportBatch(
       pool,
+      clubId,
       batchId,
       dryRun
         ? "dry_run"
@@ -1213,6 +1238,7 @@ export const importGoogleSheets = async (
   } catch (error) {
     await finishImportBatch(
       pool,
+      clubId,
       batchId,
       "failed",
       error instanceof Error ? error.message : String(error),
@@ -1222,7 +1248,7 @@ export const importGoogleSheets = async (
 };
 
 
-export const getMovementImportAudit = async () => {
+export const getMovementImportAudit = async (auth: RequestAuthContext) => {
   const pool = await getPostgresPool();
   const result = await pool.query(`
     select
@@ -1232,12 +1258,12 @@ export const getMovementImportAudit = async () => {
       m.operational_status as status,
       count(*)::int as count
     from miclub.movements m
-    left join miclub.sectors s on s.id = m.sector_id
-    left join miclub.movement_categories c on c.id = m.category_id
-    where m.source = 'google_sheets'
+    left join miclub.sectors s on s.id = m.sector_id and s.club_id = m.club_id
+    left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
+    where m.club_id = $1 and m.source = 'google_sheets'
     group by 1, 2, 3, 4
     order by 1, 2, 3, 4
-  `);
+  `, [auth.clubId]);
   const totals = { total: 0, bySector: {} as Record<string, number>, byCategory: {} as Record<string, number>, byType: {} as Record<string, number>, byStatus: {} as Record<string, number> };
   for (const row of result.rows as Array<{ sector: string; category: string; type: string; status: string; count: number }>) {
     const count = Number(row.count);

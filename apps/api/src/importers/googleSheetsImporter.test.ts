@@ -15,6 +15,7 @@ test('parseMissingEnrollmentStrategy usa archive por defecto y acepta aliases de
 });
 
 const createSummary = () => ({
+  clubId: 'club-1',
   batchId: 'batch-1',
   dryRun: false,
   read: 0,
@@ -57,11 +58,11 @@ test('processMovement importa movimientos operativos con monto cero', async () =
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.movements'));
   assert.ok(insert, 'expected a movement insert query');
-  assert.equal(insert.params?.[2], 'INGRESOS');
-  assert.equal(insert.params?.[5], 'Bonificación 100%');
-  assert.equal(insert.params?.[7], 0);
-  assert.equal(insert.params?.[10], 'pagado');
-  assert.equal(insert.params?.[11], 'COMPLETADO');
+  assert.equal(insert.params?.[3], 'INGRESOS');
+  assert.equal(insert.params?.[6], 'Bonificación 100%');
+  assert.equal(insert.params?.[8], 0);
+  assert.equal(insert.params?.[11], 'pagado');
+  assert.equal(insert.params?.[12], 'COMPLETADO');
   assert.equal(summary.movementsProcessed, 1);
 });
 
@@ -134,13 +135,13 @@ test('processMovement importa movimientos de LOCAL 1 con layout sectorial sin co
   const sectorLookup = queries.find((query) => query.sql.includes('from miclub.sectors'));
   const insert = queries.find((query) => query.sql.includes('insert into miclub.movements'));
   assert.ok(sectorLookup, 'expected sector lookup');
-  assert.equal(sectorLookup.params?.[0], 'LOCAL 1');
+  assert.equal(sectorLookup.params?.[1], 'LOCAL 1');
   assert.ok(insert, 'expected a movement insert query');
-  assert.equal(insert.params?.[2], 'INGRESOS');
-  assert.equal(insert.params?.[5], 'Pago (PARCIAL) Tattoo - Proyecto Fabian');
-  assert.equal(insert.params?.[7], 50000);
-  assert.equal(insert.params?.[10], 'pagado');
-  assert.equal(insert.params?.[11], 'COMPLETADO');
+  assert.equal(insert.params?.[3], 'INGRESOS');
+  assert.equal(insert.params?.[6], 'Pago (PARCIAL) Tattoo - Proyecto Fabian');
+  assert.equal(insert.params?.[8], 50000);
+  assert.equal(insert.params?.[11], 'pagado');
+  assert.equal(insert.params?.[12], 'COMPLETADO');
   assert.equal(summary.movementsProcessed, 1);
 });
 
@@ -156,7 +157,7 @@ test('processMember usa headers reales de FITNESS y completa due_date desde Venc
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
   assert.ok(insert, 'expected an enrollment insert query');
-  assert.equal(insert.params?.[5], '2026-07-25');
+  assert.equal(insert.params?.[6], '2026-07-25');
 });
 
 test('processMember usa headers reales de SALON y completa due_date desde Vence en BB', async () => {
@@ -171,7 +172,7 @@ test('processMember usa headers reales de SALON y completa due_date desde Vence 
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
   assert.ok(insert, 'expected an enrollment insert query');
-  assert.equal(insert.params?.[5], '2026-07-26');
+  assert.equal(insert.params?.[6], '2026-07-26');
 });
 
 test('processMember usa headers reales de AULA y completa due_date desde Vence en BB', async () => {
@@ -186,7 +187,7 @@ test('processMember usa headers reales de AULA y completa due_date desde Vence e
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
   assert.ok(insert, 'expected an enrollment insert query');
-  assert.equal(insert.params?.[5], '2026-07-27');
+  assert.equal(insert.params?.[6], '2026-07-27');
 });
 
 const createMemberPool = (queries: Array<{ sql: string; params?: unknown[] }>) => ({
@@ -311,5 +312,5 @@ test('processMovement envía timestamp explícito de Argentina para evitar desfa
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.movements'));
   assert.ok(insert, 'expected a movement insert query');
-  assert.equal(insert.params?.[1], '2026-07-01 00:00:00 America/Argentina/Buenos_Aires');
+  assert.equal(insert.params?.[2], '2026-07-01 00:00:00 America/Argentina/Buenos_Aires');
 });
