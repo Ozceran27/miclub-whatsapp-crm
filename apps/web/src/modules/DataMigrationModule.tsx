@@ -24,6 +24,11 @@ const formatValue = (value: unknown) => {
 
 const formatDateTime = (value?: string) => value ? new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
+const errorGuidance = (code?: string) => code === 'IMPORT_SCHEMA_CONFLICT_CONFIGURATION' ? {
+  cause: 'El ON CONFLICT del importador no coincide con una restricción o índice UNIQUE de PostgreSQL.',
+  action: 'Aplicar y validar la migración de constraints multi-tenant.'
+} : { cause: 'Revisar el dato y el detalle del error.', action: 'Corregir la fila de origen y repetir el dry-run.' };
+
 const JsonPanel = ({ title, state }: { title: string; state: EndpointState<unknown> }) => (
   <article className="card migration-status-card">
     <h4>{title}</h4>
@@ -178,7 +183,7 @@ export default function DataMigrationModule() {
             <button type="button" onClick={() => { setErrorOffset(0); void loadBatchErrors(selectedBatchId, 0, { sheet: errorSheet, entity: errorEntity }); }}>Aplicar filtros</button>
           </div>
           <h4>Resumen agrupado ({batchErrors.data.total ?? 0} errores)</h4>
-          <div className="history-table-wrap"><table className="history-table"><thead><tr><th>Código</th><th>Cantidad</th><th>Hoja</th><th>Entidad</th><th>Mensaje</th></tr></thead><tbody>{(batchErrors.data.groups ?? []).map((group, index) => <tr key={`${group.error_code}-${group.sheet}-${index}`}><td><code>{group.error_code}</code></td><td>{group.count}</td><td>{group.sheet || '—'}</td><td>{group.entity_type || '—'}</td><td>{group.message}</td></tr>)}</tbody></table></div>
+          <div className="history-table-wrap"><table className="history-table"><thead><tr><th>Código</th><th>Cantidad</th><th>Hoja</th><th>Entidad</th><th>Descripción</th><th>Causa probable</th><th>Acción sugerida</th></tr></thead><tbody>{(batchErrors.data.groups ?? []).map((group, index) => { const guidance = errorGuidance(group.error_code); return <tr key={`${group.error_code}-${group.sheet}-${index}`}><td><code>{group.error_code}</code></td><td>{group.count}</td><td>{group.sheet || '—'}</td><td>{group.entity_type || '—'}</td><td>{group.message}</td><td>{guidance.cause}</td><td>{guidance.action}</td></tr>; })}</tbody></table></div>
           <h4>Errores representativos</h4>
           <div className="history-table-wrap">
             <table className="history-table">

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints } from './googleSheetsImporter.js';
+import { isImportSchemaConflictConfiguration, parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints } from './googleSheetsImporter.js';
 import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
@@ -34,6 +34,26 @@ test('processRowsWithSavepoints evita que un error de fila envenene las filas si
   assert.deepEqual(processed, [1, 3]);
   assert.deepEqual(errors, [2]);
   assert.ok(sql.includes('rollback to savepoint import_row_1'));
+});
+
+test('un ON CONFLICT incompatible aborta temprano y no se replica por cada fila', async () => {
+  const processed: number[] = [];
+  const rowErrors: number[] = [];
+  const transaction = { query: async () => ({ rows: [] }) };
+  await assert.rejects(
+    processRowsWithSavepoints(transaction as never, [1, 2, 3], async (row) => {
+      processed.push(row);
+      throw Object.assign(new Error('no unique or exclusion constraint matching the ON CONFLICT specification'), { code: '42P10' });
+    }, (row) => rowErrors.push(row)),
+    (error: unknown) => isImportSchemaConflictConfiguration(error),
+  );
+  assert.deepEqual(processed, [1]);
+  assert.deepEqual(rowErrors, []);
+});
+
+test('clasifica también el mensaje localizado de PostgreSQL como configuración sistémica', () => {
+  assert.equal(isImportSchemaConflictConfiguration(new Error('no hay restricción única o de exclusión que coincida con la especificación ON CONFLICT')), true);
+  assert.equal(isImportSchemaConflictConfiguration(Object.assign(new Error('otro error'), { code: '23503' })), false);
 });
 
 const createSummary = () => ({
@@ -80,6 +100,7 @@ test('processMovement importa movimientos operativos con monto cero', async () =
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.movements'));
   assert.ok(insert, 'expected a movement insert query');
+  assert.match(insert.sql, /on conflict \(club_id, external_id\) where external_id is not null do update/i);
   assert.equal(insert.params?.[3], 'INGRESOS');
   assert.equal(insert.params?.[6], 'Bonificación 100%');
   assert.equal(insert.params?.[8], 0);
@@ -179,6 +200,7 @@ test('processMember usa headers reales de FITNESS y completa due_date desde Venc
 
   const insert = queries.find((query) => query.sql.includes('insert into miclub.enrollments'));
   assert.ok(insert, 'expected an enrollment insert query');
+  assert.match(insert.sql, /on conflict \(club_id, external_id\) where external_id is not null do update/i);
   assert.equal(insert.params?.[6], '2026-07-25');
 });
 
