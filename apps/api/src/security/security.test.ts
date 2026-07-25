@@ -66,3 +66,15 @@ test("CSRF permite una mutación con cookie desde el Origin configurado", () => 
   csrfProtection(new Set(["https://app.example.com"]))(request, {} as Response, () => { nextCalled = true; });
   assert.equal(nextCalled, true);
 });
+
+test("CSRF permite siempre logout para que el servidor pueda destruir la sesión", () => {
+  let nextCalled = false;
+  const request = {
+    method: "POST",
+    path: "/auth/logout",
+    headers: { cookie: "miclub_session=signed" },
+    get: () => undefined
+  } as unknown as Request;
+  csrfProtection(new Set())(request, {} as Response, () => { nextCalled = true; });
+  assert.equal(nextCalled, true);
+});

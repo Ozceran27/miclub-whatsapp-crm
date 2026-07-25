@@ -139,6 +139,9 @@ const hasSessionCookie = (req: Request): boolean =>
 export const csrfProtection = (allowedOrigins = getAllowedOrigins()): RequestHandler =>
   (req: Request, res: Response, next: NextFunction) => {
     if (!MUTATING_METHODS.has(req.method) || !hasSessionCookie(req)) return next();
+    // El logout no modifica datos y debe poder destruir la cookie aun si un
+    // proxy omite Origin o la configuración de orígenes quedó desactualizada.
+    if (req.path === "/auth/logout") return next();
     const origin = req.get("origin");
     if (origin && normalizeOrigin(origin) && allowedOrigins.has(normalizeOrigin(origin)!)) return next();
     return res.status(403).json({ error: true, message: "Origen no permitido por la política CSRF.", requestId: req.requestId });

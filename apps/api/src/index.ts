@@ -98,6 +98,13 @@ const seedDefaultTemplates = async () => {
 };
 
 app.use(["/auth/login", "/auth/register"], authRateLimit);
+app.use("/auth", (_req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  res.set("Surrogate-Control", "no-store");
+  next();
+});
 app.use("/auth", authRoutes);
 // Set this before authentication so reverse proxies never retain a stale 401.
 app.use((req, res, next) => {
