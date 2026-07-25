@@ -12,21 +12,23 @@ export type AuthUser = {
 };
 
 export type AuthenticatedContext = {
-  userId: string | null;
+  userId: string;
+  personId: string;
   email: string;
   legacy: boolean;
-  clubId?: string;
-  membershipId?: string;
-  role?: string;
-  permissions?: readonly string[];
-  sectorIds?: readonly string[];
+  clubId: string;
+  membershipId: string;
+  role: string;
+  permissions: readonly string[];
+  sectorIds: readonly string[];
 };
 
 /** Identidad autenticada, independiente del tenant seleccionado. */
-export type AuthContext = Pick<AuthenticatedContext, "userId" | "email" | "legacy">;
+export type AuthContext = Pick<AuthenticatedContext, "userId" | "personId" | "email" | "legacy">;
 
 /** Autorización efectiva dentro del club seleccionado. */
 export type TenantContext = {
+  personId: string;
   clubId: string;
   membershipId: string;
   role: string;

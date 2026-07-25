@@ -7,7 +7,7 @@ export const lockDurationMs = 15 * 60 * 1000;
 
 export type LoginResult =
   | { ok: true; context: AuthenticatedContext }
-  | { ok: false; reason: "invalid_credentials" | "disabled" | "locked" };
+  | { ok: false; reason: "invalid_credentials" | "disabled" | "locked" | "membership_required" };
 
 export const login = async (
   repository: UserRepository,
@@ -29,6 +29,11 @@ export const login = async (
     await repository.recordFailedLogin(user.id, failedAttempts, lockedUntil);
     return { ok: false, reason: lockedUntil ? "locked" : "invalid_credentials" };
   }
+
+  // A password-valid identity is not an application principal until the
+  // authoritative user -> person -> active membership -> club -> role chain
+  // has been resolved. Never issue an identity-only or synthetic tenant cookie.
+  if (!user.tenant) return { ok: false, reason: "membership_required" };
 
   await repository.recordSuccessfulLogin(user.id, now);
   return { ok: true, context: {

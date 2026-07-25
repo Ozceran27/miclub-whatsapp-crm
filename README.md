@@ -187,13 +187,12 @@ Para crear un acceso directo:
 
 ## Acceso remoto y autenticación
 
-Antes de publicar miClub Gestión con Cloudflare Tunnel, activá el login local con cookie `httpOnly` desde variables de entorno. No se usa base de datos de usuarios ni servicios externos.
+Antes de publicar miClub Gestión con Cloudflare Tunnel, activá el login con cookie `httpOnly`. Las identidades y membresías se validan en PostgreSQL.
 
 Variables disponibles en `.env`:
 
 - `AUTH_ENABLED`: usá `false` para mantener el acceso directo local de siempre. Usá `true` para exigir login en toda la aplicación.
-- `AUTH_USER`: usuario local permitido cuando `AUTH_ENABLED=true`.
-- `AUTH_PASSWORD`: contraseña local permitida cuando `AUTH_ENABLED=true`. Evitá contraseñas simples o reutilizadas.
+- `AUTH_USER` y `AUTH_PASSWORD` fueron retiradas: no existe un usuario global de entorno.
 - `SESSION_SECRET`: secreto largo y aleatorio para firmar la cookie de sesión. Es obligatorio si `AUTH_ENABLED=true`.
 - `PUBLIC_APP_URL`: URL pública de la app; por ejemplo, la URL `https://...` del Cloudflare Tunnel. Ayuda a configurar cookies seguras detrás de HTTPS.
 
@@ -201,8 +200,6 @@ Ejemplo para probar localmente:
 
 ```env
 AUTH_ENABLED=true
-AUTH_USER=admin
-AUTH_PASSWORD=una-clave-larga-y-unica
 SESSION_SECRET=un-secreto-largo-aleatorio-de-al-menos-32-caracteres
 PUBLIC_APP_URL=http://localhost:4000
 ```

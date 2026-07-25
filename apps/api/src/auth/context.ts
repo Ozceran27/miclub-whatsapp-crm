@@ -14,9 +14,10 @@ type AuthenticatedRequest = express.Request & { [authContextKey]?: Authenticated
 
 export const setAuthenticatedContext = (request: express.Request, context: AuthenticatedContext): void => {
   (request as AuthenticatedRequest)[authContextKey] = context;
-  if (context.userId && context.clubId && context.membershipId && context.role) {
+  if (context.userId && context.personId && context.clubId && context.membershipId && context.role) {
     request.auth = {
       userId: context.userId,
+      personId: context.personId,
       email: context.email,
       legacy: context.legacy,
       clubId: context.clubId,

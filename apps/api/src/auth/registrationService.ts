@@ -35,10 +35,11 @@ export const registerClubOwner = async (clubName: unknown, email: unknown, passw
     const clubId = club.rows[0].id;
     const role = await client.query<{ id: string }>(`insert into miclub.roles (club_id, code, name, description) values ($1, 'owner', 'Propietario', 'Control total del club') returning id`, [clubId]);
     const user = await client.query<{ id: string }>(`insert into miclub.users (email, password_hash, display_name, status, is_active) values ($1, $2, $3, 'active', true) returning id`, [input.email, passwordHash, input.clubName]);
+    const person = await client.query<{ id: string }>(`insert into miclub.people (club_id, user_id, first_name, last_name, email, status) values ($1, $2, 'Administrador', $3, $4, 'activa') returning id`, [clubId, user.rows[0].id, input.clubName, input.email]);
     const membership = await client.query<{ id: string }>(`insert into miclub.user_club_memberships (user_id, club_id, role_id, permissions) values ($1, $2, $3, $4::text[]) returning id`, [user.rows[0].id, clubId, role.rows[0].id, OWNER_PERMISSIONS]);
     await client.query(`insert into miclub.payment_methods (club_id, name) values ($1, 'Efectivo'), ($1, 'Transferencia') on conflict do nothing`, [clubId]);
     await client.query("commit");
-    return { userId: user.rows[0].id, email: input.email, legacy: false, clubId, membershipId: membership.rows[0].id, role: "owner", permissions: OWNER_PERMISSIONS, sectorIds: [] };
+    return { userId: user.rows[0].id, personId: person.rows[0].id, email: input.email, legacy: false, clubId, membershipId: membership.rows[0].id, role: "owner", permissions: OWNER_PERMISSIONS, sectorIds: [] };
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
     if (error instanceof RegistrationError) throw error;
