@@ -4,43 +4,38 @@ type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 export type ImportBatchStatus = "pending" | "running" | "completed" | "completed_with_errors" | "failed" | "failed_configuration" | "dry_run";
 
 export type ImportSchemaPreflightDetail = {
-  entity: "movements" | "enrollments";
-  requiredConflictTarget: ["club_id", "external_id"];
-  requiredPredicate: "external_id IS NOT NULL";
+  entity: "movements" | "enrollments" | "operational_balances" | "payment_methods" | "instructors" | "activities";
+  requiredConflictTarget: string[];
+  requiredPredicate: string | null;
   compatibleConstraintFound: boolean;
 };
 
 /**
- * PostgreSQL can only infer a partial UNIQUE index when ON CONFLICT declares a
- * compatible predicate.  Check the actual database catalog rather than a
- * migration filename or an assumed index name.
+ * PostgreSQL only accepts ON CONFLICT arbiters backed by ready, valid UNIQUE
+ * indexes. Check every importer-owned index in the live catalog before the
+ * simulation starts, including writes that happen before the source rows.
  */
 export const inspectImportConflictTargets = async (pool: Pick<Pool, "query">): Promise<ImportSchemaPreflightDetail[]> => {
-  const result = await pool.query<{ table_name: string; compatible: boolean }>(
-    `with required(table_name) as (values ('movements'::text), ('enrollments'::text))
-     select required.table_name,
-            exists (
-              select 1
-                from pg_index i
-                join pg_class t on t.oid = i.indrelid
-                join pg_namespace n on n.oid = t.relnamespace
-               where n.nspname = 'miclub'
-                 and t.relname = required.table_name
-                 and i.indisunique and i.indisvalid and i.indisready
-                 and (select array_agg(a.attname order by keys.ordinality)
-                        from unnest(i.indkey) with ordinality keys(attnum, ordinality)
-                        join pg_attribute a on a.attrelid = t.oid and a.attnum = keys.attnum)
-                     = array['club_id', 'external_id']::name[]
-                 and pg_get_expr(i.indpred, i.indrelid) in (
-                   '(external_id IS NOT NULL)', 'external_id IS NOT NULL'
-                 )
-            ) as compatible
-       from required order by required.table_name`,
+  const result = await pool.query<{ table_name: string; target: string[]; predicate: string | null; compatible: boolean }>(
+    `with required(table_name, index_name, target, predicate) as (values
+       ('activities'::text, 'activities_import_conflict_key'::text, array['club_id','sector_id','lower(name)',"coalesce(modality, ''::text)"], null::text),
+       ('enrollments', 'enrollments_club_external_id_key', array['club_id','external_id'], 'external_id IS NOT NULL'),
+       ('instructors', 'instructors_import_conflict_key', array['club_id','person_id'], null),
+       ('movements', 'movements_club_external_id_key', array['club_id','external_id'], 'external_id IS NOT NULL'),
+       ('operational_balances', 'operational_balances_club_source_cutoff_key', array['club_id','source','cutoff_date'], null),
+       ('payment_methods', 'payment_methods_club_normalized_name_key', array['club_id','lower(name)'], null)
+     )
+     select required.table_name, required.target, required.predicate,
+            coalesce(i.indisunique and i.indisvalid and i.indisready, false) as compatible
+       from required
+       left join pg_class idx on idx.oid = to_regclass('miclub.' || required.index_name)
+       left join pg_index i on i.indexrelid = idx.oid
+      order by required.table_name`,
   );
   return result.rows.map((row) => ({
     entity: row.table_name as ImportSchemaPreflightDetail["entity"],
-    requiredConflictTarget: ["club_id", "external_id"],
-    requiredPredicate: "external_id IS NOT NULL",
+    requiredConflictTarget: row.target,
+    requiredPredicate: row.predicate,
     compatibleConstraintFound: row.compatible,
   }));
 };
