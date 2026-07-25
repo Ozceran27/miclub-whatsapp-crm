@@ -34,6 +34,8 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
   assert.equal(query.params?.[12], 'scale_adjustment:300000->30000');
   assert.match(query.sql, /monthly_fee = case\s+when \$8::boolean then excluded\.monthly_fee\s+else miclub\.activities\.monthly_fee/s);
   assert.match(query.sql, /insert into miclub\.activity_fee_history/);
+  assert.match(query.sql, /lower\(name\) = lower\(\$3\)/);
+  assert.match(query.sql, /on conflict \(club_id, sector_id, lower\(name\), coalesce\(modality, ''::text\)\)/);
   assert.doesNotMatch(query.sql, /greatest\(miclub\.activities\.monthly_fee, excluded\.monthly_fee\)/);
 });
 
