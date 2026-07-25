@@ -38,7 +38,7 @@ const normalizeIdentity = (value: string | undefined): string => (value ?? "").t
  * que quieran limitar las migraciones a una única identidad.
  */
 export const isImportOperator = (
-  auth: Pick<AuthenticatedContext, "email" | "userId" | "membershipId" | "permissions"> | undefined,
+  auth: Partial<Pick<AuthenticatedContext, "email" | "userId" | "membershipId" | "permissions">> | undefined,
 ): boolean => {
   const configuredUser = normalizeIdentity(process.env.IMPORT_OPERATOR_USER);
   const hasTenantPermission = Boolean(

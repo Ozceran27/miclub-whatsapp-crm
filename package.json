@@ -17,7 +17,8 @@
     "import:sheets:dry": "tsx apps/api/src/scripts/importGoogleSheetsToPostgres.ts --dry-run",
     "audit:postgres": "tsx apps/api/src/scripts/auditPostgres.ts",
     "audit:economy-yearly-breakdown": "tsx apps/api/src/scripts/auditEconomyYearlyBreakdown.ts",
-    "db:migrate": "tsx apps/api/src/scripts/runMigrations.ts"
+    "db:migrate": "tsx apps/api/src/scripts/runMigrations.ts",
+    "bootstrap:director": "tsx apps/api/src/scripts/bootstrapDirector.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

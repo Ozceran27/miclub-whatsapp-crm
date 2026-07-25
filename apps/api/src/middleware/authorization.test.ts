@@ -5,7 +5,7 @@ import { isImportOperator, requireAuth, requireImportOperator, requireMembership
 import type { RequestAuthContext } from "../auth/types.js";
 
 const auth: RequestAuthContext = {
-  userId: "user-1", email: "admin@club.test", legacy: false,
+  userId: "user-1", personId: "person-1", email: "admin@club.test", legacy: false,
   clubId: "club-1", membershipId: "membership-1", role: "admin",
   permissions: ["people:read"], sectorIds: ["sector-1"]
 };

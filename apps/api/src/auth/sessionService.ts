@@ -3,8 +3,9 @@ import type { AuthenticatedContext } from "./types.js";
 
 export const sessionCookieName = "miclub_session";
 export const sessionMaxAgeMs = 12 * 60 * 60 * 1000;
+export const sessionVersion = 2;
 
-export type SessionPayload = AuthenticatedContext & { issuedAt: number; expiresAt: number };
+export type SessionPayload = AuthenticatedContext & { version: number; issuedAt: number; expiresAt: number };
 
 const safeEqual = (a: string, b: string): boolean => {
   const first = Buffer.from(a);
@@ -14,7 +15,7 @@ const safeEqual = (a: string, b: string): boolean => {
 
 export const createSession = (context: AuthenticatedContext, secret: string, now = Date.now()): string => {
   if (!secret) throw new Error("SESSION_SECRET es obligatorio para crear sesiones.");
-  const payload = Buffer.from(JSON.stringify({ ...context, issuedAt: now, expiresAt: now + sessionMaxAgeMs } satisfies SessionPayload)).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ ...context, version: sessionVersion, issuedAt: now, expiresAt: now + sessionMaxAgeMs } satisfies SessionPayload)).toString("base64url");
   const signature = createHmac("sha256", secret).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 };
@@ -25,7 +26,10 @@ export const readSession = (value: string | undefined, secret: string, now = Dat
   if (!payload || !signature || extra || !safeEqual(signature, createHmac("sha256", secret).update(payload).digest("base64url"))) return null;
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Partial<SessionPayload>;
-    if (typeof parsed.email !== "string" || (typeof parsed.userId !== "string" && parsed.userId !== null) || typeof parsed.legacy !== "boolean" || typeof parsed.issuedAt !== "number" || typeof parsed.expiresAt !== "number" || parsed.expiresAt <= now) return null;
+    if (parsed.version !== sessionVersion || parsed.legacy !== false || typeof parsed.email !== "string"
+      || ![parsed.userId, parsed.personId, parsed.membershipId, parsed.clubId, parsed.role].every((value) => typeof value === "string" && value.length > 0)
+      || !Array.isArray(parsed.permissions) || !Array.isArray(parsed.sectorIds)
+      || typeof parsed.issuedAt !== "number" || typeof parsed.expiresAt !== "number" || parsed.expiresAt <= now) return null;
     return parsed as SessionPayload;
   } catch {
     return null;

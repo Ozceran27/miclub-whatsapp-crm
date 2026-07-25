@@ -38,7 +38,7 @@ const withImportServer = async (fn: (baseUrl: string) => Promise<void>, importEn
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    req.auth = { userId: 'user-1', email: 'owner@example.com', legacy: false, clubId: '11111111-1111-4111-8111-111111111111', membershipId: 'membership-1', role: 'owner', permissions: ['imports:run'], sectorIds: [] };
+    req.auth = { userId: 'user-1', personId: 'person-1', email: 'owner@example.com', legacy: false, clubId: '11111111-1111-4111-8111-111111111111', membershipId: 'membership-1', role: 'owner', permissions: ['imports:run'], sectorIds: [] };
     next();
   });
   app.use('/api/import', importRoutes);

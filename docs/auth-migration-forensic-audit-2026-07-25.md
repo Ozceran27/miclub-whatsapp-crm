@@ -59,6 +59,15 @@ backend aceptaba la cookie sobreviviente.
 * El panel y su historial requieren membresía y obtienen `clubId` exclusivamente
   de `req.auth`. El flag `IMPORT_ENDPOINTS_ENABLED` limita sólo mutaciones y
   responde `503 IMPORT_DISABLED`; no oculta el panel ni simula un logout.
+* `AUTH_USER` y `AUTH_PASSWORD` fueron retirados del runtime. `SESSION_SECRET`
+  sólo firma cookies HMAC y nunca se guarda en PostgreSQL.
+* La sesión v2 exige `userId`, `personId`, `membershipId`, `clubId` y rol. Una
+  contraseña válida sin esa cadena recibe `MEMBERSHIP_REQUIRED` y no obtiene
+  cookie ni acceso al panel.
+* El dump del 24/07 contiene miClub y la persona Fernando Ramos, pero muestra
+  `miclub.users` y `miclub.user_club_memberships` vacías y no contiene un rol
+  DIRECTOR. La CLI `npm run bootstrap:director` completa esa cadena de manera
+  transaccional e idempotente con una contraseña temporal del entorno.
 
 ## Verificación manual pendiente de entorno externo
 
