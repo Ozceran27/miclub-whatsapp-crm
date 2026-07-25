@@ -26,7 +26,7 @@ test("login registra éxito y aplica bloqueo después de cinco fallos", async ()
   const passwordHash = await hashPassword("correcta");
   const user: AuthUser = {
     id: "user-1", email: "Admin@miClub.test", passwordHash, status: "active",
-    failedLoginAttempts: maxFailedLoginAttempts - 1, lockedUntil: null, lastLoginAt: null
+    failedLoginAttempts: maxFailedLoginAttempts - 1, lockedUntil: null, lastLoginAt: null, tenant: null
   };
   const failedUpdates: Array<{ attempts: number; lockedUntil: Date | null }> = [];
   const successfulLogins: Date[] = [];

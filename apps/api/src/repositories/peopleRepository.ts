@@ -3,6 +3,7 @@ import { getPostgresPool } from "../db/postgres.js";
 export type PersonRow = Record<string, unknown>;
 
 export type PeopleQuery = {
+  clubId: string;
   limit: number;
   offset: number;
   search?: string;
@@ -13,16 +14,16 @@ export type PeoplePage = {
   total: number;
 };
 
-const buildPeopleWhereClause = (search: string | undefined): { sql: string; params: unknown[] } => {
+const buildPeopleWhereClause = (clubId: string, search: string | undefined): { sql: string; params: unknown[] } => {
   const normalizedSearch = search?.trim();
-  if (!normalizedSearch) return { sql: "", params: [] };
+  if (!normalizedSearch) return { sql: "where people.club_id = $1", params: [clubId] };
 
-  return { sql: "where row_to_json(people)::text ilike $1", params: [`%${normalizedSearch}%`] };
+  return { sql: "where people.club_id = $1 and row_to_json(people)::text ilike $2", params: [clubId, `%${normalizedSearch}%`] };
 };
 
-export const getPeople = async ({ limit, offset, search }: PeopleQuery): Promise<PeoplePage> => {
+export const getPeople = async ({ clubId, limit, offset, search }: PeopleQuery): Promise<PeoplePage> => {
   const pool = await getPostgresPool();
-  const where = buildPeopleWhereClause(search);
+  const where = buildPeopleWhereClause(clubId, search);
   const limitParam = where.params.length + 1;
   const offsetParam = where.params.length + 2;
 

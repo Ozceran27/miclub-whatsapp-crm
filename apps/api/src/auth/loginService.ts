@@ -31,5 +31,10 @@ export const login = async (
   }
 
   await repository.recordSuccessfulLogin(user.id, now);
-  return { ok: true, context: { userId: user.id, email: user.email, legacy: false } };
+  return { ok: true, context: {
+    userId: user.id,
+    email: user.email,
+    legacy: false,
+    ...(user.tenant ?? {})
+  } };
 };
