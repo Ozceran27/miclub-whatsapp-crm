@@ -36,16 +36,29 @@ test("clubId nunca se acepta desde el frontend", async () => {
   assert.deepEqual(await request(rejectClientClubId), { status: 200, next: true });
 });
 
-test("el operador de importación se identifica exclusivamente por configuración del servidor", async () => {
+test("la restricción de identidad se aplica además del permiso de importación", async () => {
   const previous = process.env.IMPORT_OPERATOR_USER;
   process.env.IMPORT_OPERATOR_USER = "admin@club.test";
   try {
-    assert.equal(isImportOperator(auth), true);
-    assert.deepEqual(await request(requireImportOperator), { status: 200, next: true });
-    assert.deepEqual(await request(requireImportOperator, { auth: { ...auth, email: "owner@other.test" } }), { status: 403, next: false });
-    assert.deepEqual(await request(requireImportOperator, { auth: { ...auth, userId: null } }), { status: 403, next: false });
+    const importAuth = { ...auth, permissions: [...auth.permissions, "imports:run"] };
+    assert.equal(isImportOperator(importAuth), true);
+    assert.deepEqual(await request(requireImportOperator, { auth: importAuth }), { status: 200, next: true });
+    assert.deepEqual(await request(requireImportOperator, { auth: { ...importAuth, email: "owner@other.test" } }), { status: 403, next: false });
+    assert.deepEqual(await request(requireImportOperator, { auth: { ...importAuth, userId: null } }), { status: 403, next: false });
   } finally {
     if (previous === undefined) delete process.env.IMPORT_OPERATOR_USER;
     else process.env.IMPORT_OPERATOR_USER = previous;
+  }
+});
+
+test("el permiso tenant habilita migraciones cuando no existe una identidad adicional configurada", () => {
+  const previous = process.env.IMPORT_OPERATOR_USER;
+  delete process.env.IMPORT_OPERATOR_USER;
+  try {
+    assert.equal(isImportOperator({ ...auth, permissions: ["imports:run"] }), true);
+    assert.equal(isImportOperator({ ...auth, permissions: [] }), false);
+    assert.equal(isImportOperator({ ...auth, membershipId: undefined, permissions: ["imports:run"] }), false);
+  } finally {
+    if (previous !== undefined) process.env.IMPORT_OPERATOR_USER = previous;
   }
 });

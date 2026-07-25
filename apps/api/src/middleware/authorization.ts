@@ -33,14 +33,20 @@ export const requireRole = (...roles: string[]): RequestHandler => (req, res, ne
 const normalizeIdentity = (value: string | undefined): string => (value ?? "").trim().toLowerCase();
 
 /**
- * IMPORT_OPERATOR_USER deliberately reuses AUTH_USER when no dedicated value
- * is configured.  This keeps the migration surface tied to one server-side
- * identity rather than to a role/permission that a newly-created club owner
- * also receives.
+ * El permiso tenant es la fuente de verdad para mostrar y operar el panel.
+ * IMPORT_OPERATOR_USER es una restricción adicional opcional para instalaciones
+ * que quieran limitar las migraciones a una única identidad.
  */
-export const isImportOperator = (auth: Pick<AuthenticatedContext, "email" | "userId"> | undefined): boolean => {
-  const configuredUser = normalizeIdentity(process.env.IMPORT_OPERATOR_USER || process.env.AUTH_USER);
-  return Boolean(configuredUser && auth?.userId && normalizeIdentity(auth.email) === configuredUser);
+export const isImportOperator = (
+  auth: Pick<AuthenticatedContext, "email" | "userId" | "membershipId" | "permissions"> | undefined,
+): boolean => {
+  const configuredUser = normalizeIdentity(process.env.IMPORT_OPERATOR_USER);
+  const hasTenantPermission = Boolean(
+    auth?.userId
+    && auth.membershipId
+    && auth.permissions?.includes("imports:run"),
+  );
+  return hasTenantPermission && (!configuredUser || normalizeIdentity(auth?.email) === configuredUser);
 };
 
 export const requireImportOperator: RequestHandler = (req, res, next) => {
