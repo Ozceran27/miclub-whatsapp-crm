@@ -111,7 +111,7 @@ export const updateHistoryStatus = async (clubId: string, id: number, status: Me
   const pool = await getPostgresPool();
   const now = new Date().toISOString();
   const result = await pool.query<Record<string, unknown>>(
-    `update miclub.crm_message_history set status=$3, opened_at=coalesce($4, opened_at), sent_at=coalesce($5, sent_at), note=coalesce($6, note) where club_id=$1 and (legacy_sqlite_id=$2 or id=$2) returning *`,
+    `update miclub.crm_message_history set status=$3, opened_at=coalesce($4, opened_at), sent_at=coalesce($5, sent_at), note=coalesce($6, note) where club_id=$1 and (legacy_sqlite_id=$2 or id::text=$2::text) returning *`,
     [clubId, id, status, status === "opened" ? now : null, status === "sent_manual" ? now : null, note ?? null]
   );
   return result.rows[0] ? mapHistory(result.rows[0]) : null;
