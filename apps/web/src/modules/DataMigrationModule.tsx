@@ -24,7 +24,7 @@ const formatValue = (value: unknown) => {
 
 const formatDateTime = (value?: string) => value ? new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
-const errorGuidance = (code?: string) => code === 'IMPORT_SCHEMA_CONFLICT_CONFIGURATION' ? {
+const errorGuidance = (code?: string) => code === 'IMPORT_SCHEMA_CONFLICT_CONFIGURATION' || code === 'IMPORT_SCHEMA_PRECONDITION_FAILED' ? {
   cause: 'El ON CONFLICT del importador no coincide con una restricción o índice UNIQUE de PostgreSQL.',
   action: 'Aplicar y validar la migración de constraints multi-tenant.'
 } : { cause: 'Revisar el dato y el detalle del error.', action: 'Corregir la fila de origen y repetir el dry-run.' };
@@ -131,7 +131,15 @@ export default function DataMigrationModule() {
         <strong>Importante:</strong> ejecutá primero una simulación y revisá sus advertencias antes de confirmar una importación real.
       </section>
 
-      {actionError && <p className="error-msg">Error de operación: {actionError}</p>}
+      {actionError && <article className="card error-msg" role="alert">
+        <h3>No se pudo completar el Dry-Run</h3>
+        <p>{actionError.message}</p>
+        <p><strong>Código:</strong> <code>{actionError.code}</code></p>
+        <p><strong>Batch:</strong> {actionError.batchId ?? 'No creado'} · <strong>requestId:</strong> {actionError.requestId ?? 'No informado'}</p>
+        {actionError.details && actionError.details.length > 0 && <pre className="migration-json">{JSON.stringify(actionError.details, null, 2)}</pre>}
+        <p>{errorGuidance(actionError.code).action}</p>
+        {actionError.batchId && <button type="button" onClick={() => void loadBatchErrors(actionError.batchId!)}>Ver errores del batch</button>}
+      </article>}
 
       <section className="migration-status-grid" aria-label="Estado actual de servicios">
         <JsonPanel title="GET /api/db/health" state={dbHealth} />

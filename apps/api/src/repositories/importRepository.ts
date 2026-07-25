@@ -3,6 +3,48 @@ import type { getPostgresPool } from "../db/postgres.js";
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 export type ImportBatchStatus = "pending" | "running" | "completed" | "completed_with_errors" | "failed" | "failed_configuration" | "dry_run";
 
+export type ImportSchemaPreflightDetail = {
+  entity: "movements" | "enrollments";
+  requiredConflictTarget: ["club_id", "external_id"];
+  requiredPredicate: "external_id IS NOT NULL";
+  compatibleConstraintFound: boolean;
+};
+
+/**
+ * PostgreSQL can only infer a partial UNIQUE index when ON CONFLICT declares a
+ * compatible predicate.  Check the actual database catalog rather than a
+ * migration filename or an assumed index name.
+ */
+export const inspectImportConflictTargets = async (pool: Pick<Pool, "query">): Promise<ImportSchemaPreflightDetail[]> => {
+  const result = await pool.query<{ table_name: string; compatible: boolean }>(
+    `with required(table_name) as (values ('movements'::text), ('enrollments'::text))
+     select required.table_name,
+            exists (
+              select 1
+                from pg_index i
+                join pg_class t on t.oid = i.indrelid
+                join pg_namespace n on n.oid = t.relnamespace
+               where n.nspname = 'miclub'
+                 and t.relname = required.table_name
+                 and i.indisunique and i.indisvalid and i.indisready
+                 and (select array_agg(a.attname order by keys.ordinality)
+                        from unnest(i.indkey) with ordinality keys(attnum, ordinality)
+                        join pg_attribute a on a.attrelid = t.oid and a.attnum = keys.attnum)
+                     = array['club_id', 'external_id']::name[]
+                 and pg_get_expr(i.indpred, i.indrelid) in (
+                   '(external_id IS NOT NULL)', 'external_id IS NOT NULL'
+                 )
+            ) as compatible
+       from required order by required.table_name`,
+  );
+  return result.rows.map((row) => ({
+    entity: row.table_name as ImportSchemaPreflightDetail["entity"],
+    requiredConflictTarget: ["club_id", "external_id"],
+    requiredPredicate: "external_id IS NOT NULL",
+    compatibleConstraintFound: row.compatible,
+  }));
+};
+
 export const createImportBatch = async (pool: Pool, input: { clubId: string; source: string; sourceFile?: string; dryRun: boolean; notes?: string }): Promise<string> => {
   const result = await pool.query<{ id: string }>(
     `insert into miclub.import_batches (club_id, source, source_file, status, notes)

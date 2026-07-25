@@ -7,6 +7,7 @@ type HttpError = Error & {
   code?: string;
   retryable?: boolean;
   batchId?: string;
+  details?: unknown;
 };
 
 const getStatusCode = (error: HttpError): number => {
@@ -24,11 +25,13 @@ export const errorHandler: ErrorRequestHandler = (error: HttpError, req, res, _n
   }
 
   res.status(status).json({
+    ok: false,
     error: true,
     message,
     status,
     code: error.code ?? (status === 500 ? "INTERNAL_ERROR" : undefined),
     batchId: error.batchId,
+    details: error.details,
     retryable: error.retryable ?? status >= 500,
     requestId: req.requestId
   });

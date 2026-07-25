@@ -3,6 +3,7 @@ import {
   getDbHealth,
   deleteMissingInscriptions,
   getErrorMessage,
+  getImportFailure,
   getImportBatchErrors,
   getImportBatches,
   getSyncStatus,
@@ -13,6 +14,7 @@ import {
   type ImportErrorsResponse,
   type ImportSummary
 } from '../../services/api/importApi';
+import type { ImportFailureResponse } from '@miclub/shared';
 
 export const getBatchId = (batch: ImportBatch) => batch.id ?? batch.batch_id ?? '';
 
@@ -22,7 +24,7 @@ export const useDataMigration = () => {
   const [batches, setBatches] = useState<EndpointState<ImportBatchesResponse>>({ loading: true });
   const [lastDryRun, setLastDryRun] = useState<ImportSummary | null>(null);
   const [lastImport, setLastImport] = useState<ImportSummary | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<ImportFailureResponse | null>(null);
   const [isRunningDryRun, setIsRunningDryRun] = useState(false);
   const [isRunningImport, setIsRunningImport] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
@@ -70,7 +72,12 @@ export const useDataMigration = () => {
       else setLastImport(summary);
       await loadStatus();
     } catch (error) {
-      setActionError(getErrorMessage(error));
+      const failure = getImportFailure(error) ?? { ok: false, code: 'IMPORT_FAILED', message: getErrorMessage(error), retryable: true };
+      setActionError(failure);
+      // A failed execution is still an auditable execution: refresh history,
+      // select its batch and load its persisted diagnostic.
+      await loadStatus();
+      if (failure.batchId) await loadBatchErrors(failure.batchId);
     } finally {
       setIsRunningDryRun(false);
       setIsRunningImport(false);
@@ -110,7 +117,7 @@ export const useDataMigration = () => {
       await loadStatus();
       return result;
     } catch (error) {
-      setActionError(getErrorMessage(error));
+      setActionError(getImportFailure(error) ?? { ok: false, code: 'DELETE_MISSING_FAILED', message: getErrorMessage(error), retryable: true });
       return { deletedIds: [] };
     } finally {
       setIsDeletingMissing(false);
