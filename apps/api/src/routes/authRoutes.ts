@@ -4,6 +4,8 @@ import { login } from "../auth/loginService.js";
 import { postgresUserRepository } from "../auth/userRepository.js";
 import { authEnabled, authPassword, authUser, clearSessionCookie, getSession, legacyAuthEnabled, setSessionCookie } from "../middleware/auth.js";
 import asyncHandler from "./asyncHandler.js";
+import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
+import { auditService } from "../services/auditService.js";
 
 // auth: paths públicos de autenticación; no renombrar sin migración frontend.
 const router = Router();
@@ -28,6 +30,7 @@ router.post("/login", asyncHandler(async (req, res) => {
 
   if (result.ok) {
     setSessionCookie(req, res, result.context);
+    await auditService.login({ action: "auth.login", result: "success", userId: result.context.userId, clubId: result.context.clubId, membershipId: result.context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el login", error));
     return res.json({ authenticated: true, username: result.context.email, user: result.context });
   }
 
@@ -41,10 +44,26 @@ router.post("/login", asyncHandler(async (req, res) => {
   return res.status(401).json({ authenticated: false, message });
 }));
 
-router.post("/logout", (req, res) => {
+router.post("/register", asyncHandler(async (req, res) => {
+  if (!authEnabled || process.env.PUBLIC_REGISTRATION_ENABLED !== "true") return res.status(404).json({ authenticated: false, message: "El registro público no está habilitado." });
+  const body = req.body as { clubName?: unknown; email?: unknown; password?: unknown };
+  try {
+    const context = await registerClubOwner(body.clubName, body.email, body.password);
+    setSessionCookie(req, res, context);
+    await auditService.registration({ action: "auth.registration", result: "success", userId: context.userId, clubId: context.clubId, membershipId: context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el registro", error));
+    return res.status(201).json({ authenticated: true, username: context.email, user: context });
+  } catch (error) {
+    if (error instanceof RegistrationError) return res.status(error.code === "email_exists" ? 409 : 400).json({ authenticated: false, message: error.message });
+    throw error;
+  }
+}));
+
+router.post("/logout", asyncHandler(async (req, res) => {
+  const session = getSession(req);
   clearSessionCookie(req, res);
+  if (session?.userId) await auditService.logout({ action: "auth.logout", result: "success", userId: session.userId, clubId: session.clubId, membershipId: session.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el logout", error));
   return res.json({ authenticated: false });
-});
+}));
 
 router.get("/me", (req, res) => {
   if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });

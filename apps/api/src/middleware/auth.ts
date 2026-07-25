@@ -104,7 +104,7 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
     if (req.path.startsWith("/auth/") || req.path === "/health") return next();
     const session = getSession(req);
     if (session) {
-      setAuthenticatedContext(req, { userId: session.userId, email: session.email, legacy: session.legacy });
+      setAuthenticatedContext(req, session);
       return next();
     }
 

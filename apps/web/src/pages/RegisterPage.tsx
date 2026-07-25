@@ -10,7 +10,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError('');
-    if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return; }
+    if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) { setError('La contraseña debe tener al menos 10 caracteres e incluir letras y números.'); return; }
     setIsLoading(true);
     try {
       const response = await fetch(apiUrl('/auth/register'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clubName, email, password }) });
@@ -29,7 +29,7 @@ export default function RegisterPage() {
         <form className="login-form" onSubmit={handleSubmit}>
           <label>Nombre del club<input autoFocus autoComplete="organization" value={clubName} onChange={(event) => setClubName(event.target.value)} disabled={isLoading} required /></label>
           <label>Correo electrónico<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isLoading} required /></label>
-          <label>Contraseña<input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} disabled={isLoading} required /></label>
+          <label>Contraseña<input type="password" autoComplete="new-password" minLength={10} value={password} onChange={(event) => setPassword(event.target.value)} disabled={isLoading} required /></label>
           {error && <p className="login-error" role="alert">{error}</p>}
           <button className="login-submit" type="submit" disabled={isLoading}>{isLoading ? 'Creando cuenta…' : 'Crear cuenta'}</button>
         </form>
