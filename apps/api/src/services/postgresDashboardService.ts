@@ -567,8 +567,11 @@ export const getPostgresClubFinanceSummary =
       dashboardValue: dashboardCuotasACobrar,
       fallbackValue: fallbackCuotasACobrar,
     });
-    if (cuotasACobrarSelection.differsBeyondThreshold) {
-      console.warn("[postgres-dashboard] cuotas_a_cobrar difiere entre v_dashboard_basic y fallback", cuotasACobrarSelection);
+    // The normalized enrollment aggregate is authoritative. The legacy view is
+    // retained only as reconciliation input and may legitimately lag behind an
+    // import; avoid emitting the same warning on every dashboard request.
+    if (cuotasACobrarSelection.differsBeyondThreshold && process.env.DEBUG_DASHBOARD_RECONCILIATION === "true") {
+      console.info("[postgres-dashboard] vista legacy difiere del agregado autoritativo", cuotasACobrarSelection);
     }
     const cuotasACobrar = cuotasACobrarSelection.cuotasACobrar;
     const pendingFallbackRow = pendingFallback.rows[0] ?? {};
@@ -588,9 +591,7 @@ export const getPostgresClubFinanceSummary =
     return {
       metadata: {
         coverage: "complete",
-        warnings: cuotasACobrarSelection.differsBeyondThreshold
-          ? ["cuotas_a_cobrar difiere entre v_dashboard_basic y fallback."]
-          : [],
+        warnings: [],
         sourceCompleteness: {},
         cuotasACobrarSource: cuotasACobrarSelection.source,
         cuotasACobrarDebug: cuotasACobrarSelection,

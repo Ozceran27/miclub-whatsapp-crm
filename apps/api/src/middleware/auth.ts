@@ -2,6 +2,7 @@ import type express from "express";
 import { setAuthenticatedContext } from "../auth/context.js";
 import { createSession, parseCookies, readSession, sessionCookieName, sessionMaxAgeMs } from "../auth/sessionService.js";
 import type { AuthenticatedContext } from "../auth/types.js";
+import { getActiveMembershipContext } from "../auth/userRepository.js";
 
 export const authEnabled = process.env.AUTH_ENABLED === "true";
 export const authUser = process.env.AUTH_USER ?? "";
@@ -81,6 +82,7 @@ export const protectedApiPrefixes = [
   "/api/dashboard-reconciliation",
   "/api/sector-finance-summary",
   "/api/import",
+  "/api/db",
   "/api/modules"
 ];
 
@@ -99,11 +101,22 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
   const isFrontendNavigation = (req: express.Request): boolean =>
     options.isProduction && req.method === "GET" && Boolean(req.accepts("html")) && !req.path.includes(".") && !isProtectedApiPath(req.path);
 
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!authEnabled) return next();
     if (req.path.startsWith("/auth/") || req.path === "/health") return next();
     const session = getSession(req);
     if (session) {
+      if (session.userId && session.membershipId) {
+        try {
+          const membership = await getActiveMembershipContext(session.userId, session.membershipId);
+          if (!membership) {
+            clearSessionCookie(req, res);
+            return res.status(401).json({ authenticated: false, message: "La sesión fue revocada" });
+          }
+          setAuthenticatedContext(req, { ...session, membershipId: membership.membership_id, clubId: membership.club_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids });
+          return next();
+        } catch (error) { return next(error); }
+      }
       setAuthenticatedContext(req, session);
       return next();
     }

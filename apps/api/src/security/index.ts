@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import cors, { type CorsOptions } from "cors";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { sessionCookieName } from "../auth/sessionService.js";
+import { getPostgresPool } from "../db/postgres.js";
 
 const DEFAULT_JSON_LIMIT = "1mb";
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -90,8 +91,39 @@ export const createRateLimit = ({ windowMs, max, message }: RateLimitOptions): R
   };
 };
 
-export const authRateLimit = createRateLimit({ windowMs: 15 * 60_000, max: 10, message: "Demasiados intentos de autenticación. Intente nuevamente más tarde." });
-export const importRateLimit = createRateLimit({ windowMs: 15 * 60_000, max: 5, message: "Demasiadas solicitudes de importación. Intente nuevamente más tarde." });
+export const createDistributedRateLimit = ({ windowMs, max, message }: RateLimitOptions, scope: string): RequestHandler =>
+  async (req, res, next) => {
+    try {
+      const now = Date.now();
+      const windowStart = new Date(Math.floor(now / windowMs) * windowMs);
+      const ip = req.ip || req.socket.remoteAddress || "unknown";
+      const email = scope === "auth" && typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
+      const key = `${scope}:${ip}:${email}`;
+      const pool = await getPostgresPool();
+      const result = await pool.query<{ request_count: number }>(
+        `insert into miclub.rate_limit_buckets(bucket_key, window_start, request_count, expires_at)
+         values ($1,$2,1,$3)
+         on conflict (bucket_key, window_start) do update set request_count=miclub.rate_limit_buckets.request_count+1
+         returning request_count`, [key, windowStart, new Date(windowStart.getTime() + windowMs)],
+      );
+      const count = Number(result.rows[0]?.request_count ?? 1);
+      const resetAt = windowStart.getTime() + windowMs;
+      res.set("RateLimit-Limit", String(max));
+      res.set("RateLimit-Remaining", String(Math.max(0, max - count)));
+      res.set("RateLimit-Reset", String(Math.ceil(resetAt / 1000)));
+      if (count > max) {
+        res.set("Retry-After", String(Math.max(1, Math.ceil((resetAt - now) / 1000))));
+        return res.status(429).json({ error: true, message, requestId: req.requestId });
+      }
+      next();
+    } catch (error) { next(error); }
+  };
+
+const rateLimit = (options: RateLimitOptions, scope: string) => process.env.RATE_LIMIT_STORE === "postgres"
+  ? createDistributedRateLimit(options, scope)
+  : createRateLimit(options);
+export const authRateLimit = rateLimit({ windowMs: 15 * 60_000, max: 10, message: "Demasiados intentos de autenticación. Intente nuevamente más tarde." }, "auth");
+export const importRateLimit = rateLimit({ windowMs: 15 * 60_000, max: 5, message: "Demasiadas solicitudes de importación. Intente nuevamente más tarde." }, "import");
 
 const hasSessionCookie = (req: Request): boolean =>
   (req.headers.cookie ?? "").split(";").some((cookie) => cookie.trim().startsWith(`${sessionCookieName}=`));

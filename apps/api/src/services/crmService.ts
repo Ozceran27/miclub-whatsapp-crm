@@ -37,20 +37,20 @@ export const auditSqliteCrmData = async () => {
   return { tables: tables.map((table) => table.name), templates: templates[0], history: history[0], legacyStrategy: "PostgreSQL stores SQLite identifiers in dedicated legacy_sqlite_id columns on crm_message_templates and crm_message_history, with unique constraints for idempotent migrations." };
 };
 
-export const listCrmTemplates = async (): Promise<MessageTemplate[]> => {
-  if (getCrmSource() === "postgres") return postgresCrm.listTemplates();
+export const listCrmTemplates = async (clubId: string): Promise<MessageTemplate[]> => {
+  if (getCrmSource() === "postgres") return postgresCrm.listTemplates(clubId);
   const rows = await sqliteAll<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>("SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates ORDER BY isDefault DESC, datetime(createdAt) ASC");
   return rows.map(mapSqliteTemplate);
 };
 
-export const createCrmTemplate = async (name: string, body: string, id: string, now: string): Promise<MessageTemplate | null> => {
-  if (getCrmSource() === "postgres") return postgresCrm.upsertTemplate({ id, name, body, isDefault: false, createdAt: now, updatedAt: now, legacySqliteId: null });
+export const createCrmTemplate = async (clubId: string, name: string, body: string, id: string, now: string): Promise<MessageTemplate | null> => {
+  if (getCrmSource() === "postgres") return postgresCrm.upsertTemplate(clubId, { id, name, body, isDefault: false, createdAt: now, updatedAt: now, legacySqliteId: null });
   await sqliteRun("INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, 0, ?, ?)", [id, name, body, now, now]);
   return sqliteGet<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>("SELECT id, name, body, isDefault, createdAt, updatedAt FROM message_templates WHERE id = ?", [id]).then((row) => row ? mapSqliteTemplate(row) : null);
 };
 
-export const updateCrmTemplate = async (id: string, name: string, body: string, now: string): Promise<MessageTemplate | null> => {
-  if (getCrmSource() === "postgres") return postgresCrm.upsertTemplate({ id, name, body, isDefault: false, createdAt: now, updatedAt: now, legacySqliteId: null });
+export const updateCrmTemplate = async (clubId: string, id: string, name: string, body: string, now: string): Promise<MessageTemplate | null> => {
+  if (getCrmSource() === "postgres") return postgresCrm.upsertTemplate(clubId, { id, name, body, isDefault: false, createdAt: now, updatedAt: now, legacySqliteId: null });
   const existing = await sqliteGet<{ id: string }>("SELECT id FROM message_templates WHERE id = ?", [id]);
   if (!existing) return null;
   await sqliteRun("UPDATE message_templates SET name = ?, body = ?, updatedAt = ? WHERE id = ?", [name, body, now, id]);
@@ -58,8 +58,8 @@ export const updateCrmTemplate = async (id: string, name: string, body: string, 
   return row ? mapSqliteTemplate(row) : null;
 };
 
-export const deleteCrmTemplate = async (id: string): Promise<"missing" | "default" | "deleted"> => {
-  if (getCrmSource() === "postgres") { await postgresCrm.deleteTemplate(id); return "deleted"; }
+export const deleteCrmTemplate = async (clubId: string, id: string): Promise<"missing" | "default" | "deleted"> => {
+  if (getCrmSource() === "postgres") { await postgresCrm.deleteTemplate(clubId, id); return "deleted"; }
   const existing = await sqliteGet<{ id: string; isDefault: number }>("SELECT id, isDefault FROM message_templates WHERE id = ?", [id]);
   if (!existing) return "missing";
   if (existing.isDefault === 1) return "default";
@@ -67,40 +67,40 @@ export const deleteCrmTemplate = async (id: string): Promise<"missing" | "defaul
   return "deleted";
 };
 
-export const replaceCrmDefaultTemplates = async (templates: MessageTemplate[], now: string): Promise<MessageTemplate[]> => {
+export const replaceCrmDefaultTemplates = async (clubId: string, templates: MessageTemplate[], now: string): Promise<MessageTemplate[]> => {
   const inputs = templates.map((template) => ({ ...template, createdAt: now, updatedAt: now, isDefault: true, legacySqliteId: template.id }));
-  if (getCrmSource() === "postgres") return postgresCrm.replaceDefaultTemplates(inputs);
+  if (getCrmSource() === "postgres") return postgresCrm.replaceDefaultTemplates(clubId, inputs);
   await sqliteRun("DELETE FROM message_templates");
   for (const template of templates) await sqliteRun("INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)", [template.id, template.name, template.body, now, now]);
-  return listCrmTemplates();
+  return listCrmTemplates(clubId);
 };
 
-export const getCrmHistory = async (page: number, pageSize: number): Promise<PaginatedHistoryResponse> => {
-  if (getCrmSource() === "postgres") return postgresCrm.getHistory(page, pageSize);
+export const getCrmHistory = async (clubId: string, page: number, pageSize: number): Promise<PaginatedHistoryResponse> => {
+  if (getCrmSource() === "postgres") return postgresCrm.getHistory(clubId, page, pageSize);
   const [{ total }] = await sqliteAll<{ total: number }>(`SELECT COUNT(*) as total FROM (SELECT id FROM message_history ORDER BY datetime(createdAt) DESC LIMIT 200)`);
   const offset = (page - 1) * pageSize;
   const rows = await sqliteAll<PreparedMessage>(`SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink, COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note, templateName FROM (SELECT * FROM message_history ORDER BY datetime(createdAt) DESC LIMIT 200) ORDER BY datetime(createdAt) DESC LIMIT ? OFFSET ?`, [pageSize, offset]);
   return { items: rows, page, pageSize, total, totalPages: total === 0 ? 0 : Math.ceil(total / pageSize) };
 };
 
-export const getCrmContactedRecent = async (since: string, windowDays: number): Promise<ContactedRecentResponse> => {
-  if (getCrmSource() === "postgres") return postgresCrm.getContactedRecent(since, windowDays);
+export const getCrmContactedRecent = async (clubId: string, since: string, windowDays: number): Promise<ContactedRecentResponse> => {
+  if (getCrmSource() === "postgres") return postgresCrm.getContactedRecent(clubId, since, windowDays);
   const rows = await sqliteAll<{ memberId: string; eventAt: string }>(`SELECT memberId, COALESCE(sentAt, createdAt) as eventAt FROM message_history WHERE COALESCE(status, estado) = 'sent_manual' AND datetime(COALESCE(sentAt, createdAt)) >= datetime(?) ORDER BY datetime(COALESCE(sentAt, createdAt)) DESC`, [since]);
   const byMemberId: ContactedRecentResponse["byMemberId"] = {};
   for (const row of rows) if (!byMemberId[row.memberId]) byMemberId[row.memberId] = { lastSentAt: row.eventAt, count: 1 }; else byMemberId[row.memberId].count += 1;
   return { windowDays, since, memberIds: Object.keys(byMemberId), byMemberId };
 };
 
-export const findCrmDuplicatePreparedMessages = async (memberIds: string[]) => getCrmSource() === "postgres" ? postgresCrm.findDuplicatePreparedMessages(memberIds) : sqliteAll<{ memberId: string; nombre: string; status: string; createdAt: string }>(`SELECT memberId, nombre, COALESCE(status, estado, 'prepared') as status, createdAt FROM message_history WHERE memberId IN (${memberIds.map(()=>'?').join(',')}) AND COALESCE(status, estado) IN ('prepared','opened','sent_manual') ORDER BY datetime(createdAt) DESC`, memberIds);
+export const findCrmDuplicatePreparedMessages = async (clubId: string, memberIds: string[]) => getCrmSource() === "postgres" ? postgresCrm.findDuplicatePreparedMessages(clubId, memberIds) : sqliteAll<{ memberId: string; nombre: string; status: string; createdAt: string }>(`SELECT memberId, nombre, COALESCE(status, estado, 'prepared') as status, createdAt FROM message_history WHERE memberId IN (${memberIds.map(()=>'?').join(',')}) AND COALESCE(status, estado) IN ('prepared','opened','sent_manual') ORDER BY datetime(createdAt) DESC`, memberIds);
 
-export const insertCrmHistory = async (history: Omit<PreparedMessage, "historyId">): Promise<PreparedMessage> => {
-  if (getCrmSource() === "postgres") return postgresCrm.insertHistory(history);
+export const insertCrmHistory = async (clubId: string, history: Omit<PreparedMessage, "historyId">): Promise<PreparedMessage> => {
+  if (getCrmSource() === "postgres") return postgresCrm.insertHistory(clubId, history);
   const result = await sqliteRun("INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt, templateName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [history.memberId, history.nombre, history.phone, history.message, history.waLink, "prepared", history.status ?? "prepared", history.createdAt, history.templateName ?? null]);
   return { ...history, historyId: result.lastID };
 };
 
-export const updateCrmHistoryStatus = async (id: number, status: NonNullable<PreparedMessage["status"]>, note?: string | null): Promise<PreparedMessage | null> => {
-  if (getCrmSource() === "postgres") return postgresCrm.updateHistoryStatus(id, status, note);
+export const updateCrmHistoryStatus = async (clubId: string, id: number, status: NonNullable<PreparedMessage["status"]>, note?: string | null): Promise<PreparedMessage | null> => {
+  if (getCrmSource() === "postgres") return postgresCrm.updateHistoryStatus(clubId, id, status, note);
   const existing = await sqliteGet<{ id: number }>("SELECT id FROM message_history WHERE id = ?", [id]);
   if (!existing) return null;
   const now = new Date().toISOString();
@@ -108,22 +108,22 @@ export const updateCrmHistoryStatus = async (id: number, status: NonNullable<Pre
   return sqliteGet<PreparedMessage>(`SELECT id as historyId, memberId, nombre, telefono as phone, mensaje as message, waLink, COALESCE(status, estado, 'prepared') as status, createdAt, openedAt, sentAt, note, templateName FROM message_history WHERE id = ?`, [id]).then((row) => row ?? null);
 };
 
-export const migrateCrmToPostgres = async ({ dryRun, phase }: { dryRun: boolean; phase: CrmMigrationPhase }) => {
+export const migrateCrmToPostgres = async ({ dryRun, phase, clubId }: { dryRun: boolean; phase: CrmMigrationPhase; clubId: string }) => {
   const audit = await auditSqliteCrmData();
   const report = { dryRun, phase, audit, templates: { read: 0, migrated: 0 }, history: { read: 0, migrated: 0, unresolved: [] as Array<{ legacySqliteId: number; memberId: string }> } };
   await postgresCrm.ensureCrmSchema();
   if (phase === "templates" || phase === "all") {
     const rows = await sqliteAll<{ id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }>("select * from message_templates order by datetime(createdAt) asc");
     report.templates.read = rows.length;
-    if (!dryRun) for (const row of rows) { await postgresCrm.upsertTemplate({ id: row.id, legacySqliteId: row.id, name: row.name, body: row.body, isDefault: row.isDefault === 1, createdAt: row.createdAt, updatedAt: row.updatedAt }); report.templates.migrated += 1; }
+    if (!dryRun) for (const row of rows) { await postgresCrm.upsertTemplate(clubId, { id: row.id, legacySqliteId: row.id, name: row.name, body: row.body, isDefault: row.isDefault === 1, createdAt: row.createdAt, updatedAt: row.updatedAt }); report.templates.migrated += 1; }
   }
   if (phase === "history" || phase === "all") {
     const rows = await sqliteAll<{ id: number; memberId: string; nombre: string; telefono: string; mensaje: string; waLink: string; status: string; estado: string; createdAt: string; openedAt?: string | null; sentAt?: string | null; note?: string | null; templateName?: string | null }>("select * from message_history order by id asc");
     report.history.read = rows.length;
     for (const row of rows) {
-      const links = await postgresCrm.resolvePostgresCrmLinks(row.memberId, row.telefono);
+      const links = await postgresCrm.resolvePostgresCrmLinks(clubId, row.memberId, row.telefono);
       if (!links.personId && !links.enrollmentId) report.history.unresolved.push({ legacySqliteId: row.id, memberId: row.memberId });
-      if (!dryRun) { await postgresCrm.insertHistory({ legacySqliteId: row.id, memberId: row.memberId, personId: links.personId, enrollmentId: links.enrollmentId, nombre: row.nombre, phone: row.telefono, message: row.mensaje, waLink: row.waLink, status: (row.status ?? row.estado ?? "prepared") as NonNullable<PreparedMessage["status"]>, createdAt: row.createdAt, openedAt: row.openedAt ?? null, sentAt: row.sentAt ?? null, note: row.note ?? null, templateName: row.templateName ?? null }); report.history.migrated += 1; }
+      if (!dryRun) { await postgresCrm.insertHistory(clubId, { legacySqliteId: row.id, memberId: row.memberId, personId: links.personId, enrollmentId: links.enrollmentId, nombre: row.nombre, phone: row.telefono, message: row.mensaje, waLink: row.waLink, status: (row.status ?? row.estado ?? "prepared") as NonNullable<PreparedMessage["status"]>, createdAt: row.createdAt, openedAt: row.openedAt ?? null, sentAt: row.sentAt ?? null, note: row.note ?? null, templateName: row.templateName ?? null }); report.history.migrated += 1; }
     }
   }
   return report;
