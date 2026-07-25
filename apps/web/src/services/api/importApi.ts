@@ -1,4 +1,5 @@
 import { apiFetch, readApiError } from '../../api';
+import type { ImportFailureResponse } from '@miclub/shared';
 
 export type EndpointState<T> = {
   loading: boolean;
@@ -7,6 +8,7 @@ export type EndpointState<T> = {
 };
 
 export type ImportSummary = {
+  ok?: true;
   batchId?: string;
   dryRun?: boolean;
   read?: number;
@@ -34,6 +36,7 @@ export type ImportSummary = {
   rowsInvalid?: number;
   operationalWritesAttempted?: number;
   metadataWrites?: number;
+  rowsBySheet?: Record<string, { rowsFetched: number; rowsDetected: number; rowsSkippedEmpty: number; membersDetected: number; movementsDetected: number }>;
 };
 
 export type MissingInscription = {
@@ -108,8 +111,12 @@ export const getErrorMessage = (error: unknown) => {
 };
 
 class ApiErrorWithRequestId extends Error {
-  constructor(message: string, readonly requestId?: string) { super(message); }
+  constructor(message: string, readonly payload: ImportFailureResponse) { super(message); }
+  get requestId() { return this.payload.requestId; }
 }
+
+export const getImportFailure = (error: unknown): ImportFailureResponse | null =>
+  error instanceof ApiErrorWithRequestId ? error.payload : null;
 
 const fetchJson = async <T,>(path: `/${string}`, init?: RequestInit): Promise<T> => {
   const response = await apiFetch(path, {
@@ -117,9 +124,19 @@ const fetchJson = async <T,>(path: `/${string}`, init?: RequestInit): Promise<T>
     ...init
   });
   if (!response.ok) {
+    const body = await response.clone().json().catch(() => undefined) as Partial<ImportFailureResponse> | undefined;
     const apiError = await readApiError(response);
-    const requestId = response.headers.get('x-request-id') ?? undefined;
-    throw new ApiErrorWithRequestId(apiError.message, requestId);
+    const requestId = body?.requestId ?? response.headers.get('x-request-id') ?? undefined;
+    const payload: ImportFailureResponse = {
+      ok: false,
+      code: body?.code ?? apiError.code ?? 'IMPORT_FAILED',
+      message: body?.message ?? apiError.message,
+      batchId: body?.batchId,
+      requestId,
+      retryable: body?.retryable ?? response.status >= 500,
+      details: body?.details
+    };
+    throw new ApiErrorWithRequestId(payload.message, payload);
   }
   const payload = await response.json().catch(() => undefined) as T | undefined;
 

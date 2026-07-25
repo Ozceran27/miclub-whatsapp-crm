@@ -41,6 +41,7 @@ import {
   normalizePhone,
   normalizeSheetText,
 } from "./normalizers.js";
+import { inspectImportConflictTargets, type ImportSchemaPreflightDetail } from "../repositories/importRepository.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 export type MissingEnrollmentStrategy =
@@ -56,6 +57,17 @@ type ImportOptions = {
   requestId?: string;
   onProgress?: (step: string, details?: Record<string, unknown>) => void;
 };
+
+class ImportSchemaPreconditionError extends Error {
+  readonly status = 422;
+  readonly code = "IMPORT_SCHEMA_PRECONDITION_FAILED";
+  readonly retryable = false;
+  readonly expose = true;
+  batchId?: string;
+  constructor(readonly details: ImportSchemaPreflightDetail[]) {
+    super("La base de datos no cumple las precondiciones del importador.");
+  }
+}
 export type MissingEnrollment = {
   id: string;
   name: string;
@@ -70,6 +82,7 @@ export type MissingEnrollment = {
 };
 
 export type ImportSummary = {
+  ok: true;
   clubId: string;
   batchId: string;
   dryRun: boolean;
@@ -107,6 +120,7 @@ export type ImportSummary = {
   rowsInvalid: number;
   operationalWritesAttempted: number;
   metadataWrites: number;
+  rowsBySheet: Record<string, { rowsFetched: number; rowsDetected: number; rowsSkippedEmpty: number; membersDetected: number; movementsDetected: number }>;
 };
 type SheetRow = {
   kind: "members" | "movements";
@@ -234,6 +248,7 @@ const readRows = async (): Promise<{
   rows: SheetRow[];
   adminBalanceRows: unknown[][];
   metricRanges: Record<string, unknown[][]>;
+  rowsBySheet: ImportSummary["rowsBySheet"];
 }> => {
   const config = getGoogleSheetsConfig();
   if (!importEnabled())
@@ -301,6 +316,7 @@ const readRows = async (): Promise<{
     valueRenderOption: "FORMATTED_VALUE",
   }, { timeout, retry: false });
   const rows: SheetRow[] = [];
+  const rowsBySheet: ImportSummary["rowsBySheet"] = {};
   const memberIndexesBySheet: Record<
     string,
     ReturnType<typeof resolveMemberColumnIndexes>
@@ -341,6 +357,7 @@ const readRows = async (): Promise<{
         ? "movements"
         : null;
     if (!kind) return;
+    const sheetStats = rowsBySheet[sheet] ??= { rowsFetched: 0, rowsDetected: 0, rowsSkippedEmpty: 0, membersDetected: 0, movementsDetected: 0 };
     const fallbackIndexes =
       normalizeComparableText(sheet) === "administracion"
         ? adminMovementFallbackIndexes
@@ -352,7 +369,11 @@ const readRows = async (): Promise<{
     const resolvedMember =
       memberIndexesBySheet[sheet] ?? resolveMemberColumnIndexes(undefined);
     (valueRange.values ?? []).forEach((row, index) => {
-      if (!isEmpty(row))
+      sheetStats.rowsFetched += 1;
+      if (!isEmpty(row)) {
+        sheetStats.rowsDetected += 1;
+        if (kind === "members") sheetStats.membersDetected += 1;
+        else sheetStats.movementsDetected += 1;
         rows.push({
           kind,
           sheet,
@@ -373,6 +394,7 @@ const readRows = async (): Promise<{
           movementFallbackMode:
             kind === "movements" ? resolvedMovement.fallbackMode : undefined,
         });
+      } else sheetStats.rowsSkippedEmpty += 1;
     });
   });
   const adminBalanceIndex = ranges.indexOf(config.adminBalancesRange);
@@ -384,7 +406,7 @@ const readRows = async (): Promise<{
       response.data.valueRanges?.[ranges.indexOf(range)]?.values ?? [],
     ]),
   );
-  return { rows, adminBalanceRows, metricRanges };
+  return { rows, adminBalanceRows, metricRanges, rowsBySheet };
 };
 
 const upsertPerson = async (
@@ -1177,6 +1199,7 @@ export const importGoogleSheets = async (
     });
     progress("batch_created", { batchId });
   const summary: ImportSummary = {
+    ok: true,
     clubId,
     batchId,
     dryRun,
@@ -1214,17 +1237,32 @@ export const importGoogleSheets = async (
     rowsInvalid: 0,
     operationalWritesAttempted: 0,
     metadataWrites: 1,
+    rowsBySheet: {},
   };
   const processedEnrollmentExternalIds = new Set<string>();
   try {
     progress("source_read_started");
-    const { rows, adminBalanceRows, metricRanges } = await readRows();
+    const { rows, adminBalanceRows, metricRanges, rowsBySheet } = await readRows();
     summary.read = rows.length;
     summary.rowsRead = rows.length;
-    summary.rowsFetched = rows.length;
+    summary.rowsFetched = Object.values(rowsBySheet).reduce((total, item) => total + item.rowsFetched, 0);
     summary.rowsDetected = rows.length;
+    summary.rowsSkippedEmpty = Object.values(rowsBySheet).reduce((total, item) => total + item.rowsSkippedEmpty, 0);
+    summary.rowsBySheet = rowsBySheet;
     progress("source_read_completed", { rowsRead: rows.length, rowsFetched: summary.rowsFetched, rowsDetected: summary.rowsDetected, rowsSkippedEmpty: summary.rowsSkippedEmpty });
+    progress("preflight_started");
+    const preflight = await inspectImportConflictTargets(client);
+    const incompatibleTargets = preflight.filter((target) => !target.compatibleConstraintFound);
+    if (incompatibleTargets.length > 0) throw new ImportSchemaPreconditionError(incompatibleTargets);
+    progress("preflight_completed", { targets: preflight.map((target) => ({ entity: target.entity, compatible: target.compatibleConstraintFound })) });
+    progress("mapping_started", { rows: rows.length });
+    // readRows performs header resolution and mapping without retaining source secrets.
+    progress("mapping_completed", { rows: rows.length });
+    progress("validation_started", { rows: rows.length });
+    progress("validation_completed", { rows: rows.length });
     const balanceAttemptedWritesStart = summary.attemptedWrites;
+    progress("transaction_started");
+    progress("simulation_started", { dryRun });
     await client.query("begin");
     try {
       await upsertOperationalBalances(transaction, adminBalanceRows, summary);
@@ -1333,10 +1371,12 @@ export const importGoogleSheets = async (
           : "completed",
       JSON.stringify(summary),
     );
+    progress("batch_finalized", { batchId, status: summary.status });
     return summary;
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
-    const schemaConflict = isImportSchemaConflictConfiguration(error);
+    const schemaConflict = isImportSchemaConflictConfiguration(error) || error instanceof ImportSchemaPreconditionError;
+    const errorCode = error instanceof ImportSchemaPreconditionError ? error.code : schemaConflict ? "IMPORT_SCHEMA_CONFLICT_CONFIGURATION" : undefined;
     if (schemaConflict) {
       await logImportError(pool, {
         clubId,
@@ -1344,7 +1384,7 @@ export const importGoogleSheets = async (
         sourceTable: "configuration",
         sourceRow: "SCHEMA:0",
         error,
-        rawPayload: { code: "IMPORT_SCHEMA_CONFLICT_CONFIGURATION" },
+        rawPayload: { code: errorCode, details: error instanceof ImportSchemaPreconditionError ? error.details : undefined },
       });
     }
     await finishImportBatch(
@@ -1354,8 +1394,9 @@ export const importGoogleSheets = async (
       schemaConflict ? "failed_configuration" : "failed",
       error instanceof Error ? error.message : String(error),
     );
+    progress("batch_finalized", { batchId, status: schemaConflict ? "FAILED_CONFIGURATION" : "FAILED" });
     if (error instanceof Error) {
-      const operationalError = error as Error & { code?: string; status?: number; retryable?: boolean; batchId?: string; expose?: boolean };
+      const operationalError = error as Error & { code?: string; status?: number; retryable?: boolean; batchId?: string; expose?: boolean; details?: unknown };
       operationalError.batchId = batchId;
       operationalError.retryable ??= true;
       if (!operationalError.code) {
@@ -1370,7 +1411,9 @@ export const importGoogleSheets = async (
       }
       operationalError.status ??= operationalError.code === "GOOGLE_SHEETS_CREDENTIALS_INVALID" || schemaConflict ? 422 : 502;
       operationalError.expose = true;
-      operationalError.message = schemaConflict
+      operationalError.message = error instanceof ImportSchemaPreconditionError
+        ? error.message
+        : schemaConflict
         ? "La base de datos no posee la restricción única requerida por el importador. Aplicá y validá la migración de constraints multi-tenant."
         : operationalError.code === "GOOGLE_SHEETS_TIMEOUT"
         ? "Google Sheets no respondió dentro del tiempo permitido. Podés reintentar."
@@ -1378,6 +1421,7 @@ export const importGoogleSheets = async (
           ? "No se pudo autenticar la fuente de Google Sheets. Revisá la configuración del servidor."
           : "La importación no pudo completarse. Podés reintentar.";
     }
+    progress("import_failed", { batchId, step: error instanceof ImportSchemaPreconditionError ? "preflight" : "simulation", errorCode: (error as { code?: string })?.code ?? errorCode ?? "IMPORT_FAILED", safeMessage: error instanceof Error ? error.message : "La importación falló.", elapsedMs: Date.now() - startedAt });
     throw error;
   }
   } finally {
