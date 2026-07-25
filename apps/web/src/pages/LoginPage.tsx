@@ -17,11 +17,11 @@ export default function LoginPage() {
       const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password })
       });
-      const payload = await response.json().catch(() => null) as { authenticated?: boolean; username?: string; canAccessDataMigration?: boolean; message?: string } | null;
+      const payload = await response.json().catch(() => null) as { authenticated?: boolean; username?: string; message?: string } | null;
       if (!response.ok || !payload?.authenticated) {
         setError(payload?.message ?? 'No se pudo iniciar sesión. Revisá tus credenciales.'); return;
       }
-      authenticate(payload.username ?? null, Boolean(payload.canAccessDataMigration)); navigate('/app', { replace: true });
+      authenticate(payload.username ?? null); navigate('/app', { replace: true });
     } catch { setError('No se pudo conectar con el servidor local.'); }
     finally { setIsLoading(false); }
   };

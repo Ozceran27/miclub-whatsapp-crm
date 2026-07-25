@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { apiUrl } from './api';
 
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -7,8 +7,7 @@ type SessionValue = {
   authEnabled: boolean;
   isAuthenticated: boolean;
   username: string | null;
-  canAccessDataMigration: boolean;
-  authenticate: (username: string | null, canAccessDataMigration?: boolean) => void;
+  authenticate: (username: string | null) => void;
   logout: () => Promise<void>;
 };
 
@@ -18,20 +17,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>('loading');
   const [authEnabled, setAuthEnabled] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
-  const [canAccessDataMigration, setCanAccessDataMigration] = useState(false);
+  const sessionChannel = useRef<BroadcastChannel | null>(null);
 
-  const authenticate = useCallback((nextUsername: string | null, migrationAccess = false) => {
+  const authenticate = useCallback((nextUsername: string | null) => {
     setUsername(nextUsername);
-    setCanAccessDataMigration(migrationAccess);
     setStatus('authenticated');
   }, []);
 
   const expireSession = useCallback(() => {
     setAuthEnabled(true);
     setUsername(null);
-    setCanAccessDataMigration(false);
     setStatus('anonymous');
   }, []);
+
+  useEffect(() => {
+    if (!('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('miclub-auth');
+    sessionChannel.current = channel;
+    channel.addEventListener('message', (event) => {
+      if (event.data === 'logout') expireSession();
+    });
+    return () => {
+      sessionChannel.current = null;
+      channel.close();
+    };
+  }, [expireSession]);
 
   useEffect(() => {
     const originalFetch = window.fetch.bind(window);
@@ -47,33 +57,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch(apiUrl('/auth/me'));
-        const payload = await response.json() as { authenticated: boolean; authEnabled?: boolean; username?: string | null; canAccessDataMigration?: boolean };
+        const response = await fetch(apiUrl('/auth/me'), { cache: 'no-store' });
+        if (!response.ok) throw new Error(`No se pudo validar la sesión (${response.status})`);
+        const payload = await response.json() as { authenticated: boolean; authEnabled?: boolean; username?: string | null };
         setAuthEnabled(Boolean(payload.authEnabled));
         setUsername(payload.username ?? null);
-        setCanAccessDataMigration(Boolean(payload.canAccessDataMigration));
         setStatus(payload.authenticated ? 'authenticated' : 'anonymous');
       } catch {
-        setAuthEnabled(false);
-        setStatus('authenticated');
+        // Nunca convertir un error de red, proxy o JSON en una sesión válida.
+        expireSession();
       }
     };
     void checkSession();
-  }, []);
+  }, [expireSession]);
 
   const logout = useCallback(async () => {
-    try {
-      await fetch(apiUrl('/auth/logout'), { method: 'POST' });
-    } finally {
-      // A network failure must never leave private UI mounted with stale local
-      // session state. The server cookie will be retried/validated on reload.
-      expireSession();
-    }
+    const response = await fetch(apiUrl('/auth/logout'), { method: 'POST', cache: 'no-store' });
+    if (!response.ok) throw new Error(`No se pudo cerrar la sesión (${response.status})`);
+    expireSession();
+    sessionChannel.current?.postMessage('logout');
   }, [expireSession]);
 
   const value = useMemo(() => ({
-    status, authEnabled, isAuthenticated: status === 'authenticated', username, canAccessDataMigration, authenticate, logout
-  }), [authEnabled, authenticate, canAccessDataMigration, logout, status, username]);
+    status, authEnabled, isAuthenticated: status === 'authenticated', username, authenticate, logout
+  }), [authEnabled, authenticate, logout, status, username]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

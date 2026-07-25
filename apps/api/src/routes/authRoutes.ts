@@ -6,7 +6,6 @@ import { authEnabled, authPassword, authUser, clearSessionCookie, getSession, le
 import asyncHandler from "./asyncHandler.js";
 import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
 import { auditService } from "../services/auditService.js";
-import { isImportOperator } from "../middleware/authorization.js";
 
 // auth: paths públicos de autenticación; no renombrar sin migración frontend.
 const router = Router();
@@ -32,7 +31,7 @@ router.post("/login", asyncHandler(async (req, res) => {
   if (result.ok) {
     setSessionCookie(req, res, result.context);
     await auditService.login({ action: "auth.login", result: "success", userId: result.context.userId, clubId: result.context.clubId, membershipId: result.context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el login", error));
-    return res.json({ authenticated: true, username: result.context.email, canAccessDataMigration: isImportOperator(result.context), user: result.context });
+    return res.json({ authenticated: true, username: result.context.email, user: result.context });
   }
 
   if (legacyAuthEnabled && safeEqual(username, authUser) && safeEqual(password, authPassword)) {
@@ -52,7 +51,7 @@ router.post("/register", asyncHandler(async (req, res) => {
     const context = await registerClubOwner(body.clubName, body.email, body.password);
     setSessionCookie(req, res, context);
     await auditService.registration({ action: "auth.registration", result: "success", userId: context.userId, clubId: context.clubId, membershipId: context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el registro", error));
-    return res.status(201).json({ authenticated: true, username: context.email, canAccessDataMigration: false, user: context });
+    return res.status(201).json({ authenticated: true, username: context.email, user: context });
   } catch (error) {
     if (error instanceof RegistrationError) return res.status(error.code === "email_exists" ? 409 : 400).json({ authenticated: false, message: error.message });
     throw error;
@@ -104,7 +103,7 @@ router.get("/me", asyncHandler(async (req, res) => {
   }
 
   const user = { userId: context.userId, email: context.email, legacy: context.legacy, clubId: context.clubId, membershipId: context.membershipId, role: context.role, permissions: context.permissions ?? [] };
-  return res.json({ authenticated: true, authEnabled: true, username: context.email, canAccessDataMigration: isImportOperator(context), user });
+  return res.json({ authenticated: true, authEnabled: true, username: context.email, user });
 }));
 
 export default router;

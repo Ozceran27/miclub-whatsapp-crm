@@ -28,21 +28,24 @@ const isModuleId = (value: string): value is ModuleId => MODULES.some(({ id }) =
 export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
   const pathModule = path.split('/')[2] ?? 'home';
-  const { username, canAccessDataMigration, logout } = useSession();
+  const { username, logout } = useSession();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const visibleModules = canAccessDataMigration ? MODULES : MODULES.filter(({ id }) => id !== 'dataMigration');
+  const [logoutError, setLogoutError] = useState('');
   const requestedModule: ModuleId = isModuleId(pathModule) ? pathModule : 'home';
-  const currentModule: ModuleId = requestedModule === 'dataMigration' && !canAccessDataMigration ? 'home' : requestedModule;
+  const currentModule: ModuleId = requestedModule;
   const { theme, toggleTheme } = useTheme();
 
   const selectModule = (module: ModuleId) => navigate(module === 'home' ? '/app' : `/app/${module}`);
   const handleLogout = async () => {
     if (isLoggingOut) return;
+    setLogoutError('');
     setIsLoggingOut(true);
     try {
       await logout();
-    } finally {
       navigate('/login', { replace: true });
+    } catch {
+      setLogoutError('No se pudo cerrar la sesión. Verificá la conexión e intentá nuevamente.');
+      setIsLoggingOut(false);
     }
   };
   const renderModule = () => {
@@ -65,7 +68,8 @@ export default function ProtectedAppShell() {
           </button>
         </div>
       </header>
-      <ModuleNav modules={visibleModules} currentModule={currentModule} onSelect={selectModule} />
+      {logoutError && <p className="login-error" role="alert">{logoutError}</p>}
+      <ModuleNav modules={MODULES} currentModule={currentModule} onSelect={selectModule} />
       {renderModule()}
     </div>
   );

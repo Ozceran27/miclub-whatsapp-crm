@@ -1,17 +1,12 @@
-import { Router, type NextFunction, type Request, type Response } from "express";
+import { Router } from "express";
 import { getPostgresPool } from "../db/postgres.js";
 import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
 import asyncHandler from "./asyncHandler.js";
-import { requireImportOperator, requireMembership, requirePermission } from "../middleware/authorization.js";
+import { requireMembership } from "../middleware/authorization.js";
 
 // migración: importadores bajo /api/import; no renombrar sin migración frontend.
 const router = Router();
-
-const requireImportEndpointsEnabled = (_req: Request, res: Response, next: NextFunction) => {
-  if (process.env.IMPORT_ENDPOINTS_ENABLED !== "true") return res.status(404).json({ error: true, message: "Endpoints de importación deshabilitados." });
-  return next();
-};
 
 export const parseBatchSize = (value: unknown, fallback = 50): number => {
   const parsed = Number(value);
@@ -34,8 +29,7 @@ const parsePagination = (query: Record<string, unknown>) => ({
   offset: Math.max(Number(query.offset ?? 0) || 0, 0)
 });
 
-router.use(requireImportEndpointsEnabled);
-router.use(requireMembership, requireImportOperator, requirePermission("imports:run"));
+router.use(requireMembership);
 
 router.post("/google-sheets", asyncHandler(async (req, res) => {
   const dryRun = req.body?.dryRun !== false;

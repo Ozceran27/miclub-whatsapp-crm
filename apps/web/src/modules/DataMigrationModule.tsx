@@ -119,7 +119,7 @@ export default function DataMigrationModule() {
       </section>
 
       <section className="section-panel migration-alert">
-        <strong>Requisito operativo:</strong> los endpoints de importación requieren <code>IMPORT_ENDPOINTS_ENABLED=true</code> únicamente durante una ventana controlada. Volver a <code>false</code> al finalizar.
+        <strong>Importante:</strong> ejecutá primero una simulación y revisá sus advertencias antes de confirmar una importación real.
       </section>
 
       {actionError && <p className="error-msg">Error de operación: {actionError}</p>}
