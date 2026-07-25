@@ -22,3 +22,17 @@ test('preflight informa exactamente el target faltante sin crear errores por fil
   const details = await inspectImportConflictTargets(pool as never);
   assert.deepEqual(details.filter((item) => !item.compatibleConstraintFound).map((item) => item.entity), ['operational_balances']);
 });
+
+test('preflight representa las expresiones del target como texto SQL y no como columnas del catálogo', async () => {
+  let capturedSql = '';
+  const pool = { query: async (sql: string) => {
+    capturedSql = sql;
+    return { rows: [] };
+  } };
+
+  await inspectImportConflictTargets(pool as never);
+
+  assert.match(capturedSql, /'lower\(name\)'/);
+  assert.match(capturedSql, /'coalesce\(modality, ''''::text\)'/);
+  assert.doesNotMatch(capturedSql, /"coalesce\(modality/);
+});

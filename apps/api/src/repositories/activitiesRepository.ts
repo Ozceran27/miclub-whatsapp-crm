@@ -51,13 +51,13 @@ export const upsertActivity = async (pool: Pool, input: {
        from miclub.activities
        where club_id = $1
          and sector_id = $2
-         and name = $3
+         and lower(name) = lower($3)
          and coalesce(modality, ''::text) = coalesce($4::text, ''::text)
        for update
      ), upserted_activity as (
        insert into miclub.activities (club_id, sector_id, name, modality, instructor_id, monthly_fee, club_commission_percent, notes)
        values ($1, $2, $3, $4, $5, $6, $7, 'Importado desde Google Sheets')
-       on conflict (club_id, sector_id, name, coalesce(modality, ''::text)) do update
+       on conflict (club_id, sector_id, lower(name), coalesce(modality, ''::text)) do update
          set instructor_id = excluded.instructor_id,
              monthly_fee = case
                when $8::boolean then excluded.monthly_fee

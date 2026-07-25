@@ -18,7 +18,7 @@ export type ImportSchemaPreflightDetail = {
 export const inspectImportConflictTargets = async (pool: Pick<Pool, "query">): Promise<ImportSchemaPreflightDetail[]> => {
   const result = await pool.query<{ table_name: string; target: string[]; predicate: string | null; compatible: boolean }>(
     `with required(table_name, index_name, target, predicate) as (values
-       ('activities'::text, 'activities_import_conflict_key'::text, array['club_id','sector_id','lower(name)',"coalesce(modality, ''::text)"], null::text),
+       ('activities'::text, 'activities_import_conflict_key'::text, array['club_id','sector_id','lower(name)','coalesce(modality, ''''::text)'], null::text),
        ('enrollments', 'enrollments_club_external_id_key', array['club_id','external_id'], 'external_id IS NOT NULL'),
        ('instructors', 'instructors_import_conflict_key', array['club_id','person_id'], null),
        ('movements', 'movements_club_external_id_key', array['club_id','external_id'], 'external_id IS NOT NULL'),
