@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectImportConflictTargets } from './importRepository.js';
 
-test('preflight acepta índices parciales tenant-scoped de ambas entidades', async () => {
+test('preflight acepta todos los índices usados por el importador', async () => {
   const pool = { query: async () => ({ rows: [
-    { table_name: 'enrollments', compatible: true },
-    { table_name: 'movements', compatible: true },
+    { table_name: 'enrollments', target: ['club_id', 'external_id'], predicate: 'external_id IS NOT NULL', compatible: true },
+    { table_name: 'movements', target: ['club_id', 'external_id'], predicate: 'external_id IS NOT NULL', compatible: true },
+    { table_name: 'operational_balances', target: ['club_id', 'source', 'cutoff_date'], predicate: null, compatible: true },
   ] }) };
   const details = await inspectImportConflictTargets(pool as never);
   assert.equal(details.every((item) => item.compatibleConstraintFound), true);
@@ -15,9 +16,9 @@ test('preflight acepta índices parciales tenant-scoped de ambas entidades', asy
 
 test('preflight informa exactamente el target faltante sin crear errores por fila', async () => {
   const pool = { query: async () => ({ rows: [
-    { table_name: 'enrollments', compatible: true },
-    { table_name: 'movements', compatible: false },
+    { table_name: 'enrollments', target: ['club_id', 'external_id'], predicate: 'external_id IS NOT NULL', compatible: true },
+    { table_name: 'operational_balances', target: ['club_id', 'source', 'cutoff_date'], predicate: null, compatible: false },
   ] }) };
   const details = await inspectImportConflictTargets(pool as never);
-  assert.deepEqual(details.filter((item) => !item.compatibleConstraintFound).map((item) => item.entity), ['movements']);
+  assert.deepEqual(details.filter((item) => !item.compatibleConstraintFound).map((item) => item.entity), ['operational_balances']);
 });
