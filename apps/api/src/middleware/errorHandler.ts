@@ -11,16 +11,20 @@ const getStatusCode = (error: HttpError): number => {
   return typeof status === "number" && status >= 400 && status < 600 ? status : 500;
 };
 
-export const errorHandler: ErrorRequestHandler = (error: HttpError, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (error: HttpError, req, res, _next) => {
   const status = getStatusCode(error);
   const message = status >= 500 && !error.expose ? "Error interno del servidor." : error.message;
 
-  if (status >= 500) console.error(error);
+  if (status >= 500) {
+    if (process.env.NODE_ENV === "production") console.error({ message: error.message, requestId: req.requestId, status });
+    else console.error(error);
+  }
 
   res.status(status).json({
     error: true,
     message,
-    status
+    status,
+    requestId: req.requestId
   });
 };
 
