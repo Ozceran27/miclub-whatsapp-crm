@@ -11,7 +11,7 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
     },
   };
 
-  const id = await upsertActivity(pool as never, {
+  const id = await upsertActivity(pool as never, { clubId: "club-1",
     sectorId: 'sector-1',
     name: 'Musculación',
     modality: 'Mensual',
@@ -27,12 +27,12 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
   assert.equal(id, 'activity-1');
   const query = queries[0];
   assert.ok(query, 'expected upsert query');
-  assert.equal(query.params?.[4], 30000);
-  assert.equal(query.params?.[6], true, 'expected monthly fee update to be enabled for normalized imports');
-  assert.equal(query.params?.[9], '300000');
-  assert.equal(query.params?.[10], 300000);
-  assert.equal(query.params?.[11], 'scale_adjustment:300000->30000');
-  assert.match(query.sql, /monthly_fee = case\s+when \$7::boolean then excluded\.monthly_fee\s+else miclub\.activities\.monthly_fee/s);
+  assert.equal(query.params?.[5], 30000);
+  assert.equal(query.params?.[7], true, 'expected monthly fee update to be enabled for normalized imports');
+  assert.equal(query.params?.[10], '300000');
+  assert.equal(query.params?.[11], 300000);
+  assert.equal(query.params?.[12], 'scale_adjustment:300000->30000');
+  assert.match(query.sql, /monthly_fee = case\s+when \$8::boolean then excluded\.monthly_fee\s+else miclub\.activities\.monthly_fee/s);
   assert.match(query.sql, /insert into miclub\.activity_fee_history/);
   assert.doesNotMatch(query.sql, /greatest\(miclub\.activities\.monthly_fee, excluded\.monthly_fee\)/);
 });
@@ -46,11 +46,11 @@ test('upsertActivity no pisa monthly_fee cuando la cuota del import viene en bla
     },
   };
 
-  await upsertActivity(pool as never, {
+  await upsertActivity(pool as never, { clubId: "club-1",
     sectorId: 'sector-1',
     name: 'Musculación',
     instructorId: 'instructor-1',
   });
 
-  assert.equal(queries[0]?.params?.[6], false, 'blank import fee must not overwrite the stored activity fee');
+  assert.equal(queries[0]?.params?.[7], false, 'blank import fee must not overwrite the stored activity fee');
 });

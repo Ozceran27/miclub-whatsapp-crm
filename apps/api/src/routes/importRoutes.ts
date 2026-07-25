@@ -45,7 +45,7 @@ router.post("/google-sheets", asyncHandler(async (req, res) => {
   }
 
   const missingEnrollmentStrategy = req.body?.missingEnrollmentStrategy === undefined ? undefined : parseMissingEnrollmentStrategy(req.body.missingEnrollmentStrategy);
-  const summary = await importGoogleSheets({ dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize, missingEnrollmentStrategy });
+  const summary = await importGoogleSheets(req.auth!, { dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize, missingEnrollmentStrategy });
   res.status(dryRun ? 200 : 202).json(summary);
 }));
 
@@ -54,11 +54,12 @@ router.post("/google-sheets", asyncHandler(async (req, res) => {
 router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req, res) => {
   const input = parseMissingEnrollmentDeletion(req.body);
   if (!input) return res.status(400).json({ ok: false, message: "Debe seleccionar al menos una inscripción válida para eliminar." });
+  const clubId = req.auth!.clubId;
 
   const pool = await getPostgresPool();
   const batch = await pool.query<{ id: string }>(
-    "select id from miclub.import_batches where id = $1 and source = 'google_sheets' and status in ('completed', 'completed_with_errors')",
-    [input.importId],
+    "select id from miclub.import_batches where id = $1 and club_id = $2 and source = 'google_sheets' and status in ('completed', 'completed_with_errors')",
+    [input.importId, clubId],
   );
   if (batch.rows.length === 0) return res.status(400).json({ error: true, message: "El import indicado no es una importación real de Google Sheets finalizada." });
 
@@ -86,10 +87,11 @@ router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req
               end as dependency_reason
          from miclub.enrollments e
         where e.id = any($1::uuid[])
+          and e.club_id = $3
           and e.source = 'google_sheets'
           and e.missing_from_import_batch_id = $2
         for update`,
-      [input.enrollmentIds, input.importId],
+      [input.enrollmentIds, input.importId, clubId],
     );
     const byId = new Map(candidates.rows.map((candidate) => [candidate.id, candidate]));
     const deletable: string[] = [];
@@ -105,10 +107,11 @@ router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req
       const deleted = await client.query<{ id: string }>(
         `delete from miclub.enrollments
           where id = any($1::uuid[])
+            and club_id = $3
             and source = 'google_sheets'
             and missing_from_import_batch_id = $2
           returning id`,
-        [deletable, input.importId],
+        [deletable, input.importId, clubId],
       );
       deletedIds = deleted.rows.map((row) => row.id);
       for (const id of deletable.filter((id) => !deletedIds.includes(id))) errors.push({ id, message: "La inscripción cambió antes de poder eliminarla; actualizá la revisión." });
@@ -130,14 +133,14 @@ router.post("/google-sheets/enrollments/delete-missing", asyncHandler(async (req
 }));
 
 
-router.get("/google-sheets/movements/audit", asyncHandler(async (_req, res) => {
-  res.json(await getMovementImportAudit());
+router.get("/google-sheets/movements/audit", asyncHandler(async (req, res) => {
+  res.json(await getMovementImportAudit(req.auth!));
 }));
 
 router.get("/batches", asyncHandler(async (req, res) => {
   const pool = await getPostgresPool();
   const { limit, offset } = parsePagination(req.query);
-  const rows = await listImportBatches(pool, limit, offset);
+  const rows = await listImportBatches(pool, req.auth!.clubId, limit, offset);
   const total = Number((rows[0] as { total_count?: string | number } | undefined)?.total_count ?? 0);
   res.json({ rows, total, limit, offset });
 }));
@@ -145,7 +148,7 @@ router.get("/batches", asyncHandler(async (req, res) => {
 router.get("/batches/:id/errors", asyncHandler(async (req, res) => {
   const pool = await getPostgresPool();
   const { limit, offset } = parsePagination(req.query);
-  const rows = await listImportErrors(pool, String(req.params.id), limit, offset);
+  const rows = await listImportErrors(pool, req.auth!.clubId, String(req.params.id), limit, offset);
   const total = Number((rows[0] as { total_count?: string | number } | undefined)?.total_count ?? 0);
   res.json({ rows, total, limit, offset });
 }));
