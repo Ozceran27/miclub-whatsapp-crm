@@ -1,7 +1,7 @@
 import type { getPostgresPool } from "../db/postgres.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
-export type ImportBatchStatus = "pending" | "running" | "completed" | "completed_with_errors" | "failed" | "dry_run";
+export type ImportBatchStatus = "pending" | "running" | "completed" | "completed_with_errors" | "failed" | "failed_configuration" | "dry_run";
 
 export const createImportBatch = async (pool: Pool, input: { clubId: string; source: string; sourceFile?: string; dryRun: boolean; notes?: string }): Promise<string> => {
   const result = await pool.query<{ id: string }>(
@@ -41,6 +41,9 @@ export const logImportError = async (pool: Pool, input: { clubId: string; batchI
 };
 
 const errorCodeSql = `case
+  when error_message ilike '%no unique or exclusion constraint matching the on conflict specification%'
+    or error_message ilike '%no hay restricción única o de exclusión que coincida con la especificación on conflict%'
+    then 'IMPORT_SCHEMA_CONFLICT_CONFIGURATION'
   when error_message ilike '%25P02%' or error_message ilike '%current transaction is aborted%' then 'TRANSACTION_ABORTED'
   when error_message ilike '%invalid%date%' or error_message ilike '%fecha%inválid%' then 'INVALID_DATE'
   when error_message ilike '%not-null%' or error_message ilike '%sin nombre%' then 'REQUIRED_FIELD'
@@ -49,6 +52,10 @@ const errorCodeSql = `case
   when error_message ilike '%sector%' then 'UNKNOWN_SECTOR'
   when error_message ilike '%activit%' or error_message ilike '%actividad%' then 'UNKNOWN_ACTIVITY'
   else 'ROW_IMPORT_ERROR' end`;
+
+const friendlyMessageSql = `case when (${errorCodeSql}) = 'IMPORT_SCHEMA_CONFLICT_CONFIGURATION'
+  then 'La base de datos no posee la restricción única requerida por el importador.'
+  else left(error_message, 500) end`;
 
 export const listImportBatches = async (pool: Pool, clubId: string, limit: number, offset: number) => {
   const result = await pool.query(
@@ -68,8 +75,10 @@ export const listImportErrors = async (pool: Pool, clubId: string, batchId: stri
             split_part(source_row, ':', 1) as sheet,
             nullif(split_part(source_row, ':', 2), '')::integer as row_number,
             ${errorCodeSql} as error_code,
-            left(error_message, 500) as message,
-            jsonb_build_object('sourceIdentifier', source_row) as metadata,
+            ${friendlyMessageSql} as message,
+            case when (${errorCodeSql}) = 'IMPORT_SCHEMA_CONFLICT_CONFIGURATION'
+              then jsonb_build_object('sourceIdentifier', source_row, 'probableCause', 'El ON CONFLICT no coincide con un índice UNIQUE o constraint de PostgreSQL.', 'suggestedAction', 'Aplicar y validar la migración de constraints multi-tenant.')
+              else jsonb_build_object('sourceIdentifier', source_row) end as metadata,
             created_at, count(*) over() as total_count
      from miclub.import_errors
      where club_id = $1 and batch_id = $2
@@ -86,7 +95,7 @@ export const summarizeImportErrors = async (pool: Pool, clubId: string, batchId:
   const result = await pool.query(
     `select ${errorCodeSql} as error_code, source_table as entity_type,
             split_part(source_row, ':', 1) as sheet,
-            left(error_message, 500) as message, count(*)::int as count
+            ${friendlyMessageSql} as message, count(*)::int as count
        from miclub.import_errors
       where club_id = $1 and batch_id = $2
       group by 1, 2, 3, 4

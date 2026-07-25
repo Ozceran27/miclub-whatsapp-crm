@@ -144,9 +144,18 @@ export const processRowsWithSavepoints = async <T>(
     } catch (error) {
       await transaction.query(`rollback to savepoint ${savepoint}`);
       await transaction.query(`release savepoint ${savepoint}`);
+      if (isImportSchemaConflictConfiguration(error)) throw error;
       onRowError(rows[index]!, error);
     }
   }
+};
+
+export const isImportSchemaConflictConfiguration = (error: unknown): boolean => {
+  const postgresError = error as { code?: unknown; message?: unknown } | null;
+  const message = String(postgresError?.message ?? error ?? "").toLowerCase();
+  return postgresError?.code === "42P10"
+    || message.includes("no unique or exclusion constraint matching the on conflict specification")
+    || message.includes("no hay restricción única o de exclusión que coincida con la especificación on conflict");
 };
 const stablePart = (value: unknown): string =>
   normalizeComparableText(value)
@@ -662,7 +671,7 @@ export const processMember = async (
     enrollmentResult = await pool.query<{ id: string }>(
       `insert into miclub.enrollments (club_id, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
        values ($1,$2,$3,$4,$5,$6::miclub.enrollment_status,$7,$8,'google_sheets',$9,$10,$11,$12,$13,now())
-       on conflict (club_id, external_id) do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
+       on conflict (club_id, external_id) where external_id is not null do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
        returning id`,
       [
         summary.clubId,
@@ -798,7 +807,7 @@ export const processMovement = async (
   await pool.query(
     `insert into miclub.movements (club_id,external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
      values ($1,$2,$3,$4::miclub.movement_type,$5,$6,$7,$8,$9,$10,$11,$12::miclub.financial_status,$13::miclub.movement_status,'google_sheets',$14::jsonb)
-     on conflict (club_id, external_id) do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
+     on conflict (club_id, external_id) where external_id is not null do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
     [
       summary.clubId,
       externalId("google_sheets", "movement", ext),
@@ -1327,11 +1336,22 @@ export const importGoogleSheets = async (
     return summary;
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
+    const schemaConflict = isImportSchemaConflictConfiguration(error);
+    if (schemaConflict) {
+      await logImportError(pool, {
+        clubId,
+        batchId,
+        sourceTable: "configuration",
+        sourceRow: "SCHEMA:0",
+        error,
+        rawPayload: { code: "IMPORT_SCHEMA_CONFLICT_CONFIGURATION" },
+      });
+    }
     await finishImportBatch(
       pool,
       clubId,
       batchId,
-      "failed",
+      schemaConflict ? "failed_configuration" : "failed",
       error instanceof Error ? error.message : String(error),
     );
     if (error instanceof Error) {
@@ -1340,15 +1360,19 @@ export const importGoogleSheets = async (
       operationalError.retryable ??= true;
       if (!operationalError.code) {
         const text = error.message.toLowerCase();
-        operationalError.code = text.includes("timeout") || text.includes("timed out")
+        operationalError.code = schemaConflict
+          ? "IMPORT_SCHEMA_CONFLICT_CONFIGURATION"
+          : text.includes("timeout") || text.includes("timed out")
           ? "GOOGLE_SHEETS_TIMEOUT"
           : text.includes("credential") || text.includes("credencial")
             ? "GOOGLE_SHEETS_CREDENTIALS_INVALID"
             : "IMPORT_FAILED";
       }
-      operationalError.status ??= operationalError.code === "GOOGLE_SHEETS_CREDENTIALS_INVALID" ? 422 : 502;
+      operationalError.status ??= operationalError.code === "GOOGLE_SHEETS_CREDENTIALS_INVALID" || schemaConflict ? 422 : 502;
       operationalError.expose = true;
-      operationalError.message = operationalError.code === "GOOGLE_SHEETS_TIMEOUT"
+      operationalError.message = schemaConflict
+        ? "La base de datos no posee la restricción única requerida por el importador. Aplicá y validá la migración de constraints multi-tenant."
+        : operationalError.code === "GOOGLE_SHEETS_TIMEOUT"
         ? "Google Sheets no respondió dentro del tiempo permitido. Podés reintentar."
         : operationalError.code === "GOOGLE_SHEETS_CREDENTIALS_INVALID"
           ? "No se pudo autenticar la fuente de Google Sheets. Revisá la configuración del servidor."
