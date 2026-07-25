@@ -98,8 +98,9 @@ test('feature de importación deshabilitada devuelve código localizado sin alte
     });
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), {
-      code: 'IMPORT_DISABLED',
-      message: 'La ejecución de importaciones está deshabilitada fuera de la ventana operativa.'
+      code: 'FEATURE_DISABLED',
+      message: 'La ejecución de importaciones está deshabilitada fuera de la ventana operativa.',
+      retryable: false
     });
   }, false);
 });

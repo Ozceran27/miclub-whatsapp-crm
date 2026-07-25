@@ -10,7 +10,8 @@ const SUMMARY_FIELDS: Array<{ key: keyof ImportSummary; label: string }> = [
   { key: 'persistedWrites', label: 'Writes persistidos' },
   { key: 'rolledBackWrites', label: 'Writes revertidos' },
   { key: 'enrollmentsProcessed', label: 'Inscripciones procesadas' },
-  { key: 'movementsProcessed', label: 'Movimientos procesados' }
+  { key: 'movementsProcessed', label: 'Movimientos procesados' },
+  { key: 'durationMs', label: 'Duración (ms)' }
 ];
 
 const formatValue = (value: unknown) => {

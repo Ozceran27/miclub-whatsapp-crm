@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import { getPostgresPool } from "../db/postgres.js";
 import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
 import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
+import { hasRecentSuccessfulDryRun } from "../repositories/importRepository.js";
 import asyncHandler from "./asyncHandler.js";
 import { requireMembership } from "../middleware/authorization.js";
 
@@ -33,12 +34,13 @@ router.use(requireMembership);
 
 const requireImportFeature: RequestHandler = (_req, res, next) => {
   if (process.env.IMPORT_ENDPOINTS_ENABLED !== "true") {
-    return res.status(503).json({ code: "IMPORT_DISABLED", message: "La ejecución de importaciones está deshabilitada fuera de la ventana operativa." });
+    return res.status(503).json({ code: "FEATURE_DISABLED", message: "La ejecución de importaciones está deshabilitada fuera de la ventana operativa.", requestId: _req.requestId, retryable: false });
   }
   next();
 };
 
 router.post("/google-sheets", requireImportFeature, asyncHandler(async (req, res) => {
+  const startedAt = Date.now();
   const dryRun = req.body?.dryRun !== false;
   const batchSizeValue = req.body?.batchSize;
   const batchSize = parseBatchSize(batchSizeValue, Number.NaN);
@@ -48,8 +50,21 @@ router.post("/google-sheets", requireImportFeature, asyncHandler(async (req, res
   }
 
   const missingEnrollmentStrategy = req.body?.missingEnrollmentStrategy === undefined ? undefined : parseMissingEnrollmentStrategy(req.body.missingEnrollmentStrategy);
-  const summary = await importGoogleSheets(req.auth!, { dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize, missingEnrollmentStrategy });
-  res.status(dryRun ? 200 : 202).json(summary);
+  const context = { requestId: req.requestId, userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId, mode: dryRun ? "dry-run" : "real" };
+  const log = (step: string, details: Record<string, unknown> = {}) => console.info(JSON.stringify({ event: "google_sheets_import", ...context, step, elapsedMs: Date.now() - startedAt, ...details }));
+  log("request_received");
+  log("auth_validated");
+  log("tenant_resolved");
+  if (!dryRun) {
+    const pool = await getPostgresPool();
+    if (!await hasRecentSuccessfulDryRun(pool, req.auth!.clubId)) {
+      return res.status(409).json({ code: "DRY_RUN_REQUIRED", message: "Se requiere un dry-run exitoso del mismo club durante los últimos 30 minutos.", requestId: req.requestId, retryable: true });
+    }
+  }
+  const summary = await importGoogleSheets(req.auth!, { dryRun, batchSize: Number.isNaN(batchSize) ? 50 : batchSize, missingEnrollmentStrategy, requestId: req.requestId, onProgress: log });
+  log("response_sent", { batchId: summary.batchId, status: summary.status, durationMs: summary.durationMs });
+  // El importador es síncrono: ambos modos responden únicamente al finalizar.
+  res.status(200).json(summary);
 }));
 
 // This intentionally is not the generic enrollment delete route. Its scope is
