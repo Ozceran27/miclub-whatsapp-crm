@@ -77,7 +77,7 @@ export const useDataMigration = () => {
     }
   };
 
-  const loadBatchErrors = async (batchId: string) => {
+  const loadBatchErrors = async (batchId: string, offset = 0, filters: { sheet?: string; entity?: string } = {}) => {
     setSelectedBatchId(batchId);
     if (!batchId) {
       setBatchErrors({ loading: false });
@@ -85,7 +85,7 @@ export const useDataMigration = () => {
     }
     setBatchErrors({ loading: true });
     try {
-      const errors = await getImportBatchErrors(batchId, 100);
+      const errors = await getImportBatchErrors(batchId, 25, offset, filters);
       setBatchErrors({ loading: false, data: errors });
     } catch (error) {
       setBatchErrors({ loading: false, error: getErrorMessage(error) });

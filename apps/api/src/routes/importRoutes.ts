@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from "express";
 import { getPostgresPool } from "../db/postgres.js";
 import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
-import { listImportBatches, listImportErrors } from "../importers/importLogger.js";
+import { listImportBatches, listImportErrors, summarizeImportErrors } from "../importers/importLogger.js";
 import { hasRecentSuccessfulDryRun } from "../repositories/importRepository.js";
 import asyncHandler from "./asyncHandler.js";
 import { requireMembership } from "../middleware/authorization.js";
@@ -166,9 +166,16 @@ router.get("/batches", asyncHandler(async (req, res) => {
 router.get("/batches/:id/errors", asyncHandler(async (req, res) => {
   const pool = await getPostgresPool();
   const { limit, offset } = parsePagination(req.query);
-  const rows = await listImportErrors(pool, req.auth!.clubId, String(req.params.id), limit, offset);
+  const filters = {
+    sheet: typeof req.query.sheet === "string" ? req.query.sheet.slice(0, 100) : undefined,
+    entityType: typeof req.query.entity === "string" ? req.query.entity.slice(0, 50) : undefined,
+  };
+  const [rows, groups] = await Promise.all([
+    listImportErrors(pool, req.auth!.clubId, String(req.params.id), limit, offset, filters),
+    summarizeImportErrors(pool, req.auth!.clubId, String(req.params.id)),
+  ]);
   const total = Number((rows[0] as { total_count?: string | number } | undefined)?.total_count ?? 0);
-  res.json({ rows, total, limit, offset });
+  res.json({ rows, groups, total, limit, offset });
 }));
 
 export default router;

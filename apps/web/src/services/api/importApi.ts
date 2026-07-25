@@ -27,6 +27,13 @@ export type ImportSummary = {
   writesReverted?: number;
   durationMs?: number;
   warningMessages?: string[];
+  rowsFetched?: number;
+  rowsDetected?: number;
+  rowsSkippedEmpty?: number;
+  rowsValid?: number;
+  rowsInvalid?: number;
+  operationalWritesAttempted?: number;
+  metadataWrites?: number;
 };
 
 export type MissingInscription = {
@@ -79,12 +86,19 @@ export type ImportError = {
   severity?: string;
   message?: string;
   details?: unknown;
+  error_code?: string;
+  entity_type?: string;
+  sheet?: string;
+  metadata?: unknown;
   created_at?: string;
 };
 
 export type ImportErrorsResponse = {
   rows?: ImportError[];
+  groups?: Array<{ error_code: string; entity_type: string; sheet: string; message: string; count: number }>;
   total?: number;
+  limit?: number;
+  offset?: number;
 };
 
 export const getErrorMessage = (error: unknown) => {
@@ -136,4 +150,9 @@ export const deleteMissingInscriptions = (importId: string, enrollmentIds: strin
   body: JSON.stringify({ importId, enrollmentIds })
 });
 
-export const getImportBatchErrors = (batchId: string, limit = 100) => fetchJson<ImportErrorsResponse>(`/api/import/batches/${encodeURIComponent(batchId)}/errors?limit=${limit}` as `/${string}`);
+export const getImportBatchErrors = (batchId: string, limit = 25, offset = 0, filters: { sheet?: string; entity?: string } = {}) => {
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (filters.sheet) query.set('sheet', filters.sheet);
+  if (filters.entity) query.set('entity', filters.entity);
+  return fetchJson<ImportErrorsResponse>(`/api/import/batches/${encodeURIComponent(batchId)}/errors?${query}` as `/${string}`);
+};

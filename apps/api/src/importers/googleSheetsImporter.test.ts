@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMissingEnrollmentStrategy, processMember, processMovement } from './googleSheetsImporter.js';
+import { parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints } from './googleSheetsImporter.js';
 import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
@@ -12,6 +12,28 @@ test('parseMissingEnrollmentStrategy usa archive por defecto y acepta aliases de
   assert.equal(parseMissingEnrollmentStrategy('replace'), 'archive');
   assert.equal(parseMissingEnrollmentStrategy('inactive'), 'inactive');
   assert.equal(parseMissingEnrollmentStrategy('abandonado'), 'abandon');
+});
+
+test('processRowsWithSavepoints evita que un error de fila envenene las filas siguientes', async () => {
+  let aborted = false;
+  const sql: string[] = [];
+  const processed: number[] = [];
+  const errors: number[] = [];
+  const transaction = { query: async (statement: string) => {
+    sql.push(statement);
+    if (statement.startsWith('rollback to savepoint')) aborted = false;
+    else if (aborted) throw Object.assign(new Error('current transaction is aborted'), { code: '25P02' });
+    return { rows: [] };
+  } };
+
+  await processRowsWithSavepoints(transaction as never, [1, 2, 3], async (row) => {
+    if (row === 2) { aborted = true; throw Object.assign(new Error('invalid date'), { code: '22007' }); }
+    processed.push(row);
+  }, (row) => errors.push(row));
+
+  assert.deepEqual(processed, [1, 3]);
+  assert.deepEqual(errors, [2]);
+  assert.ok(sql.includes('rollback to savepoint import_row_1'));
 });
 
 const createSummary = () => ({
