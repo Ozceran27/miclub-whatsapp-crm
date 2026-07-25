@@ -317,27 +317,27 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       }
     });
 
-    router.get("/comparison-debug", async (_req, res) => {
+    router.get("/comparison-debug", async (req, res) => {
       try {
-        res.json(await compareLegacyWithPostgres());
+        res.json(await compareLegacyWithPostgres(req.auth!));
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo comparar legacy contra PostgreSQL.";
         jsonError(res, 500, message);
       }
     });
 
-    router.get("/comparison-debug/summary", async (_req, res) => {
+    router.get("/comparison-debug/summary", async (req, res) => {
       try {
-        res.json(await compareLegacySummaryWithPostgresDashboard());
+        res.json(await compareLegacySummaryWithPostgresDashboard(req.auth!));
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo comparar /summary legacy contra dashboard PostgreSQL.";
         jsonError(res, 500, message);
       }
     });
 
-    router.get("/comparison-debug/members", async (_req, res) => {
+    router.get("/comparison-debug/members", async (req, res) => {
       try {
-        res.json(await compareLegacyMembersWithPostgresEnrollments());
+        res.json(await compareLegacyMembersWithPostgresEnrollments(req.auth!));
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo comparar miembros legacy contra enrollments/personas PostgreSQL.";
         jsonError(res, 500, message);

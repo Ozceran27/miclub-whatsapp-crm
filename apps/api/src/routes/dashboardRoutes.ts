@@ -6,8 +6,8 @@ import { getDashboardReconciliation } from "../services/dashboardReconciliationS
 // productivo: dashboard bajo /api; no renombrar sin migración frontend.
 const router = Router();
 
-router.get("/dashboard/basic", asyncHandler(async (_req, res) => res.json(await getDashboardBasic())));
-router.get("/sector-finance-summary", asyncHandler(async (_req, res) => res.json(await getSectorFinanceSummary())));
+router.get("/dashboard/basic", asyncHandler(async (req, res) => res.json(await getDashboardBasic(req.auth!))));
+router.get("/sector-finance-summary", asyncHandler(async (req, res) => res.json(await getSectorFinanceSummary(req.auth!))));
 router.get("/dashboard-reconciliation", asyncHandler(async (_req, res) => res.json(await getDashboardReconciliation())));
 
 export default router;

@@ -1,4 +1,5 @@
 import { catalogNames, getCatalogRows, type CatalogName, type CatalogRow } from "../repositories/catalogRepository.js";
+import type { RequestAuthContext } from "../auth/types.js";
 
 export type NormalizedCatalogItem = Record<string, unknown>;
 
@@ -21,13 +22,13 @@ export const normalizeCatalogRow = (row: CatalogRow): NormalizedCatalogItem =>
 
 export const listCatalogs = (): CatalogName[] => catalogNames;
 
-export const getCatalog = async (catalog: CatalogName): Promise<CatalogResponse> => {
-  const rows = await getCatalogRows(catalog);
+export const getCatalog = async (auth: RequestAuthContext, catalog: CatalogName): Promise<CatalogResponse> => {
+  const rows = await getCatalogRows(catalog, auth.clubId);
   const items = rows.map(normalizeCatalogRow);
   return { catalog, items, total: items.length };
 };
 
-export const getCatalogItems = async (catalog: CatalogName): Promise<NormalizedCatalogItem[]> => {
-  const response = await getCatalog(catalog);
+export const getCatalogItems = async (auth: RequestAuthContext, catalog: CatalogName): Promise<NormalizedCatalogItem[]> => {
+  const response = await getCatalog(auth, catalog);
   return response.items;
 };
