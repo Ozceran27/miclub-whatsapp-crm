@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { login } from "../auth/loginService.js";
-import { postgresUserRepository } from "../auth/userRepository.js";
+import { getActiveMembershipContext, listActiveMemberships, postgresUserRepository } from "../auth/userRepository.js";
 import { authEnabled, authPassword, authUser, clearSessionCookie, getSession, legacyAuthEnabled, setSessionCookie } from "../middleware/auth.js";
 import asyncHandler from "./asyncHandler.js";
 import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
@@ -65,12 +65,29 @@ router.post("/logout", asyncHandler(async (req, res) => {
   return res.json({ authenticated: false });
 }));
 
+router.get("/clubs", asyncHandler(async (req, res) => {
+  const session = getSession(req);
+  if (!session?.userId) return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
+  res.json({ clubs: await listActiveMemberships(session.userId), selectedMembershipId: session.membershipId ?? null });
+}));
+
+router.post("/clubs/select", asyncHandler(async (req, res) => {
+  const session = getSession(req);
+  const membershipId = typeof req.body?.membershipId === "string" ? req.body.membershipId : "";
+  if (!session?.userId) return res.status(401).json({ authenticated: false, message: "Sesión requerida" });
+  const membership = await getActiveMembershipContext(session.userId, membershipId);
+  if (!membership) return res.status(403).json({ authenticated: false, message: "Membresía no autorizada" });
+  const context = { ...session, clubId: membership.club_id, membershipId: membership.membership_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids };
+  setSessionCookie(req, res, context);
+  res.json({ authenticated: true, user: context });
+}));
+
 router.get("/me", (req, res) => {
   if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
 
   const session = getSession(req);
   if (!session) return res.json({ authenticated: false, authEnabled: true });
-  const user = { userId: session.userId, email: session.email, legacy: session.legacy };
+  const user = { userId: session.userId, email: session.email, legacy: session.legacy, clubId: session.clubId, membershipId: session.membershipId, role: session.role, permissions: session.permissions ?? [] };
   return res.json({ authenticated: true, authEnabled: true, username: session.email, user });
 });
 
