@@ -1,5 +1,6 @@
 import type { ClubOperationsSummary, Member, SourceSheet } from "@miclub/shared";
 import { getDashboardBasic, getSectorFinanceSummary } from "./dashboardService.js";
+import type { RequestAuthContext } from "../auth/types.js";
 import { getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, normalizeOperationalStatus } from "./googleSheets.js";
 import { getPostgresClubFinanceSummary, getPostgresMembers, getPostgresSummary } from "./postgresDashboardService.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
@@ -97,12 +98,12 @@ const pickNumber = (row: JsonRecord | null | undefined, keys: string[]): number 
   return 0;
 };
 
-const buildDashboardAggregate = async (): Promise<AggregateSnapshot> => {
+const buildDashboardAggregate = async (auth: RequestAuthContext): Promise<AggregateSnapshot> => {
   const [summary, finance, dashboard, sectors] = await Promise.all([
     getPostgresSummary(),
     getPostgresClubFinanceSummary(),
-    getDashboardBasic(),
-    getSectorFinanceSummary()
+    getDashboardBasic(auth),
+    getSectorFinanceSummary(auth)
   ]);
   const incomeBySector: NumericMap = {};
   const expenseBySector: NumericMap = {};
@@ -149,18 +150,18 @@ const compareAggregates = (legacy: AggregateSnapshot, postgres: AggregateSnapsho
   };
 };
 
-export const compareLegacySummaryWithPostgresDashboard = async (): Promise<ComparisonResult> => {
+export const compareLegacySummaryWithPostgresDashboard = async (auth: RequestAuthContext): Promise<ComparisonResult> => {
   const legacyMembers = await getMembersFromGoogleSheets();
   const legacyFinance = await getClubOperationsSummaryFromGoogleSheets(legacyMembers);
   return compareAggregates(
     buildMemberAggregate(legacyMembers, legacyFinance),
-    await buildDashboardAggregate(),
+    await buildDashboardAggregate(auth),
     { legacy: "google_sheets_summary", postgres: "postgres_dashboard" },
     getGoogleSheetsConfig().enabled ? [] : ["Google Sheets está desactivado; la comparación legacy puede no representar producción."]
   );
 };
 
-export const compareLegacyMembersWithPostgresEnrollments = async (): Promise<ComparisonResult> => {
+export const compareLegacyMembersWithPostgresEnrollments = async (_auth: RequestAuthContext): Promise<ComparisonResult> => {
   const [legacyMembers, postgresMembers, postgresFinance] = await Promise.all([
     getMembersFromGoogleSheets(),
     getPostgresMembers(),
@@ -174,7 +175,7 @@ export const compareLegacyMembersWithPostgresEnrollments = async (): Promise<Com
   );
 };
 
-export const compareLegacyWithPostgres = async () => ({
-  summaryVsDashboard: await compareLegacySummaryWithPostgresDashboard(),
-  membersVsEnrollments: await compareLegacyMembersWithPostgresEnrollments()
+export const compareLegacyWithPostgres = async (auth: RequestAuthContext) => ({
+  summaryVsDashboard: await compareLegacySummaryWithPostgresDashboard(auth),
+  membersVsEnrollments: await compareLegacyMembersWithPostgresEnrollments(auth)
 });

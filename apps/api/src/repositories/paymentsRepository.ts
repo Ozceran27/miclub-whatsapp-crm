@@ -2,7 +2,7 @@ import { getPostgresPool } from "../db/postgres.js";
 
 export type PaymentRow = Record<string, unknown>;
 
-export const getPayments = async (): Promise<PaymentRow[]> => {
+export const getPayments = async (clubId: string): Promise<PaymentRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<PaymentRow>(`
     select
@@ -12,9 +12,10 @@ export const getPayments = async (): Promise<PaymentRow[]> => {
         '[]'::jsonb
       ) as allocations
     from miclub.payments p
-    left join miclub.payment_allocations pa on pa.payment_id = p.id
+    left join miclub.payment_allocations pa on pa.payment_id = p.id and pa.club_id = p.club_id
+    where p.club_id = $1
     group by p.id
     order by p.paid_at desc nulls last, p.created_at desc nulls last, p.id desc nulls last
-  `);
+  `, [clubId]);
   return result.rows;
 };

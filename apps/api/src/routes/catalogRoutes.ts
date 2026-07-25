@@ -21,8 +21,8 @@ const catalogEndpoints: Array<{ path: string; catalog: CatalogName }> = [
 for (const endpoint of catalogEndpoints) {
   router.get(
     endpoint.path,
-    asyncHandler(async (_req, res) => {
-      res.json(await getCatalogItems(endpoint.catalog));
+    asyncHandler(async (req, res) => {
+      res.json(await getCatalogItems(req.auth!, endpoint.catalog));
     })
   );
 }
@@ -47,7 +47,7 @@ router.get(
       });
     }
 
-    return res.json(await getCatalog(catalog));
+    return res.json(await getCatalog(req.auth!, catalog));
   })
 );
 
