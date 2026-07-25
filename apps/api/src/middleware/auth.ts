@@ -4,20 +4,17 @@ import { createSession, getCookieValues, isSessionRevoked, parseCookies, readSes
 import type { AuthenticatedContext } from "../auth/types.js";
 import { getActiveMembershipContext } from "../auth/userRepository.js";
 
-export const authEnabled = process.env.AUTH_ENABLED === "true";
-export const sessionSecret = process.env.SESSION_SECRET ?? "";
-export const publicAppUrl = process.env.PUBLIC_APP_URL ?? "";
+export const isAuthEnabled = (): boolean => process.env.AUTH_ENABLED === "true";
+export const isExplicitTestAuthBypass = (): boolean => process.env.NODE_ENV === "test" && process.env.AUTH_ENABLED !== "true";
+const getSessionSecret = (): string => process.env.SESSION_SECRET?.trim() ?? "";
 export const sessionCookiePath = "/";
 export const sessionCookieSameSite = "lax" as const;
-
-if (authEnabled && !sessionSecret) {
-  throw new Error("SESSION_SECRET es obligatorio cuando AUTH_ENABLED=true.");
-}
 
 export { parseCookies, sessionCookieName, sessionMaxAgeMs };
 
 export const getSession = (req: express.Request) => {
-  if (!authEnabled || !sessionSecret) return null;
+  const sessionSecret = getSessionSecret();
+  if (!isAuthEnabled() || !sessionSecret) return null;
   // RFC 6265 no define el orden cuando coexisten cookies del mismo nombre con
   // distinto Path. Validar todas evita que una cookie legacy /api o /auth tape
   // la cookie oficial `/` durante su ventana de retiro.
@@ -29,10 +26,10 @@ export const getSession = (req: express.Request) => {
 };
 
 export const shouldUseSecureCookie = (req: express.Request): boolean =>
-  req.secure || req.get("x-forwarded-proto") === "https" || publicAppUrl.startsWith("https://");
+  req.secure || req.get("x-forwarded-proto") === "https" || (process.env.PUBLIC_APP_URL ?? "").startsWith("https://");
 
 export const setSessionCookie = (req: express.Request, res: express.Response, context: AuthenticatedContext) => {
-  res.cookie(sessionCookieName, createSession(context, sessionSecret), {
+  res.cookie(sessionCookieName, createSession(context, getSessionSecret()), {
     httpOnly: true,
     sameSite: sessionCookieSameSite,
     secure: shouldUseSecureCookie(req),
@@ -115,7 +112,10 @@ export const createAuthProtection = (options: { isProduction: boolean }): expres
     options.isProduction && req.method === "GET" && Boolean(req.accepts("html")) && !req.path.includes(".") && !isProtectedApiPath(req.path);
 
   return async (req, res, next) => {
-    if (!authEnabled) return next();
+    if (!isAuthEnabled()) {
+      if (isExplicitTestAuthBypass()) return next();
+      return res.status(503).json({ authenticated: false, code: "AUTH_CONFIGURATION_ERROR", message: "La autenticación no está habilitada" });
+    }
     if (req.path.startsWith("/auth/") || req.path === "/health") return next();
     const session = getSession(req);
     if (session) {

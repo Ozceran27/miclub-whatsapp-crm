@@ -1,12 +1,18 @@
 // legacy-compat: paths raíz del CRM; no renombrar sin migración frontend.
 import { randomUUID } from "node:crypto";
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import type { Member, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
 import { templates } from "../data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "../services/messages.js";
 import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, insertCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
 import { requireMembership, requirePermission } from "../middleware/authorization.js";
-import { authEnabled } from "../middleware/auth.js";
+import { isExplicitTestAuthBypass } from "../middleware/auth.js";
+
+const getClubId = (req: Request): string => {
+  if (req.auth?.clubId) return req.auth.clubId;
+  if (isExplicitTestAuthBypass()) return "test";
+  throw new Error("Tenant context missing after authentication middleware");
+};
 
 const jsonError = (res: Response, status: number, message: string) =>
   res.status(status).json({ error: true, message });
@@ -39,12 +45,12 @@ export const createCrmRoutes = (options: {
   isDebtorMember: (member: Member) => boolean;
 }) => {
   const router = Router();
-  if (authEnabled) router.use(requireMembership);
-  const requireCrmWrite = authEnabled ? requirePermission("crm:write") : (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next();
+  if (!isExplicitTestAuthBypass()) router.use(requireMembership);
+  const requireCrmWrite = isExplicitTestAuthBypass() ? (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next() : requirePermission("crm:write");
 
   router.get("/templates", async (req, res) => {
     try {
-      res.json(await listCrmTemplates((req.auth?.clubId ?? "legacy")));
+      res.json(await listCrmTemplates(getClubId(req)));
     } catch {
       jsonError(res, 500, "No se pudieron obtener las plantillas.");
     }
@@ -57,7 +63,7 @@ export const createCrmRoutes = (options: {
     const now = new Date().toISOString();
     const id = randomUUID();
     try {
-      const created = await createCrmTemplate((req.auth?.clubId ?? "legacy"), body.name?.trim() ?? "", body.body?.trim() ?? "", id, now);
+      const created = await createCrmTemplate(getClubId(req), body.name?.trim() ?? "", body.body?.trim() ?? "", id, now);
       res.status(201).json(created);
     } catch {
       jsonError(res, 500, "No se pudo crear la plantilla.");
@@ -71,7 +77,7 @@ export const createCrmRoutes = (options: {
     if (validationError) return jsonError(res, 400, validationError);
     try {
       const now = new Date().toISOString();
-      const updated = await updateCrmTemplate((req.auth?.clubId ?? "legacy"), id, body.name?.trim() ?? "", body.body?.trim() ?? "", now);
+      const updated = await updateCrmTemplate(getClubId(req), id, body.name?.trim() ?? "", body.body?.trim() ?? "", now);
       if (!updated) return jsonError(res, 404, "Plantilla no encontrada.");
       res.json(updated);
     } catch {
@@ -82,7 +88,7 @@ export const createCrmRoutes = (options: {
   router.delete("/templates/:id", requireCrmWrite, async (req, res) => {
     const id = String(req.params.id);
     try {
-      const deleteResult = await deleteCrmTemplate((req.auth?.clubId ?? "legacy"), id);
+      const deleteResult = await deleteCrmTemplate(getClubId(req), id);
       if (deleteResult === "missing") return jsonError(res, 404, "Plantilla no encontrada.");
       if (deleteResult === "default") return jsonError(res, 400, "No se pueden eliminar plantillas predeterminadas.");
       res.status(204).send();
@@ -94,7 +100,7 @@ export const createCrmRoutes = (options: {
   router.post("/templates/reset-defaults", requireCrmWrite, async (req, res) => {
     const now = new Date().toISOString();
     try {
-      res.json(await replaceCrmDefaultTemplates((req.auth?.clubId ?? "legacy"), templates, now));
+      res.json(await replaceCrmDefaultTemplates(getClubId(req), templates, now));
     } catch {
       jsonError(res, 500, "No se pudieron restaurar las plantillas predeterminadas.");
     }
@@ -107,7 +113,7 @@ export const createCrmRoutes = (options: {
     const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(pageSizeRaw, 20) : 20;
 
     try {
-      res.json(await getCrmHistory((req.auth?.clubId ?? "legacy"), page, pageSize));
+      res.json(await getCrmHistory(getClubId(req), page, pageSize));
     } catch {
       jsonError(res, 500, "No se pudo obtener el historial.");
     }
@@ -120,7 +126,7 @@ export const createCrmRoutes = (options: {
     const since = sinceDate.toISOString();
 
     try {
-      res.json(await getCrmContactedRecent((req.auth?.clubId ?? "legacy"), since, windowDays));
+      res.json(await getCrmContactedRecent(getClubId(req), since, windowDays));
     } catch {
       jsonError(res, 500, "No se pudo obtener contactos recientes.");
     }
@@ -135,7 +141,7 @@ export const createCrmRoutes = (options: {
     const missingPhoneMembers = selected.filter((m) => normalizeArPhone(m.telefono).length === 0).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}` }));
     const unresolvedVariables = unresolvedTemplateVariables(body.message);
     const placeholders = selected.slice(0, 3).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}`, actividad: m.actividad, cuota: m.cuota, phone: m.telefono }));
-    const duplicateRows = selected.length === 0 ? [] : await findCrmDuplicatePreparedMessages((req.auth?.clubId ?? "legacy"), selected.map((m) => m.id));
+    const duplicateRows = selected.length === 0 ? [] : await findCrmDuplicatePreparedMessages(getClubId(req), selected.map((m) => m.id));
     const seen = new Set<string>();
     const duplicates = duplicateRows.filter((r) => { if (seen.has(r.memberId)) return false; seen.add(r.memberId); return true; });
     const sample = selected[0] ? interpolateTemplate(body.message, selected[0]) : body.message;
@@ -176,7 +182,7 @@ export const createCrmRoutes = (options: {
         const waLink = buildWaLink(phone, message);
         const createdAt = new Date().toISOString();
 
-        const created = await insertCrmHistory((req.auth?.clubId ?? "legacy"), { memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, templateName: body.templateName?.trim() || null });
+        const created = await insertCrmHistory(getClubId(req), { memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, templateName: body.templateName?.trim() || null });
 
         prepared.push(created);
       }
@@ -196,7 +202,7 @@ export const createCrmRoutes = (options: {
     if (!body.status || !validStatuses.has(body.status)) return jsonError(res, 400, "status inválido.");
 
     try {
-      const updated = await updateCrmHistoryStatus((req.auth?.clubId ?? "legacy"), id, body.status, body.note ?? null);
+      const updated = await updateCrmHistoryStatus(getClubId(req), id, body.status, body.note ?? null);
       if (!updated) return jsonError(res, 404, "Mensaje no encontrado.");
       res.json(updated);
     } catch {

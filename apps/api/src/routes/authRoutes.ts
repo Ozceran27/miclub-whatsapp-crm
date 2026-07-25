@@ -2,7 +2,7 @@ import { Router } from "express";
 import { login } from "../auth/loginService.js";
 import { getActiveMembershipContext, listActiveMemberships, postgresUserRepository, revokeUserSessions } from "../auth/userRepository.js";
 import { isSessionRevoked } from "../auth/sessionService.js";
-import { authEnabled, clearSessionCookie, getSession, setSessionCookie } from "../middleware/auth.js";
+import { clearSessionCookie, getSession, isAuthEnabled, setSessionCookie } from "../middleware/auth.js";
 import asyncHandler from "./asyncHandler.js";
 import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
 import { auditService } from "../services/auditService.js";
@@ -11,11 +11,12 @@ import { auditService } from "../services/auditService.js";
 const router = Router();
 
 router.post("/login", asyncHandler(async (req, res) => {
-  if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
+  if (!isAuthEnabled()) return res.status(503).json({ authenticated: false, authEnabled: false, code: "AUTH_CONFIGURATION_ERROR", message: "La autenticación no está habilitada" });
 
   const body = req.body as { username?: unknown; password?: unknown };
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  if (!username || !password) return res.status(400).json({ authenticated: false, code: "INVALID_REQUEST", message: "Correo y contraseña son obligatorios" });
   const result = await login(postgresUserRepository, username, password);
 
   if (result.ok) {
@@ -24,13 +25,14 @@ router.post("/login", asyncHandler(async (req, res) => {
     return res.json({ authenticated: true, username: result.context.email, user: result.context });
   }
 
-  if (result.reason === "membership_required") return res.status(403).json({ authenticated: false, code: "MEMBERSHIP_REQUIRED", message: "La cuenta no posee una membresía activa con perfil personal" });
+  if (result.reason === "membership_required") return res.status(403).json({ authenticated: false, code: "NO_ACTIVE_MEMBERSHIP", message: "La cuenta no posee una membresía activa con perfil personal" });
+  if (result.reason === "disabled") return res.status(403).json({ authenticated: false, code: "ACCOUNT_DISABLED", message: "Acceso denegado" });
   const message = result.reason === "locked" ? "Cuenta temporalmente bloqueada" : "Credenciales inválidas";
-  return res.status(401).json({ authenticated: false, message });
+  return res.status(401).json({ authenticated: false, code: result.reason === "locked" ? "ACCOUNT_LOCKED" : "INVALID_CREDENTIALS", message });
 }));
 
 router.post("/register", asyncHandler(async (req, res) => {
-  if (!authEnabled || process.env.PUBLIC_REGISTRATION_ENABLED !== "true") return res.status(404).json({ authenticated: false, message: "El registro público no está habilitado." });
+  if (!isAuthEnabled() || process.env.PUBLIC_REGISTRATION_ENABLED !== "true") return res.status(404).json({ authenticated: false, message: "El registro público no está habilitado." });
   const body = req.body as { clubName?: unknown; email?: unknown; password?: unknown };
   try {
     const context = await registerClubOwner(body.clubName, body.email, body.password);
@@ -83,7 +85,7 @@ router.post("/clubs/select", asyncHandler(async (req, res) => {
 }));
 
 router.get("/me", asyncHandler(async (req, res) => {
-  if (!authEnabled) return res.json({ authenticated: true, authEnabled: false, username: null });
+  if (!isAuthEnabled()) return res.status(503).json({ authenticated: false, authEnabled: false, code: "AUTH_CONFIGURATION_ERROR" });
 
   const session = getSession(req);
   if (!session) return res.status(401).json({ authenticated: false, authEnabled: true, code: "AUTHENTICATION_REQUIRED" });
