@@ -40,6 +40,16 @@ export const logImportError = async (pool: Pool, input: { clubId: string; batchI
   );
 };
 
+const errorCodeSql = `case
+  when error_message ilike '%25P02%' or error_message ilike '%current transaction is aborted%' then 'TRANSACTION_ABORTED'
+  when error_message ilike '%invalid%date%' or error_message ilike '%fecha%inválid%' then 'INVALID_DATE'
+  when error_message ilike '%not-null%' or error_message ilike '%sin nombre%' then 'REQUIRED_FIELD'
+  when error_message ilike '%foreign key%' then 'FOREIGN_KEY'
+  when error_message ilike '%duplicate%' or error_message ilike '%unique constraint%' then 'DUPLICATE_EXTERNAL_ID'
+  when error_message ilike '%sector%' then 'UNKNOWN_SECTOR'
+  when error_message ilike '%activit%' or error_message ilike '%actividad%' then 'UNKNOWN_ACTIVITY'
+  else 'ROW_IMPORT_ERROR' end`;
+
 export const listImportBatches = async (pool: Pool, clubId: string, limit: number, offset: number) => {
   const result = await pool.query(
     `select *, count(*) over() as total_count
@@ -52,14 +62,37 @@ export const listImportBatches = async (pool: Pool, clubId: string, limit: numbe
   return result.rows;
 };
 
-export const listImportErrors = async (pool: Pool, clubId: string, batchId: string, limit: number, offset: number) => {
+export const listImportErrors = async (pool: Pool, clubId: string, batchId: string, limit: number, offset: number, filters: { sheet?: string; entityType?: string } = {}) => {
   const result = await pool.query(
-    `select *, count(*) over() as total_count
+    `select id, batch_id, club_id, source_table as entity_type,
+            split_part(source_row, ':', 1) as sheet,
+            nullif(split_part(source_row, ':', 2), '')::integer as row_number,
+            ${errorCodeSql} as error_code,
+            left(error_message, 500) as message,
+            jsonb_build_object('sourceIdentifier', source_row) as metadata,
+            created_at, count(*) over() as total_count
      from miclub.import_errors
      where club_id = $1 and batch_id = $2
+       and ($5::text is null or split_part(source_row, ':', 1) = $5)
+       and ($6::text is null or source_table = $6)
      order by created_at asc, id asc
      limit $3 offset $4`,
-    [clubId, batchId, limit, offset]
+    [clubId, batchId, limit, offset, filters.sheet ?? null, filters.entityType ?? null]
+  );
+  return result.rows;
+};
+
+export const summarizeImportErrors = async (pool: Pool, clubId: string, batchId: string) => {
+  const result = await pool.query(
+    `select ${errorCodeSql} as error_code, source_table as entity_type,
+            split_part(source_row, ':', 1) as sheet,
+            left(error_message, 500) as message, count(*)::int as count
+       from miclub.import_errors
+      where club_id = $1 and batch_id = $2
+      group by 1, 2, 3, 4
+      order by count(*) desc, 1, 2, 3
+      limit 100`,
+    [clubId, batchId],
   );
   return result.rows;
 };

@@ -100,6 +100,13 @@ export type ImportSummary = {
   writesReverted: number;
   durationMs: number;
   warningMessages: string[];
+  rowsFetched: number;
+  rowsDetected: number;
+  rowsSkippedEmpty: number;
+  rowsValid: number;
+  rowsInvalid: number;
+  operationalWritesAttempted: number;
+  metadataWrites: number;
 };
 type SheetRow = {
   kind: "members" | "movements";
@@ -116,6 +123,31 @@ type SheetRow = {
 };
 const isEmpty = (row: unknown[]): boolean =>
   row.every((cell) => String(cell ?? "").trim() === "");
+
+/**
+ * PostgreSQL aborts a transaction after any statement error. A savepoint per
+ * source row is therefore required: merely catching the JS exception makes
+ * every later statement fail with 25P02 and hides the original data error.
+ */
+export const processRowsWithSavepoints = async <T>(
+  transaction: Pick<Pool, "query">,
+  rows: T[],
+  processRow: (row: T) => Promise<void>,
+  onRowError: (row: T, error: unknown) => void,
+): Promise<void> => {
+  for (let index = 0; index < rows.length; index += 1) {
+    const savepoint = `import_row_${index}`;
+    await transaction.query(`savepoint ${savepoint}`);
+    try {
+      await processRow(rows[index]!);
+      await transaction.query(`release savepoint ${savepoint}`);
+    } catch (error) {
+      await transaction.query(`rollback to savepoint ${savepoint}`);
+      await transaction.query(`release savepoint ${savepoint}`);
+      onRowError(rows[index]!, error);
+    }
+  }
+};
 const stablePart = (value: unknown): string =>
   normalizeComparableText(value)
     .replace(/[^a-z0-9]+/g, "-")
@@ -1166,6 +1198,13 @@ export const importGoogleSheets = async (
     writesReverted: 0,
     durationMs: 0,
     warningMessages: [],
+    rowsFetched: 0,
+    rowsDetected: 0,
+    rowsSkippedEmpty: 0,
+    rowsValid: 0,
+    rowsInvalid: 0,
+    operationalWritesAttempted: 0,
+    metadataWrites: 1,
   };
   const processedEnrollmentExternalIds = new Set<string>();
   try {
@@ -1173,7 +1212,9 @@ export const importGoogleSheets = async (
     const { rows, adminBalanceRows, metricRanges } = await readRows();
     summary.read = rows.length;
     summary.rowsRead = rows.length;
-    progress("source_read_completed", { rowsRead: rows.length });
+    summary.rowsFetched = rows.length;
+    summary.rowsDetected = rows.length;
+    progress("source_read_completed", { rowsRead: rows.length, rowsFetched: summary.rowsFetched, rowsDetected: summary.rowsDetected, rowsSkippedEmpty: summary.rowsSkippedEmpty });
     const balanceAttemptedWritesStart = summary.attemptedWrites;
     await client.query("begin");
     try {
@@ -1199,8 +1240,7 @@ export const importGoogleSheets = async (
       const groupAttemptedWritesStart = summary.attemptedWrites;
       await client.query("begin");
       try {
-        for (const row of group) {
-          try {
+        await processRowsWithSavepoints(transaction, group, async (row) => {
             if (row.kind === "members") {
               const enrollmentExternalId = await processMember(
                 transaction,
@@ -1210,11 +1250,12 @@ export const importGoogleSheets = async (
               if (enrollmentExternalId)
                 processedEnrollmentExternalIds.add(enrollmentExternalId);
             } else await processMovement(transaction, row, summary);
-          } catch (error) {
+            summary.rowsValid += 1;
+          }, (row, error) => {
             summary.errors += 1;
+            summary.rowsInvalid += 1;
             groupErrors.push({ row, error });
-          }
-        }
+          });
         if (dryRun) {
           await client.query("rollback");
           summary.rolledBackWrites +=
@@ -1266,11 +1307,12 @@ export const importGoogleSheets = async (
     );
     summary.status = summary.errors > 0 ? "COMPLETED_WITH_ERRORS" : "COMPLETED";
     summary.writesAttempted = summary.attemptedWrites;
+    summary.operationalWritesAttempted = summary.attemptedWrites;
     summary.writesPersisted = summary.persistedWrites;
     summary.writesReverted = summary.rolledBackWrites;
     summary.durationMs = Date.now() - startedAt;
     summary.warningMessages = summary.warnings;
-    progress("simulation_completed", { errors: summary.errors, durationMs: summary.durationMs });
+    progress("simulation_completed", { errors: summary.errors, rowsValid: summary.rowsValid, rowsInvalid: summary.rowsInvalid, operationalWritesAttempted: summary.operationalWritesAttempted, metadataWrites: summary.metadataWrites, durationMs: summary.durationMs });
     await finishImportBatch(
       pool,
       clubId,

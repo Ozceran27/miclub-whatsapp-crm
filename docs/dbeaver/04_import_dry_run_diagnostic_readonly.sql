@@ -40,6 +40,64 @@ select ie.id, ie.club_id, ie.batch_id, ie.source_table, ie.source_row,
  order by ie.created_at desc
  limit 100;
 
+-- 5.a. Top del batch original. Reemplazar únicamente el UUID entre comillas.
+-- La presencia masiva de 25P02 demuestra el efecto cascada; la primera fila
+-- cronológica anterior a esos errores contiene la causa de datos real.
+with selected_batch as (
+  select nullif('PEGAR_BATCH_ID_AQUI', 'PEGAR_BATCH_ID_AQUI')::uuid as id
+), classified as (
+  select ie.*,
+         case
+           when error_message ilike '%25P02%' or error_message ilike '%current transaction is aborted%' then 'TRANSACTION_ABORTED'
+           when error_message ilike '%invalid%date%' or error_message ilike '%fecha%inválid%' then 'INVALID_DATE'
+           when error_message ilike '%not-null%' or error_message ilike '%sin nombre%' then 'REQUIRED_FIELD'
+           when error_message ilike '%foreign key%' then 'FOREIGN_KEY'
+           when error_message ilike '%duplicate%' or error_message ilike '%unique constraint%' then 'DUPLICATE_EXTERNAL_ID'
+           when error_message ilike '%sector%' then 'UNKNOWN_SECTOR'
+           when error_message ilike '%activit%' or error_message ilike '%actividad%' then 'UNKNOWN_ACTIVITY'
+           else 'ROW_IMPORT_ERROR'
+         end as error_code
+    from miclub.import_errors ie join selected_batch b on b.id = ie.batch_id
+)
+select error_code, left(error_message, 300) as message,
+       split_part(source_row, ':', 1) as sheet, source_table as entity_type,
+       count(*) as quantity
+  from classified
+ group by 1, 2, 3, 4
+ order by quantity desc, error_code;
+
+-- 5.b. Primeros 20 errores en orden (sin raw_payload sensible).
+with selected_batch as (select nullif('PEGAR_BATCH_ID_AQUI', 'PEGAR_BATCH_ID_AQUI')::uuid as id)
+select ie.id, ie.club_id, ie.source_table as entity_type,
+       split_part(ie.source_row, ':', 1) as sheet,
+       split_part(ie.source_row, ':', 2) as row_number,
+       left(ie.error_message, 500) as message, ie.created_at
+  from miclub.import_errors ie join selected_batch b on b.id = ie.batch_id
+ order by ie.created_at, ie.id limit 20;
+
+-- 5.c. Verifica que batch y errores pertenezcan a un único tenant.
+with selected_batch as (select nullif('PEGAR_BATCH_ID_AQUI', 'PEGAR_BATCH_ID_AQUI')::uuid as id)
+select b.id, b.club_id as batch_club_id, count(ie.*) as errors,
+       count(*) filter (where ie.club_id is distinct from b.club_id) as wrong_tenant_errors
+  from miclub.import_batches b join selected_batch sb on sb.id = b.id
+  left join miclub.import_errors ie on ie.batch_id = b.id
+ group by b.id, b.club_id;
+
+-- 5.d. External IDs duplicados dentro de un club (debe devolver cero filas).
+select 'movements' as entity, club_id, external_id, count(*)
+  from miclub.movements group by club_id, external_id having count(*) > 1
+union all
+select 'enrollments', club_id, external_id, count(*)
+  from miclub.enrollments group by club_id, external_id having count(*) > 1;
+
+-- 5.e. Integridad tenant de relaciones principales (conteos deben ser cero).
+select 'movement_sector_cross_tenant' check_name, count(*) failures
+  from miclub.movements m join miclub.sectors s on s.id = m.sector_id where s.club_id is distinct from m.club_id
+union all select 'enrollment_activity_cross_tenant', count(*)
+  from miclub.enrollments e join miclub.activities a on a.id = e.activity_id where a.club_id is distinct from e.club_id
+union all select 'enrollment_person_cross_tenant', count(*)
+  from miclub.enrollments e join miclub.people p on p.id = e.person_id where p.club_id is distinct from e.club_id;
+
 -- 6. Invariantes multi-tenant.
 select 'import_batches_without_club' as check_name, count(*) as failures from miclub.import_batches where club_id is null
 union all

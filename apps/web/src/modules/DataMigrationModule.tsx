@@ -88,6 +88,9 @@ const MissingInscriptionsReview = ({ items, deleting, result, onDelete }: { item
 };
 
 export default function DataMigrationModule() {
+  const [errorOffset, setErrorOffset] = useState(0);
+  const [errorSheet, setErrorSheet] = useState('');
+  const [errorEntity, setErrorEntity] = useState('');
   const {
     dbHealth,
     syncStatus,
@@ -156,7 +159,7 @@ export default function DataMigrationModule() {
             <h3>Errores por batch</h3>
             <p>Seleccioná un batch reciente para consultar <code>GET /api/import/batches/:id/errors</code>.</p>
           </div>
-          <select value={selectedBatchId} onChange={(event) => void loadBatchErrors(event.target.value)}>
+          <select value={selectedBatchId} onChange={(event) => { setErrorOffset(0); void loadBatchErrors(event.target.value, 0, { sheet: errorSheet, entity: errorEntity }); }}>
             <option value="">Seleccionar batch…</option>
             {batches.data?.rows?.map((batch) => {
               const id = getBatchId(batch);
@@ -168,23 +171,33 @@ export default function DataMigrationModule() {
         {batchErrors.loading && <p className="section-note">Cargando errores…</p>}
         {batchErrors.error && <p className="error-msg">{batchErrors.error}</p>}
         {batchErrors.data && (
+          <>
+          <div className="actions-row">
+            <label>Hoja <select value={errorSheet} onChange={(event) => setErrorSheet(event.target.value)}><option value="">Todas</option>{[...new Set(batchErrors.data.groups?.map((group) => group.sheet))].filter(Boolean).map((sheet) => <option key={sheet} value={sheet}>{sheet}</option>)}</select></label>
+            <label>Entidad <select value={errorEntity} onChange={(event) => setErrorEntity(event.target.value)}><option value="">Todas</option>{[...new Set(batchErrors.data.groups?.map((group) => group.entity_type))].filter(Boolean).map((entity) => <option key={entity} value={entity}>{entity}</option>)}</select></label>
+            <button type="button" onClick={() => { setErrorOffset(0); void loadBatchErrors(selectedBatchId, 0, { sheet: errorSheet, entity: errorEntity }); }}>Aplicar filtros</button>
+          </div>
+          <h4>Resumen agrupado ({batchErrors.data.total ?? 0} errores)</h4>
+          <div className="history-table-wrap"><table className="history-table"><thead><tr><th>Código</th><th>Cantidad</th><th>Hoja</th><th>Entidad</th><th>Mensaje</th></tr></thead><tbody>{(batchErrors.data.groups ?? []).map((group, index) => <tr key={`${group.error_code}-${group.sheet}-${index}`}><td><code>{group.error_code}</code></td><td>{group.count}</td><td>{group.sheet || '—'}</td><td>{group.entity_type || '—'}</td><td>{group.message}</td></tr>)}</tbody></table></div>
+          <h4>Errores representativos</h4>
           <div className="history-table-wrap">
             <table className="history-table">
-              <thead><tr><th>Fila</th><th>Origen</th><th>Severidad</th><th>Mensaje</th><th>Detalles</th></tr></thead>
+              <thead><tr><th>Hoja / fila</th><th>Entidad</th><th>Código</th><th>Mensaje</th></tr></thead>
               <tbody>
                 {(batchErrors.data.rows ?? []).map((error, index) => (
                   <tr key={error.id ?? index}>
-                    <td>{formatValue(error.row_number)}</td>
-                    <td>{formatValue(error.source)}</td>
-                    <td>{formatValue(error.severity)}</td>
+                    <td>{formatValue(error.sheet)} / {formatValue(error.row_number)}</td>
+                    <td>{formatValue(error.entity_type)}</td>
+                    <td><code>{formatValue(error.error_code)}</code></td>
                     <td>{formatValue(error.message)}</td>
-                    <td><pre className="migration-json migration-json--inline">{formatValue(error.details)}</pre></td>
                   </tr>
                 ))}
-                {(batchErrors.data.rows ?? []).length === 0 && <tr><td colSpan={5}>Sin errores registrados para este batch.</td></tr>}
+                {(batchErrors.data.rows ?? []).length === 0 && <tr><td colSpan={4}>Sin errores registrados para este batch.</td></tr>}
               </tbody>
             </table>
           </div>
+          <div className="actions-row"><button type="button" disabled={errorOffset === 0} onClick={() => { const next = Math.max(0, errorOffset - 25); setErrorOffset(next); void loadBatchErrors(selectedBatchId, next, { sheet: errorSheet, entity: errorEntity }); }}>Anterior</button><span>Página {Math.floor(errorOffset / 25) + 1}</span><button type="button" disabled={errorOffset + 25 >= (batchErrors.data.total ?? 0)} onClick={() => { const next = errorOffset + 25; setErrorOffset(next); void loadBatchErrors(selectedBatchId, next, { sheet: errorSheet, entity: errorEntity }); }}>Siguiente</button></div>
+          </>
         )}
       </section>
     </main>
