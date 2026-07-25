@@ -22,7 +22,8 @@ router.get(
     const limit = Math.min(requestedLimit, MAX_LIMIT);
     const offset = parsePositiveInteger(req.query.offset, 0);
     const search = typeof req.query.search === "string" ? req.query.search : undefined;
-    const { rows, total } = await getPeople({ limit, offset, search });
+    const clubId = req.auth!.clubId;
+    const { rows, total } = await getPeople({ clubId, limit, offset, search });
 
     res.json({
       items: rows.map(normalizeCatalogRow),

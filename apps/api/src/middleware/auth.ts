@@ -87,6 +87,14 @@ export const protectedApiPrefixes = [
 export const isProtectedApiPath = (pathName: string): boolean =>
   protectedApiPrefixes.some((prefix) => pathName === prefix || pathName.startsWith(`${prefix}/`));
 
+const tenantScopedPrefixes = [
+  ...protectedApiPrefixes,
+  "/api/economy"
+];
+
+export const isTenantScopedPath = (pathName: string): boolean =>
+  tenantScopedPrefixes.some((prefix) => pathName === prefix || pathName.startsWith(`${prefix}/`));
+
 export const createAuthProtection = (options: { isProduction: boolean }): express.RequestHandler => {
   const isFrontendNavigation = (req: express.Request): boolean =>
     options.isProduction && req.method === "GET" && Boolean(req.accepts("html")) && !req.path.includes(".") && !isProtectedApiPath(req.path);

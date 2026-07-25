@@ -55,7 +55,8 @@ import { createLegacyCompatRoutes, getMembersSource, isDebtorMember } from "./ro
 import { createFrontendRoutes } from "./routes/frontendRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
-import { createAuthProtection, isProtectedApiPath } from "./middleware/auth.js";
+import { authEnabled, createAuthProtection, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
+import { rejectClientClubId, requireAuth, requireMembership } from "./middleware/authorization.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -103,6 +104,20 @@ app.use((req, res, next) => {
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
     res.set("Surrogate-Control", "no-store");
+  }
+  if (isTenantScopedPath(req.path)) {
+    if (authEnabled) {
+      return requireAuth(req, res, (error?: unknown) => {
+        if (error) return next(error);
+        requireMembership(req, res, (membershipError?: unknown) => {
+          if (membershipError) return next(membershipError);
+          rejectClientClubId(req, res, next);
+        });
+      });
+    }
+    if (req.params.clubId !== undefined || req.query.clubId !== undefined || (req.body as Record<string, unknown> | undefined)?.clubId !== undefined) {
+      return rejectClientClubId(req, res, next);
+    }
   }
   next();
 });
