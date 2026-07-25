@@ -27,8 +27,10 @@ const isModuleId = (value: string): value is ModuleId => MODULES.some(({ id }) =
 export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
   const pathModule = path.split('/')[2] ?? 'home';
-  const currentModule: ModuleId = isModuleId(pathModule) ? pathModule : 'home';
-  const { authEnabled, username, logout } = useSession();
+  const { authEnabled, username, canAccessDataMigration, logout } = useSession();
+  const visibleModules = canAccessDataMigration ? MODULES : MODULES.filter(({ id }) => id !== 'dataMigration');
+  const requestedModule: ModuleId = isModuleId(pathModule) ? pathModule : 'home';
+  const currentModule: ModuleId = requestedModule === 'dataMigration' && !canAccessDataMigration ? 'home' : requestedModule;
   const { theme, toggleTheme } = useTheme();
 
   const selectModule = (module: ModuleId) => navigate(module === 'home' ? '/app' : `/app/${module}`);
@@ -51,7 +53,7 @@ export default function ProtectedAppShell() {
           {authEnabled && <button className="ghost-btn logout-btn" type="button" onClick={handleLogout}>Cerrar sesión{username ? ` · ${username}` : ''}</button>}
         </div>
       </header>
-      <ModuleNav modules={MODULES} currentModule={currentModule} onSelect={selectModule} />
+      <ModuleNav modules={visibleModules} currentModule={currentModule} onSelect={selectModule} />
       {renderModule()}
     </div>
   );

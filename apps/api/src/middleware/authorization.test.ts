@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
-import { requireAuth, requireMembership, requirePermission, requireRole, requireSectorAccess, rejectClientClubId } from "./authorization.js";
+import { isImportOperator, requireAuth, requireImportOperator, requireMembership, requirePermission, requireRole, requireSectorAccess, rejectClientClubId } from "./authorization.js";
 import type { RequestAuthContext } from "../auth/types.js";
 
 const auth: RequestAuthContext = {
@@ -34,4 +34,18 @@ test("los guards autorizan únicamente el contexto tenant de la sesión", async 
 test("clubId nunca se acepta desde el frontend", async () => {
   assert.deepEqual(await request(rejectClientClubId, { query: { clubId: "otro-club" } }), { status: 400, next: false });
   assert.deepEqual(await request(rejectClientClubId), { status: 200, next: true });
+});
+
+test("el operador de importación se identifica exclusivamente por configuración del servidor", async () => {
+  const previous = process.env.IMPORT_OPERATOR_USER;
+  process.env.IMPORT_OPERATOR_USER = "admin@club.test";
+  try {
+    assert.equal(isImportOperator(auth), true);
+    assert.deepEqual(await request(requireImportOperator), { status: 200, next: true });
+    assert.deepEqual(await request(requireImportOperator, { auth: { ...auth, email: "owner@other.test" } }), { status: 403, next: false });
+    assert.deepEqual(await request(requireImportOperator, { auth: { ...auth, userId: null } }), { status: 403, next: false });
+  } finally {
+    if (previous === undefined) delete process.env.IMPORT_OPERATOR_USER;
+    else process.env.IMPORT_OPERATOR_USER = previous;
+  }
 });

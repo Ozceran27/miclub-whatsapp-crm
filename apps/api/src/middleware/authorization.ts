@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from "express";
+import type { AuthenticatedContext } from "../auth/types.js";
 
 const reject = (status: 401 | 403, message: string): RequestHandler =>
   (_req, res) => res.status(status).json({ message });
@@ -26,6 +27,25 @@ export const requirePermission = (...permissions: string[]): RequestHandler => (
 export const requireRole = (...roles: string[]): RequestHandler => (req, res, next) => {
   if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
   if (!roles.includes(req.auth.role)) return reject(403, "Rol insuficiente")(req, res, next);
+  next();
+};
+
+const normalizeIdentity = (value: string | undefined): string => (value ?? "").trim().toLowerCase();
+
+/**
+ * IMPORT_OPERATOR_USER deliberately reuses AUTH_USER when no dedicated value
+ * is configured.  This keeps the migration surface tied to one server-side
+ * identity rather than to a role/permission that a newly-created club owner
+ * also receives.
+ */
+export const isImportOperator = (auth: Pick<AuthenticatedContext, "email" | "userId"> | undefined): boolean => {
+  const configuredUser = normalizeIdentity(process.env.IMPORT_OPERATOR_USER || process.env.AUTH_USER);
+  return Boolean(configuredUser && auth?.userId && normalizeIdentity(auth.email) === configuredUser);
+};
+
+export const requireImportOperator: RequestHandler = (req, res, next) => {
+  if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
+  if (!isImportOperator(req.auth)) return reject(403, "Panel de migración reservado al operador autorizado")(req, res, next);
   next();
 };
 
