@@ -61,7 +61,7 @@ export default function ProtectedAppShell() {
     <div className="container app-shell">
       <header className="app-header">
         <img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" />
-        <div><h1>miClub Gestión</h1><p>Panel operativo y CRM del club</p></div>
+        <div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div>
         <div className="app-header__actions">
           <button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}><span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</button>
           <button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>
