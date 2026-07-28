@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiUrl } from '../../api';
+import { getEconomyResource } from '../../services/api/economyApi';
 import type { DashboardStatus, EconomyAnnualSummary, EconomyCategoryBreakdownItem, EconomyComparison, EconomyDashboardCollection, EconomyDashboardError, EconomyInsight, EconomyMonthlyEvolutionItem, EconomyPaymentMethodsSummary, EconomyPendingSummary, EconomyRecentMovement, EconomySectorBreakdownItem, EconomySectorRankings, EconomySummary, EconomyYearlyBreakdown } from './types';
 
 type EconomyDashboardData = {
@@ -32,25 +32,8 @@ type EconomyEndpointMap = {
   yearlyBreakdown: EconomyYearlyBreakdown;
 };
 
-const endpoints: { [K in keyof EconomyEndpointMap]: `/${string}` } = {
-  summary: '/api/economy/summary',
-  monthlyEvolution: '/api/economy/monthly-evolution',
-  bySector: '/api/economy/by-sector?limit=6',
-  byCategory: '/api/economy/by-category?limit=6',
-  sectorRankings: '/api/economy/sector-rankings?limit=5',
-  paymentMethods: '/api/economy/payment-methods',
-  recentMovements: '/api/economy/recent-movements?limit=10',
-  pending: '/api/economy/pending?limit=8',
-  annualSummary: '/api/economy/annual-summary',
-  comparison: '/api/economy/comparison',
-  insights: '/api/economy/insights',
-  yearlyBreakdown: '/api/economy/yearly-breakdown'
-};
-
 const fetchEconomyResource = async <K extends keyof EconomyEndpointMap>(key: K, signal?: AbortSignal): Promise<EconomyEndpointMap[K]> => {
-  const response = await fetch(apiUrl(endpoints[key]), { cache: 'no-store', signal });
-  if (!response.ok) throw new Error(`No se pudo cargar ${endpoints[key]}.`);
-  return response.json() as Promise<EconomyEndpointMap[K]>;
+  return getEconomyResource<EconomyEndpointMap[K]>(key, signal);
 };
 
 export function useEconomyDashboard() {

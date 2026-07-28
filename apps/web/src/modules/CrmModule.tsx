@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { MessageTemplate, PreparedMessage, PrepareMessagesValidation } from '@miclub/shared';
-import { apiUrl } from '../api';
+import type { PreparedMessage } from '@miclub/shared';
+import { crmApi } from '../services/api/crmApi';
 import { CrmSummaryCards } from './CRM/CrmSummaryCards';
 import { CrmFilters } from './CRM/CrmFilters';
 import { MembersTable } from './CRM/MembersTable';
@@ -11,7 +11,7 @@ import { fill } from './CRM/formatters';
 import { Icon } from './CRM/Icon';
 import { useCrmData } from './CRM/useCrmData';
 import { useCrmFilters } from './CRM/useCrmFilters';
-import type { ApiError, MessageStatus } from './CRM/types';
+import type { MessageStatus } from './CRM/types';
 import { ACTIONABLE_STATUSES } from './CRM/types';
 
 export default function CrmModule() {
@@ -39,9 +39,7 @@ export default function CrmModule() {
 
   const saveTemplate = async () => {
     if (!selectedTemplate) return;
-    const res = await fetch(apiUrl(`/templates/${selectedTemplate.id}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: templateName, body: message }) });
-    if (!res.ok) { const payload = (await res.json()) as ApiError; throw new Error(payload.message ?? 'No se pudo guardar la plantilla.'); }
-    const updated = (await res.json()) as MessageTemplate;
+    const updated = await crmApi.updateTemplate(selectedTemplate.id, templateName, message);
     setTemplates((prev) => prev.map((template) => (template.id === updated.id ? updated : template)));
     setTemplateStatus('saved');
   };
@@ -52,18 +50,14 @@ export default function CrmModule() {
   const createTemplate = async () => {
     const name = window.prompt('Nombre de la nueva plantilla:');
     if (!name?.trim()) return;
-    const res = await fetch(apiUrl('/templates'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), body: message || 'Hola {nombre}, ' }) });
-    if (!res.ok) { const payload = (await res.json()) as ApiError; throw new Error(payload.message ?? 'No se pudo crear la plantilla.'); }
-    const created = (await res.json()) as MessageTemplate;
+    const created = await crmApi.createTemplate(name.trim(), message || 'Hola {nombre}, ');
     setTemplates((prev) => [...prev, created]);
     setSelectedTemplateId(created.id);
     setTemplateStatus('saved');
   };
   const duplicateTemplate = async () => {
     if (!selectedTemplate) return;
-    const res = await fetch(apiUrl('/templates'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `${templateName} (copia)`, body: message }) });
-    if (!res.ok) throw new Error('No se pudo duplicar la plantilla.');
-    const duplicated = (await res.json()) as MessageTemplate;
+    const duplicated = await crmApi.createTemplate(`${templateName} (copia)`, message);
     setTemplates((prev) => [...prev, duplicated]);
     setSelectedTemplateId(duplicated.id);
     setTemplateStatus('saved');
@@ -71,17 +65,14 @@ export default function CrmModule() {
   const deleteTemplate = async () => {
     if (!selectedTemplate || selectedTemplate.isDefault) return;
     if (!window.confirm('¿Eliminar plantilla seleccionada?')) return;
-    const res = await fetch(apiUrl(`/templates/${selectedTemplate.id}`), { method: 'DELETE' });
-    if (!res.ok) throw new Error('No se pudo eliminar la plantilla.');
+    await crmApi.deleteTemplate(selectedTemplate.id);
     const remaining = templates.filter((template) => template.id !== selectedTemplate.id);
     setTemplates(remaining);
     if (remaining[0]) setSelectedTemplateId(remaining[0].id);
   };
   const resetDefaultTemplates = async () => {
     if (!window.confirm('Esto restaurará las plantillas predeterminadas y quitará las personalizadas.')) return;
-    const res = await fetch(apiUrl('/templates/reset-defaults'), { method: 'POST' });
-    if (!res.ok) throw new Error('No se pudieron restaurar plantillas.');
-    const restored = (await res.json()) as MessageTemplate[];
+    const restored = await crmApi.resetTemplates();
     setTemplates(restored);
     if (restored[0]) setSelectedTemplateId(restored[0].id);
     setTemplateStatus('saved');
@@ -90,9 +81,7 @@ export default function CrmModule() {
     if (filters.selected.length === 0) { setError('Seleccioná al menos un miembro Adeudando antes de preparar mensajes.'); return; }
     setPreparing(true); setError(null);
     try {
-      const validationRes = await fetch(apiUrl('/prepare-messages/validate'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberIds: filters.selected, message, templateName: selectedTemplate?.name ?? templateName }) });
-      if (!validationRes.ok) { const payload = (await validationRes.json()) as ApiError; throw new Error(payload.message ?? 'No se pudo validar la preparación de mensajes.'); }
-      const validation = (await validationRes.json()) as PrepareMessagesValidation;
+      const validation = await crmApi.validateMessages(filters.selected, message, selectedTemplate?.name ?? templateName);
       if (validation.missingPhoneMembers.length > 0) throw new Error(`Hay ${validation.missingPhoneMembers.length} miembros sin teléfono válido.`);
       if (validation.unresolvedVariables.length > 0) throw new Error(`Hay variables sin reemplazar en el mensaje: ${validation.unresolvedVariables.join(', ')}`);
       const previewClients = validation.selectedPreview.map((c) => c.nombre).join(', ');
@@ -100,16 +89,13 @@ export default function CrmModule() {
       const batchWarning = validation.selectedCount > 1 ? `\n⚠ Vas a preparar ${validation.selectedCount} mensajes. Revisá antes de abrir WhatsApp.` : '';
       const confirmText = `Confirmar preparación\nCantidad: ${validation.selectedCount}\nPrimeros clientes: ${previewClients}\nActividad: ${validation.selectedPreview[0]?.actividad ?? '-'}\nCuota: ${validation.selectedPreview[0]?.cuota ?? '-'}\nMensaje ejemplo: ${validation.sampleMessage}${duplicateWarning}${batchWarning}`;
       if (!window.confirm(confirmText)) return;
-      const res = await fetch(apiUrl('/prepare-messages'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberIds: filters.selected, message, templateName: selectedTemplate?.name ?? templateName }) });
-      if (!res.ok) { const payload = (await res.json()) as ApiError; throw new Error(payload.message ?? 'No se pudieron preparar mensajes.'); }
-      setPrepared(await res.json());
+      setPrepared(await crmApi.prepareMessages(filters.selected, message, selectedTemplate?.name ?? templateName));
       await loadHistory();
     } catch (e) { setError(e instanceof Error ? e.message : 'Error desconocido al preparar mensajes.'); } finally { setPreparing(false); }
   };
   const updatePreparedStatus = async (historyId: number | undefined, status: MessageStatus) => {
     if (!historyId) return;
-    const res = await fetch(apiUrl(`/history/${historyId}/status`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-    if (!res.ok) { const payload = (await res.json()) as ApiError; throw new Error(payload.message ?? 'No se pudo actualizar el estado.'); }
+    await crmApi.updateHistoryStatus(historyId, status);
     setPrepared(prev => prev.map((item) => (item.historyId === historyId ? { ...item, status } : item)).filter((item) => ACTIONABLE_STATUSES.includes(item.status ?? 'prepared')));
     await loadHistory();
   };
