@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "approvedAt": "2026-07-28",
+  "monthly_balance": { "income": 5600000, "expenses": 2100000, "balance": 3500000 },
+  "variation": {
+    "input": { "current": 5600000, "previous": 3800000 },
+    "expected": { "current": 5600000, "previous": 3800000, "absoluteChange": 1800000, "percentageChange": 47.368421052631575, "direction": "up", "comparable": true, "impact": "favorable" }
+  },
+  "operating_profitability": {
+    "movements": [
+      { "movement_type": "INGRESOS", "category": "CUOTA", "operational_status": "COMPLETADO", "amount": 100000 },
+      { "movement_type": "EGRESOS", "category": "CLASES", "operational_status": "COMPLETADO", "amount": 30000 },
+      { "movement_type": "INGRESOS", "category": "PUBLICIDAD", "operational_status": "COMPLETADO", "amount": 50000 },
+      { "movement_type": "INGRESOS", "category": "CUOTA", "operational_status": "PENDIENTE", "amount": 90000 }
+    ],
+    "expected": { "income": 100000, "expenses": 30000, "expense": 30000, "profitability": 70000, "movementsCount": 2 }
+  },
+  "category_balances": [
+    { "categories": ["DEUDA", "DEUDAS"], "movements": [{ "movement_type": "INGRESOS", "category": "DEUDA", "operational_status": "COMPLETADO", "amount": 20000 }, { "movement_type": "EGRESOS", "category": "DEUDAS", "operational_status": "COMPLETADO", "amount": 100000 }], "expected": { "income": 20000, "expenses": 100000, "balance": -80000, "movementsCount": 2 } },
+    { "categories": ["LUZ", "AGUA", "INTERNET"], "movements": [{ "movement_type": "INGRESOS", "category": "INTERNET", "operational_status": "COMPLETADO", "amount": 10000 }, { "movement_type": "EGRESOS", "category": "LUZ", "operational_status": "COMPLETADO", "amount": 40000 }, { "movement_type": "EGRESOS", "category": "AGUA", "operational_status": "COMPLETADO", "amount": 20000 }], "expected": { "income": 10000, "expenses": 60000, "balance": -50000, "movementsCount": 3 } }
+  ]
+}
