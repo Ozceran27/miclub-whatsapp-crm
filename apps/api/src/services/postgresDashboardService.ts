@@ -10,6 +10,7 @@ import {
   type StatusBreakdown,
 } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
+import { getArgentinaMonthWindow } from "../domain/argentinaTime.js";
 import { calculateOperationalBalances, calculateSettlementBalance } from "./operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "../importers/normalizers.js";
 import { OPERATING_CATEGORIES } from "./economyDomain.js";
@@ -637,6 +638,7 @@ export const getPostgresSectorOperationalSummary =
     const members = await getPostgresMembers(clubId);
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
+    const monthWindow = getArgentinaMonthWindow();
     const [sectorResult, sectorProfitabilityResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_finance_summary where club_id = $1`, [clubId],
@@ -658,16 +660,16 @@ export const getPostgresSectorOperationalSummary =
             and m.movement_type in ('INGRESOS', 'EGRESOS')
             and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($2::text[])
         ), current_month as (
-          select date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') at time zone 'America/Argentina/Buenos_Aires' as start_at
+          select $3::timestamptz as start_at, $4::timestamptz as end_at
         )
         select
           sector_key,
           coalesce(sum(case when movement_type = 'INGRESOS' then abs(amount) when movement_type = 'EGRESOS' then -abs(amount) else 0 end), 0) as total_profitability,
-          coalesce(sum(case when movement_date >= current_month.start_at and movement_type = 'INGRESOS' then abs(amount) when movement_date >= current_month.start_at and movement_type = 'EGRESOS' then -abs(amount) else 0 end), 0) as current_month_profitability
+          coalesce(sum(case when movement_date >= current_month.start_at and movement_date < current_month.end_at and movement_type = 'INGRESOS' then abs(amount) when movement_date >= current_month.start_at and movement_date < current_month.end_at and movement_type = 'EGRESOS' then -abs(amount) else 0 end), 0) as current_month_profitability
         from normalized_movements
         cross join current_month
         group by sector_key`,
-        [clubId, OPERATING_CATEGORIES],
+        [clubId, OPERATING_CATEGORIES, monthWindow.from, monthWindow.to],
       ),
       pool.query<Record<string, unknown>>(
         `with relevant as (

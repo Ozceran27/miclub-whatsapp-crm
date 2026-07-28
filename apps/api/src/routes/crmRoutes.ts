@@ -7,6 +7,7 @@ import { buildWaLink, interpolateTemplate, normalizeArPhone } from "../services/
 import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, insertCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
 import { requireMembership, requirePermission } from "../middleware/authorization.js";
 import { isExplicitTestAuthBypass } from "../middleware/auth.js";
+import { getArgentinaLastNDaysWindow } from "../domain/argentinaTime.js";
 
 const getClubId = (req: Request): string => {
   if (req.auth?.clubId) return req.auth.clubId;
@@ -121,12 +122,12 @@ export const createCrmRoutes = (options: {
 
   router.get("/contacted-recent", async (req, res) => {
     const windowDays = 30;
-    const sinceDate = new Date();
-    sinceDate.setUTCDate(sinceDate.getUTCDate() - windowDays);
-    const since = sinceDate.toISOString();
+    const { from, to } = getArgentinaLastNDaysWindow(windowDays);
+    const since = from.toISOString();
+    const until = to.toISOString();
 
     try {
-      res.json(await getCrmContactedRecent(getClubId(req), since, windowDays));
+      res.json(await getCrmContactedRecent(getClubId(req), since, until, windowDays));
     } catch {
       jsonError(res, 500, "No se pudo obtener contactos recientes.");
     }

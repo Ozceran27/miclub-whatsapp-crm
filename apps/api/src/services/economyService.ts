@@ -20,6 +20,7 @@ import {
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
 import { ARGENTINA_TIME_ZONE, calculateVariation, classifyExpenseCategory, DEBT_LIABILITY_CATEGORIES, EXPENSE_TYPE_KEYS, EXPENSE_TYPE_LABELS, getCurrentMonthWindow, getLastCompleteMonthWindows, getRollingInterannualMonthWindow, NON_OPERATING_EXPENSE_CATEGORIES, normalizeCategoryName, OPERATING_CATEGORIES, OPERATING_PROFIT_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, type ExpenseTypeKey } from "./economyDomain.js";
+import { getArgentinaCalendarYear, getArgentinaYearToDateWindow } from "../domain/argentinaTime.js";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
@@ -45,19 +46,7 @@ const parseLimit = (value: unknown, fallback = DEFAULT_LIMIT): number => {
 
 const parseYear = (value: unknown): number => {
   const parsed = toInteger(Array.isArray(value) ? value[0] : value);
-  return parsed >= 2000 && parsed <= 2100 ? parsed : new Date().getUTCFullYear();
-};
-
-const monthRange = (date = new Date()): { from: Date; to: Date } => {
-  const from = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-  const to = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
-  return { from, to };
-};
-
-
-const currentYearToDateRange = (date = new Date()): { from: Date; to: Date } => {
-  const from = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return { from, to: date };
+  return parsed >= 2000 && parsed <= 2100 ? parsed : getArgentinaCalendarYear();
 };
 
 const legacyVariation = (current: number, previous: number): number | null => calculateVariation(current, previous).percentageChange;
@@ -268,14 +257,14 @@ export const getByCategory = async (clubId: string, limitQuery?: unknown): Promi
 export const getSectorRankings = async (clubId: string, limitQuery?: unknown): Promise<JsonRecord> => {
   const limit = parseLimit(limitQuery, 5);
   const month = getCurrentMonthWindow();
-  const annual = currentYearToDateRange();
+  const annual = getArgentinaYearToDateWindow();
   const [monthlyItems, annualItems] = await Promise.all([
     getRankingBySector(month.start, new Date(), limit, clubId),
     getRankingBySector(annual.from, annual.to, limit, clubId),
   ]);
   return {
     monthly: { label: month.label, items: normalizeRankingItems(monthlyItems), total: monthlyItems.length },
-    annual: { year: annual.from.getUTCFullYear(), items: normalizeRankingItems(annualItems), total: annualItems.length },
+    annual: { year: getArgentinaCalendarYear(annual.from), items: normalizeRankingItems(annualItems), total: annualItems.length },
   };
 };
 
@@ -297,7 +286,7 @@ const normalizePaymentItems = (rows: EconomyRow[] | JsonRecord[]): JsonRecord[] 
 export const getPaymentMethods = async (clubId: string): Promise<JsonRecord> => {
   const month = getCurrentMonthWindow();
   const now = new Date();
-  const annual = currentYearToDateRange(now);
+  const annual = getArgentinaYearToDateWindow(now);
   const [monthlyRows, annualRows, auxiliaryRows, statusRows] = await Promise.all([
     getPaymentMethodRows(month.start, now, clubId),
     getPaymentMethodRows(annual.from, annual.to, clubId),
@@ -323,7 +312,7 @@ export const getPaymentMethods = async (clubId: string): Promise<JsonRecord> => 
     items: monthlyItems,
     total: monthlyItems.length,
     monthly: { label: month.label, items: monthlyItems, total: monthlyItems.length },
-    annual: { year: annual.from.getUTCFullYear(), items: annualItems, total: annualItems.length },
+    annual: { year: getArgentinaCalendarYear(annual.from), items: annualItems, total: annualItems.length },
     statusCounts,
     nonOperatingExpenses: {
       categories: [...NON_OPERATING_EXPENSE_CATEGORIES],
