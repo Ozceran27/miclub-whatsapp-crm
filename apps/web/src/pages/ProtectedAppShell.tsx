@@ -8,6 +8,7 @@ import PlaceholderModule from '../modules/PlaceholderModule';
 import { useRouter } from '../router';
 import { useSession } from '../session';
 import { useTheme } from '../theme';
+import { tenantModuleKey } from '../tenantScope';
 
 const MODULES: ModuleDefinition[] = [
   { id: 'home', label: 'INICIO' }, { id: 'economy', label: 'ECONOMÍA CLUB' }, { id: 'fitness', label: 'ESPACIO FITNESS' },
@@ -29,7 +30,7 @@ export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
   const rawPathModule = path.split('/')[2] ?? 'home';
   const pathModule = rawPathModule === 'migration' ? 'dataMigration' : rawPathModule;
-  const { username, logout } = useSession();
+  const { username, clubId, logout } = useSession();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const requestedModule: ModuleId = isModuleId(pathModule) ? pathModule : 'home';
@@ -71,7 +72,7 @@ export default function ProtectedAppShell() {
       </header>
       {logoutError && <p className="login-error" role="alert">{logoutError}</p>}
       <ModuleNav modules={MODULES} currentModule={currentModule} onSelect={selectModule} />
-      {renderModule()}
+      <div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div>
     </div>
   );
 }

@@ -15,7 +15,7 @@ export default function RegisterPage() {
     try {
       const payload = await register(clubName, email, password);
       if (!payload.authenticated) { setError(payload.message ?? 'El registro todavía no está disponible para este club.'); return; }
-      authenticate(payload.username ?? email); navigate('/app', { replace: true });
+      authenticate(payload.username ?? email, payload.user); navigate('/app', { replace: true });
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo conectar con el servidor local.'); }
     finally { setIsLoading(false); }
   };

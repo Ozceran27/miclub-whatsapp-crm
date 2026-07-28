@@ -1,6 +1,11 @@
 import { apiJson } from '../../api';
 
-export type AuthResponse = { authenticated?: boolean; username?: string; message?: string };
+export type AuthResponse = {
+  authenticated?: boolean;
+  username?: string;
+  message?: string;
+  user?: { clubId?: string | null; membershipId?: string | null };
+};
 
 export const login = (username: string, password: string) => apiJson<AuthResponse>('/auth/login', {
   method: 'POST', body: JSON.stringify({ username, password })
