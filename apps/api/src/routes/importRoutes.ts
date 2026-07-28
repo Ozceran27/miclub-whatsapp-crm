@@ -1,10 +1,11 @@
 import { Router, type RequestHandler } from "express";
 import { getPostgresPool } from "../db/postgres.js";
 import { getMovementImportAudit, importGoogleSheets, parseMissingEnrollmentStrategy } from "../importers/googleSheetsImporter.js";
+import { getAdminMovementsFromGoogleSheets } from "../services/googleSheets.js";
 import { listImportBatches, listImportErrors, summarizeImportErrors } from "../importers/importLogger.js";
 import { hasRecentSuccessfulDryRun } from "../repositories/importRepository.js";
 import asyncHandler from "./asyncHandler.js";
-import { requireMembership } from "../middleware/authorization.js";
+import { requireImportOperator, requireMembership } from "../middleware/authorization.js";
 
 // migración: importadores bajo /api/import; no renombrar sin migración frontend.
 const router = Router();
@@ -30,7 +31,7 @@ const parsePagination = (query: Record<string, unknown>) => ({
   offset: Math.max(Number(query.offset ?? 0) || 0, 0)
 });
 
-router.use(requireMembership);
+router.use(requireMembership, requireImportOperator);
 
 const requireImportFeature: RequestHandler = (_req, res, next) => {
   if (process.env.IMPORT_ENDPOINTS_ENABLED !== "true") {
@@ -38,6 +39,10 @@ const requireImportFeature: RequestHandler = (_req, res, next) => {
   }
   next();
 };
+
+router.get("/google-sheets/admin-movements", requireImportFeature, asyncHandler(async (_req, res) => {
+  res.json(await getAdminMovementsFromGoogleSheets());
+}));
 
 router.post("/google-sheets", requireImportFeature, asyncHandler(async (req, res) => {
   const startedAt = Date.now();

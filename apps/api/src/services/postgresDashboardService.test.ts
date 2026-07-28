@@ -60,7 +60,7 @@ test("selectCuotasACobrar prioriza fallback autoritativo aunque v_dashboard_basi
   const result = selectCuotasACobrar({ dashboardValue: 405_500, fallbackValue: 430_500 });
 
   assert.equal(result.cuotasACobrar, 430_500);
-  assert.equal(result.source, "fallback");
+  assert.equal(result.source, "derived_receivables");
   assert.equal(result.dashboardValue, 405_500);
   assert.equal(result.fallbackValue, 430_500);
   assert.equal(result.differsBeyondThreshold, true);
@@ -70,7 +70,7 @@ test("selectCuotasACobrar conserva cero legítimo del fallback", () => {
   const result = selectCuotasACobrar({ dashboardValue: 0, fallbackValue: 0 });
 
   assert.equal(result.cuotasACobrar, 0);
-  assert.equal(result.source, "fallback");
+  assert.equal(result.source, "derived_receivables");
   assert.equal(result.differsBeyondThreshold, false);
 });
 
@@ -79,9 +79,9 @@ test("selectCuotasACobrar usa fallback solo cuando v_dashboard_basic es null o f
   const missingDashboard = selectCuotasACobrar({ fallbackValue: 430_500 });
 
   assert.equal(nullDashboard.cuotasACobrar, 430_500);
-  assert.equal(nullDashboard.source, "fallback");
+  assert.equal(nullDashboard.source, "derived_receivables");
   assert.equal(missingDashboard.cuotasACobrar, 430_500);
-  assert.equal(missingDashboard.source, "fallback");
+  assert.equal(missingDashboard.source, "derived_receivables");
 });
 
 

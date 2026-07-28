@@ -1,5 +1,5 @@
 import { normalizeMembershipFeeUnit, normalizeMovementAmount } from "@miclub/shared";
-import { normalizeOperationalStatus } from "./googleSheets.js";
+import { normalizeOperationalStatus } from "../importers/normalizers.js";
 
 const money = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
