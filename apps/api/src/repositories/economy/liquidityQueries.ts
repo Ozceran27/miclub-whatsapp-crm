@@ -60,7 +60,11 @@ export const getRecentMovements = async (limit: number, clubId: string): Promise
   // Explicit exception: the recent activity feed exposes every status.
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
-    select * from miclub.v_movements_enriched
+    select id, external_id, movement_date, movement_type, category_id, category,
+           sector_id, sector_code, sector_name, concept, person_id, first_name,
+           last_name, counterparty_text, amount, taxes, payment_method_id,
+           payment_method, financial_status, operational_status, source
+    from miclub.v_movements_enriched
     where club_id = $2
     order by movement_date desc nulls last, created_at desc nulls last, id desc nulls last
     limit $1::integer
@@ -72,7 +76,11 @@ export const getPendingMovements = async (limit: number, clubId: string): Promis
   // Explicit exception: a pending list is not an ordinary completed metric.
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
-    select * from miclub.v_movements_enriched
+    select id, external_id, movement_date, movement_type, category_id, category,
+           sector_id, sector_code, sector_name, concept, person_id, first_name,
+           last_name, counterparty_text, amount, taxes, payment_method_id,
+           payment_method, financial_status, operational_status, source
+    from miclub.v_movements_enriched
     where club_id = $2
       and ${pendingMovementPredicate("v_movements_enriched")}
     order by movement_date asc nulls last, created_at asc nulls last, id asc nulls last
@@ -121,4 +129,3 @@ export const getBaseInsights = async (clubId: string): Promise<EconomyRow[]> => 
 };
 
 export const getCurrentPreviousMonthComparison = async (_clubId: string): Promise<EconomyRow[]> => [];
-

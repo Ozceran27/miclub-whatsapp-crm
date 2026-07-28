@@ -1,11 +1,7 @@
 import { apiJson } from '../../api';
+import type { AuthResponse } from '@miclub/shared';
 
-export type AuthResponse = {
-  authenticated?: boolean;
-  username?: string;
-  message?: string;
-  user?: { clubId?: string | null; membershipId?: string | null };
-};
+export type { AuthResponse } from '@miclub/shared';
 
 export const login = (username: string, password: string) => apiJson<AuthResponse>('/auth/login', {
   method: 'POST', body: JSON.stringify({ username, password })

@@ -1,9 +1,9 @@
+import { asLegacyUnknownCode, type ApiErrorCode, type ApiErrorResponse } from '@miclub/shared';
+
 const configuredApiBaseUrl = import.meta.env?.VITE_API_URL?.trim();
 
 export const API_BASE_URL = configuredApiBaseUrl || '';
 export const apiUrl = (path: `/${string}`) => `${API_BASE_URL}${path}`;
-
-export type ApiErrorCode = 'AUTHENTICATION_REQUIRED' | 'SESSION_EXPIRED' | 'FORBIDDEN' | 'VALIDATION_ERROR' | 'SERVICE_UNAVAILABLE' | 'NETWORK_ERROR' | 'REQUEST_TIMEOUT' | 'REQUEST_CANCELLED' | string;
 
 export class ApiError extends Error {
   constructor(
@@ -23,12 +23,12 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 let sessionValidation: Promise<boolean> | null = null;
 
 const parseErrorPayload = async (response: Response) => {
-  const payload = await response.clone().json().catch(() => undefined) as { code?: string; error?: string; message?: string; requestId?: string; details?: unknown; errors?: unknown } | undefined;
+  const payload = await response.clone().json().catch(() => undefined) as Partial<ApiErrorResponse> & { errors?: unknown } | undefined;
   const statusCode: Record<number, ApiErrorCode> = { 401: 'AUTHENTICATION_REQUIRED', 403: 'FORBIDDEN', 422: 'VALIDATION_ERROR', 503: 'SERVICE_UNAVAILABLE' };
   return new ApiError(
     response.status,
-    payload?.code ?? statusCode[response.status] ?? 'HTTP_ERROR',
-    payload?.message ?? payload?.error ?? `HTTP ${response.status}`,
+    payload?.code ?? statusCode[response.status] ?? asLegacyUnknownCode<"api-error">('HTTP_ERROR'),
+    payload?.message ?? `HTTP ${response.status}`,
     payload?.requestId ?? response.headers.get('x-request-id') ?? undefined,
     payload?.details ?? payload?.errors
   );

@@ -1,5 +1,5 @@
 import { apiFetch, readApiError } from '../../api';
-import type { ImportFailureResponse } from '@miclub/shared';
+import { asLegacyUnknownCode, type ImportFailureResponse } from '@miclub/shared';
 
 export type EndpointState<T> = {
   loading: boolean;
@@ -129,7 +129,7 @@ const fetchJson = async <T,>(path: `/${string}`, init?: RequestInit): Promise<T>
     const requestId = body?.requestId ?? response.headers.get('x-request-id') ?? undefined;
     const payload: ImportFailureResponse = {
       ok: false,
-      code: body?.code ?? apiError.code ?? 'IMPORT_FAILED',
+      code: body?.code ?? asLegacyUnknownCode<"import-error">(apiError.code ?? 'IMPORT_FAILED'),
       message: body?.message ?? apiError.message,
       batchId: body?.batchId,
       requestId,

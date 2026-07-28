@@ -1,4 +1,5 @@
 import type { SourceSheet } from "./migration.js";
+import type { PaginatedResponse } from "./http.js";
 
 export type OperationalStatusKey = "al_dia" | "nuevo_inscripto" | "adeudando" | "abandonado" | "cancelado" | "otro";
 
@@ -77,13 +78,7 @@ export interface PrepareMessagesValidation {
 }
 
 
-export interface PaginatedHistoryResponse {
-  items: PreparedMessage[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
+export type PaginatedHistoryResponse = PaginatedResponse<PreparedMessage>;
 
 export interface ContactedRecentMemberInfo {
   lastSentAt: string;
@@ -186,4 +181,3 @@ export interface SectorOperationalSummary {
     totalDebtAmount: number;
   };
 }
-

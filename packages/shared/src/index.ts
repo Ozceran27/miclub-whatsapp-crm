@@ -6,3 +6,6 @@ export type { EconomyOperationalStatus } from "./movementStatus.js";
 export * from "./contracts/migration.js";
 export * from "./contracts/members.js";
 export * from "./contracts/economy.js";
+export * from "./contracts/legacy.js";
+export * from "./contracts/http.js";
+export * from "./contracts/auth.js";

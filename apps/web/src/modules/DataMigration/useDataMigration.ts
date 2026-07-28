@@ -14,6 +14,7 @@ import {
   type ImportErrorsResponse,
   type ImportSummary
 } from '../../services/api/importApi';
+import { asLegacyUnknownCode } from '@miclub/shared';
 import type { ImportFailureResponse } from '@miclub/shared';
 
 export const getBatchId = (batch: ImportBatch) => batch.id ?? batch.batch_id ?? '';
@@ -117,7 +118,7 @@ export const useDataMigration = () => {
       await loadStatus();
       return result;
     } catch (error) {
-      setActionError(getImportFailure(error) ?? { ok: false, code: 'DELETE_MISSING_FAILED', message: getErrorMessage(error), retryable: true });
+      setActionError(getImportFailure(error) ?? { ok: false, code: asLegacyUnknownCode<"import-error">('DELETE_MISSING_FAILED'), message: getErrorMessage(error), retryable: true });
       return { deletedIds: [] };
     } finally {
       setIsDeletingMissing(false);
