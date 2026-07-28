@@ -18,7 +18,7 @@ export default function LoginPage() {
       if (!payload.authenticated) {
         setError(payload?.message ?? 'No se pudo iniciar sesión. Revisá tus credenciales.'); return;
       }
-      authenticate(payload.username ?? null); navigate('/app', { replace: true });
+      authenticate(payload.username ?? null, payload.user); navigate('/app', { replace: true });
     } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo conectar con el servidor local.'); }
     finally { setIsLoading(false); }
   };
