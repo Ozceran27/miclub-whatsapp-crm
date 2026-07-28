@@ -77,5 +77,9 @@ test("rankings, pendientes y movimientos recientes nunca mezclan tenants", async
     assert.match(calls[0].sql, /s\.club_id = m\.club_id/);
     assert.match(calls[2].sql, /where club_id = \$2/);
     assert.match(calls[4].sql, /where club_id = \$2/);
+    for (const call of [calls[2], calls[3], calls[4], calls[5]]) {
+      assert.doesNotMatch(call.sql, /select\s+\*/i);
+      assert.doesNotMatch(call.sql, /source_payload|created_at\s*,|updated_at/i);
+    }
   });
 });

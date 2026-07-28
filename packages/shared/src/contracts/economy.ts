@@ -1,5 +1,6 @@
 import type { EconomyOperationalStatus } from "../movementStatus.js";
 import type { SummaryMetadata } from "./members.js";
+import type { LegacyUnknownCode } from "./legacy.js";
 
 export interface AdminMovement {
   id: string;
@@ -37,9 +38,13 @@ export interface CategoryAmountBreakdown {
   amount: number;
 }
 
-export type EconomyMovementType = "INGRESOS" | "EGRESOS" | string;
+export type KnownEconomyMovementType = "INGRESOS" | "EGRESOS";
+export type LegacyEconomyMovementType = LegacyUnknownCode<"movement-type">;
+export type EconomyMovementType = KnownEconomyMovementType | LegacyEconomyMovementType;
 
-export type EconomyFinancialStatus = "pendiente" | "pagado" | "cancelado" | string;
+export type KnownEconomyFinancialStatus = "pendiente" | "pagado" | "cancelado";
+export type LegacyEconomyFinancialStatus = LegacyUnknownCode<"financial-status">;
+export type EconomyFinancialStatus = KnownEconomyFinancialStatus | LegacyEconomyFinancialStatus;
 
 export interface EconomySummary {
   month?: { label: string; income: number; expenses: number; balance: number };
@@ -74,16 +79,16 @@ export interface EconomyMonthlyEvolutionItem {
 }
 
 export interface EconomyComparisonMetric {
-  key: "income" | "expenses" | "balance" | "liquidity" | string;
+  key: "income" | "expenses" | "balance" | "liquidity" | LegacyUnknownCode<"comparison-metric">;
   label: string;
   current: number;
   previous: number;
   variation?: number | null;
   percentageChange?: number | null;
   absoluteChange?: number;
-  direction: "up" | "down" | "stable" | "flat" | "none" | string;
+  direction: "up" | "down" | "stable" | "flat" | "none" | LegacyUnknownCode<"comparison-direction">;
   comparable?: boolean;
-  impact?: "favorable" | "unfavorable" | "neutral" | string;
+  impact?: "favorable" | "unfavorable" | "neutral" | LegacyUnknownCode<"comparison-impact">;
   applies: boolean;
   available?: boolean;
   reason?: string;
@@ -192,9 +197,6 @@ export interface EconomyRecentMovement {
   financialStatus?: EconomyFinancialStatus | null;
   operationalStatus?: EconomyOperationalStatus | null;
   source?: string | null;
-  sourcePayload?: Record<string, unknown> | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
 }
 
 export interface EconomyPendingSummary {
@@ -257,7 +259,7 @@ export interface EconomyAnnualSummary {
   movements: number;
 }
 
-export type EconomyInsightType = "positive" | "warning" | "info" | string;
+export type EconomyInsightType = "positive" | "warning" | "info" | LegacyUnknownCode<"economy-insight">;
 
 export interface EconomyInsight {
   key: string;

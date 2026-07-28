@@ -10,9 +10,11 @@ export type ImportFailureCode =
   | "IMPORT_VALIDATION_FAILED"
   | "IMPORT_FAILED";
 
+export type LegacyImportFailureCode = import("./legacy.js").LegacyUnknownCode<"import-error">;
+
 export type ImportFailureResponse = {
   ok: false;
-  code: ImportFailureCode | string;
+  code: ImportFailureCode | LegacyImportFailureCode;
   message: string;
   batchId?: string;
   requestId?: string;
@@ -27,4 +29,3 @@ export type ImportFailureResponse = {
 
 export type ImportSuccessResponse<TSummary> = TSummary & { ok: true };
 export type ImportResponse<TSummary> = ImportSuccessResponse<TSummary> | ImportFailureResponse;
-
