@@ -68,9 +68,9 @@ export type EconomyClubMovement = {
   createdAt: string | null;
 };
 
-export const getEconomyClubSummary = async (): Promise<EconomyClubSummary> => {
+export const getEconomyClubSummary = async (clubId: string): Promise<EconomyClubSummary> => {
   const pool = await getPostgresPool();
-  const result = await pool.query<PgRow>(`select * from miclub.v_dashboard_basic limit 1`);
+  const result = await pool.query<PgRow>(`select * from miclub.v_dashboard_basic where club_id = $1`, [clubId]);
   const row = result.rows[0] ?? {};
   const income = toNumber(row.total_income);
   const expenses = toNumber(row.total_expense);
@@ -90,13 +90,14 @@ export const getEconomyClubSummary = async (): Promise<EconomyClubSummary> => {
   };
 };
 
-export const getEconomyClubSectorBalances = async (): Promise<EconomyClubSectorBalance[]> => {
+export const getEconomyClubSectorBalances = async (clubId: string): Promise<EconomyClubSectorBalance[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<PgRow>(`
     select sector_id, sector_code, sector_name, total_income, total_expense, balance
     from miclub.v_sector_finance_summary
+    where club_id = $1
     order by sector_name asc nulls last, sector_code asc nulls last
-  `);
+  `, [clubId]);
 
   return result.rows.map((row) => ({
     sectorId: toNullableString(row.sector_id),
@@ -108,7 +109,7 @@ export const getEconomyClubSectorBalances = async (): Promise<EconomyClubSectorB
   }));
 };
 
-export const listEconomyClubMovements = async (limitInput: unknown): Promise<EconomyClubMovement[]> => {
+export const listEconomyClubMovements = async (clubId: string, limitInput: unknown): Promise<EconomyClubMovement[]> => {
   const pool = await getPostgresPool();
   const limit = normalizeLimit(limitInput);
   const result = await pool.query<PgRow>(`
@@ -116,9 +117,10 @@ export const listEconomyClubMovements = async (limitInput: unknown): Promise<Eco
       first_name, last_name, counterparty_text, amount, taxes, payment_method,
       financial_status, operational_status, source, created_at
     from miclub.v_movements_enriched
+    where club_id = $1
     order by movement_date desc, created_at desc
-    limit $1
-  `, [limit]);
+    limit $2
+  `, [clubId, limit]);
 
   return result.rows.map((row) => {
     const fullName = [row.first_name, row.last_name].filter(Boolean).map(String).join(" ").trim();

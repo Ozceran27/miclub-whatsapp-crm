@@ -64,3 +64,9 @@ export const closePostgresPool = async (): Promise<void> => {
   await pool.end();
   pool = undefined;
 };
+
+/** Test seam for repository-level tenant isolation tests. */
+export const setPostgresPoolForTests = (testPool: PgPool | undefined): void => {
+  if (process.env.NODE_ENV !== "test") throw new Error("setPostgresPoolForTests solo está disponible en tests");
+  pool = testPool;
+};
