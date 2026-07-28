@@ -5,8 +5,8 @@ import { getEconomyClubSectorBalances, getEconomyClubSummary, listEconomyClubMov
 // productivo: módulos bajo /api/modules; no renombrar sin migración frontend.
 const router = Router();
 
-router.get("/economy/summary", asyncHandler(async (_req, res) => res.json(await getEconomyClubSummary())));
-router.get("/economy/sector-balances", asyncHandler(async (_req, res) => res.json(await getEconomyClubSectorBalances())));
-router.get("/economy/movements", asyncHandler(async (req, res) => res.json(await listEconomyClubMovements(req.query.limit))));
+router.get("/economy/summary", asyncHandler(async (req, res) => res.json(await getEconomyClubSummary(req.auth!.clubId))));
+router.get("/economy/sector-balances", asyncHandler(async (req, res) => res.json(await getEconomyClubSectorBalances(req.auth!.clubId))));
+router.get("/economy/movements", asyncHandler(async (req, res) => res.json(await listEconomyClubMovements(req.auth!.clubId, req.query.limit))));
 
 export default router;

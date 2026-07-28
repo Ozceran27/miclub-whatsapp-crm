@@ -3,9 +3,15 @@ import { DEBT_LIABILITY_CATEGORY_KEYS, NON_OPERATING_EXPENSE_CATEGORY_KEYS, OPER
 
 export type EconomyRow = Record<string, unknown>;
 
+export const getClubFinanceSummary = async (clubId: string): Promise<EconomyRow[]> => {
+  const pool = await getPostgresPool();
+  return (await pool.query<EconomyRow>(`
+    select * from miclub.v_dashboard_basic where club_id = $1
+  `, [clubId])).rows;
+};
 
 
-export const getMonthlySummary = async (from: Date, to: Date): Promise<EconomyRow[]> => {
+export const getMonthlySummary = async (from: Date, to: Date, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with bounds as (select $1::timestamptz as start_at, $2::timestamptz as end_at)
@@ -17,15 +23,16 @@ export const getMonthlySummary = async (from: Date, to: Date): Promise<EconomyRo
       count(*) filter (where m.operational_status = 'COMPLETADO')::integer as completed_movements,
       count(*)::integer as total_movements
     from miclub.movements m
-    left join miclub.movement_categories c on c.id = m.category_id
+    left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
     cross join bounds b
     where coalesce(upper(regexp_replace(translate(trim(c.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')), '') <> 'CAPITAL'
       and m.movement_date >= b.start_at and m.movement_date < b.end_at
-  `, [from, to]);
+      and m.club_id = $3
+  `, [from, to, clubId]);
   return result.rows;
 };
 
-export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), operatingCategories: readonly string[] = []): Promise<EconomyRow[]> => {
+export const getAnnualEvolution = async (clubId: string, year = new Date().getUTCFullYear(), operatingCategories: readonly string[] = []): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with months as (
@@ -43,7 +50,8 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
       left join (
         select m.*, upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
         from miclub.movements m
-        left join miclub.movement_categories c on c.id = m.category_id
+        left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
+        where m.club_id = $3
       ) m on m.movement_date >= months.month_start and m.movement_date < months.month_start + interval '1 month'
       group by months.month_start
     )
@@ -59,9 +67,10 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
       coalesce((
         select count(e.id)::integer
         from miclub.enrollments e
-        join miclub.activities a on a.id = e.activity_id
-        join miclub.sectors s on s.id = a.sector_id
+        join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
+          and e.club_id = $3
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
           and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
@@ -70,9 +79,10 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
       lag(coalesce((
         select count(e.id)::integer
         from miclub.enrollments e
-        join miclub.activities a on a.id = e.activity_id
-        join miclub.sectors s on s.id = a.sector_id
+        join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
+          and e.club_id = $3
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
           and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
@@ -81,7 +91,7 @@ export const getAnnualEvolution = async (year = new Date().getUTCFullYear(), ope
     from monthly
     where monthly.month_start >= make_date($1::integer, 1, 1)
     order by monthly.month_start
-  `, [year, operatingCategories]);
+  `, [year, operatingCategories, clubId]);
   return result.rows;
 };
 
@@ -94,8 +104,9 @@ const rankingQuery = (dimensionSql: string, idSql: string, tableSql: string) => 
          count(m.id)::integer as movements
   from miclub.movements m
   ${tableSql}
-  left join miclub.movement_categories ranking_category on ranking_category.id = m.category_id
+  left join miclub.movement_categories ranking_category on ranking_category.id = m.category_id and ranking_category.club_id = m.club_id
   where m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
+    and m.club_id = $5
     and upper(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) in ('COMPLETADO', 'COMPLETED')
     and upper(regexp_replace(regexp_replace(translate(trim(coalesce(ranking_category.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($4::text[])
     and m.movement_type in ('INGRESOS', 'EGRESOS')
@@ -104,34 +115,35 @@ const rankingQuery = (dimensionSql: string, idSql: string, tableSql: string) => 
   limit $3::integer
 `;
 
-export const getRankingBySector = async (from: Date, to: Date, limit: number): Promise<EconomyRow[]> => {
+export const getRankingBySector = async (from: Date, to: Date, limit: number, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
-  return (await pool.query<EconomyRow>(rankingQuery("s.name", "s.id", "left join miclub.sectors s on s.id = m.sector_id"), [from, to, limit, OPERATING_CATEGORIES])).rows;
+  return (await pool.query<EconomyRow>(rankingQuery("s.name", "s.id", "left join miclub.sectors s on s.id = m.sector_id and s.club_id = m.club_id"), [from, to, limit, OPERATING_CATEGORIES, clubId])).rows;
 };
 
-export const getRankingByCategory = async (from: Date, to: Date, limit: number): Promise<EconomyRow[]> => {
+export const getRankingByCategory = async (from: Date, to: Date, limit: number, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
-  return (await pool.query<EconomyRow>(rankingQuery("c.name", "c.id", "left join miclub.movement_categories c on c.id = m.category_id"), [from, to, limit, OPERATING_CATEGORIES])).rows;
+  return (await pool.query<EconomyRow>(rankingQuery("c.name", "c.id", "left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id"), [from, to, limit, OPERATING_CATEGORIES, clubId])).rows;
 };
 
-export const getPaymentMethods = async (from: Date, to: Date): Promise<EconomyRow[]> => {
+export const getPaymentMethods = async (from: Date, to: Date, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select pm.id, coalesce(pm.name, 'Sin método') as name,
            coalesce(sum(abs(m.amount)) filter (where m.movement_type = 'INGRESOS'), 0) as amount,
            count(m.id) filter (where m.movement_type = 'INGRESOS')::integer as movements
     from miclub.movements m
-    left join miclub.payment_methods pm on pm.id = m.payment_method_id
+    left join miclub.payment_methods pm on pm.id = m.payment_method_id and pm.club_id = m.club_id
     where m.operational_status = 'COMPLETADO'
       and m.movement_type = 'INGRESOS'
       and m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
+      and m.club_id = $3
     group by pm.id, pm.name
     order by amount desc
-  `, [from, to]);
+  `, [from, to, clubId]);
   return result.rows;
 };
 
-export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date, to: Date): Promise<EconomyRow[]> => {
+export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date, to: Date, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with periods as (
@@ -143,9 +155,10 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
         upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
       from periods p
       left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
+        and m.club_id = $8
         and m.operational_status = 'COMPLETADO'
         and m.movement_type in ('INGRESOS', 'EGRESOS')
-      left join miclub.movement_categories c on c.id = m.category_id
+      left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
     )
     select period_key,
       coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($4::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($4::text[]) then -amount else 0 end), 0) as non_operating_balance,
@@ -156,44 +169,47 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
       coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($7::text[]) then amount when movement_type = 'EGRESOS' and normalized_category = any($7::text[]) then -amount else 0 end), 0) as taxes_balance
     from movements
     group by period_key
-  `, [monthFrom, yearFrom, to, NON_OPERATING_EXPENSE_CATEGORY_KEYS, DEBT_LIABILITY_CATEGORY_KEYS, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS]);
+  `, [monthFrom, yearFrom, to, NON_OPERATING_EXPENSE_CATEGORY_KEYS, DEBT_LIABILITY_CATEGORY_KEYS, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS, clubId]);
   return result.rows;
 };
 
-export const getMovementStatusCounts = async (from: Date, to: Date): Promise<EconomyRow[]> => {
+export const getMovementStatusCounts = async (from: Date, to: Date, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select upper(regexp_replace(regexp_replace(translate(trim(coalesce(operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g'), '\.+$', '', 'g')) as status,
       count(*)::integer as movements
     from miclub.movements
     where movement_date >= $1::timestamptz and movement_date < $2::timestamptz
+      and club_id = $3
     group by status
-  `, [from, to]);
+  `, [from, to, clubId]);
   return result.rows;
 };
 
-export const getRecentMovements = async (limit: number): Promise<EconomyRow[]> => {
+export const getRecentMovements = async (limit: number, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select * from miclub.v_movements_enriched
+    where club_id = $2
     order by movement_date desc nulls last, created_at desc nulls last, id desc nulls last
     limit $1::integer
-  `, [limit]);
+  `, [limit, clubId]);
   return result.rows;
 };
 
-export const getPendingMovements = async (limit: number): Promise<EconomyRow[]> => {
+export const getPendingMovements = async (limit: number, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select * from miclub.v_movements_enriched
-    where financial_status = 'pendiente' or operational_status = 'PENDIENTE'
+    where club_id = $2
+      and (financial_status = 'pendiente' or operational_status = 'PENDIENTE')
     order by movement_date asc nulls last, created_at asc nulls last, id asc nulls last
     limit $1::integer
-  `, [limit]);
+  `, [limit, clubId]);
   return result.rows;
 };
 
-export const getPendingSummary = async (): Promise<EconomyRow[]> => {
+export const getPendingSummary = async (clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select
@@ -202,12 +218,13 @@ export const getPendingSummary = async (): Promise<EconomyRow[]> => {
       coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as pending_balance,
       count(*)::integer as pending_movements
     from miclub.movements
-    where financial_status = 'pendiente' or operational_status = 'PENDIENTE'
-  `, []);
+    where club_id = $1
+      and (financial_status = 'pendiente' or operational_status = 'PENDIENTE')
+  `, [clubId]);
   return result.rows;
 };
 
-export const getAnnualSummary = async (year = new Date().getUTCFullYear()): Promise<EconomyRow[]> => {
+export const getAnnualSummary = async (clubId: string, year = new Date().getUTCFullYear()): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select $1::integer as year,
@@ -217,12 +234,13 @@ export const getAnnualSummary = async (year = new Date().getUTCFullYear()): Prom
            count(*)::integer as movements
     from miclub.movements
     where movement_date >= make_timestamptz($1::integer, 1, 1, 0, 0, 0) and movement_date < make_timestamptz(($1::integer + 1), 1, 1, 0, 0, 0)
-  `, [year]);
+      and club_id = $2
+  `, [year, clubId]);
   return result.rows;
 };
 
 
-export const getCompletedMonthMovementSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date, operatingCategories: readonly string[]): Promise<EconomyRow[]> => {
+export const getCompletedMonthMovementSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date, operatingCategories: readonly string[], clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with periods as (
@@ -233,9 +251,10 @@ export const getCompletedMonthMovementSummary = async (previousStart: Date, curr
       select p.period_key, m.movement_type, m.amount, upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
       from periods p
       left join miclub.movements m on m.movement_date >= p.start_at and m.movement_date < p.end_at
+        and m.club_id = $5
         and m.operational_status = 'COMPLETADO'
         and m.movement_type in ('INGRESOS', 'EGRESOS')
-      left join miclub.movement_categories c on c.id = m.category_id
+      left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
     )
     select period_key,
       coalesce(sum(amount) filter (where movement_type = 'INGRESOS' and normalized_category <> 'CAPITAL'), 0) as income,
@@ -245,11 +264,11 @@ export const getCompletedMonthMovementSummary = async (previousStart: Date, curr
     from movements
     group by period_key
     order by case period_key when 'previous' then 1 else 2 end
-  `, [previousStart, currentStart, currentEnd, operatingCategories]);
+  `, [previousStart, currentStart, currentEnd, operatingCategories, clubId]);
   return result.rows;
 };
 
-export const getGrowthSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date): Promise<EconomyRow[]> => {
+export const getGrowthSummary = async (previousStart: Date, currentStart: Date, currentEnd: Date, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with periods as (
@@ -261,28 +280,30 @@ export const getGrowthSummary = async (previousStart: Date, currentStart: Date, 
       coalesce((
         select sum(m.amount)
         from miclub.movements m
-        left join miclub.movement_categories c on c.id = m.category_id
+        left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
         where m.movement_date >= p.start_at and m.movement_date < p.end_at
+          and m.club_id = $4
           and m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO'
           and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) <> 'CAPITAL'
       ), 0) as income,
       coalesce((
         select count(e.id)::integer
         from miclub.enrollments e
-        join miclub.activities a on a.id = e.activity_id
-        join miclub.sectors s on s.id = a.sector_id
+        join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < (p.end_at at time zone 'America/Argentina/Buenos_Aires')::date
+          and e.club_id = $4
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
           and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
       ), 0) as enrollments
     from periods p
     order by case p.period_key when 'previous' then 1 else 2 end
-  `, [previousStart, currentStart, currentEnd]);
+  `, [previousStart, currentStart, currentEnd, clubId]);
   return result.rows;
 };
 
-export const getEconomyDataQuality = async (): Promise<EconomyRow[]> => {
+export const getEconomyDataQuality = async (clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select
@@ -290,21 +311,24 @@ export const getEconomyDataQuality = async (): Promise<EconomyRow[]> => {
       count(*) filter (where operational_status = 'COMPLETADO' and category_id is null)::integer as missing_category,
       count(*) filter (where operational_status = 'COMPLETADO' and payment_method_id is null)::integer as missing_payment_method
     from miclub.movements
-  `, []);
+    where club_id = $1
+  `, [clubId]);
   return result.rows;
 };
 
-export const getBaseInsights = async (): Promise<EconomyRow[]> => {
+export const getBaseInsights = async (clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
-    select 'pending_count' as metric, count(*)::numeric as value from miclub.movements where financial_status = 'pendiente' or operational_status = 'PENDIENTE'
-  `, []);
+    select 'pending_count' as metric, count(*)::numeric as value
+    from miclub.movements
+    where club_id = $1 and (financial_status = 'pendiente' or operational_status = 'PENDIENTE')
+  `, [clubId]);
   return result.rows;
 };
 
-export const getCurrentPreviousMonthComparison = async (): Promise<EconomyRow[]> => [];
+export const getCurrentPreviousMonthComparison = async (_clubId: string): Promise<EconomyRow[]> => [];
 
-export const getYearlyBreakdownRows = async (from: Date, to: Date): Promise<EconomyRow[]> => {
+export const getYearlyBreakdownRows = async (from: Date, to: Date, clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select
@@ -316,13 +340,14 @@ export const getYearlyBreakdownRows = async (from: Date, to: Date): Promise<Econ
       coalesce(sum(m.amount), 0) as amount,
       count(m.id)::integer as movements
     from miclub.movements m
-    left join miclub.movement_categories c on c.id = m.category_id
+    left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
     where m.movement_date >= $1::timestamptz
       and m.movement_date < $2::timestamptz
+      and m.club_id = $3
       and m.operational_status = 'COMPLETADO'
       and m.movement_type in ('INGRESOS', 'EGRESOS')
     group by 1, 2, 3, 4, 5
     order by 1, 2, 3, 5
-  `, [from, to]);
+  `, [from, to, clubId]);
   return result.rows;
 };

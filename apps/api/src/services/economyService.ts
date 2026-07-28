@@ -14,12 +14,12 @@ import {
   getRankingBySector,
   getRecentMovements as getRecentMovementRows,
   getCompletedMonthMovementSummary,
+  getClubFinanceSummary,
   getYearlyBreakdownRows,
   type EconomyRow,
 } from "../repositories/economyRepository.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
 import { ARGENTINA_TIME_ZONE, calculateVariation, classifyExpenseCategory, DEBT_LIABILITY_CATEGORIES, EXPENSE_TYPE_KEYS, EXPENSE_TYPE_LABELS, getCurrentMonthWindow, getLastCompleteMonthWindows, getRollingInterannualMonthWindow, NON_OPERATING_EXPENSE_CATEGORIES, normalizeCategoryName, OPERATING_CATEGORIES, OPERATING_PROFIT_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, type ExpenseTypeKey } from "./economyDomain.js";
-import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
@@ -92,31 +92,32 @@ const addVariation = (items: JsonRecord[]): JsonRecord[] =>
     };
   });
 
-export const getSummary = async (): Promise<JsonRecord> => {
+export const getSummary = async (clubId: string): Promise<JsonRecord> => {
   const month = getCurrentMonthWindow();
   const [summary, finance] = await Promise.all([
-    normalizeRows(await getMonthlySummary(month.start, month.end)),
-    getPostgresClubFinanceSummary(),
+    normalizeRows(await getMonthlySummary(month.start, month.end, clubId)),
+    normalizeRows(await getClubFinanceSummary(clubId)),
   ]);
+  const financeRow = finance[0] ?? {};
   const row = summary[0] ?? {};
   const income = toNumber(row.income);
   const expenses = toNumber(row.expenses);
   return {
     month: { label: month.label, income, expenses, balance: toNumber(row.balance) },
-    current: { liquidity: finance.liquidity, projectedBalance: finance.projectedBalance },
+    current: { liquidity: toNumber(financeRow.liquidity), projectedBalance: toNumber(financeRow.projectedBalance) },
     income,
     expenses,
     balance: toNumber(row.balance),
-    liquidity: finance.liquidity,
-    projectedBalance: finance.projectedBalance,
+    liquidity: toNumber(financeRow.liquidity),
+    projectedBalance: toNumber(financeRow.projectedBalance),
     pendingBalance: toNumber(row.pendingBalance),
     completedMovements: toInteger(row.completedMovements),
     totalMovements: toInteger(row.totalMovements),
   };
 };
 
-export const getMonthlyEvolution = async (yearQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
-  const baseItems = addVariation(normalizeRows(await getAnnualEvolution(parseYear(yearQuery), OPERATING_CATEGORIES)));
+export const getMonthlyEvolution = async (clubId: string, yearQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
+  const baseItems = addVariation(normalizeRows(await getAnnualEvolution(clubId, parseYear(yearQuery), OPERATING_CATEGORIES)));
   const items = baseItems.map((item) => {
     const economicGrowth = calculateVariation(toNumber(item.growthIncome), toNumber(item.previousGrowthIncome));
     const clientGrowth = calculateVariation(toNumber(item.cumulativeEnrollments), toNumber(item.previousCumulativeEnrollments));
@@ -246,31 +247,31 @@ const parseAsOfDate = (value: unknown): Date => {
   return new Date();
 };
 
-export const getYearlyBreakdown = async (asOfQuery?: unknown): Promise<JsonRecord> => {
+export const getYearlyBreakdown = async (clubId: string, asOfQuery?: unknown): Promise<JsonRecord> => {
   const window = getRollingInterannualMonthWindow(parseAsOfDate(asOfQuery));
-  return buildYearlyBreakdown(window, normalizeRows(await getYearlyBreakdownRows(window.start, window.end)));
+  return buildYearlyBreakdown(window, normalizeRows(await getYearlyBreakdownRows(window.start, window.end, clubId)));
 };
 
-export const getBySector = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
+export const getBySector = async (clubId: string, limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
   const { start: from, end: to } = getCurrentMonthWindow();
-  const items = normalizeRankingItems(await getRankingBySector(from, to, parseLimit(limitQuery)));
+  const items = normalizeRankingItems(await getRankingBySector(from, to, parseLimit(limitQuery), clubId));
   return { items, total: items.length };
 };
 
-export const getByCategory = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
+export const getByCategory = async (clubId: string, limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
   const { start: from, end: to } = getCurrentMonthWindow();
-  const items = normalizeRankingItems(await getRankingByCategory(from, to, parseLimit(limitQuery)));
+  const items = normalizeRankingItems(await getRankingByCategory(from, to, parseLimit(limitQuery), clubId));
   return { items, total: items.length };
 };
 
 
-export const getSectorRankings = async (limitQuery?: unknown): Promise<JsonRecord> => {
+export const getSectorRankings = async (clubId: string, limitQuery?: unknown): Promise<JsonRecord> => {
   const limit = parseLimit(limitQuery, 5);
   const month = getCurrentMonthWindow();
   const annual = currentYearToDateRange();
   const [monthlyItems, annualItems] = await Promise.all([
-    getRankingBySector(month.start, new Date(), limit),
-    getRankingBySector(annual.from, annual.to, limit),
+    getRankingBySector(month.start, new Date(), limit, clubId),
+    getRankingBySector(annual.from, annual.to, limit, clubId),
   ]);
   return {
     monthly: { label: month.label, items: normalizeRankingItems(monthlyItems), total: monthlyItems.length },
@@ -293,15 +294,15 @@ const normalizePaymentItems = (rows: EconomyRow[] | JsonRecord[]): JsonRecord[] 
   }));
 };
 
-export const getPaymentMethods = async (): Promise<JsonRecord> => {
+export const getPaymentMethods = async (clubId: string): Promise<JsonRecord> => {
   const month = getCurrentMonthWindow();
   const now = new Date();
   const annual = currentYearToDateRange(now);
   const [monthlyRows, annualRows, auxiliaryRows, statusRows] = await Promise.all([
-    getPaymentMethodRows(month.start, now),
-    getPaymentMethodRows(annual.from, annual.to),
-    getEconomyAuxiliarySummary(month.start, annual.from, now),
-    getMovementStatusCounts(month.start, now),
+    getPaymentMethodRows(month.start, now, clubId),
+    getPaymentMethodRows(annual.from, annual.to, clubId),
+    getEconomyAuxiliarySummary(month.start, annual.from, now, clubId),
+    getMovementStatusCounts(month.start, now, clubId),
   ]);
   const auxiliary = normalizeRows(auxiliaryRows);
   const auxiliaryByPeriod = new Map(auxiliary.map((row) => [String(row.periodKey), row]));
@@ -341,15 +342,15 @@ export const getPaymentMethods = async (): Promise<JsonRecord> => {
   };
 };
 
-export const getRecentMovements = async (limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = normalizeRows(await getRecentMovementRows(parseLimit(limitQuery, 20)));
+export const getRecentMovements = async (clubId: string, limitQuery?: unknown): Promise<{ items: JsonRecord[]; total: number }> => {
+  const items = normalizeRows(await getRecentMovementRows(parseLimit(limitQuery, 20), clubId));
   return { items, total: items.length };
 };
 
-export const getPending = async (limitQuery?: unknown): Promise<JsonRecord> => {
+export const getPending = async (clubId: string, limitQuery?: unknown): Promise<JsonRecord> => {
   const [summary, items] = await Promise.all([
-    getPendingSummaryRows(),
-    getPendingMovementRows(parseLimit(limitQuery, 20)),
+    getPendingSummaryRows(clubId),
+    getPendingMovementRows(parseLimit(limitQuery, 20), clubId),
   ]);
   const [pendingSummary] = normalizeRows(summary);
   const pendingItems = normalizeRows(items);
@@ -363,8 +364,8 @@ export const getPending = async (limitQuery?: unknown): Promise<JsonRecord> => {
   };
 };
 
-export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord> => {
-  const [summary] = normalizeRows(await getAnnualSummaryRows(parseYear(yearQuery)));
+export const getAnnualSummary = async (clubId: string, yearQuery?: unknown): Promise<JsonRecord> => {
+  const [summary] = normalizeRows(await getAnnualSummaryRows(clubId, parseYear(yearQuery)));
   return {
     year: toInteger(summary?.year) || parseYear(yearQuery),
     income: toNumber(summary?.income),
@@ -374,13 +375,13 @@ export const getAnnualSummary = async (yearQuery?: unknown): Promise<JsonRecord>
   };
 };
 
-export const getComparison = async (): Promise<JsonRecord> => {
+export const getComparison = async (clubId: string): Promise<JsonRecord> => {
   // Todas las tarjetas de cabecera comparten el mismo reloj de negocio que Crecimiento:
   // los dos últimos meses calendario completos, con límites semiabiertos [inicio, fin).
   const months = getLastCompleteMonthWindows();
   const [rows, growthRows] = await Promise.all([
-    normalizeRows(await getCompletedMonthMovementSummary(months.previousStart, months.currentStart, months.currentEnd, OPERATING_CATEGORIES)),
-    normalizeRows(await getGrowthSummary(months.previousStart, months.currentStart, months.currentEnd)),
+    normalizeRows(await getCompletedMonthMovementSummary(months.previousStart, months.currentStart, months.currentEnd, OPERATING_CATEGORIES, clubId)),
+    normalizeRows(await getGrowthSummary(months.previousStart, months.currentStart, months.currentEnd, clubId)),
   ]);
   const previous = rows.find((row) => row.periodKey === "previous") ?? {};
   const current = rows.find((row) => row.periodKey === "current") ?? {};
@@ -422,12 +423,12 @@ export const getComparison = async (): Promise<JsonRecord> => {
   };
 };
 
-export const getInsights = async (): Promise<{ items: JsonRecord[]; total: number }> => {
+export const getInsights = async (clubId: string): Promise<{ items: JsonRecord[]; total: number }> => {
   const [baseRows, comparison, summary, qualityRows] = await Promise.all([
-    normalizeRows(await getBaseInsights()),
-    getComparison(),
-    getSummary(),
-    normalizeRows(await getEconomyDataQuality()),
+    normalizeRows(await getBaseInsights(clubId)),
+    getComparison(clubId),
+    getSummary(clubId),
+    normalizeRows(await getEconomyDataQuality(clubId)),
   ]);
   const valueByMetric = new Map(baseRows.map((row) => [String(row.metric), toNumber(row.value)]));
   const pendingCount = valueByMetric.get("pending_count") ?? 0;
