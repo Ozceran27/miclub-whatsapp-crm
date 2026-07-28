@@ -100,8 +100,8 @@ const pickNumber = (row: JsonRecord | null | undefined, keys: string[]): number 
 
 const buildDashboardAggregate = async (auth: RequestAuthContext): Promise<AggregateSnapshot> => {
   const [summary, finance, dashboard, sectors] = await Promise.all([
-    getPostgresSummary(),
-    getPostgresClubFinanceSummary(),
+    getPostgresSummary(auth.clubId),
+    getPostgresClubFinanceSummary(auth.clubId),
     getDashboardBasic(auth),
     getSectorFinanceSummary(auth)
   ]);
@@ -161,11 +161,11 @@ export const compareLegacySummaryWithPostgresDashboard = async (auth: RequestAut
   );
 };
 
-export const compareLegacyMembersWithPostgresEnrollments = async (_auth: RequestAuthContext): Promise<ComparisonResult> => {
+export const compareLegacyMembersWithPostgresEnrollments = async (auth: RequestAuthContext): Promise<ComparisonResult> => {
   const [legacyMembers, postgresMembers, postgresFinance] = await Promise.all([
     getMembersFromGoogleSheets(),
-    getPostgresMembers(),
-    getPostgresClubFinanceSummary()
+    getPostgresMembers(auth.clubId),
+    getPostgresClubFinanceSummary(auth.clubId)
   ]);
   const legacyFinance = await getClubOperationsSummaryFromGoogleSheets(legacyMembers);
   return compareAggregates(
