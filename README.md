@@ -222,16 +222,20 @@ Recomendaciones para acceso remoto:
 
 ## PostgreSQL schema migration for Google Sheets import
 
-Before running the Google Sheets dry-run importer, apply the versioned PostgreSQL migration that creates the `miclub` schema, required extensions, enums, tables, unique indexes used by importer `on conflict` clauses, and service views:
+Before running the Google Sheets dry-run importer, apply **all** versioned PostgreSQL migrations with the manifest-based runner:
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
+npm run db:migrations:check
+npm run db:migrate
 npm run import:sheets:dry
 ```
 
-If you connect with discrete PostgreSQL variables instead of `DATABASE_URL`, pass the same host/database/user options you use for the API, for example:
+`apps/api/src/scripts/migrationManifest.ts` is the authoritative order. It interleaves the root migrations and `db/migrations/multitenant` explicitly: the base schema and historical root changes run first, then tenant tables/columns and backfill, then authentication/authorization, tenant-scoped views, hardening, and importer conflict targets. The runner does not recurse or sort filenames; it aborts if a SQL file is missing, unlisted, duplicated by name, or differs from its recorded SHA-256.
 
-```bash
-psql -h "$PGHOST" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
-npm run import:sheets:dry
+Configure either `DATABASE_URL` or the same discrete PostgreSQL variables used by the API before invoking `npm run db:migrate`. Do not apply individual files with `psql`, because that bypasses the manifest and `public.miclub_schema_migrations`. Before renaming or reordering any previously shipped migration, inspect that table and confirm which names and checksums have already been applied:
+
+```sql
+select name, checksum, applied_at
+from public.miclub_schema_migrations
+order by applied_at, name;
 ```
