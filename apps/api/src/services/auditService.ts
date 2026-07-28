@@ -1,4 +1,5 @@
 import { getPostgresPool } from "../db/postgres.js";
+import type { QueryExecutor } from "../db/postgres.js";
 
 export const AUDIT_EVENT_TYPES = [
   "registration",
@@ -30,10 +31,6 @@ export type AuditEvent = {
   oldData?: AuditData | null;
   newData?: AuditData | null;
   metadata?: AuditData;
-};
-
-type QueryExecutor = {
-  query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
 };
 
 const SENSITIVE_KEY = /(?:password|passwd|passphrase|credential|authorization|cookie|token|secret|api[_-]?key|private[_-]?key|session(?:id)?|refresh|access[_-]?token|client[_-]?secret)/i;
