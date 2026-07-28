@@ -1,4 +1,7 @@
 export { normalizeMembershipFeeUnit, normalizeReceivableAggregate, normalizeMovementAmount, normalizeMoneyAmount } from "./moneyNormalization.js";
+export { MOVEMENT_OPERATIONAL_STATUSES, isCompletedMovementStatus, isEconomyOperationalStatus, isPendingMovementStatus } from "./movementStatus.js";
+import type { EconomyOperationalStatus } from "./movementStatus.js";
+export type { EconomyOperationalStatus };
 export type SourceSheet = "FITNESS" | "SALON" | "AULA" | "LOCAL_1" | "CANTINA" | "ADMINISTRACION";
 
 export type ImportFailureCode =
@@ -255,8 +258,6 @@ export interface CategoryAmountBreakdown {
 export type EconomyMovementType = "INGRESOS" | "EGRESOS" | string;
 
 export type EconomyFinancialStatus = "pendiente" | "pagado" | "cancelado" | string;
-
-export type EconomyOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | string;
 
 export interface EconomySummary {
   month?: { label: string; income: number; expenses: number; balance: number };

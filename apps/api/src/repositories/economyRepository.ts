@@ -1,5 +1,6 @@
 import { getPostgresPool } from "../db/postgres.js";
 import { DEBT_LIABILITY_CATEGORY_KEYS, NON_OPERATING_EXPENSE_CATEGORY_KEYS, OPERATING_CATEGORIES, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS } from "../services/economyDomain.js";
+import { completedMovementPredicate, pendingMovementPredicate } from "./movementPredicates.js";
 
 export type EconomyRow = Record<string, unknown>;
 
@@ -19,9 +20,9 @@ export const getMonthlySummary = async (from: Date, to: Date, clubId: string): P
       coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as income,
       coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as expenses,
       coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
-      coalesce(sum(case when m.financial_status = 'pendiente' and m.movement_type = 'INGRESOS' then m.amount when m.financial_status = 'pendiente' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as pending_balance,
+      coalesce(sum(case when ${pendingMovementPredicate("m")} and m.source_payload->>'sheet' = 'ADMINISTRACIÓN' and m.movement_type = 'INGRESOS' then m.amount when ${pendingMovementPredicate("m")} and m.source_payload->>'sheet' = 'ADMINISTRACIÓN' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as pending_balance,
       count(*) filter (where m.operational_status = 'COMPLETADO')::integer as completed_movements,
-      count(*)::integer as total_movements
+      count(*) filter (where ${completedMovementPredicate("m")})::integer as total_movements
     from miclub.movements m
     left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
     cross join bounds b
@@ -107,7 +108,7 @@ const rankingQuery = (dimensionSql: string, idSql: string, tableSql: string) => 
   left join miclub.movement_categories ranking_category on ranking_category.id = m.category_id and ranking_category.club_id = m.club_id
   where m.movement_date >= $1::timestamptz and m.movement_date < $2::timestamptz
     and m.club_id = $5
-    and upper(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')) in ('COMPLETADO', 'COMPLETED')
+    and ${completedMovementPredicate("m")}
     and upper(regexp_replace(regexp_replace(translate(trim(coalesce(ranking_category.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($4::text[])
     and m.movement_type in ('INGRESOS', 'EGRESOS')
   group by ${idSql}, ${dimensionSql}
@@ -174,6 +175,7 @@ export const getEconomyAuxiliarySummary = async (monthFrom: Date, yearFrom: Date
 };
 
 export const getMovementStatusCounts = async (from: Date, to: Date, clubId: string): Promise<EconomyRow[]> => {
+  // Explicit exception: this diagnostic intentionally includes every status.
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select upper(regexp_replace(regexp_replace(translate(trim(coalesce(operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\s+', ' ', 'g'), '\.+$', '', 'g')) as status,
@@ -187,6 +189,7 @@ export const getMovementStatusCounts = async (from: Date, to: Date, clubId: stri
 };
 
 export const getRecentMovements = async (limit: number, clubId: string): Promise<EconomyRow[]> => {
+  // Explicit exception: the recent activity feed exposes every status.
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select * from miclub.v_movements_enriched
@@ -198,11 +201,12 @@ export const getRecentMovements = async (limit: number, clubId: string): Promise
 };
 
 export const getPendingMovements = async (limit: number, clubId: string): Promise<EconomyRow[]> => {
+  // Explicit exception: a pending list is not an ordinary completed metric.
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select * from miclub.v_movements_enriched
     where club_id = $2
-      and (financial_status = 'pendiente' or operational_status = 'PENDIENTE')
+      and ${pendingMovementPredicate("v_movements_enriched")}
     order by movement_date asc nulls last, created_at asc nulls last, id asc nulls last
     limit $1::integer
   `, [limit, clubId]);
@@ -219,7 +223,8 @@ export const getPendingSummary = async (clubId: string): Promise<EconomyRow[]> =
       count(*)::integer as pending_movements
     from miclub.movements
     where club_id = $1
-      and (financial_status = 'pendiente' or operational_status = 'PENDIENTE')
+      and ${pendingMovementPredicate("movements")}
+      and source_payload->>'sheet' = 'ADMINISTRACIÓN'
   `, [clubId]);
   return result.rows;
 };
@@ -231,7 +236,7 @@ export const getAnnualSummary = async (clubId: string, year = new Date().getUTCF
            coalesce(sum(case when movement_type = 'INGRESOS' and operational_status = 'COMPLETADO' then amount else 0 end), 0) as income,
            coalesce(sum(case when movement_type = 'EGRESOS' and operational_status = 'COMPLETADO' then amount else 0 end), 0) as expenses,
            coalesce(sum(case when movement_type = 'INGRESOS' and operational_status = 'COMPLETADO' then amount when movement_type = 'EGRESOS' and operational_status = 'COMPLETADO' then -amount else 0 end), 0) as balance,
-           count(*)::integer as movements
+           count(*) filter (where ${completedMovementPredicate("movements")})::integer as movements
     from miclub.movements
     where movement_date >= make_timestamptz($1::integer, 1, 1, 0, 0, 0) and movement_date < make_timestamptz(($1::integer + 1), 1, 1, 0, 0, 0)
       and club_id = $2
@@ -321,7 +326,7 @@ export const getBaseInsights = async (clubId: string): Promise<EconomyRow[]> => 
   const result = await pool.query<EconomyRow>(`
     select 'pending_count' as metric, count(*)::numeric as value
     from miclub.movements
-    where club_id = $1 and (financial_status = 'pendiente' or operational_status = 'PENDIENTE')
+    where club_id = $1 and ${pendingMovementPredicate("movements")}
   `, [clubId]);
   return result.rows;
 };
