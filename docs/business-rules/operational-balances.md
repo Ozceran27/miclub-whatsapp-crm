@@ -62,7 +62,8 @@ Fórmula:
 
 Reglas:
 
-- pendiente se determina con una normalización común: `operational_status = PENDIENTE` o `financial_status = pendiente`;
+- pendiente se determina exclusivamente con `operational_status = PENDIENTE`;
+- `financial_status = pendiente` se conserva como metadata de importación, pero no habilita por sí solo la métrica: así un dato financiero desactualizado nunca reincorpora un movimiento `COMPLETADO`, `CANCELADO` o `ANULADO`;
 - la fuente debe ser ADMINISTRACIÓN;
 - se excluyen completados, cancelados/anulados, duplicados y movimientos que no sean `INGRESOS` o `EGRESOS`;
 - `CAPITAL` no se incluye automáticamente;
