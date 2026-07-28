@@ -89,7 +89,7 @@ export const createCrmRoutes = (options: {
   router.delete("/templates/:id", requireCrmWrite, async (req, res) => {
     const id = String(req.params.id);
     try {
-      const deleteResult = await deleteCrmTemplate(getClubId(req), id);
+      const deleteResult = await deleteCrmTemplate(getClubId(req), id, req.auth?.userId ?? null);
       if (deleteResult === "missing") return jsonError(res, 404, "Plantilla no encontrada.");
       if (deleteResult === "default") return jsonError(res, 400, "No se pueden eliminar plantillas predeterminadas.");
       res.status(204).send();

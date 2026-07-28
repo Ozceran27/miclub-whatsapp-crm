@@ -1,6 +1,6 @@
 import type { QueryExecutor } from "../db/postgres.js";
 import { withTransaction } from "../db/transaction.js";
-import { deleteMissingEnrollments, isCompletedGoogleSheetsImport, lockMissingEnrollments } from "../repositories/migrationRepository.js";
+import { archiveMissingEnrollments, isCompletedGoogleSheetsImport, lockMissingEnrollments } from "../repositories/migrationRepository.js";
 import { auditService } from "./auditService.js";
 
 export type DeleteMissingEnrollmentInput = { importId: string; enrollmentIds: string[] };
@@ -34,19 +34,18 @@ export const removeMissingEnrollments = async (
     for (const id of input.enrollmentIds) {
       const candidate = byId.get(id);
       if (!candidate) errors.push({ id, message: "La inscripción no existe, no tiene origen Google Sheets o ya no está marcada como faltante para este import." });
-      else if (candidate.dependency_reason) errors.push({ id, message: candidate.dependency_reason });
       else deletable.push(id);
     }
 
     const deletedIds = deletable.length > 0
-      ? await deleteMissingEnrollments(executor, deletable, input.importId, context.clubId)
+      ? await archiveMissingEnrollments(executor, deletable, input.importId, context.clubId)
       : [];
     for (const id of deletable.filter((id) => !deletedIds.includes(id))) {
       errors.push({ id, message: "La inscripción cambió antes de poder eliminarla; actualizá la revisión." });
     }
 
     await audit({
-      action: "migration.enrollments.delete_missing",
+      action: "migration.enrollments.archive_missing",
       result: "success",
       userId: context.userId,
       clubId: context.clubId,
@@ -56,7 +55,7 @@ export const removeMissingEnrollments = async (
       requestId: context.requestId,
       ip: context.ip,
       userAgent: context.userAgent,
-      metadata: { requestedEnrollmentIds: input.enrollmentIds, deletedEnrollmentIds: deletedIds, skippedCount: errors.length },
+      metadata: { requestedEnrollmentIds: input.enrollmentIds, archivedEnrollmentIds: deletedIds, importBatchId: input.importId, reason: "missing_from_google_sheets_import", skippedCount: errors.length },
     }, executor);
 
     return { ok: deletedIds.length > 0, deletedCount: deletedIds.length, skippedCount: errors.length, deletedIds, errors };

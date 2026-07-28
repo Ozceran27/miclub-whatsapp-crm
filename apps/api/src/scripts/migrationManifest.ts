@@ -44,4 +44,5 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202607250010_align_import_conflict_targets.sql", sha256: "6f1ac98576774acefbc4f408a8b2a10de4c7e804b32c0b8e6b46ce3cc20e4523" },
   { path: "202607250011_complete_import_conflict_targets.sql", sha256: "09d4f96d6794516ef4c9a56c711d70166ecc64f9a7c3e7d5b854eef0ed1824c8" },
   { path: "202607280001_enforce_operational_movement_status.sql", sha256: "6df122df959125f83fa608f9283693887db41d8c5ae402f797c3e5b7c87e7dba" },
+  { path: "202607280002_retention_and_crm_template_archive.sql", sha256: "8727f7a14f6276c8541cf9bc6eef5bbce161e69b91397d78fdc5c062499716cc" },
 ];
