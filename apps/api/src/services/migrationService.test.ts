@@ -13,7 +13,11 @@ test("removeMissingEnrollments revierte la escritura cuando falla la auditoría"
       if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) transactionCommands.push(sql);
       if (sql.includes("from miclub.import_batches")) return { rows: [{ id: "batch" }] as T[] };
       if (sql.includes("from miclub.enrollments e")) return { rows: [{ id: enrollmentId, dependency_reason: null }] as T[] };
-      if (sql.includes("delete from miclub.enrollments")) return { rows: [{ id: enrollmentId }] as T[] };
+      if (sql.includes("update miclub.enrollments")) {
+        assert.match(sql, /superseded_at = coalesce/);
+        assert.match(sql, /status = 'cancelado'/);
+        return { rows: [{ id: enrollmentId }] as T[] };
+      }
       return { rows: [] as T[] };
     },
     release: () => { releases += 1; },

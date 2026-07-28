@@ -58,8 +58,8 @@ export const updateCrmTemplate = async (clubId: string, id: string, name: string
   return row ? mapSqliteTemplate(row) : null;
 };
 
-export const deleteCrmTemplate = async (clubId: string, id: string): Promise<"missing" | "default" | "deleted"> => {
-  if (getCrmSource() === "postgres") { await postgresCrm.deleteTemplate(clubId, id); return "deleted"; }
+export const deleteCrmTemplate = async (clubId: string, id: string, userId: string | null = null): Promise<"missing" | "default" | "deleted"> => {
+  if (getCrmSource() === "postgres") return postgresCrm.archiveTemplate(clubId, id, userId);
   const existing = await sqliteGet<{ id: string; isDefault: number }>("SELECT id, isDefault FROM message_templates WHERE id = ?", [id]);
   if (!existing) return "missing";
   if (existing.isDefault === 1) return "default";

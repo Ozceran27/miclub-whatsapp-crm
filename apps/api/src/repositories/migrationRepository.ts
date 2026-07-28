@@ -30,9 +30,16 @@ export const lockMissingEnrollments = async (executor: QueryExecutor, enrollment
   return result.rows;
 };
 
-export const deleteMissingEnrollments = async (executor: QueryExecutor, enrollmentIds: string[], importId: string, clubId: string): Promise<string[]> => {
+export const archiveMissingEnrollments = async (executor: QueryExecutor, enrollmentIds: string[], importId: string, clubId: string): Promise<string[]> => {
   const result = await executor.query<{ id: string }>(
-    `delete from miclub.enrollments
+    `update miclub.enrollments
+        set inactive = true,
+            inactive_at = coalesce(inactive_at, now()),
+            inactive_reason = 'missing_from_google_sheets_import',
+            superseded_at = coalesce(superseded_at, now()),
+            superseded_reason = 'missing_from_google_sheets_import',
+            status = 'cancelado'::miclub.enrollment_status,
+            updated_at = now()
       where id = any($1::uuid[]) and club_id = $3 and source = 'google_sheets' and missing_from_import_batch_id = $2
       returning id`,
     [enrollmentIds, importId, clubId],
