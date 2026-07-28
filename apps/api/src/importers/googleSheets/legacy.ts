@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import type { AdminMovement, ClubOperationsSummary, Member, SectorBalance } from "@miclub/shared";
+import { addArgentinaCalendarDays, getArgentinaDayWindow, getArgentinaMonthWindow } from "../../domain/argentinaTime.js";
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeComparableText, normalizeDate, normalizeDni, normalizeFee, normalizeMembershipFeeAmount, normalizeHeader, normalizeMoney, normalizeOperationalStatus, parseArgentinianDate, parseGoogleSheetDate, parseSheetDateToLocalDate, normalizeSheetText, toMemberStatus } from "../normalizers.js";
 export { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeDate, normalizeDni, normalizeMoney, normalizeOperationalStatus, parseArgentinianDate, parseGoogleSheetDate, parseSheetDateToLocalDate, normalizeSheetText, toMemberStatus };
 
@@ -607,9 +608,7 @@ export const calculateReceivableFee = (member: Member, aulaCommissionMap: Record
 };
 
 const addDays = (date: Date, days: number): Date => {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
+  return addArgentinaCalendarDays(date, days);
 };
 
 export const getMemberDueDate = (member: Member): Date | undefined => {
@@ -620,13 +619,13 @@ export const getMemberDueDate = (member: Member): Date | undefined => {
 };
 
 export const calculateFutureReceivableFeesUntilMonthEnd = (members: Member[], aulaCommissionMap: Record<string, number>, today = new Date()): number => {
-  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  const { from: start } = getArgentinaDayWindow(today);
+  const { to: end } = getArgentinaMonthWindow(today);
   return members
     .filter((member) => normalizeOperationalStatus(member.estado) === "al_dia")
     .reduce((sum, member) => {
       const dueDate = getMemberDueDate(member);
-      if (!dueDate || dueDate < start || dueDate > end) return sum;
+      if (!dueDate || dueDate < start || dueDate >= end) return sum;
       return sum + calculateReceivableFee(member, aulaCommissionMap);
     }, 0);
 };

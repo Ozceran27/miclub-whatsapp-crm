@@ -1,4 +1,5 @@
 import { getPostgresPool } from "../db/postgres.js";
+import { getArgentinaCalendarYear } from "../domain/argentinaTime.js";
 import { DEBT_LIABILITY_CATEGORY_KEYS, NON_OPERATING_EXPENSE_CATEGORY_KEYS, OPERATING_CATEGORIES, SERVICE_CATEGORY_KEYS, TAX_CATEGORY_KEYS } from "../services/economyDomain.js";
 import { completedMovementPredicate, pendingMovementPredicate } from "./movementPredicates.js";
 
@@ -33,7 +34,7 @@ export const getMonthlySummary = async (from: Date, to: Date, clubId: string): P
   return result.rows;
 };
 
-export const getAnnualEvolution = async (clubId: string, year = new Date().getUTCFullYear(), operatingCategories: readonly string[] = []): Promise<EconomyRow[]> => {
+export const getAnnualEvolution = async (clubId: string, year = getArgentinaCalendarYear(), operatingCategories: readonly string[] = []): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     with months as (
@@ -53,7 +54,7 @@ export const getAnnualEvolution = async (clubId: string, year = new Date().getUT
         from miclub.movements m
         left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
         where m.club_id = $3
-      ) m on m.movement_date >= months.month_start and m.movement_date < months.month_start + interval '1 month'
+      ) m on m.movement_date >= (months.month_start at time zone 'America/Argentina/Buenos_Aires') and m.movement_date < ((months.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')
       group by months.month_start
     )
     select
@@ -229,7 +230,7 @@ export const getPendingSummary = async (clubId: string): Promise<EconomyRow[]> =
   return result.rows;
 };
 
-export const getAnnualSummary = async (clubId: string, year = new Date().getUTCFullYear()): Promise<EconomyRow[]> => {
+export const getAnnualSummary = async (clubId: string, year = getArgentinaCalendarYear()): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<EconomyRow>(`
     select $1::integer as year,
@@ -238,7 +239,7 @@ export const getAnnualSummary = async (clubId: string, year = new Date().getUTCF
            coalesce(sum(case when movement_type = 'INGRESOS' and operational_status = 'COMPLETADO' then amount when movement_type = 'EGRESOS' and operational_status = 'COMPLETADO' then -amount else 0 end), 0) as balance,
            count(*) filter (where ${completedMovementPredicate("movements")})::integer as movements
     from miclub.movements
-    where movement_date >= make_timestamptz($1::integer, 1, 1, 0, 0, 0) and movement_date < make_timestamptz(($1::integer + 1), 1, 1, 0, 0, 0)
+    where movement_date >= make_timestamptz($1::integer, 1, 1, 0, 0, 0, 'America/Argentina/Buenos_Aires') and movement_date < make_timestamptz(($1::integer + 1), 1, 1, 0, 0, 0, 'America/Argentina/Buenos_Aires')
       and club_id = $2
   `, [year, clubId]);
   return result.rows;

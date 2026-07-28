@@ -83,9 +83,9 @@ export const getCrmHistory = async (clubId: string, page: number, pageSize: numb
   return { items: rows, page, pageSize, total, totalPages: total === 0 ? 0 : Math.ceil(total / pageSize) };
 };
 
-export const getCrmContactedRecent = async (clubId: string, since: string, windowDays: number): Promise<ContactedRecentResponse> => {
-  if (getCrmSource() === "postgres") return postgresCrm.getContactedRecent(clubId, since, windowDays);
-  const rows = await sqliteAll<{ memberId: string; eventAt: string }>(`SELECT memberId, COALESCE(sentAt, createdAt) as eventAt FROM message_history WHERE COALESCE(status, estado) = 'sent_manual' AND datetime(COALESCE(sentAt, createdAt)) >= datetime(?) ORDER BY datetime(COALESCE(sentAt, createdAt)) DESC`, [since]);
+export const getCrmContactedRecent = async (clubId: string, since: string, until: string, windowDays: number): Promise<ContactedRecentResponse> => {
+  if (getCrmSource() === "postgres") return postgresCrm.getContactedRecent(clubId, since, until, windowDays);
+  const rows = await sqliteAll<{ memberId: string; eventAt: string }>(`SELECT memberId, COALESCE(sentAt, createdAt) as eventAt FROM message_history WHERE COALESCE(status, estado) = 'sent_manual' AND datetime(COALESCE(sentAt, createdAt)) >= datetime(?) AND datetime(COALESCE(sentAt, createdAt)) < datetime(?) ORDER BY datetime(COALESCE(sentAt, createdAt)) DESC`, [since, until]);
   const byMemberId: ContactedRecentResponse["byMemberId"] = {};
   for (const row of rows) if (!byMemberId[row.memberId]) byMemberId[row.memberId] = { lastSentAt: row.eventAt, count: 1 }; else byMemberId[row.memberId].count += 1;
   return { windowDays, since, memberIds: Object.keys(byMemberId), byMemberId };

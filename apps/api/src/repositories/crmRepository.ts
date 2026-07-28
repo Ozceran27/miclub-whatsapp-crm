@@ -117,10 +117,10 @@ export const updateHistoryStatus = async (clubId: string, id: number, status: Me
   return result.rows[0] ? mapHistory(result.rows[0]) : null;
 };
 
-export const getContactedRecent = async (clubId: string, since: string, windowDays: number): Promise<ContactedRecentResponse> => {
+export const getContactedRecent = async (clubId: string, since: string, until: string, windowDays: number): Promise<ContactedRecentResponse> => {
   await ensureCrmSchema();
   const pool = await getPostgresPool();
-  const result = await pool.query<{ member_id: string; event_at: string }>(`select member_id, coalesce(sent_at, created_at) as event_at from miclub.crm_message_history where club_id=$1 and status='sent_manual' and coalesce(sent_at, created_at) >= $2 order by coalesce(sent_at, created_at) desc`, [clubId, since]);
+  const result = await pool.query<{ member_id: string; event_at: string }>(`select member_id, coalesce(sent_at, created_at) as event_at from miclub.crm_message_history where club_id=$1 and status='sent_manual' and coalesce(sent_at, created_at) >= $2::timestamptz and coalesce(sent_at, created_at) < $3::timestamptz order by coalesce(sent_at, created_at) desc`, [clubId, since, until]);
   const byMemberId: ContactedRecentResponse["byMemberId"] = {};
   for (const row of result.rows) {
     const existing = byMemberId[row.member_id];
