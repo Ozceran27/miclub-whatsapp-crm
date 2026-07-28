@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ClubOperationsSummary, Member, SectorOperationalSummary, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
-import { apiUrl } from '../../api';
+import { homeApi } from '../../services/api/homeApi';
 import { formatArPeso } from '../../utils';
 import type { ModuleId } from '../ModuleNav';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
@@ -13,7 +13,7 @@ export type SyncStatus = {
   error?: string;
 };
 
-type Summary = {
+export type Summary = {
   totalMembers: number;
   totalDebtors: number;
   totalEstimatedDebt: number;
@@ -174,12 +174,10 @@ export function useHomeDashboard() {
   const loadHome = async () => {
     setLoading(true); setError(null); setFinanceError(null); setSectorError(null);
     try {
-      const financePromise = fetch(apiUrl('/club-finance-summary'), { cache: 'no-store' }).then(async (response) => { if (!response.ok) throw new Error('No se pudo cargar el resumen financiero.'); return response.json() as Promise<ClubOperationsSummary>; }).catch((financeLoadError) => { setFinanceError(financeLoadError instanceof Error ? financeLoadError.message : 'Resumen financiero no disponible.'); return null; });
-      const sectorPromise = fetch(apiUrl('/sector-operational-summary'), { cache: 'no-store' }).then(async (response) => { if (!response.ok) throw new Error('No se pudo cargar el resumen operativo por sector.'); return response.json() as Promise<SectorOperationalSummary>; }).catch((sectorLoadError) => { setSectorError(sectorLoadError instanceof Error ? sectorLoadError.message : 'Resumen operativo por sector no disponible.'); return null; });
-      const [summaryRes, membersRes, debtorsRes, syncRes, financePayload, sectorPayload] = await Promise.all([fetch(apiUrl('/summary'), { cache: 'no-store' }), fetch(apiUrl('/members'), { cache: 'no-store' }), fetch(apiUrl('/debtors'), { cache: 'no-store' }), fetch(apiUrl('/sync-status'), { cache: 'no-store' }), financePromise, sectorPromise]);
-      if (!summaryRes.ok || !membersRes.ok || !debtorsRes.ok || !syncRes.ok) throw new Error('No se pudo cargar el inicio operativo.');
-      const [summaryPayload, membersPayload, debtorsPayload, syncPayload] = await Promise.all([summaryRes.json(), membersRes.json(), debtorsRes.json(), syncRes.json()]);
-      setSummary(summaryPayload as Summary); setMembers(membersPayload as Member[]); setDebtors(debtorsPayload as Member[]); setSyncStatus(syncPayload as SyncStatus); setFinanceSummary(financePayload); setSectorSummary(sectorPayload);
+      const financePromise = homeApi.getFinanceSummary().catch((e) => { setFinanceError(e instanceof Error ? e.message : 'Resumen financiero no disponible.'); return null; });
+      const sectorPromise = homeApi.getSectorSummary().catch((e) => { setSectorError(e instanceof Error ? e.message : 'Resumen operativo por sector no disponible.'); return null; });
+      const [summaryPayload, membersPayload, debtorsPayload, syncPayload, financePayload, sectorPayload] = await Promise.all([homeApi.getSummary(), homeApi.getMembers(), homeApi.getDebtors(), homeApi.getSyncStatus(), financePromise, sectorPromise]);
+      setSummary(summaryPayload); setMembers(membersPayload); setDebtors(debtorsPayload); setSyncStatus(syncPayload); setFinanceSummary(financePayload); setSectorSummary(sectorPayload);
     } catch (e) { setError(e instanceof Error ? e.message : 'Error desconocido al cargar el inicio.'); } finally { setLoading(false); }
   };
 
