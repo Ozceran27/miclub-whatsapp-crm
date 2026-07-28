@@ -144,7 +144,8 @@ export const buildEnrollmentReceivablesQuery = ({
   if (capabilities.hasEnrollmentReceivableFeesView) {
     return receivablesAggregateSql(
       `select status, due_date, receivable_fee
-   from miclub.v_enrollment_receivable_fees`,
+   from miclub.v_enrollment_receivable_fees
+   where club_id = $1`,
     );
   }
 
@@ -167,13 +168,13 @@ export const buildEnrollmentReceivablesQuery = ({
       end
     end as receivable_fee
   from miclub.enrollments e
-  join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id
-  join miclub.activities a on a.id = e.activity_id
-  join miclub.sectors s on s.id = a.sector_id
+  join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
+  join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+  join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
   cross join lateral (
     select ${normalizedFeeExpression} as normalized_fee_amount
   ) normalized_fee
-  where true${inactiveEnrollmentFilter}`,
+  where e.club_id = $1${inactiveEnrollmentFilter}`,
   );
 };
 
@@ -250,7 +251,8 @@ const getMovementBreakdown = (groupColumn: "sector_name" | "category") => `
       coalesce(nullif(trim(${groupColumn}), ''), 'Sin datos') as name,
       coalesce(sum(amount), 0) as amount
     from miclub.v_movements_enriched
-    where movement_type = $1
+    where club_id = $1
+      and movement_type = $2
       and operational_status = 'COMPLETADO'
     group by coalesce(nullif(trim(${groupColumn}), ''), 'Sin datos')
   )
@@ -270,11 +272,12 @@ export const normalizeStatusLabel = (value: unknown, _dueDate?: unknown): Debtor
   return "Desconocido";
 };
 
-export const getPostgresMembers = async (): Promise<Member[]> => {
+export const getPostgresMembers = async (clubId: string): Promise<Member[]> => {
   const pool = await getPostgresPool();
   const inactiveFilter = await enrollmentInactiveFilter("v_current_enrollments", "v_current_enrollments");
   const result = await pool.query<Record<string, unknown>>(
-    `select * from miclub.v_current_enrollments where true${inactiveFilter}`,
+    `select * from miclub.v_current_enrollments where club_id = $1${inactiveFilter}`,
+    [clubId],
   );
   return result.rows.map((row, index) => ({
     id: pickString(
@@ -363,13 +366,13 @@ const buildStatusBreakdown = (members: Member[]): StatusBreakdown => {
   return statusBreakdown;
 };
 
-export const getPostgresDebtors = async (): Promise<Member[]> =>
-  (await getPostgresMembers()).filter(
+export const getPostgresDebtors = async (clubId: string): Promise<Member[]> =>
+  (await getPostgresMembers(clubId)).filter(
     (member) => normalizeOperationalStatus(member.estado) === "adeudando",
   );
 
-export const getPostgresSummary = async () => {
-  const members = await getPostgresMembers();
+export const getPostgresSummary = async (clubId: string) => {
+  const members = await getPostgresMembers(clubId);
   const debtors = members.filter(
     (member) => normalizeOperationalStatus(member.estado) === "adeudando",
   );
@@ -405,7 +408,7 @@ export interface ReceivableEffectiveStatusDebugRow {
   totalNormalizedFee: number;
 }
 
-export const getPostgresReceivableEffectiveStatusDebug = async (): Promise<{
+export const getPostgresReceivableEffectiveStatusDebug = async (clubId: string): Promise<{
   businessRule: string;
   rows: ReceivableEffectiveStatusDebugRow[];
 }> => {
@@ -413,7 +416,9 @@ export const getPostgresReceivableEffectiveStatusDebug = async (): Promise<{
   const result = await pool.query<Record<string, unknown>>(
     `select effective_status, enrollments_count, total_receivable_fee, total_normalized_fee
      from miclub.v_receivable_fees_effective_status_debug
+     where club_id = $1
      order by effective_status`,
+    [clubId],
   );
   return {
     businessRule: "cuotas_a_cobrar incluye solo effective_status=adeudando; nuevo_inscripto queda excluido",
@@ -427,7 +432,7 @@ export const getPostgresReceivableEffectiveStatusDebug = async (): Promise<{
 };
 
 export const getPostgresClubFinanceSummary =
-  async (): Promise<ClubOperationsSummary> => {
+  async (clubId: string): Promise<ClubOperationsSummary> => {
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
     const dashboardCapabilities = await detectPostgresDashboardCapabilities();
@@ -444,41 +449,41 @@ export const getPostgresClubFinanceSummary =
       pendingFallback,
     ] = await Promise.all([
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_dashboard_basic`,
+        `select * from miclub.v_dashboard_basic where club_id = $1`, [clubId],
       ).catch((error: unknown) => {
         console.warn("[postgres-dashboard] v_dashboard_basic no disponible; usando fallback para métricas derivadas.", error);
         return { rows: [], rowCount: 0, command: "SELECT", oid: 0, fields: [] };
       }),
       pool.query<Record<string, unknown>>(
-        `select liquidity, cash, bank, dollars from miclub.operational_balances order by cutoff_date desc, created_at desc limit 1`,
+        `select liquidity, cash, bank, dollars from miclub.operational_balances where club_id = $1 order by cutoff_date desc, created_at desc limit 1`, [clubId],
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_settlement_balances where settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`,
+        `select * from miclub.v_sector_settlement_balances where club_id = $1 and settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`, [clubId],
       ),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
-        "INGRESOS",
+        clubId, "INGRESOS",
       ]),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
-        "EGRESOS",
+        clubId, "EGRESOS",
       ]),
       pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
-        "INGRESOS",
+        clubId, "INGRESOS",
       ]),
       pool.query<Record<string, unknown>>(getMovementBreakdown("category"), [
-        "EGRESOS",
+        clubId, "EGRESOS",
       ]),
       pool.query<Record<string, unknown>>(
         `select distinct on (metric_key) metric_key, metric_value
          from miclub.sheet_metric_snapshots
-         where metric_key = any($1::text[])
+         where club_id = $1 and metric_key = any($2::text[])
          order by metric_key, captured_at desc`,
-        [["fitness.settlement_balance", "salon.settlement_balance", "aula.settlement_balance", "local1.settlement_balance"]],
+        [clubId, ["fitness.settlement_balance", "salon.settlement_balance", "aula.settlement_balance", "local1.settlement_balance"]],
       ),
       pool.query<Record<string, unknown>>(
         buildEnrollmentReceivablesQuery({
           capabilities: dashboardCapabilities,
           inactiveEnrollmentFilter,
-        }),
+        }), [clubId],
       ),
       pool.query<Record<string, unknown>>(
         `select
@@ -486,8 +491,10 @@ export const getPostgresClubFinanceSummary =
            coalesce(sum(case when movement_type = 'EGRESOS' then amount else 0 end), 0) as pending_expenses,
            coalesce(sum(case when movement_type = 'INGRESOS' then amount when movement_type = 'EGRESOS' then -amount else 0 end), 0) as pending_net_balance
          from miclub.v_movements_enriched
-         where coalesce(source_payload->>'sheet', '') = 'ADMINISTRACIÓN'
+         where club_id = $1
+           and coalesce(source_payload->>'sheet', '') = 'ADMINISTRACIÓN'
            and (operational_status = 'PENDIENTE'::miclub.movement_status or financial_status = 'pendiente'::miclub.financial_status)`,
+        [clubId],
       ),
     ]);
     const row = {
@@ -626,13 +633,13 @@ export const getPostgresClubFinanceSummary =
   };
 
 export const getPostgresSectorOperationalSummary =
-  async (): Promise<SectorOperationalSummary> => {
-    const members = await getPostgresMembers();
+  async (clubId: string): Promise<SectorOperationalSummary> => {
+    const members = await getPostgresMembers(clubId);
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
     const [sectorResult, sectorProfitabilityResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_finance_summary`,
+        `select * from miclub.v_sector_finance_summary where club_id = $1`, [clubId],
       ),
 
       pool.query<Record<string, unknown>>(
@@ -644,11 +651,12 @@ export const getPostgresSectorOperationalSummary =
             m.movement_date,
             upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
           from miclub.movements m
-          left join miclub.sectors s on s.id = m.sector_id
-          left join miclub.movement_categories c on c.id = m.category_id
-          where upper(regexp_replace(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) in ('COMPLETADO', 'COMPLETED')
+          left join miclub.sectors s on s.id = m.sector_id and s.club_id = m.club_id
+          left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
+          where m.club_id = $1
+            and upper(regexp_replace(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) in ('COMPLETADO', 'COMPLETED')
             and m.movement_type in ('INGRESOS', 'EGRESOS')
-            and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($1::text[])
+            and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($2::text[])
         ), current_month as (
           select date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') at time zone 'America/Argentina/Buenos_Aires' as start_at
         )
@@ -659,7 +667,7 @@ export const getPostgresSectorOperationalSummary =
         from normalized_movements
         cross join current_month
         group by sector_key`,
-        [OPERATING_CATEGORIES],
+        [clubId, OPERATING_CATEGORIES],
       ),
       pool.query<Record<string, unknown>>(
         `with relevant as (
@@ -668,7 +676,8 @@ export const getPostgresSectorOperationalSummary =
             coalesce(nullif(trim(concept), ''), category) as concept,
             movement_date
           from miclub.v_movements_enriched
-          where regexp_replace(
+          where club_id = $1
+            and regexp_replace(
               translate(lower(coalesce(sector_name, sector_code, '')), 'áéíóúüñ', 'aeiouun'),
               '[^a-z0-9]+',
               '',
@@ -712,6 +721,7 @@ export const getPostgresSectorOperationalSummary =
           (select amount from highlighted) as highlighted_income_amount,
           (select concept from highlighted) as highlighted_income_concept,
           (select movement_date from highlighted) as highlighted_income_date`,
+        [clubId],
       ),
       pool.query<Record<string, unknown>>(
         `with normalized_movements as (
@@ -730,7 +740,8 @@ export const getPostgresSectorOperationalSummary =
               'g'
             ) as normalized_category
           from miclub.v_movements_enriched
-          where regexp_replace(
+          where club_id = $1
+            and regexp_replace(
               translate(lower(coalesce(sector_name, sector_code, '')), 'áéíóúüñ', 'aeiouun'),
               '[^a-z0-9]+',
               '',
@@ -765,13 +776,14 @@ export const getPostgresSectorOperationalSummary =
           cmv,
           kiosk_income + drinks_income - cmv as total_profitability
         from cantina_components`,
+        [clubId],
       ),
       pool.query<Record<string, unknown>>(
         `select distinct on (metric_key) metric_key, metric_value
          from miclub.sheet_metric_snapshots
-         where metric_key = any($1::text[])
+         where club_id = $1 and metric_key = any($2::text[])
          order by metric_key, captured_at desc`,
-        [[
+        [clubId, [
           "fitness.total_profitability",
           "fitness.current_month_profitability",
           "fitness.settlement_balance",
@@ -798,9 +810,10 @@ export const getPostgresSectorOperationalSummary =
             a.name,
             count(*)::integer as members
           from miclub.enrollments e
-          join miclub.activities a on a.id = e.activity_id
-          join miclub.sectors s on s.id = a.sector_id
-          where e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])${inactiveEnrollmentFilter}
+          join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+          join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
+          where e.club_id = $1
+            and e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])${inactiveEnrollmentFilter}
             and upper(replace(s.code, ' ', '_')) in ('SALON', 'AULA')
           group by upper(replace(s.code, ' ', '_')), a.name
         ), ranked as (
@@ -814,6 +827,7 @@ export const getPostgresSectorOperationalSummary =
         select sector_key, name, members, popularity_rank, unpopularity_rank
         from ranked
         where popularity_rank = 1 or unpopularity_rank = 1`,
+        [clubId],
       ),
       pool.query<Record<string, unknown>>(
         `select
@@ -825,10 +839,12 @@ export const getPostgresSectorOperationalSummary =
              else e.fee_amount
            end), 0) as total_debt_amount
          from miclub.enrollments e
-         join miclub.activities a on a.id = e.activity_id
-         join miclub.sectors s on s.id = a.sector_id
-         where e.status = 'adeudando'::miclub.enrollment_status${inactiveEnrollmentFilter}
+         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+         join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
+         where e.club_id = $1
+           and e.status = 'adeudando'::miclub.enrollment_status${inactiveEnrollmentFilter}
          group by upper(replace(s.code, ' ', '_'))`,
+        [clubId],
       ),
     ]);
     const sectors = sectorResult.rows;

@@ -47,9 +47,10 @@ const getPostgresSyncStatus = async (): Promise<SyncStatus & { ok: boolean; warn
   }
 };
 
-export const getMembersSource = async (): Promise<{ members: Member[]; syncStatus: SyncStatus }> => {
+export const getMembersSource = async (clubId?: string): Promise<{ members: Member[]; syncStatus: SyncStatus }> => {
   if (shouldUsePostgresDataSource()) {
-    const members = await getPostgresMembers();
+    if (!clubId) throw new Error("clubId es obligatorio para consultar PostgreSQL");
+    const members = await getPostgresMembers(clubId);
     lastSyncAt = new Date().toISOString();
     lastSyncError = undefined;
     return { members, syncStatus: { source: "postgres", enabled: true, sheets: [], lastSyncAt } };
@@ -158,48 +159,48 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
   router.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 
   // legacy-compat: estos paths raíz son consumidos por el frontend actual; no renombrar sin migración frontend.
-  router.get("/members", async (_req, res) => {
+  router.get("/members", async (req, res) => {
     try {
       if (shouldUsePostgresDataSource()) {
         try {
-          return res.json(await getPostgresMembers());
+          return res.json(await getPostgresMembers(req.auth!.clubId));
         } catch (error) {
           return res.json(postgresFallback("miembros", [], error));
         }
       }
-      const { members } = await getMembersSource();
+      const { members } = await getMembersSource(req.auth!.clubId);
       res.json(members);
     } catch {
       jsonError(res, 500, "No se pudo obtener la lista de miembros.");
     }
   });
 
-  router.get("/debtors", async (_req, res) => {
+  router.get("/debtors", async (req, res) => {
     try {
       if (shouldUsePostgresDataSource()) {
         try {
-          return res.json(await getPostgresDebtors());
+          return res.json(await getPostgresDebtors(req.auth!.clubId));
         } catch (error) {
           return res.json(postgresFallback("deudores", [], error));
         }
       }
-      const { members } = await getMembersSource();
+      const { members } = await getMembersSource(req.auth!.clubId);
       res.json(members.filter(isDebtorMember));
     } catch {
       jsonError(res, 500, "No se pudo obtener la lista de deudores.");
     }
   });
 
-  router.get("/summary", async (_req, res) => {
+  router.get("/summary", async (req, res) => {
     try {
       if (shouldUsePostgresDataSource()) {
         try {
-          return res.json(await getPostgresSummary());
+          return res.json(await getPostgresSummary(req.auth!.clubId));
         } catch (error) {
           return res.json(postgresFallback("resumen", emptyPostgresSummary(), error));
         }
       }
-      const { members } = await getMembersSource();
+      const { members } = await getMembersSource(req.auth!.clubId);
       const debtors = members.filter(isDebtorMember);
       const statusBreakdown = buildStatusBreakdown(members);
       const rawStatusBreakdown = buildRawStatusBreakdown(members);
@@ -229,16 +230,16 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
     }
   });
 
-  router.get("/club-finance-summary", async (_req, res) => {
+  router.get("/club-finance-summary", async (req, res) => {
     try {
       if (shouldUsePostgresDataSource()) {
         try {
-          return res.json(await getPostgresClubFinanceSummary());
+          return res.json(await getPostgresClubFinanceSummary(req.auth!.clubId));
         } catch (error) {
           return res.json(postgresFallback("resumen financiero", emptyPostgresClubFinanceSummary(), error));
         }
       }
-      const { members } = await getMembersSource();
+      const { members } = await getMembersSource(req.auth!.clubId);
       res.json(await getClubOperationsSummaryFromGoogleSheets(members));
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo obtener el resumen financiero del club.";
@@ -246,16 +247,16 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
     }
   });
 
-  router.get("/sector-operational-summary", async (_req, res) => {
+  router.get("/sector-operational-summary", async (req, res) => {
     try {
       if (shouldUsePostgresDataSource()) {
         try {
-          return res.json(await getPostgresSectorOperationalSummary());
+          return res.json(await getPostgresSectorOperationalSummary(req.auth!.clubId));
         } catch (error) {
           return res.json(postgresFallback("resumen operativo por sector", emptyPostgresSectorOperationalSummary(), error));
         }
       }
-      const { members } = await getMembersSource();
+      const { members } = await getMembersSource(req.auth!.clubId);
       res.json(await getSectorOperationalSummary(members));
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo obtener el resumen operativo por sector.";
@@ -263,10 +264,10 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
     }
   });
 
-  router.get("/sync-status", async (_req, res) => {
+  router.get("/sync-status", async (req, res) => {
     try {
       if (shouldUsePostgresDataSource()) return res.json(await getPostgresSyncStatus());
-      const { syncStatus } = await getMembersSource();
+      const { syncStatus } = await getMembersSource(req.auth!.clubId);
       res.json(syncStatus);
     } catch {
       jsonError(res, 500, "No se pudo obtener el estado de sincronización.");
@@ -274,12 +275,12 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
   });
 
   if (debugEndpointsEnabled) {
-    router.get("/club-finance-debug", async (_req, res) => {
+    router.get("/club-finance-debug", async (req, res) => {
       try {
         if (shouldUsePostgresDataSource()) {
-          return res.json(await getPostgresClubFinanceSummary());
+          return res.json(await getPostgresClubFinanceSummary(req.auth!.clubId));
         }
-        const { members } = await getMembersSource();
+        const { members } = await getMembersSource(req.auth!.clubId);
         res.json(await getClubFinanceDebugFromGoogleSheets(members));
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo leer el debug financiero del club.";
@@ -287,9 +288,9 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       }
     });
 
-    router.get("/receivable-fees-effective-status-debug", async (_req, res) => {
+    router.get("/receivable-fees-effective-status-debug", async (req, res) => {
       try {
-        if (shouldUsePostgresDataSource()) return res.json(await getPostgresReceivableEffectiveStatusDebug());
+        if (shouldUsePostgresDataSource()) return res.json(await getPostgresReceivableEffectiveStatusDebug(req.auth!.clubId));
         jsonError(res, 404, "Debug de estados efectivos disponible solo con PostgreSQL.");
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo leer el debug de cuotas por estado efectivo.";
@@ -297,9 +298,9 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       }
     });
 
-    router.get("/sector-operational-debug", async (_req, res) => {
+    router.get("/sector-operational-debug", async (req, res) => {
       try {
-        const { members } = await getMembersSource();
+        const { members } = await getMembersSource(req.auth!.clubId);
         res.json(await getSectorOperationalDebug(members));
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo leer el debug operativo por sector.";
@@ -307,9 +308,9 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       }
     });
 
-    router.get("/status-debug", async (_req, res) => {
+    router.get("/status-debug", async (req, res) => {
       try {
-        const { members } = await getMembersSource();
+        const { members } = await getMembersSource(req.auth!.clubId);
         const normalizedStatusBreakdown = buildStatusBreakdown(members);
         res.json({ totalMembers: members.length, rawStatusBreakdown: buildRawStatusBreakdown(members), normalizedStatusBreakdown });
       } catch {
