@@ -1,13 +1,15 @@
 import { getPostgresEnv, validatePostgresEnv } from "../config/env.js";
 
-type PgPool = {
+export type QueryExecutor = {
   query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
+};
+
+export type PgPool = QueryExecutor & {
   connect: () => Promise<PgClient>;
   end: () => Promise<void>;
 };
 
-type PgClient = {
-  query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
+export type PgClient = QueryExecutor & {
   release: () => void;
 };
 

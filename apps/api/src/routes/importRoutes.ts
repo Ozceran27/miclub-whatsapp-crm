@@ -6,6 +6,7 @@ import { listImportBatches, listImportErrors, summarizeImportErrors } from "../i
 import { hasRecentSuccessfulDryRun } from "../repositories/importRepository.js";
 import asyncHandler from "./asyncHandler.js";
 import { requireImportOperator, requireMembership } from "../middleware/authorization.js";
+import { InvalidMigrationBatchError, removeMissingEnrollments } from "../services/migrationService.js";
 
 // migración: importadores bajo /api/import; no renombrar sin migración frontend.
 const router = Router();
@@ -78,81 +79,25 @@ router.post("/google-sheets/enrollments/delete-missing", requireImportFeature, a
   const input = parseMissingEnrollmentDeletion(req.body);
   if (!input) return res.status(400).json({ ok: false, message: "Debe seleccionar al menos una inscripción válida para eliminar." });
   const clubId = req.auth!.clubId;
-
-  const pool = await getPostgresPool();
-  const batch = await pool.query<{ id: string }>(
-    "select id from miclub.import_batches where id = $1 and club_id = $2 and source = 'google_sheets' and status in ('completed', 'completed_with_errors')",
-    [input.importId, clubId],
-  );
-  if (batch.rows.length === 0) return res.status(400).json({ error: true, message: "El import indicado no es una importación real de Google Sheets finalizada." });
-
-  const client = await pool.connect();
-  const errors: Array<{ id: string; message: string }> = [];
-  let deletedIds: string[] = [];
-  let phase = "begin_transaction";
   try {
-    await client.query("begin");
-    phase = "validate_candidates";
-    const candidates = await client.query<{ id: string; dependency_reason: string | null }>(
-      `select e.id,
-              case
-                when exists (
-                  select 1
-                    from miclub.payment_allocations pa
-                    join miclub.receivables r on r.id = pa.receivable_id
-                   where r.enrollment_id = e.id
-                ) then 'La inscripción tiene pagos asociados y se conserva para no romper la integridad histórica.'
-                when exists (select 1 from miclub.receivables r where r.enrollment_id = e.id)
-                  then 'La inscripción tiene cuentas por cobrar asociadas y se conserva para no romper la integridad histórica.'
-                when exists (select 1 from miclub.crm_message_history cmh where cmh.enrollment_id = e.id)
-                  then 'La inscripción tiene historial de mensajes asociado y se conserva para no romper la integridad histórica.'
-                else null
-              end as dependency_reason
-         from miclub.enrollments e
-        where e.id = any($1::uuid[])
-          and e.club_id = $3
-          and e.source = 'google_sheets'
-          and e.missing_from_import_batch_id = $2
-        for update`,
-      [input.enrollmentIds, input.importId, clubId],
-    );
-    const byId = new Map(candidates.rows.map((candidate) => [candidate.id, candidate]));
-    const deletable: string[] = [];
-    for (const id of input.enrollmentIds) {
-      const candidate = byId.get(id);
-      if (!candidate) errors.push({ id, message: "La inscripción no existe, no tiene origen Google Sheets o ya no está marcada como faltante para este import." });
-      else if (candidate.dependency_reason) errors.push({ id, message: candidate.dependency_reason });
-      else deletable.push(id);
-    }
-
-    if (deletable.length > 0) {
-      phase = "delete_enrollments";
-      const deleted = await client.query<{ id: string }>(
-        `delete from miclub.enrollments
-          where id = any($1::uuid[])
-            and club_id = $3
-            and source = 'google_sheets'
-            and missing_from_import_batch_id = $2
-          returning id`,
-        [deletable, input.importId, clubId],
-      );
-      deletedIds = deleted.rows.map((row) => row.id);
-      for (const id of deletable.filter((id) => !deletedIds.includes(id))) errors.push({ id, message: "La inscripción cambió antes de poder eliminarla; actualizá la revisión." });
-    }
-    phase = "commit_transaction";
-    await client.query("commit");
+    const result = await removeMissingEnrollments(input, {
+      clubId,
+      userId: req.auth!.userId,
+      membershipId: req.auth!.membershipId,
+      requestId: req.requestId,
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+    res.json(result);
   } catch (error) {
-    await client.query("rollback").catch(() => undefined);
+    if (error instanceof InvalidMigrationBatchError) return res.status(400).json({ error: true, message: error.message });
     const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : undefined;
-    console.error("delete-missing enrollments failed", { endpoint: req.originalUrl, importId: input.importId, enrollmentIds: input.enrollmentIds, phase, code, message: error instanceof Error ? error.message : String(error) });
+    console.error("delete-missing enrollments failed", { endpoint: req.originalUrl, importId: input.importId, enrollmentIds: input.enrollmentIds, code, message: error instanceof Error ? error.message : String(error) });
     const message = code === "23503"
       ? "No se pudo eliminar una o más inscripciones porque tienen datos relacionados. Actualizá la revisión e intentá nuevamente."
       : "No se pudieron eliminar las inscripciones seleccionadas. Intentá nuevamente.";
     return res.status(code === "23503" ? 409 : 500).json({ ok: false, message, deletedCount: 0, skippedCount: input.enrollmentIds.length, deletedIds: [], errors: input.enrollmentIds.map((id) => ({ id, message })) });
-  } finally {
-    client.release();
   }
-  res.json({ ok: deletedIds.length > 0, deletedCount: deletedIds.length, skippedCount: errors.length, deletedIds, errors });
 }));
 
 
