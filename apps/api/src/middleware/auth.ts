@@ -61,7 +61,6 @@ export const protectedApiPrefixes = [
   "/members",
   "/debtors",
   "/summary",
-  "/admin-movements",
   "/club-finance",
   "/sector-operational",
   "/status-debug",

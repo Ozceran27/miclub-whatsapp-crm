@@ -6,7 +6,7 @@ import type { ModuleId } from '../ModuleNav';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
 
 export type SyncStatus = {
-  source: 'mock' | 'google_sheets' | 'postgres';
+  source: 'postgres';
   enabled: boolean;
   sheets: string[];
   lastSyncAt?: string;
@@ -186,7 +186,7 @@ export function useHomeDashboard() {
   useEffect(() => { void loadHome(); }, []);
 
   return useMemo(() => {
-    const syncLabel = !syncStatus ? 'No disponible' : syncStatus.error ? 'Con advertencias' : syncStatus.source === 'google_sheets' ? 'Google Sheets conectado' : 'Datos mock/locales';
+    const syncLabel = !syncStatus ? 'No disponible' : syncStatus.error ? 'Con advertencias' : 'PostgreSQL conectado';
     const enrollmentStats = mapSummaryStatusBreakdown(summary?.statusBreakdown) ?? getEnrollmentStatusBreakdown(members, summary?.totalMembers);
     const debtorRecords = members.length > 0 ? members : debtors;
     const debtorBreakdown = buildActivityBreakdown(debtorRecords.filter(isDebtor));

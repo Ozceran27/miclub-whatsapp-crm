@@ -41,7 +41,7 @@ const unresolvedTemplateVariables = (message: string): string[] => {
 };
 
 export const createCrmRoutes = (options: {
-  getMembersSource: () => Promise<{ members: Member[] }>;
+  getMembersSource: (clubId: string) => Promise<{ members: Member[] }>;
   isDebtorMember: (member: Member) => boolean;
 }) => {
   const router = Router();
@@ -136,7 +136,7 @@ export const createCrmRoutes = (options: {
     const body = req.body as Partial<PrepareMessagesRequest>;
     if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) return jsonError(res, 400, "memberIds debe ser un array no vacío.");
     if (typeof body.message !== "string" || body.message.trim().length === 0) return jsonError(res, 400, "message debe ser un string no vacío.");
-    const { members } = await options.getMembersSource();
+    const { members } = await options.getMembersSource(getClubId(req));
     const selected = members.filter((m) => body.memberIds?.includes(m.id));
     const missingPhoneMembers = selected.filter((m) => normalizeArPhone(m.telefono).length === 0).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}` }));
     const unresolvedVariables = unresolvedTemplateVariables(body.message);
@@ -160,7 +160,7 @@ export const createCrmRoutes = (options: {
       return jsonError(res, 400, "message debe ser un string no vacío.");
     }
 
-    const { members } = await options.getMembersSource();
+    const { members } = await options.getMembersSource(getClubId(req));
     const selected = members.filter((m) => body.memberIds?.includes(m.id));
     const nonDebtors = selected.filter((m) => !options.isDebtorMember(m));
 

@@ -1,7 +1,7 @@
 export type ApiError = { error: true; message: string };
 
 export type SyncStatus = {
-  source: 'mock' | 'google_sheets';
+  source: 'postgres';
   enabled: boolean;
   sheets: string[];
   lastSyncAt?: string;

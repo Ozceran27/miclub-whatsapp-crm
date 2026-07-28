@@ -138,7 +138,7 @@ export type MetricAvailabilityStatus = "available" | "unavailable";
 export interface MetricCompleteness {
   status: MetricAvailabilityStatus;
   reason?: string;
-  source?: "postgres" | "google_sheets" | "fallback";
+  source?: "postgres";
 }
 
 export type SourceCompleteness = Record<string, MetricCompleteness>;
@@ -147,10 +147,10 @@ export interface SummaryMetadata {
   sourceCompleteness?: SourceCompleteness;
   warnings?: string[];
   coverage?: "complete" | "partial" | "unavailable";
-  cuotasACobrarSource?: "v_dashboard_basic" | "fallback";
+  cuotasACobrarSource?: "v_dashboard_basic" | "derived_receivables";
   cuotasACobrarDebug?: {
     cuotasACobrar: number;
-    source: "v_dashboard_basic" | "fallback";
+    source: "v_dashboard_basic" | "derived_receivables";
     dashboardValue: number | null;
     fallbackValue: number | null;
     difference: number | null;

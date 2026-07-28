@@ -41,7 +41,7 @@ Inventario actualizado de endpoints Express expuestos por `@miclub/api`. Los pat
 | GET | `/members` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |
 | GET | `/debtors` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |
 | GET | `/summary` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |
-| GET | `/admin-movements` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |
+| GET | `/api/import/google-sheets/admin-movements` | `apps/api/src/routes/importRoutes.ts` | migración; feature flag + membership + `imports:run` |
 | GET | `/club-finance-summary` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |
 | GET | `/sector-operational-summary` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |
 | GET | `/sync-status` | `apps/api/src/routes/legacyCompatRoutes.ts` | legacy-compat |

@@ -11,7 +11,7 @@ import {
 } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
 import { calculateOperationalBalances, calculateSettlementBalance } from "./operationalBalancesCalculator.js";
-import { normalizeOperationalStatus } from "./googleSheets.js";
+import { normalizeOperationalStatus } from "../importers/normalizers.js";
 import { OPERATING_CATEGORIES } from "./economyDomain.js";
 
 const SHEETS: SourceSheet[] = [
@@ -179,7 +179,7 @@ export const buildEnrollmentReceivablesQuery = ({
 };
 
 
-type CuotasACobrarSource = "v_dashboard_basic" | "fallback";
+type CuotasACobrarSource = "v_dashboard_basic" | "derived_receivables";
 
 export interface CuotasACobrarSelection {
   cuotasACobrar: number;
@@ -202,8 +202,8 @@ export const selectCuotasACobrar = ({
 }): CuotasACobrarSelection => {
   const normalizedDashboardValue = dashboardValue == null ? null : normalizeSuspiciousArsAmount(dashboardValue);
   const normalizedFallbackValue = fallbackValue == null ? null : normalizeSuspiciousArsAmount(fallbackValue);
-  const source: CuotasACobrarSource = normalizedFallbackValue == null ? "v_dashboard_basic" : "fallback";
-  const cuotasACobrar = source === "fallback" ? normalizedFallbackValue! : (normalizedDashboardValue ?? 0);
+  const source: CuotasACobrarSource = normalizedFallbackValue == null ? "v_dashboard_basic" : "derived_receivables";
+  const cuotasACobrar = source === "derived_receivables" ? normalizedFallbackValue! : (normalizedDashboardValue ?? 0);
   const difference = normalizedDashboardValue != null && normalizedFallbackValue != null
     ? Math.abs(normalizedDashboardValue - normalizedFallbackValue)
     : null;

@@ -64,21 +64,14 @@ export const validatePostgresEnv = (env: PostgresEnv = getPostgresEnv()): string
   return missing.length > 0 ? [`Faltan variables PostgreSQL: ${missing.join(", ")}.`] : [];
 };
 
-export const warnIfProductionCrmSourceIsNotPostgres = (isProduction: boolean): void => {
-  if (!isProduction) return;
-
-  const crmSource = normalize(process.env.CRM_SOURCE) ?? "sqlite";
-  if (crmSource === "postgres") return;
-
-  console.warn(`CRM_SOURCE debería ser postgres en producción. Valor actual: ${crmSource}. Se mantiene el comportamiento legacy/local sin bloquear el arranque.`);
-};
-
 export const validateRuntimeConfig = ({ isProduction }: { isProduction: boolean }): void => {
   if (!isProduction) return;
   const errors: string[] = [];
   if (process.env.AUTH_ENABLED !== "true") errors.push("AUTH_ENABLED debe ser true");
   if ((process.env.SESSION_SECRET?.trim().length ?? 0) < 32) errors.push("SESSION_SECRET debe tener al menos 32 caracteres");
   if (process.env.BOOTSTRAP_DIRECTOR_ENABLED === "true") errors.push("BOOTSTRAP_DIRECTOR_ENABLED debe estar deshabilitado");
+  if (normalize(process.env.DATA_SOURCE) !== "postgres") errors.push("DATA_SOURCE debe ser postgres");
+  if (normalize(process.env.CRM_SOURCE) !== "postgres") errors.push("CRM_SOURCE debe ser postgres");
   errors.push(...validatePostgresEnv());
   const publicUrl = readOptional("PUBLIC_APP_URL");
   if (!publicUrl || !publicUrl.startsWith("https://")) errors.push("PUBLIC_APP_URL debe ser una URL HTTPS");
