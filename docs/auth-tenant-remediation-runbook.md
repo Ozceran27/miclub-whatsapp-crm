@@ -1,7 +1,14 @@
 # Runbook definitivo de identidad y tenant
 
 1. Tomar backup PostgreSQL y ejecutar `docs/dbeaver/01_auth_tenant_diagnostic_readonly.sql`.
-2. Aplicar migraciones versionadas con `npm run db:migrate`. No ejecutar desde esta auditoría.
+2. Consultar `public.miclub_schema_migrations` y conservar sus nombres/checksums. No
+   renombrar migraciones ya aplicadas. Ejecutar `npm run db:migrations:check` y luego
+   `npm run db:migrate`. El runner sigue exclusivamente el manifiesto versionado:
+   primero el esquema base y las migraciones raíz históricas; después
+   `multitenant/202607240001`–`202607240003` y el backfill `202607250001`; a
+   continuación identidad/autorización, vistas multitenant y endurecimiento; por
+   último los ajustes de importación. No ejecutar archivos SQL individuales ni
+   asumir orden lexical o recursivo. No ejecutar las migraciones desde esta auditoría.
 3. Ejecutar manualmente `docs/dbeaver/02_miclub_backfill_manual.sql`; revisar que conteos y sumas no cambien.
 4. En un proceso aislado, definir `BOOTSTRAP_DIRECTOR_ENABLED=true` y
    `BOOTSTRAP_DIRECTOR_PASSWORD` (no usar historial de shell compartido), ejecutar

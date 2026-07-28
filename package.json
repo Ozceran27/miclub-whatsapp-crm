@@ -18,6 +18,7 @@
     "audit:postgres": "tsx apps/api/src/scripts/auditPostgres.ts",
     "audit:economy-yearly-breakdown": "tsx apps/api/src/scripts/auditEconomyYearlyBreakdown.ts",
     "db:migrate": "tsx apps/api/src/scripts/runMigrations.ts",
+    "db:migrations:check": "tsx --test apps/api/src/scripts/migrationManifest.test.ts",
     "bootstrap:director": "tsx apps/api/src/scripts/bootstrapDirector.ts",
     "auth:set-password": "npm run auth:set-password -w @miclub/api --"
   },
