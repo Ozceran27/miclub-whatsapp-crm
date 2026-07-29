@@ -277,12 +277,12 @@ test('processMember actualiza inscripción existente si coincide DNI, nombre, ap
 });
 
 test('resolveMovementColumnIndexes resuelve headers reales sectoriales sin fallback semántico', () => {
-  const headers = ['Id.', 'Fecha', '', 'Tipo', '', 'Categoría', '', 'Concepto', '', '', '', '', 'Contra-parte', '', 'Monto', '', 'Impuestos', '', 'M.P.', '', 'Estado Finan.', '', '', 'Estado', '', '', 'Id.'];
+  const headers = ['Id.', 'Fecha', '', 'Tipo', '', 'Categoría', '', 'Concepto', '', '', '', '', 'Contra-parte', '', 'Monto', '', 'Impuestos', '', 'M.P.', '', 'Estado Finan.', '', '', 'Estado'];
   for (const sheet of ['FITNESS', 'SALON', 'AULA', 'LOCAL 1']) {
     const resolved = resolveMovementColumnIndexes(headers, sectorMovementFallbackIndexes);
     assert.equal(resolved.usedFallback, false, `${sheet} no debería usar fallback`);
     assert.equal(resolved.fallbackMode, 'none');
-    const row = ['I-0001', '01/06/2026', '', 'INGRESOS', '', 'CUOTA', '', `Concepto ${sheet}`, '', '', '', '', '30.111.222', '', '12345', '', '0', '', 'Transferencia', '', 'PAGADO', '', '', 'COMPLETADO', '', '', 'M-001'];
+    const row = ['I-0001', '01/06/2026', '', 'INGRESOS', '', 'CUOTA', '', `Concepto ${sheet}`, '', '', '', '', '30.111.222', '', '12345', '', '0', '', 'Transferencia', '', 'PAGADO', '', '', 'COMPLETADO'];
     assert.deepEqual({
       id: movementValue(row, resolved.indexes, 'id'),
       fecha: movementValue(row, resolved.indexes, 'fecha'),
