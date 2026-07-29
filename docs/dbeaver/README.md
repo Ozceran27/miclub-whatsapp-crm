@@ -8,9 +8,11 @@ que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 
 1. Abrir una conexión nueva y ejecutar `01_auth_tenant_diagnostic_readonly.sql`.
 2. Confirmar que existe exactamente un club candidato `miClub`.
-3. Hacer backup y ejecutar `02_miclub_backfill_manual.sql` completo, no por
-   selecciones parciales. El primer `ROLLBACK` limpia el estado `25P02` dejado
-   por errores anteriores; luego el script abre su propia transacción.
+3. Ejecutar el diagnóstico 08. Si todas las filas muestran `PASS`, no ejecutar
+   ningún backfill. Sólo si hay `club_id` nulos confirmados como datos legacy de
+   miClub: hacer backup y ejecutar `02_miclub_backfill_manual.sql` completo, no
+   por selecciones parciales. El primer `ROLLBACK` limpia el estado `25P02`
+   dejado por errores anteriores; luego el script abre su propia transacción.
 4. Crear/corregir la identidad con la CLI oficial (PostgreSQL no implementa el
    hash `scrypt` usado por la aplicación):
 
@@ -74,3 +76,31 @@ No ejecutar `02_miclub_backfill_manual.sql` si todo lo anterior pasa. Si aparece
 `REVIEW`, conservar/exportar esos resultados y hacer backup antes de decidir una
 corrección: un UUID distinto puede pertenecer legítimamente a otro club y no debe
 reasignarse automáticamente.
+
+## Cuando el diagnóstico ya está todo OK
+
+No hay un segundo enlace «datos → Fernando Ramos». Los datos operativos
+pertenecen a `miclub.clubs.id`; Fernando accede a ellos mediante su fila activa
+en `user_club_memberships`, y su perfil privado se enlaza por `people.user_id` y
+el mismo `people.club_id`. Es incorrecto escribir el UUID del usuario o de la
+membresía en las columnas `club_id`.
+
+Si 08 confirma la cadena activa de Fernando, `without_club = 0`,
+`linked_elsewhere = 0`, cero relaciones cruzadas y los cinco PASS finales, el
+backfill ya está realizado. Ejecutar 02 sería idempotente y actualizaría cero
+filas, pero no debe hacerse sólo «para asegurar»: continúe directamente con 03,
+reinicie la sesión de la aplicación y valide INICIO/CRM.
+
+Si, en cambio, 08 muestra `REVIEW` por filas nulas y se confirmó que pertenecen
+a miClub, el procedimiento manual es:
+
+1. Exportar los resultados de 08 y realizar un backup restaurable.
+2. Abrir una conexión DBeaver nueva con autocommit activo.
+3. Ejecutar **todo** `02_miclub_backfill_manual.sql` con **Execute SQL Script**;
+   no ejecutar sólo el bloque `UPDATE` ni sustituir UUID manualmente.
+4. Confirmar que no hubo excepción y que llegó a `COMMIT`.
+5. Ejecutar completo `03_final_validation_readonly.sql`; todas las comprobaciones
+   deben dar PASS y los totales deben coincidir con los guardados antes.
+6. Cerrar sesiones abiertas, iniciar sesión de nuevo como Fernando y validar los
+   cinco endpoints. Si 02 falla antes del COMMIT, ejecutar `ROLLBACK`, conservar
+   el error exacto y no repetir parcialmente el script.
