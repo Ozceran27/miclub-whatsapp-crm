@@ -37,6 +37,7 @@ import {
   normalizeMembershipFeeAmount,
   normalizeFinancialStatus,
   normalizeMoney,
+  normalizeMovementOperationalStatus,
   normalizeOperationalStatus,
   normalizePhone,
   normalizeSheetText,
@@ -847,11 +848,9 @@ export const processMovement = async (
       normalizeFinancialStatus(
         movementValue(row.row, movementIndexes, "estadoFinan"),
       ),
-      normalizeComparableText(
+      normalizeMovementOperationalStatus(
         movementValue(row.row, movementIndexes, "estado"),
-      ).includes("pend")
-        ? "PENDIENTE"
-        : "COMPLETADO",
+      ),
       JSON.stringify({
         sheet: row.sheet,
         rowNumber: row.rowNumber,

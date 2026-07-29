@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isImportSchemaConflictConfiguration, parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints } from './googleSheetsImporter.js';
 import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
-import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
+import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeMovementOperationalStatus, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
 
 test('parseMissingEnrollmentStrategy usa archive por defecto y acepta aliases de archivado', () => {
@@ -12,6 +12,13 @@ test('parseMissingEnrollmentStrategy usa archive por defecto y acepta aliases de
   assert.equal(parseMissingEnrollmentStrategy('replace'), 'archive');
   assert.equal(parseMissingEnrollmentStrategy('inactive'), 'inactive');
   assert.equal(parseMissingEnrollmentStrategy('abandonado'), 'abandon');
+});
+
+test('normaliza los cuatro estados operativos sin convertir anulados en completados', () => {
+  assert.equal(normalizeMovementOperationalStatus('COMPLETADO'), 'COMPLETADO');
+  assert.equal(normalizeMovementOperationalStatus('Pendiente'), 'PENDIENTE');
+  assert.equal(normalizeMovementOperationalStatus('CANCELADO'), 'CANCELADO');
+  assert.equal(normalizeMovementOperationalStatus('ANULADO'), 'ANULADO');
 });
 
 test('processRowsWithSavepoints evita que un error de fila envenene las filas siguientes', async () => {
