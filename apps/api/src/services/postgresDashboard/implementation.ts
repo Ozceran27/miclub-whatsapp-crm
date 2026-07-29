@@ -463,7 +463,12 @@ export const getPostgresClubFinanceSummary =
         `select liquidity, cash, bank, dollars from miclub.operational_balances where club_id = $1 order by cutoff_date desc, created_at desc limit 1`, [clubId],
       ),
       pool.query<Record<string, unknown>>(
-        `select * from miclub.v_sector_settlement_balances where club_id = $1 and settlement_balance <> 0 order by sector_name asc nulls last, sector_id asc nulls last`, [clubId],
+        `select ssb.*
+         from miclub.v_sector_settlement_balances ssb
+         join miclub.sectors s on s.id = ssb.sector_id
+         where s.club_id = $1
+           and ssb.settlement_balance <> 0
+         order by ssb.sector_name asc nulls last, ssb.sector_id asc nulls last`, [clubId],
       ),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
         clubId, "INGRESOS",
