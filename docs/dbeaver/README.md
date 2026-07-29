@@ -8,9 +8,11 @@ que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 
 1. Abrir una conexión nueva y ejecutar `01_auth_tenant_diagnostic_readonly.sql`.
 2. Confirmar que existe exactamente un club candidato `miClub`.
-3. Hacer backup y ejecutar `02_miclub_backfill_manual.sql` completo, no por
-   selecciones parciales. El primer `ROLLBACK` limpia el estado `25P02` dejado
-   por errores anteriores; luego el script abre su propia transacción.
+3. Ejecutar el diagnóstico 08. Si todas las filas muestran `PASS`, no ejecutar
+   ningún backfill. Sólo si hay `club_id` nulos confirmados como datos legacy de
+   miClub: hacer backup y ejecutar `02_miclub_backfill_manual.sql` completo, no
+   por selecciones parciales. El primer `ROLLBACK` limpia el estado `25P02`
+   dejado por errores anteriores; luego el script abre su propia transacción.
 4. Crear/corregir la identidad con la CLI oficial (PostgreSQL no implementa el
    hash `scrypt` usado por la aplicación):
 
@@ -49,3 +51,56 @@ el UUID centinela. El script es de solo lectura y **no crea índices**: cualquie
 DDL posterior requiere comparar el inventario y conservar los planes reales.
 
 - `07_integral_regression_audit_readonly.sql`: auditoría integral pre-admin, reconciliación por módulo y reporte PASS/FAIL; no modifica datos.
+
+## Diagnóstico de INICIO/CRM
+
+`08_dashboard_crm_forensic_readonly.sql` no solicita parámetros y no modifica
+datos. Resuelve automáticamente el UUID del único club cuyo nombre es `miClub`.
+Si se está usando una copia anterior que abre **Enlazar parámetro(s)** para
+`:club_id`, se puede cancelar y usar la versión actual. Alternativamente, en esa
+copia anterior hay que pegar en **Valor** el UUID exacto obtenido con
+`SELECT id FROM miclub.clubs WHERE lower(trim(name))=lower('miClub');`, sin
+inventar ni usar el ID del usuario o de la membresía.
+
+Antes de considerar un nuevo backfill, revisar en la salida de 08:
+
+- una sola fila para `resolved_club_id`;
+- una sola cadena de Fernando Ramos con membresía `active` y el mismo club en
+  `person_club_id`, `membership_club_id` y `club_id`;
+- `without_club = 0`, y —si miClub es realmente el único tenant con datos—
+  `linked_elsewhere = 0` para todas las relaciones;
+- cero filas en el resultado de relaciones cruzadas;
+- PASS en las cinco consultas finales.
+
+No ejecutar `02_miclub_backfill_manual.sql` si todo lo anterior pasa. Si aparece
+`REVIEW`, conservar/exportar esos resultados y hacer backup antes de decidir una
+corrección: un UUID distinto puede pertenecer legítimamente a otro club y no debe
+reasignarse automáticamente.
+
+## Cuando el diagnóstico ya está todo OK
+
+No hay un segundo enlace «datos → Fernando Ramos». Los datos operativos
+pertenecen a `miclub.clubs.id`; Fernando accede a ellos mediante su fila activa
+en `user_club_memberships`, y su perfil privado se enlaza por `people.user_id` y
+el mismo `people.club_id`. Es incorrecto escribir el UUID del usuario o de la
+membresía en las columnas `club_id`.
+
+Si 08 confirma la cadena activa de Fernando, `without_club = 0`,
+`linked_elsewhere = 0`, cero relaciones cruzadas y los cinco PASS finales, el
+backfill ya está realizado. Ejecutar 02 sería idempotente y actualizaría cero
+filas, pero no debe hacerse sólo «para asegurar»: continúe directamente con 03,
+reinicie la sesión de la aplicación y valide INICIO/CRM.
+
+Si, en cambio, 08 muestra `REVIEW` por filas nulas y se confirmó que pertenecen
+a miClub, el procedimiento manual es:
+
+1. Exportar los resultados de 08 y realizar un backup restaurable.
+2. Abrir una conexión DBeaver nueva con autocommit activo.
+3. Ejecutar **todo** `02_miclub_backfill_manual.sql` con **Execute SQL Script**;
+   no ejecutar sólo el bloque `UPDATE` ni sustituir UUID manualmente.
+4. Confirmar que no hubo excepción y que llegó a `COMMIT`.
+5. Ejecutar completo `03_final_validation_readonly.sql`; todas las comprobaciones
+   deben dar PASS y los totales deben coincidir con los guardados antes.
+6. Cerrar sesiones abiertas, iniciar sesión de nuevo como Fernando y validar los
+   cinco endpoints. Si 02 falla antes del COMMIT, ejecutar `ROLLBACK`, conservar
+   el error exacto y no repetir parcialmente el script.

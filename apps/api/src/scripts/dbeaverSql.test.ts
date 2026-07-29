@@ -31,3 +31,14 @@ test("SQL de planes es manual, de solo lectura y no crea índices", () => {
     assert.match(plans, new RegExp(`-- ${section}:`));
   }
 });
+
+test("diagnóstico de dashboard resuelve miClub sin pedir parámetros ni modificar datos", () => {
+  const dashboard = sql("08_dashboard_crm_forensic_readonly.sql");
+  assert.match(dashboard, /BEGIN TRANSACTION READ ONLY;/);
+  assert.match(dashboard, /lower\(trim\(name\)\)\s*=\s*lower\('miClub'\)/);
+  assert.match(dashboard, /Fernando Ramos/);
+  assert.match(dashboard, /without_club/);
+  assert.match(dashboard, /linked_elsewhere/);
+  assert.doesNotMatch(dashboard, /:club_id/);
+  assert.doesNotMatch(dashboard, /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)\b/i);
+});
