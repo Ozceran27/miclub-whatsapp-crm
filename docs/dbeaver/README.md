@@ -38,3 +38,12 @@ que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 Los registros operativos pertenecen al club mediante `club_id`; no deben recibir
 el `user_id` de Fernando. Sólo la cuenta, su perfil `people`, la membresía y los
 eventos de auditoría usan los IDs de usuario/persona correspondientes.
+
+## Planes de consultas de la aplicación
+
+`06_application_query_plans_readonly.sql` reúne el inventario de `pg_indexes`,
+constraints y estadísticas, seguido de `EXPLAIN (ANALYZE, BUFFERS)` para Home,
+Economía, movimientos, personas, inscripciones y CRM. Debe ejecutarse manualmente
+en una réplica o entorno seguro con datos representativos, después de reemplazar
+el UUID centinela. El script es de solo lectura y **no crea índices**: cualquier
+DDL posterior requiere comparar el inventario y conservar los planes reales.
