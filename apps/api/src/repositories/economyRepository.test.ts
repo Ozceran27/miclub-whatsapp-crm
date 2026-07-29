@@ -3,6 +3,7 @@ import test from "node:test";
 import { setPostgresPoolForTests } from "../db/postgres.js";
 import {
   getAnnualEvolution,
+  getClubFinanceSummary,
   getMonthlySummary,
   getPendingMovements,
   getRankingBySector,
@@ -52,6 +53,19 @@ test("agregados y enrollments quedan aislados entre Club A y Club B", async () =
     assert.match(calls[2].sql, /e\.club_id = \$3/);
     assert.match(calls[2].sql, /a\.club_id = e\.club_id/);
     assert.match(calls[2].sql, /s\.club_id = a\.club_id/);
+  });
+});
+
+test("Inicio y Economía consumen el corte PostgreSQL autoritativo de liquidez", async () => {
+  await withTenantFixture(async (calls) => {
+    await getClubFinanceSummary(CLUB_A);
+    const query = calls[0];
+    assert.deepEqual(query.params, [CLUB_A]);
+    assert.match(query.sql, /from miclub\.operational_balances/);
+    assert.match(query.sql, /order by cutoff_date desc, created_at desc/);
+    assert.match(query.sql, /coalesce\(b\.liquidity, d\.liquidity, 0\)/);
+    assert.match(query.sql, /coalesce\(d\.cuotas_a_cobrar, 0\)/);
+    assert.match(query.sql, /coalesce\(d\.pending_net_balance, 0\)/);
   });
 });
 
