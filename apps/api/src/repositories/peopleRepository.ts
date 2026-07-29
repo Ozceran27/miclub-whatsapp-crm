@@ -18,7 +18,13 @@ const buildPeopleWhereClause = (clubId: string, search: string | undefined): { s
   const normalizedSearch = search?.trim();
   if (!normalizedSearch) return { sql: "where people.club_id = $1", params: [clubId] };
 
-  return { sql: "where people.club_id = $1 and row_to_json(people)::text ilike $2", params: [clubId, `%${normalizedSearch}%`] };
+  return {
+    sql: `where people.club_id = $1 and concat_ws(' ',
+      people.first_name, people.last_name, people.dni, people.normalized_dni,
+      people.phone, people.normalized_phone, people.email, people.notes
+    ) ilike $2`,
+    params: [clubId, `%${normalizedSearch}%`]
+  };
 };
 
 export const getPeople = async ({ clubId, limit, offset, search }: PeopleQuery): Promise<PeoplePage> => {
@@ -29,7 +35,10 @@ export const getPeople = async ({ clubId, limit, offset, search }: PeopleQuery):
 
   const result = await pool.query<PersonRow & { total_count: string | number }>(
     `
-      select *, count(*) over() as total_count
+      select people.id, people.first_name, people.last_name, people.dni,
+             people.phone, people.normalized_phone, people.email, people.notes,
+             people.created_at, people.updated_at, people.club_id, people.user_id,
+             people.normalized_dni, count(*) over() as total_count
       from miclub.people as people
       ${where.sql}
       order by id asc

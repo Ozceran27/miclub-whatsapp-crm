@@ -19,3 +19,15 @@ test("SQL DBeaver usa las columnas reales y recupera transacciones abortadas", (
   assert.match(backfill, /movement_type::text/);
   assert.match(validation, /movement_type::text/);
 });
+
+test("SQL de planes es manual, de solo lectura y no crea índices", () => {
+  const plans = sql("06_application_query_plans_readonly.sql");
+  assert.match(plans, /BEGIN TRANSACTION READ ONLY;/);
+  assert.match(plans, /EXPLAIN \(ANALYZE, BUFFERS/);
+  assert.match(plans, /FROM pg_indexes/);
+  assert.match(plans, /FROM pg_constraint/);
+  assert.doesNotMatch(plans, /CREATE\s+(UNIQUE\s+)?INDEX/i);
+  for (const section of ["HOME", "ECONOMÍA", "MOVIMIENTOS", "PERSONAS", "INSCRIPCIONES", "CRM"]) {
+    assert.match(plans, new RegExp(`-- ${section}:`));
+  }
+});
