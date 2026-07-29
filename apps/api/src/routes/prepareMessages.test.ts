@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
-import db from '../lib/sqlite.js';
-import { app } from '../index.js';
+import express from 'express';
+import type { Member } from '@miclub/shared';
+// This is an explicit compatibility test for the legacy SQLite migration path.
+// Ordinary runtime defaults to PostgreSQL even when CRM_SOURCE is absent.
+process.env.CRM_SOURCE = 'sqlite';
+const { default: db } = await import('../lib/sqlite.js');
+const { createCrmRoutes } = await import('./crmRoutes.js');
 
 const memberId = '1';
 const templateMessage = 'Hola {nombre}, deuda de {actividad}.';
@@ -13,6 +18,18 @@ type PreparedRouteMessage = {
   status: string;
   message: string;
 };
+
+const debtor: Member = {
+  id: memberId, nombre: 'Lucía', apellido: 'Gómez', telefono: '5491162341133',
+  actividad: 'Fitness', modalidad: 'Mensual', cuota: 1000, estado: 'Adeudando',
+  instructor: 'Test', sourceSheet: 'FITNESS'
+};
+const app = express();
+app.use(express.json());
+app.use(createCrmRoutes({
+  getMembersSource: async () => ({ members: [debtor] }),
+  isDebtorMember: () => true
+}));
 
 const runDb = (sql: string, params: unknown[] = []) =>
   new Promise<void>((resolve, reject) => {

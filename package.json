@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w @miclub/api\" \"npm run dev -w @miclub/web\"",
-    "build": "npm run build -ws",
+    "build": "npm run build -w @miclub/shared && npm run build -w @miclub/api && npm run build -w @miclub/web",
     "typecheck": "npm run typecheck -ws",
     "start": "npm run start -w @miclub/api",
     "start:prod": "npm run build && npm run start",
