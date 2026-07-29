@@ -14,10 +14,10 @@ import {
   getRankingBySector,
   getRecentMovements as getRecentMovementRows,
   getCompletedMonthMovementSummary,
-  getClubFinanceSummary,
   getYearlyBreakdownRows,
   type EconomyRow,
 } from "../repositories/economyRepository.js";
+import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
 import { ARGENTINA_TIME_ZONE, calculateVariation, classifyExpenseCategory, DEBT_LIABILITY_CATEGORIES, EXPENSE_TYPE_KEYS, EXPENSE_TYPE_LABELS, getCurrentMonthWindow, getLastCompleteMonthWindows, getRollingInterannualMonthWindow, NON_OPERATING_EXPENSE_CATEGORIES, normalizeCategoryName, OPERATING_CATEGORIES, OPERATING_PROFIT_CATEGORIES, SERVICE_CATEGORIES, TAX_CATEGORIES, type ExpenseTypeKey } from "./economyDomain.js";
 import { getArgentinaCalendarYear, getArgentinaYearToDateWindow } from "../domain/argentinaTime.js";
@@ -85,9 +85,9 @@ export const getSummary = async (clubId: string): Promise<JsonRecord> => {
   const month = getCurrentMonthWindow();
   const [summary, finance] = await Promise.all([
     normalizeRows(await getMonthlySummary(month.start, month.end, clubId)),
-    normalizeRows(await getClubFinanceSummary(clubId)),
+    getPostgresClubFinanceSummary(clubId),
   ]);
-  const financeRow = finance[0] ?? {};
+  const financeRow = finance;
   const row = summary[0] ?? {};
   const income = toNumber(row.income);
   const expenses = toNumber(row.expenses);

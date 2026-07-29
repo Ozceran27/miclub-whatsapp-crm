@@ -10,8 +10,8 @@ export const getMonthlySummary = async (from: Date, to: Date, clubId: string): P
     with bounds as (select $1::timestamptz as start_at, $2::timestamptz as end_at)
     select
       coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as income,
-      coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then m.amount else 0 end), 0) as expenses,
-      coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
+      coalesce(sum(case when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and coalesce(upper(regexp_replace(translate(trim(c.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')), '') <> 'DOLARES' then m.amount else 0 end), 0) as expenses,
+      coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and coalesce(upper(regexp_replace(translate(trim(c.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g')), '') <> 'DOLARES' then -m.amount else 0 end), 0) as balance,
       coalesce(sum(case when ${pendingMovementPredicate("m")} and m.source_payload->>'sheet' = 'ADMINISTRACIÓN' and m.movement_type = 'INGRESOS' then m.amount when ${pendingMovementPredicate("m")} and m.source_payload->>'sheet' = 'ADMINISTRACIÓN' and m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as pending_balance,
       count(*) filter (where m.operational_status = 'COMPLETADO')::integer as completed_movements,
       count(*) filter (where ${completedMovementPredicate("m")})::integer as total_movements
@@ -33,9 +33,9 @@ export const getAnnualEvolution = async (clubId: string, year = getArgentinaCale
     ), monthly as (
       select
         months.month_start,
-        coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO'), 0) as income,
-        coalesce(sum(m.amount) filter (where m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO'), 0) as expenses,
-        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' then -m.amount else 0 end), 0) as balance,
+        coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category <> 'CAPITAL'), 0) as income,
+        coalesce(sum(m.amount) filter (where m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category not in ('CAPITAL', 'DOLARES')), 0) as expenses,
+        coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category <> 'CAPITAL' then m.amount when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category not in ('CAPITAL', 'DOLARES') then -m.amount else 0 end), 0) as balance,
         coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category <> 'CAPITAL'), 0) as growth_income,
         coalesce(sum(case when m.movement_type = 'INGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then abs(m.amount) when m.movement_type = 'EGRESOS' and m.operational_status = 'COMPLETADO' and normalized_category = any($2::text[]) then -abs(m.amount) else 0 end), 0) as operating_profitability,
         count(m.id) filter (where m.operational_status = 'COMPLETADO')::integer as movements
@@ -142,8 +142,8 @@ export const getCompletedMonthMovementSummary = async (previousStart: Date, curr
     )
     select period_key,
       coalesce(sum(amount) filter (where movement_type = 'INGRESOS' and normalized_category <> 'CAPITAL'), 0) as income,
-      coalesce(sum(amount) filter (where movement_type = 'EGRESOS' and normalized_category <> 'CAPITAL'), 0) as expenses,
-      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category <> 'CAPITAL' then amount when movement_type = 'EGRESOS' and normalized_category <> 'CAPITAL' then -amount else 0 end), 0) as utility,
+      coalesce(sum(amount) filter (where movement_type = 'EGRESOS' and normalized_category not in ('CAPITAL', 'DOLARES')), 0) as expenses,
+      coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category <> 'CAPITAL' then amount when movement_type = 'EGRESOS' and normalized_category not in ('CAPITAL', 'DOLARES') then -amount else 0 end), 0) as utility,
       coalesce(sum(case when movement_type = 'INGRESOS' and normalized_category = any($4::text[]) then abs(amount) when movement_type = 'EGRESOS' and normalized_category = any($4::text[]) then -abs(amount) else 0 end), 0) as operating_profitability
     from movements
     group by period_key

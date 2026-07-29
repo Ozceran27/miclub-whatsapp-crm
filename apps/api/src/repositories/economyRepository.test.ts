@@ -69,6 +69,14 @@ test("Inicio y Economía consumen el corte PostgreSQL autoritativo de liquidez",
   });
 });
 
+test("las tablas mensuales replican la exclusión de egresos en DÓLARES de la planilla", async () => {
+  await withTenantFixture(async (calls) => {
+    await getMonthlySummary(new Date("2026-06-01T03:00:00Z"), new Date("2026-07-01T03:00:00Z"), CLUB_A);
+    assert.match(calls[0].sql, /movement_type = 'EGRESOS'.+<> 'DOLARES'/s);
+    assert.match(calls[0].sql, /movement_type = 'INGRESOS'.+operational_status = 'COMPLETADO'/s);
+  });
+});
+
 test("rankings, pendientes y movimientos recientes nunca mezclan tenants", async () => {
   await withTenantFixture(async (calls) => {
     const from = new Date("2026-01-01T00:00:00Z");

@@ -1,4 +1,5 @@
 import { normalizeMembershipFeeUnit, normalizeMovementAmount, type DebtorStatus, type OperationalStatusKey } from "@miclub/shared";
+import type { EconomyOperationalStatus } from "@miclub/shared";
 
 export const normalizeSheetText = (value: unknown): string =>
   String(value ?? "")
@@ -17,6 +18,14 @@ export const normalizePhone = (value: unknown): string => {
   return `549${digits.replace(/^0/, "").replace(/^15/, "")}`;
 };
 export const normalizeComparableText = (value: unknown): string => normalizeSheetText(value).toLowerCase().replace(/\s+/g, " ");
+
+export const normalizeMovementOperationalStatus = (value: unknown): EconomyOperationalStatus => {
+  const normalized = normalizeComparableText(value);
+  if (normalized.includes("anulad")) return "ANULADO";
+  if (normalized.includes("cancel")) return "CANCELADO";
+  if (normalized.includes("pend")) return "PENDIENTE";
+  return "COMPLETADO";
+};
 
 export const normalizeOperationalStatus = (value: unknown): OperationalStatusKey => {
   const normalized = normalizeComparableText(value).replace(/[-–—_/]+/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
