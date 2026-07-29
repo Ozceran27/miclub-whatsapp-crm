@@ -7,7 +7,25 @@ import type { EconomyRow } from "./types.js";
 export const getClubFinanceSummary = async (clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   return (await pool.query<EconomyRow>(`
-    select * from miclub.v_dashboard_basic where club_id = $1
+    with latest_balance as (
+      select liquidity, cash, bank, dollars
+      from miclub.operational_balances
+      where club_id = $1
+      order by cutoff_date desc, created_at desc
+      limit 1
+    )
+    select d.*,
+      coalesce(b.liquidity, d.liquidity, 0) as liquidity,
+      coalesce(b.cash, d.cash, 0) as cash,
+      coalesce(b.bank, d.bank, 0) as bank,
+      coalesce(b.dollars, d.dollars, 0) as dollars,
+      coalesce(b.liquidity, d.liquidity, 0)
+        + coalesce(d.cuotas_a_cobrar, 0)
+        - coalesce(d.saldos_a_pagar, 0)
+        + coalesce(d.pending_net_balance, 0) as projected_balance
+    from miclub.v_dashboard_basic d
+    left join latest_balance b on true
+    where d.club_id = $1
   `, [clubId])).rows;
 };
 

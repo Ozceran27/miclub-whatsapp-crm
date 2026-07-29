@@ -14,6 +14,7 @@ import { getArgentinaMonthWindow } from "../../domain/argentinaTime.js";
 import { calculateOperationalBalances, calculateSettlementBalance } from "../operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "../../importers/normalizers.js";
 import { OPERATING_CATEGORIES } from "../economyDomain.js";
+import { getClubFinanceSummary } from "../../repositories/economyRepository.js";
 
 const SHEETS: SourceSheet[] = [
   "FITNESS",
@@ -453,15 +454,11 @@ export const getPostgresClubFinanceSummary =
       receivablesFallback,
       pendingFallback,
     ] = await Promise.all([
-      pool.query<Record<string, unknown>>(
-        `select * from miclub.v_dashboard_basic where club_id = $1`, [clubId],
-      ).catch((error: unknown) => {
+      getClubFinanceSummary(clubId).then((rows) => ({ rows })).catch((error: unknown) => {
         console.warn("[postgres-dashboard] v_dashboard_basic no disponible; usando fallback para métricas derivadas.", error);
         return { rows: [], rowCount: 0, command: "SELECT", oid: 0, fields: [] };
       }),
-      pool.query<Record<string, unknown>>(
-        `select liquidity, cash, bank, dollars from miclub.operational_balances where club_id = $1 order by cutoff_date desc, created_at desc limit 1`, [clubId],
-      ),
+      Promise.resolve({ rows: [] as Record<string, unknown>[] }),
       pool.query<Record<string, unknown>>(
         `select ssb.*
          from miclub.v_sector_settlement_balances ssb
