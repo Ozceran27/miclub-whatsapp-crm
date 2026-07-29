@@ -43,7 +43,7 @@ INICIO resuelve las seis solicitudes de forma independiente: conserva respuestas
 
 - `GET /auth/me` es la comprobación pública de bootstrap de `SessionProvider`; usa `credentials: 'include'`. Un `401` antes del login representa sesión anónima normal. Las respuestas 401 posteriores a endpoints protegidos se revalidan una sola vez. No se encontró motivo para cambiar autenticación.
 - La CSP deliberadamente mantiene `script-src 'self'`. No existe integración de Cloudflare Web Analytics en el código; el beacon inyectado externamente queda bloqueado. Se conserva la opción segura: no permitir el dominio ni agregar comodines/`unsafe-inline`. El warning no afecta las consultas.
-- No se necesita SQL correctivo en DBeaver. `docs/dbeaver/08_dashboard_crm_forensic_readonly.sql` permite auditar el schema real y ejecutar equivalentes tenant-scoped sin modificar datos.
+- No se necesita SQL correctivo en DBeaver. `docs/dbeaver/08_dashboard_crm_forensic_readonly.sql` permite auditar el schema real y ejecutar equivalentes tenant-scoped sin modificar datos. El script resuelve por sí mismo el único club llamado `miClub`: ya no abre la ventana **Enlazar parámetro(s)**. También informa la cadena Fernando Ramos → perfil → membresía activa → miClub, filas sin `club_id`, filas enlazadas a otro club y relaciones parent/child cruzadas. Sólo un resultado `REVIEW` o filas cruzadas justifican evaluar el backfill manual existente; nunca debe ejecutarse a ciegas.
 
 ## Límites de validación ambiental
 

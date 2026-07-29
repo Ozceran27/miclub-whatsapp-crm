@@ -49,3 +49,28 @@ el UUID centinela. El script es de solo lectura y **no crea índices**: cualquie
 DDL posterior requiere comparar el inventario y conservar los planes reales.
 
 - `07_integral_regression_audit_readonly.sql`: auditoría integral pre-admin, reconciliación por módulo y reporte PASS/FAIL; no modifica datos.
+
+## Diagnóstico de INICIO/CRM
+
+`08_dashboard_crm_forensic_readonly.sql` no solicita parámetros y no modifica
+datos. Resuelve automáticamente el UUID del único club cuyo nombre es `miClub`.
+Si se está usando una copia anterior que abre **Enlazar parámetro(s)** para
+`:club_id`, se puede cancelar y usar la versión actual. Alternativamente, en esa
+copia anterior hay que pegar en **Valor** el UUID exacto obtenido con
+`SELECT id FROM miclub.clubs WHERE lower(trim(name))=lower('miClub');`, sin
+inventar ni usar el ID del usuario o de la membresía.
+
+Antes de considerar un nuevo backfill, revisar en la salida de 08:
+
+- una sola fila para `resolved_club_id`;
+- una sola cadena de Fernando Ramos con membresía `active` y el mismo club en
+  `person_club_id`, `membership_club_id` y `club_id`;
+- `without_club = 0`, y —si miClub es realmente el único tenant con datos—
+  `linked_elsewhere = 0` para todas las relaciones;
+- cero filas en el resultado de relaciones cruzadas;
+- PASS en las cinco consultas finales.
+
+No ejecutar `02_miclub_backfill_manual.sql` si todo lo anterior pasa. Si aparece
+`REVIEW`, conservar/exportar esos resultados y hacer backup antes de decidir una
+corrección: un UUID distinto puede pertenecer legítimamente a otro club y no debe
+reasignarse automáticamente.
