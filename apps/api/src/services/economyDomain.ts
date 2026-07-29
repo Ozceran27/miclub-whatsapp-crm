@@ -1,4 +1,15 @@
-export const ARGENTINA_TIME_ZONE = "America/Argentina/Buenos_Aires";
+import {
+  ARGENTINA_TIME_ZONE,
+  argentinaDayStart,
+  formatArgentinaDate,
+  getArgentinaCalendarYear,
+  getArgentinaDateParts,
+  getArgentinaLastNDaysWindow,
+  getArgentinaMonthWindow,
+  getArgentinaYearWindow,
+} from "../domain/argentinaTime.js";
+
+export { ARGENTINA_TIME_ZONE, getArgentinaCalendarYear, getArgentinaYearWindow };
 
 export const OPERATING_PROFIT_CATEGORIES = [
   "INSCRIPCIÓN",
@@ -96,13 +107,7 @@ export const classifyExpenseCategory = (value: unknown): ExpenseTypeKey => {
   return "UNCLASSIFIED";
 };
 
-export const getArgentinaCalendarYear = (reference = new Date()): number => zonedParts(reference).year;
 
-export const getArgentinaYearWindow = (year = getArgentinaCalendarYear()) => ({
-  start: utcFromArgentinaDay(year, 1, 1),
-  end: utcFromArgentinaDay(year + 1, 1, 1),
-  year,
-});
 
 export const MONTH_LABELS_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -117,7 +122,7 @@ const addArgentinaMonths = (year: number, month: number, offset: number): { year
 };
 
 export const getRollingInterannualMonthWindow = (reference = new Date()) => {
-  const current = zonedParts(reference);
+  const current = getArgentinaDateParts(reference);
   const start = { year: current.year - 1, month: current.month };
   const endExclusive = addArgentinaMonths(current.year, current.month, 1);
   const shortFormatter = new Intl.DateTimeFormat("es-AR", { timeZone: ARGENTINA_TIME_ZONE, month: "short", year: "numeric" });
@@ -125,7 +130,7 @@ export const getRollingInterannualMonthWindow = (reference = new Date()) => {
   const months: RollingInterannualMonth[] = [];
   for (let offset = 0; offset <= 12; offset += 1) {
     const part = addArgentinaMonths(start.year, start.month, offset);
-    const date = utcFromArgentinaDay(part.year, part.month, 1);
+    const date = argentinaDayStart(part.year, part.month, 1);
     const label = shortFormatter.format(date).replace(/\.$/, "").replace(/^./, (char) => char.toLocaleUpperCase("es-AR"));
     const fullLabel = fullFormatter.format(date).replace(/^./, (char) => char.toLocaleUpperCase("es-AR"));
     months.push({ year: part.year, month: part.month, key: `${part.year}-${String(part.month).padStart(2, "0")}`, label, fullLabel });
@@ -133,8 +138,8 @@ export const getRollingInterannualMonthWindow = (reference = new Date()) => {
   return {
     fromMonth: `${start.year}-${String(start.month).padStart(2, "0")}-01`,
     toExclusive: `${endExclusive.year}-${String(endExclusive.month).padStart(2, "0")}-01`,
-    start: utcFromArgentinaDay(start.year, start.month, 1),
-    end: utcFromArgentinaDay(endExclusive.year, endExclusive.month, 1),
+    start: argentinaDayStart(start.year, start.month, 1),
+    end: argentinaDayStart(endExclusive.year, endExclusive.month, 1),
     timezone: ARGENTINA_TIME_ZONE,
     months,
   };
@@ -263,58 +268,44 @@ export const calculateSectorProfitability = (movements: SectorProfitabilityMovem
   return Array.from(sectors.values()).sort((a, b) => b.balance - a.balance || b.income - a.income);
 };
 
-const zonedParts = (date: Date) => {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: ARGENTINA_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" })
-    .formatToParts(date)
-    .reduce<Record<string, string>>((acc, part) => ({ ...acc, [part.type]: part.value }), {});
-  return { year: Number(parts.year), month: Number(parts.month), day: Number(parts.day) };
-};
-
-const utcFromArgentinaDay = (year: number, month: number, day: number): Date => new Date(Date.UTC(year, month - 1, day, 3, 0, 0));
 const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * 86_400_000);
 
-const formatArgentinaDate = (date: Date): string => {
-  const { year, month, day } = zonedParts(date);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-};
-
 const formatArgentinaLabel = (date: Date): string => {
-  const { year, month, day } = zonedParts(date);
+  const { year, month, day } = getArgentinaDateParts(date);
   return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
 };
 
 export const getCurrentMonthWindow = (reference = new Date()) => {
-  const { year, month } = zonedParts(reference);
-  const start = utcFromArgentinaDay(year, month, 1);
-  const nextMonth = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
-  const end = utcFromArgentinaDay(nextMonth.year, nextMonth.month, 1);
+  const { from: start, to: end } = getArgentinaMonthWindow(reference);
   const label = new Intl.DateTimeFormat("es-AR", { timeZone: ARGENTINA_TIME_ZONE, month: "long" }).format(start);
   return { start, end, label: label.charAt(0).toUpperCase() + label.slice(1) };
 };
 
 export const getRolling30DayWindows = (reference = new Date()) => {
-  const { year, month, day } = zonedParts(reference);
-  const currentEnd = new Date(reference);
-  const currentStart = addDays(currentEnd, -30);
-  const previousStart = addDays(currentStart, -30);
+  const current = getArgentinaLastNDaysWindow(30, reference);
+  const previousReference = new Date(current.from.getTime() - 1);
+  const previous = getArgentinaLastNDaysWindow(30, previousReference);
+  const currentEnd = current.to;
+  const currentStart = current.from;
+  const previousStart = previous.from;
   return {
     previousStart,
     currentStart,
     currentEnd,
     tomorrowStart: currentEnd,
-    current: { from: currentStart, to: currentEnd, labelFrom: formatArgentinaLabel(currentStart), labelTo: formatArgentinaLabel(currentEnd), dateFrom: formatArgentinaDate(currentStart), dateTo: formatArgentinaDate(currentEnd) },
+    current: { from: currentStart, to: currentEnd, labelFrom: formatArgentinaLabel(currentStart), labelTo: formatArgentinaLabel(addDays(currentEnd, -1)), dateFrom: formatArgentinaDate(currentStart), dateTo: formatArgentinaDate(addDays(currentEnd, -1)) },
     previous: { from: previousStart, to: currentStart, labelFrom: formatArgentinaLabel(previousStart), labelTo: formatArgentinaLabel(addDays(currentStart, -1)), dateFrom: formatArgentinaDate(previousStart), dateTo: formatArgentinaDate(addDays(currentStart, -1)) },
     timezone: ARGENTINA_TIME_ZONE,
   };
 };
 
 export const getLastCompleteMonthWindows = (reference = new Date()) => {
-  const { year, month } = zonedParts(reference);
-  const currentMonthStart = utcFromArgentinaDay(year, month, 1);
-  const currentStart = month === 1 ? utcFromArgentinaDay(year - 1, 12, 1) : utcFromArgentinaDay(year, month - 1, 1);
-  const previousStart = currentStart.getUTCMonth() === 0
-    ? utcFromArgentinaDay(currentStart.getUTCFullYear() - 1, 12, 1)
-    : utcFromArgentinaDay(currentStart.getUTCFullYear(), currentStart.getUTCMonth(), 1);
+  const { year, month } = getArgentinaDateParts(reference);
+  const currentMonthStart = argentinaDayStart(year, month, 1);
+  const currentStart = month === 1 ? argentinaDayStart(year - 1, 12, 1) : argentinaDayStart(year, month - 1, 1);
+  const previousStart = month <= 2
+    ? argentinaDayStart(year - 1, month === 1 ? 11 : 12, 1)
+    : argentinaDayStart(year, month - 2, 1);
   const label = (date: Date) => new Intl.DateTimeFormat("es-AR", { timeZone: ARGENTINA_TIME_ZONE, month: "long", year: "numeric" }).format(date);
   return { previousStart, currentStart, currentEnd: currentMonthStart, currentLabel: label(currentStart), previousLabel: label(previousStart) };
 };

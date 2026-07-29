@@ -1,5 +1,5 @@
-import { normalizeMembershipFeeUnit, normalizeMovementAmount } from "@miclub/shared";
-import { normalizeOperationalStatus } from "./googleSheets.js";
+import { isEconomyOperationalStatus, isPendingMovementStatus, normalizeMembershipFeeUnit, normalizeMovementAmount } from "@miclub/shared";
+import { normalizeOperationalStatus } from "../importers/normalizers.js";
 
 const money = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -119,8 +119,9 @@ export const calculateSettlementBalance = (settlements: SettlementInput[]): { to
 export const isPendingAdministrationMovement = (movement: PendingMovementInput): boolean => {
   const source = normalizeText(movement.sourceSheet);
   const operational = normalizeText(movement.operationalStatus);
-  const financial = normalizeText(movement.financialStatus).toLowerCase();
-  return (source === "ADMINISTRACION" || source === "ADMIN") && (operational === "PENDIENTE" || financial === "pendiente");
+  return (source === "ADMINISTRACION" || source === "ADMIN")
+    && isEconomyOperationalStatus(operational)
+    && isPendingMovementStatus(operational);
 };
 
 export const calculatePendingBalance = (movements: PendingMovementInput[]): { income: number; expenses: number; net: number } => {

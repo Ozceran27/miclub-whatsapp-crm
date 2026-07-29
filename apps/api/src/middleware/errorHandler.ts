@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from "express";
+import { asLegacyUnknownCode, type ApiErrorCode, type ApiErrorResponse } from "@miclub/shared";
 
 type HttpError = Error & {
   status?: number;
@@ -24,17 +25,21 @@ export const errorHandler: ErrorRequestHandler = (error: HttpError, req, res, _n
     else console.error(error);
   }
 
-  res.status(status).json({
+  const code = (error.code
+    ? asLegacyUnknownCode<"api-error">(error.code)
+    : status === 500 ? "INTERNAL_ERROR" : "HTTP_ERROR") satisfies ApiErrorCode;
+  const response = {
     ok: false,
     error: true,
     message,
     status,
-    code: error.code ?? (status === 500 ? "INTERNAL_ERROR" : undefined),
+    code,
     batchId: error.batchId,
     details: error.details,
     retryable: error.retryable ?? status >= 500,
     requestId: req.requestId
-  });
+  } satisfies ApiErrorResponse;
+  res.status(status).json(response);
 };
 
 export default errorHandler;

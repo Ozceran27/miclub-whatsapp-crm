@@ -1,5 +1,7 @@
 import type { ContactedRecentResponse, MessageTemplate, PaginatedHistoryResponse, PreparedMessage } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
+import { withTransaction } from "../db/transaction.js";
+import { auditService } from "../services/auditService.js";
 
 export type MessageStatus = NonNullable<PreparedMessage["status"]>;
 export type TemplateInput = Pick<MessageTemplate, "id" | "name" | "body" | "createdAt" | "updatedAt"> & { isDefault: boolean; legacySqliteId?: string | null };
@@ -41,7 +43,7 @@ export const ensureCrmSchema = async (): Promise<void> => {
 export const listTemplates = async (clubId: string): Promise<MessageTemplate[]> => {
   await ensureCrmSchema();
   const pool = await getPostgresPool();
-  const result = await pool.query<Record<string, unknown>>(`select * from miclub.crm_message_templates where club_id=$1 order by is_default desc, created_at asc`, [clubId]);
+  const result = await pool.query<Record<string, unknown>>(`select * from miclub.crm_message_templates where club_id=$1 and archived_at is null order by is_default desc, created_at asc`, [clubId]);
   return result.rows.map(mapTemplate);
 };
 
@@ -58,17 +60,41 @@ export const upsertTemplate = async (clubId: string, template: TemplateInput): P
   return mapTemplate(result.rows[0]);
 };
 
-export const deleteTemplate = async (clubId: string, id: string): Promise<void> => {
+export const archiveTemplate = async (clubId: string, id: string, userId: string | null): Promise<"missing" | "default" | "deleted"> => {
   await ensureCrmSchema();
-  const pool = await getPostgresPool();
-  await pool.query(`delete from miclub.crm_message_templates where club_id=$1 and id=$2`, [clubId, id]);
+  return withTransaction(async (executor) => {
+    const before = await executor.query<Record<string, unknown>>(
+      `select * from miclub.crm_message_templates where club_id=$1 and id=$2 and archived_at is null for update`, [clubId, id],
+    );
+    if (!before.rows[0]) return "missing";
+    if (before.rows[0].is_default === true) return "default";
+    const after = await executor.query<Record<string, unknown>>(
+      `update miclub.crm_message_templates set archived_at=now(), archived_by=$3::uuid, updated_at=now()
+        where club_id=$1 and id=$2 returning *`, [clubId, id, userId],
+    );
+    await auditService.sensitiveChange({
+      action: "crm.template.archive", result: "success", userId, clubId,
+      entityType: "crm_message_template", entityId: null,
+      oldData: before.rows[0], newData: after.rows[0], metadata: { templateId: id },
+    }, executor);
+    return "deleted";
+  });
 };
 
 export const replaceDefaultTemplates = async (clubId: string, templates: TemplateInput[]): Promise<MessageTemplate[]> => {
   await ensureCrmSchema();
   const pool = await getPostgresPool();
-  await pool.query("delete from miclub.crm_message_templates where club_id=$1", [clubId]);
-  for (const template of templates) await upsertTemplate(clubId, template);
+  await withTransaction(async (executor) => {
+    await executor.query("update miclub.crm_message_templates set archived_at=now(), updated_at=now() where club_id=$1 and is_default=true and archived_at is null", [clubId]);
+    for (const template of templates) {
+      await executor.query(
+        `insert into miclub.crm_message_templates (club_id,id,legacy_sqlite_id,name,body,is_default,created_at,updated_at,archived_at,archived_by)
+         values ($1,$2,$3,$4,$5,true,$6,$7,null,null)
+         on conflict (club_id,id) do update set name=excluded.name,body=excluded.body,is_default=true,updated_at=excluded.updated_at,archived_at=null,archived_by=null`,
+        [clubId, template.id, template.legacySqliteId ?? template.id, template.name, template.body, template.createdAt, template.updatedAt],
+      );
+    }
+  }, pool);
   return listTemplates(clubId);
 };
 
@@ -117,10 +143,10 @@ export const updateHistoryStatus = async (clubId: string, id: number, status: Me
   return result.rows[0] ? mapHistory(result.rows[0]) : null;
 };
 
-export const getContactedRecent = async (clubId: string, since: string, windowDays: number): Promise<ContactedRecentResponse> => {
+export const getContactedRecent = async (clubId: string, since: string, until: string, windowDays: number): Promise<ContactedRecentResponse> => {
   await ensureCrmSchema();
   const pool = await getPostgresPool();
-  const result = await pool.query<{ member_id: string; event_at: string }>(`select member_id, coalesce(sent_at, created_at) as event_at from miclub.crm_message_history where club_id=$1 and status='sent_manual' and coalesce(sent_at, created_at) >= $2 order by coalesce(sent_at, created_at) desc`, [clubId, since]);
+  const result = await pool.query<{ member_id: string; event_at: string }>(`select member_id, coalesce(sent_at, created_at) as event_at from miclub.crm_message_history where club_id=$1 and status='sent_manual' and coalesce(sent_at, created_at) >= $2::timestamptz and coalesce(sent_at, created_at) < $3::timestamptz order by coalesce(sent_at, created_at) desc`, [clubId, since, until]);
   const byMemberId: ContactedRecentResponse["byMemberId"] = {};
   for (const row of result.rows) {
     const existing = byMemberId[row.member_id];

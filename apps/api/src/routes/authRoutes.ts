@@ -6,6 +6,16 @@ import { clearSessionCookie, getSession, isAuthEnabled, setSessionCookie } from 
 import asyncHandler from "./asyncHandler.js";
 import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
 import { auditService } from "../services/auditService.js";
+import { toPermissionCode, toRoleCode, type PublicAuthUser } from "@miclub/shared";
+
+const publicUser = (context: { userId: string; email: string; clubId: string; membershipId: string; role: string; permissions: readonly string[] }): PublicAuthUser => ({
+  userId: context.userId,
+  email: context.email,
+  clubId: context.clubId,
+  membershipId: context.membershipId,
+  role: toRoleCode(context.role),
+  permissions: context.permissions.map(toPermissionCode),
+});
 
 // auth: paths públicos de autenticación; no renombrar sin migración frontend.
 const router = Router();
@@ -22,7 +32,7 @@ router.post("/login", asyncHandler(async (req, res) => {
   if (result.ok) {
     setSessionCookie(req, res, result.context);
     await auditService.login({ action: "auth.login", result: "success", userId: result.context.userId, clubId: result.context.clubId, membershipId: result.context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el login", error));
-    return res.json({ authenticated: true, username: result.context.email, user: result.context });
+    return res.json({ authenticated: true, username: result.context.email, user: publicUser(result.context) });
   }
 
   if (result.reason === "membership_required") return res.status(403).json({ authenticated: false, code: "NO_ACTIVE_MEMBERSHIP", message: "La cuenta no posee una membresía activa con perfil personal" });
@@ -38,7 +48,7 @@ router.post("/register", asyncHandler(async (req, res) => {
     const context = await registerClubOwner(body.clubName, body.email, body.password);
     setSessionCookie(req, res, context);
     await auditService.registration({ action: "auth.registration", result: "success", userId: context.userId, clubId: context.clubId, membershipId: context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el registro", error));
-    return res.status(201).json({ authenticated: true, username: context.email, user: context });
+    return res.status(201).json({ authenticated: true, username: context.email, user: publicUser(context) });
   } catch (error) {
     if (error instanceof RegistrationError) return res.status(error.code === "email_exists" ? 409 : 400).json({ authenticated: false, message: error.message });
     throw error;
@@ -81,7 +91,7 @@ router.post("/clubs/select", asyncHandler(async (req, res) => {
   if (!membership) return res.status(403).json({ authenticated: false, message: "Membresía no autorizada" });
   const context = { ...session, clubId: membership.club_id, membershipId: membership.membership_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids };
   setSessionCookie(req, res, context);
-  res.json({ authenticated: true, user: context });
+  res.json({ authenticated: true, user: publicUser(context) });
 }));
 
 router.get("/me", asyncHandler(async (req, res) => {
@@ -104,7 +114,7 @@ router.get("/me", asyncHandler(async (req, res) => {
     setSessionCookie(req, res, context);
   }
 
-  const user = { userId: context.userId, personId: context.personId, email: context.email, legacy: false, clubId: context.clubId, membershipId: context.membershipId, role: context.role, permissions: context.permissions };
+  const user = publicUser(context);
   return res.json({ authenticated: true, authEnabled: true, username: context.email, user });
 }));
 

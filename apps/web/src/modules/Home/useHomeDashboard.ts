@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ClubOperationsSummary, Member, SectorOperationalSummary, StatusBreakdown as ApiStatusBreakdown } from '@miclub/shared';
-import { apiUrl } from '../../api';
+import { loadHomeDashboardResources } from './homeDashboardApi';
+import { buildActivityBreakdown, calculateWeightedAverageFee, formatDateTime, getCurrentSpanishMonthUpper, getEnrollmentStatusBreakdown, isActiveMember, isDebtor, isFiniteNumber, mapSummaryStatusBreakdown } from './homeDashboardPresentation';
 import { formatArPeso } from '../../utils';
 import type { ModuleId } from '../ModuleNav';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
 
 export type SyncStatus = {
-  source: 'mock' | 'google_sheets' | 'postgres';
+  source: 'postgres';
   enabled: boolean;
   sheets: string[];
   lastSyncAt?: string;
   error?: string;
 };
 
-type Summary = {
+export type Summary = {
   totalMembers: number;
   totalDebtors: number;
   totalEstimatedDebt: number;
@@ -24,7 +25,7 @@ type Summary = {
   rawStatusBreakdown?: Record<string, number>;
 };
 
-type ActivityBreakdownItem = {
+export type ActivityBreakdownItem = {
   activity: string;
   count: number;
 };
@@ -77,87 +78,6 @@ export type StatusBreakdown = {
 
 export type HomeDashboardState = ReturnType<typeof useHomeDashboard>;
 
-const MONTH_NAMES_ES_UPPER = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'] as const;
-
-const getCurrentSpanishMonthUpper = () => MONTH_NAMES_ES_UPPER[new Date().getMonth()];
-
-const STATUS_ALIASES: Record<string, 'current' | 'newEnrollment' | 'debtor' | 'abandoned' | 'cancelled'> = {
-  'al dia': 'current', aldia: 'current', activo: 'current', activos: 'current',
-  'nuevo inscripto': 'newEnrollment', nuevoinscripto: 'newEnrollment', 'nuevo inscrito': 'newEnrollment', nuevoinscrito: 'newEnrollment', nuevo: 'newEnrollment',
-  adeudando: 'debtor', deudor: 'debtor', deudores: 'debtor', deuda: 'debtor',
-  abandonado: 'abandoned', abandonada: 'abandoned', abandono: 'abandoned', inactivo: 'abandoned', inactivos: 'abandoned',
-  cancelado: 'cancelled', cancelada: 'cancelled', cancelacion: 'cancelled'
-};
-
-const normalizeText = (value?: string) => (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
-
-const formatDateTime = (value?: string) => {
-  if (!value) return 'Sin sincronización registrada';
-  return new Date(value).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-};
-
-const normalizeStatus = (status?: string) => normalizeText(status).replace(/[-–—_/]+/g, ' ').replace(/[^a-z0-9ñ\s]/g, '').replace(/\s+/g, ' ').trim();
-
-const getStatusBucketFromRawStatus = (status?: string) => {
-  const normalized = normalizeStatus(status);
-  const compact = normalized.replace(/\s/g, '');
-  if (STATUS_ALIASES[normalized]) return STATUS_ALIASES[normalized];
-  if (STATUS_ALIASES[compact]) return STATUS_ALIASES[compact];
-  if (normalized.includes('nuevo') && (normalized.includes('inscripto') || normalized.includes('inscrito'))) return 'newEnrollment';
-  if (normalized.includes('abandon')) return 'abandoned';
-  if (normalized.includes('cancel')) return 'cancelled';
-  if (normalized.includes('adeud') || normalized.includes('deud')) return 'debtor';
-  if (normalized.includes('al dia') || compact.includes('aldia')) return 'current';
-  return undefined;
-};
-
-const getStatusBucket = (member: Member) => getStatusBucketFromRawStatus(normalizeStatus(String(member.estado ?? '')));
-const isActiveMember = (member: Member) => !['abandoned', 'cancelled'].includes(getStatusBucket(member) ?? '');
-const isDebtor = (member: Member) => getStatusBucket(member) === 'debtor';
-
-const parseMemberFee = (value: unknown) => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value === 'string') {
-    const parsed = Number(value.replace(/[^0-9,-]/g, '').replace(',', '.'));
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-};
-
-const calculateWeightedAverageFee = (records: Member[]) => {
-  const activeMembersWithFee = records.map((member) => ({ member, fee: parseMemberFee(member.cuota) })).filter(({ member, fee }) => isActiveMember(member) && fee > 0);
-  if (activeMembersWithFee.length === 0) return undefined;
-  return activeMembersWithFee.reduce((total, { fee }) => total + fee, 0) / activeMembersWithFee.length;
-};
-
-const getActivityName = (member: Member) => member.actividad?.trim() || member.modalidad?.trim() || 'Sin actividad asignada';
-
-const getEnrollmentStatusBreakdown = (records: Member[], fallbackTotal?: number): StatusBreakdown => {
-  const breakdown: StatusBreakdown = { total: records.length || fallbackTotal || 0, active: 0, current: 0, newEnrollment: 0, debtor: 0, abandoned: 0, cancelled: 0, others: 0 };
-  records.forEach((member) => {
-    const bucket = getStatusBucket(member);
-    if (bucket === 'current') breakdown.current += 1;
-    if (bucket === 'newEnrollment') breakdown.newEnrollment += 1;
-    if (bucket === 'debtor') breakdown.debtor += 1;
-    if (bucket === 'abandoned') breakdown.abandoned += 1;
-    if (bucket === 'cancelled') breakdown.cancelled += 1;
-    if (!bucket) breakdown.others += 1;
-  });
-  breakdown.active = records.filter(isActiveMember).length;
-  return breakdown;
-};
-
-const mapSummaryStatusBreakdown = (statusBreakdown?: ApiStatusBreakdown): StatusBreakdown | undefined => statusBreakdown ? {
-  total: statusBreakdown.total, active: statusBreakdown.active, current: statusBreakdown.alDia, newEnrollment: statusBreakdown.nuevoInscripto, debtor: statusBreakdown.adeudando, abandoned: statusBreakdown.abandonado, cancelled: statusBreakdown.cancelado, others: statusBreakdown.otros
-} : undefined;
-
-const buildActivityBreakdown = (records: Member[]): ActivityBreakdownItem[] => {
-  const counts = new Map<string, number>();
-  records.forEach((member) => counts.set(getActivityName(member), (counts.get(getActivityName(member)) ?? 0) + 1));
-  return Array.from(counts.entries()).map(([activity, count]) => ({ activity, count })).sort((a, b) => b.count - a.count || a.activity.localeCompare(b.activity, 'es'));
-};
-
-const isFiniteNumber = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
 
 export function useHomeDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -174,19 +94,17 @@ export function useHomeDashboard() {
   const loadHome = async () => {
     setLoading(true); setError(null); setFinanceError(null); setSectorError(null);
     try {
-      const financePromise = fetch(apiUrl('/club-finance-summary'), { cache: 'no-store' }).then(async (response) => { if (!response.ok) throw new Error('No se pudo cargar el resumen financiero.'); return response.json() as Promise<ClubOperationsSummary>; }).catch((financeLoadError) => { setFinanceError(financeLoadError instanceof Error ? financeLoadError.message : 'Resumen financiero no disponible.'); return null; });
-      const sectorPromise = fetch(apiUrl('/sector-operational-summary'), { cache: 'no-store' }).then(async (response) => { if (!response.ok) throw new Error('No se pudo cargar el resumen operativo por sector.'); return response.json() as Promise<SectorOperationalSummary>; }).catch((sectorLoadError) => { setSectorError(sectorLoadError instanceof Error ? sectorLoadError.message : 'Resumen operativo por sector no disponible.'); return null; });
-      const [summaryRes, membersRes, debtorsRes, syncRes, financePayload, sectorPayload] = await Promise.all([fetch(apiUrl('/summary'), { cache: 'no-store' }), fetch(apiUrl('/members'), { cache: 'no-store' }), fetch(apiUrl('/debtors'), { cache: 'no-store' }), fetch(apiUrl('/sync-status'), { cache: 'no-store' }), financePromise, sectorPromise]);
-      if (!summaryRes.ok || !membersRes.ok || !debtorsRes.ok || !syncRes.ok) throw new Error('No se pudo cargar el inicio operativo.');
-      const [summaryPayload, membersPayload, debtorsPayload, syncPayload] = await Promise.all([summaryRes.json(), membersRes.json(), debtorsRes.json(), syncRes.json()]);
-      setSummary(summaryPayload as Summary); setMembers(membersPayload as Member[]); setDebtors(debtorsPayload as Member[]); setSyncStatus(syncPayload as SyncStatus); setFinanceSummary(financePayload); setSectorSummary(sectorPayload);
+      const payload = await loadHomeDashboardResources();
+      setSummary(payload.summary); setMembers(payload.members); setDebtors(payload.debtors); setSyncStatus(payload.syncStatus);
+      setFinanceSummary(payload.finance.value); setFinanceError(payload.finance.error);
+      setSectorSummary(payload.sector.value); setSectorError(payload.sector.error);
     } catch (e) { setError(e instanceof Error ? e.message : 'Error desconocido al cargar el inicio.'); } finally { setLoading(false); }
   };
 
   useEffect(() => { void loadHome(); }, []);
 
   return useMemo(() => {
-    const syncLabel = !syncStatus ? 'No disponible' : syncStatus.error ? 'Con advertencias' : syncStatus.source === 'google_sheets' ? 'Google Sheets conectado' : 'Datos mock/locales';
+    const syncLabel = !syncStatus ? 'No disponible' : syncStatus.error ? 'Con advertencias' : 'PostgreSQL conectado';
     const enrollmentStats = mapSummaryStatusBreakdown(summary?.statusBreakdown) ?? getEnrollmentStatusBreakdown(members, summary?.totalMembers);
     const debtorRecords = members.length > 0 ? members : debtors;
     const debtorBreakdown = buildActivityBreakdown(debtorRecords.filter(isDebtor));

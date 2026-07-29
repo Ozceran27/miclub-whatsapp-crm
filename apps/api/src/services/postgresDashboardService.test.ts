@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeMembershipFeeUnit, normalizeReceivableAggregate } from "@miclub/shared";
-import { buildEnrollmentReceivablesQuery, calculateOperationalProjectedBalance, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
+import { setPostgresPoolForTests } from "../db/postgres.js";
+import { buildEnrollmentReceivablesQuery, calculateOperationalProjectedBalance, getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
 
 test("moneyNormalization normaliza cuotas unitarias y agregados compartidos", () => {
   assert.equal(normalizeMembershipFeeUnit("30.000"), 30_000);
@@ -59,7 +60,7 @@ test("selectCuotasACobrar prioriza fallback autoritativo aunque v_dashboard_basi
   const result = selectCuotasACobrar({ dashboardValue: 405_500, fallbackValue: 430_500 });
 
   assert.equal(result.cuotasACobrar, 430_500);
-  assert.equal(result.source, "fallback");
+  assert.equal(result.source, "derived_receivables");
   assert.equal(result.dashboardValue, 405_500);
   assert.equal(result.fallbackValue, 430_500);
   assert.equal(result.differsBeyondThreshold, true);
@@ -69,7 +70,7 @@ test("selectCuotasACobrar conserva cero legítimo del fallback", () => {
   const result = selectCuotasACobrar({ dashboardValue: 0, fallbackValue: 0 });
 
   assert.equal(result.cuotasACobrar, 0);
-  assert.equal(result.source, "fallback");
+  assert.equal(result.source, "derived_receivables");
   assert.equal(result.differsBeyondThreshold, false);
 });
 
@@ -78,9 +79,9 @@ test("selectCuotasACobrar usa fallback solo cuando v_dashboard_basic es null o f
   const missingDashboard = selectCuotasACobrar({ fallbackValue: 430_500 });
 
   assert.equal(nullDashboard.cuotasACobrar, 430_500);
-  assert.equal(nullDashboard.source, "fallback");
+  assert.equal(nullDashboard.source, "derived_receivables");
   assert.equal(missingDashboard.cuotasACobrar, 430_500);
-  assert.equal(missingDashboard.source, "fallback");
+  assert.equal(missingDashboard.source, "derived_receivables");
 });
 
 
@@ -135,4 +136,50 @@ test("receivablesFallback coincide con una fila simulada de v_enrollment_receiva
     },
     simulatedViewRow,
   );
+});
+
+test("los cinco dashboards PostgreSQL aíslan dos clubes por club_id", async () => {
+  const clubA = "11111111-1111-4111-8111-111111111111";
+  const clubB = "22222222-2222-4222-8222-222222222222";
+  const tenantQueries: Array<{ text: string; params?: unknown[] }> = [];
+  const pool = {
+    query: async <T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: T[] }> => {
+      let rows: Record<string, unknown>[] = [];
+      if (text.includes("information_schema.columns")) rows = [{ exists: false }];
+      if (text.includes("to_regclass('miclub.v_enrollment_receivable_fees')")) {
+        rows = [{ hasEnrollmentReceivableFeesView: true, hasNormalizeMembershipFeeAmountFunction: true }];
+      }
+      if (rows.length === 0) {
+        tenantQueries.push({ text, params });
+      }
+      if (rows.length === 0 && text.includes("v_current_enrollments")) {
+        const clubId = params?.[0];
+        rows = [{ id: `${clubId}-member`, first_name: clubId === clubA ? "Ana" : "Bea", status: clubId === clubA ? "adeudando" : "al_dia", fee_amount: 10_000, source_sheet: "FITNESS" }];
+      }
+      return { rows: rows as T[] };
+    },
+    connect: async () => { throw new Error("connect no esperado"); },
+    end: async () => undefined,
+  };
+  setPostgresPoolForTests(pool);
+  try {
+    assert.equal((await getPostgresMembers(clubA))[0]?.nombre, "Ana");
+    assert.equal((await getPostgresMembers(clubB))[0]?.nombre, "Bea");
+    assert.equal((await getPostgresDebtors(clubA)).length, 1);
+    assert.equal((await getPostgresDebtors(clubB)).length, 0);
+    assert.equal((await getPostgresSummary(clubA)).totalDebtors, 1);
+    assert.equal((await getPostgresSummary(clubB)).totalDebtors, 0);
+    await getPostgresClubFinanceSummary(clubA);
+    await getPostgresClubFinanceSummary(clubB);
+    await getPostgresSectorOperationalSummary(clubA);
+    await getPostgresSectorOperationalSummary(clubB);
+
+    assert.ok(tenantQueries.length > 0);
+    for (const query of tenantQueries) {
+      assert.match(query.text, /club_id\s*=\s*\$1|where e\.club_id = \$1|where m\.club_id = \$1/);
+      assert.ok(query.params?.[0] === clubA || query.params?.[0] === clubB);
+    }
+  } finally {
+    setPostgresPoolForTests(undefined);
+  }
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiUrl } from '../api';
+import { login } from '../services/api/authApi';
 import { Link, useRouter } from '../router';
 import { useSession } from '../session';
 
@@ -14,15 +14,12 @@ export default function LoginPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(''); setIsLoading(true);
     try {
-      const response = await fetch(apiUrl('/auth/login'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password })
-      });
-      const payload = await response.json().catch(() => null) as { authenticated?: boolean; username?: string; message?: string } | null;
-      if (!response.ok || !payload?.authenticated) {
+      const payload = await login(username, password);
+      if (!payload.authenticated) {
         setError(payload?.message ?? 'No se pudo iniciar sesión. Revisá tus credenciales.'); return;
       }
-      authenticate(payload.username ?? null); navigate('/app', { replace: true });
-    } catch { setError('No se pudo conectar con el servidor local.'); }
+      authenticate(payload.username ?? null, payload.user); navigate('/app', { replace: true });
+    } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo conectar con el servidor local.'); }
     finally { setIsLoading(false); }
   };
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiUrl } from '../api';
+import { register } from '../services/api/authApi';
 import { Link, useRouter } from '../router';
 import { useSession } from '../session';
 
@@ -13,11 +13,10 @@ export default function RegisterPage() {
     if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) { setError('La contraseña debe tener al menos 10 caracteres e incluir letras y números.'); return; }
     setIsLoading(true);
     try {
-      const response = await fetch(apiUrl('/auth/register'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clubName, email, password }) });
-      const payload = await response.json().catch(() => null) as { authenticated?: boolean; username?: string; message?: string } | null;
-      if (!response.ok || !payload?.authenticated) { setError(payload?.message ?? 'El registro todavía no está disponible para este club.'); return; }
-      authenticate(payload.username ?? email); navigate('/app', { replace: true });
-    } catch { setError('No se pudo conectar con el servidor local.'); }
+      const payload = await register(clubName, email, password);
+      if (!payload.authenticated) { setError(payload.message ?? 'El registro todavía no está disponible para este club.'); return; }
+      authenticate(payload.username ?? email, payload.user); navigate('/app', { replace: true });
+    } catch (error) { setError(error instanceof Error ? error.message : 'No se pudo conectar con el servidor local.'); }
     finally { setIsLoading(false); }
   };
 

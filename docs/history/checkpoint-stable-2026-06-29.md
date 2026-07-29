@@ -1,5 +1,6 @@
 # Checkpoint estable 2026-06-29: producción PostgreSQL
 
+> **Documento histórico (2026-06-29). No usar para despliegues nuevos.** La referencia vigente es [`../checkpoint-pre-admin.md`](../checkpoint-pre-admin.md).
 Este documento fija el estado estable declarado para la operación actual de MiClub CRM al 2026-06-29. Su objetivo es servir como referencia antes de futuras PRs, migraciones o refactors. No contiene secretos, credenciales ni valores reales de `.env`.
 
 ## Estado estable declarado

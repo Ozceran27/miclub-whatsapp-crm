@@ -7,6 +7,7 @@ import { buildWaLink, interpolateTemplate, normalizeArPhone } from "../services/
 import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, insertCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
 import { requireMembership, requirePermission } from "../middleware/authorization.js";
 import { isExplicitTestAuthBypass } from "../middleware/auth.js";
+import { getArgentinaLastNDaysWindow } from "../domain/argentinaTime.js";
 
 const getClubId = (req: Request): string => {
   if (req.auth?.clubId) return req.auth.clubId;
@@ -41,7 +42,7 @@ const unresolvedTemplateVariables = (message: string): string[] => {
 };
 
 export const createCrmRoutes = (options: {
-  getMembersSource: () => Promise<{ members: Member[] }>;
+  getMembersSource: (clubId: string) => Promise<{ members: Member[] }>;
   isDebtorMember: (member: Member) => boolean;
 }) => {
   const router = Router();
@@ -88,7 +89,7 @@ export const createCrmRoutes = (options: {
   router.delete("/templates/:id", requireCrmWrite, async (req, res) => {
     const id = String(req.params.id);
     try {
-      const deleteResult = await deleteCrmTemplate(getClubId(req), id);
+      const deleteResult = await deleteCrmTemplate(getClubId(req), id, req.auth?.userId ?? null);
       if (deleteResult === "missing") return jsonError(res, 404, "Plantilla no encontrada.");
       if (deleteResult === "default") return jsonError(res, 400, "No se pueden eliminar plantillas predeterminadas.");
       res.status(204).send();
@@ -121,12 +122,12 @@ export const createCrmRoutes = (options: {
 
   router.get("/contacted-recent", async (req, res) => {
     const windowDays = 30;
-    const sinceDate = new Date();
-    sinceDate.setUTCDate(sinceDate.getUTCDate() - windowDays);
-    const since = sinceDate.toISOString();
+    const { from, to } = getArgentinaLastNDaysWindow(windowDays);
+    const since = from.toISOString();
+    const until = to.toISOString();
 
     try {
-      res.json(await getCrmContactedRecent(getClubId(req), since, windowDays));
+      res.json(await getCrmContactedRecent(getClubId(req), since, until, windowDays));
     } catch {
       jsonError(res, 500, "No se pudo obtener contactos recientes.");
     }
@@ -136,7 +137,7 @@ export const createCrmRoutes = (options: {
     const body = req.body as Partial<PrepareMessagesRequest>;
     if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) return jsonError(res, 400, "memberIds debe ser un array no vacío.");
     if (typeof body.message !== "string" || body.message.trim().length === 0) return jsonError(res, 400, "message debe ser un string no vacío.");
-    const { members } = await options.getMembersSource();
+    const { members } = await options.getMembersSource(getClubId(req));
     const selected = members.filter((m) => body.memberIds?.includes(m.id));
     const missingPhoneMembers = selected.filter((m) => normalizeArPhone(m.telefono).length === 0).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}` }));
     const unresolvedVariables = unresolvedTemplateVariables(body.message);
@@ -160,7 +161,7 @@ export const createCrmRoutes = (options: {
       return jsonError(res, 400, "message debe ser un string no vacío.");
     }
 
-    const { members } = await options.getMembersSource();
+    const { members } = await options.getMembersSource(getClubId(req));
     const selected = members.filter((m) => body.memberIds?.includes(m.id));
     const nonDebtors = selected.filter((m) => !options.isDebtorMember(m));
 

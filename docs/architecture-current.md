@@ -1,24 +1,26 @@
 # Arquitectura actual
 
-## `mockData` legacy y uso permitido
+**Vigencia:** 2026-07-28. Esta página describe el contrato de runtime, no los mecanismos históricos de transición.
 
-`apps/api/src/data/mockData.ts` es un fallback legacy para mantener operables demos,
-desarrollo local y pruebas manuales cuando no hay una fuente externa disponible. No debe
-considerarse una fuente productiva ni una representación completa o autoritativa de socios,
-pagos, saldos o plantillas.
+## Flujo productivo
 
-El runtime puede responder con `syncStatus.source = "mock"` únicamente en escenarios de
-fallback controlado:
+1. La web inicia sesión contra `/auth`; la API firma una cookie `httpOnly`.
+2. El middleware resuelve usuario, membresía activa y `clubId`. Las rutas tenant-scoped rechazan un `clubId` suministrado por el cliente.
+3. Repositorios y servicios consultan PostgreSQL con el tenant del contexto autenticado.
+4. PostgreSQL es la fuente autoritativa para identidad, CRM, personas, operación, finanzas y auditoría.
 
-- Google Sheets está desactivado para el entorno actual.
-- Google Sheets está activado pero faltan credenciales.
-- La sincronización contra Google Sheets falla y la API conserva una respuesta funcional para
-  demo/desarrollo.
+El arranque productivo exige `AUTH_ENABLED=true`, `DATA_SOURCE=postgres`, `CRM_SOURCE=postgres`, una sesión robusta, conexión PostgreSQL y `PUBLIC_APP_URL` HTTPS. Una configuración legacy no degrada silenciosamente: el proceso debe fallar antes de servir tráfico.
 
-En producción, el origen esperado para datos operativos es PostgreSQL. Si una pantalla,
-endpoint o prueba depende de `mockData`, esa dependencia debe tratarse como deuda legacy y
-no como contrato productivo. No eliminar `mockData.ts` hasta confirmar que no se usa en
-demos, desarrollo local o pruebas automatizadas/manuales.
+## Importaciones
 
-Si se decide mover este archivo a `apps/api/src/legacy/mockData.ts`, hacerlo en una PR pequeña
-que cambie solo imports relacionados y ejecutar typecheck completo para validar el alcance.
+Google Sheets es exclusivamente un origen temporal de importación hacia PostgreSQL. No participa como read path ordinario. La importación requiere habilitación explícita, operador autorizado, tenant determinado y posterior auditoría; al terminar se deshabilitan sus flags.
+
+SQLite y `mockData` permanecen como artefactos de compatibilidad, migración o prueba. No son fuentes, respaldos automáticos ni fallbacks de producción. Su contexto anterior está en [`history/`](history/README.md) y no debe copiarse a despliegues nuevos.
+
+## Superficies HTTP
+
+Las rutas se montan en `apps/api/src/index.ts`; el inventario reconciliado está en [`api-route-inventory.md`](api-route-inventory.md). Salvo login/registro y health técnico, las superficies de negocio requieren autenticación; las rutas tenant-scoped requieren además membresía.
+
+## Referencia operativa
+
+El documento canónico para el estado previo al módulo admin es [`checkpoint-pre-admin.md`](checkpoint-pre-admin.md). Los procedimientos detallados se mantienen en runbooks enlazados desde allí para evitar versiones duplicadas.

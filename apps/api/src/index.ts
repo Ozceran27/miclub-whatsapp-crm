@@ -53,7 +53,7 @@ import { createCrmRoutes } from "./routes/crmRoutes.js";
 import { createLegacyCompatRoutes, getMembersSource, isDebtorMember } from "./routes/legacyCompatRoutes.js";
 import { createFrontendRoutes } from "./routes/frontendRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
-import { validateRuntimeConfig, warnIfProductionCrmSourceIsNotPostgres } from "./config/env.js";
+import { validateRuntimeConfig } from "./config/env.js";
 import { createAuthProtection, isExplicitTestAuthBypass, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
 import { rejectClientClubId, requireAuth, requireMembership } from "./middleware/authorization.js";
 import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importMutationRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
@@ -61,7 +61,6 @@ import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, he
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const debugEndpointsEnabled = process.env.DEBUG_ENDPOINTS_ENABLED === "true";
-warnIfProductionCrmSourceIsNotPostgres(isProduction);
 app.set("trust proxy", true);
 const allowedOrigins = getAllowedOrigins();
 app.use(requestId);

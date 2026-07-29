@@ -1,237 +1,61 @@
 # miClub WhatsApp CRM
 
-Herramienta interna para gestión de cobranzas y preparación manual de mensajes por WhatsApp para miClub.
+Punto de entrada operativo para miClub Gestión: API Express/TypeScript, web React/Vite y **PostgreSQL como única fuente autoritativa de producción**.
 
-## Stack
-- Node.js + TypeScript
-- Express (API)
-- React + Vite (Web)
-- PostgreSQL (datos operativos y CRM en producción)
-- SQLite (historial CRM legacy/local hasta finalizar el corte)
-- Monorepo con workspaces npm
+## Contrato de producción
 
-## Instalación
+- `DATA_SOURCE=postgres` y `CRM_SOURCE=postgres`; PostgreSQL conserva datos operativos, CRM, identidad, membresías y auditoría.
+- La autenticación es obligatoria (`AUTH_ENABLED=true`). El arranque productivo rechaza una sesión débil, una URL pública sin HTTPS o fuentes legacy.
+- Toda operación de negocio obtiene `clubId` de la sesión y membresía autenticadas. No se acepta un tenant enviado por query, body o headers del cliente.
+- Google Sheets no es una fuente de lectura productiva: se admite únicamente como entrada de importaciones explícitas, auditadas y acotadas.
+- No existe fallback productivo a mocks, fixtures, Google Sheets ni SQLite. Los artefactos legacy solo sirven para pruebas, migración o consulta histórica.
+
+El estado y los controles previos al siguiente módulo administrativo están en el [checkpoint canónico](docs/checkpoint-pre-admin.md). La [arquitectura actual](docs/architecture-current.md) y el [inventario de rutas](docs/api-route-inventory.md) complementan esa referencia.
+
+## Inicio local
+
 ```bash
 npm install
 cp .env.example .env
-```
-
-## Variables de entorno
-```env
-PORT=4000
-SQLITE_DB_PATH=apps/api/data/miclub.sqlite
-POSTGRES_ENABLED=false
-DATA_SOURCE=legacy
-CRM_SOURCE=sqlite
-VITE_API_URL=http://localhost:4000
-GOOGLE_SHEETS_ENABLED=false
-GOOGLE_SHEET_ID=
-GOOGLE_SERVICE_ACCOUNT_EMAIL=
-GOOGLE_PRIVATE_KEY=
-GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY500
-GOOGLE_SHEETS_SALON_RANGE=SALON!AB34:AY500
-GOOGLE_SHEETS_AULA_RANGE=AULA!AB34:AY500
-
-```
-
-## Integración Google Sheets (Fase 1)
-La API puede leer miembros reales de las hojas `FITNESS`, `SALON` y `AULA`.
-
-### 1) Habilitar Google Sheets API
-1. Ir a Google Cloud Console y crear/seleccionar un proyecto.
-2. Activar **Google Sheets API** para el proyecto.
-3. Crear una **Service Account**.
-4. Generar una clave JSON para esa Service Account.
-
-### 2) Configurar credenciales en `.env`
-- `GOOGLE_SHEETS_ENABLED=true`
-- `GOOGLE_SHEET_ID=<ID de la planilla>`
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL=<client_email del JSON>`
-- `GOOGLE_PRIVATE_KEY=<private_key del JSON, conservando saltos de línea con \n>`
-- `GOOGLE_SHEETS_FITNESS_RANGE=FITNESS!AB20:AY500`
-- `GOOGLE_SHEETS_SALON_RANGE=SALON!AB34:AY500`
-- `GOOGLE_SHEETS_AULA_RANGE=AULA!AB34:AY500`
-
-### 3) Compartir la planilla con la Service Account
-En Google Sheets, compartir la planilla con el email de la service account (permiso de lectura).
-
-### 4) Fallback automático a mock
-- Si `GOOGLE_SHEETS_ENABLED=false`: usa datos mock.
-- Si faltan credenciales: usa mock y registra warning.
-- Si falla Google Sheets: usa mock y no rompe la API.
-
-### 5) Volver manualmente a modo mock
-Configurar:
-```env
-GOOGLE_SHEETS_ENABLED=false
-```
-
-### 6) Rangos financieros globales
-La primera integración global de datos operativos usa estos rangos y celdas:
-- Movimientos: `ADMINISTRACIÓN!B12:AB3000` (encabezados en fila 12, datos desde fila 13).
-- Saldos líquidos: `ADMINISTRACIÓN!AD12:AG14` (`AD12` liquidez, `AG12` caja, `AG13` banco, `AG14` dólares).
-- Saldos a pagar/liquidar por sector: `FITNESS!X3`, `SALON!X3`, `AULA!X3`, `LOCAL 1!X3`, `CANTINA!X3`.
-
-La app calcula ingresos/egresos pendientes, saldo pendiente neto, saldos a pagar, saldo proyectado e ingresos/egresos por sector y categoría.
-
-
-
-## Migración Google Sheets → PostgreSQL
-
-La guía operativa para importar Google Sheets a PostgreSQL, incluyendo variables `.env`, rangos, comandos `npm run import:sheets:dry` / `npm run import:sheets`, endpoints de importación, validaciones y rollback, está en `docs/google-sheets-postgres-migration.md`.
-
-## Operación PostgreSQL y retiro de legacy
-
-El corte productivo a PostgreSQL debe seguir el runbook de `docs/postgres-cutover-runbook.md`. En resumen:
-
-1. Confirmar que `DATA_SOURCE=postgres` está estable en producción durante el período acordado antes de retirar mocks o Google Sheets.
-2. Confirmar que `CRM_SOURCE=postgres` está estable y que el historial migrado coincide con SQLite antes de retirar SQLite.
-3. Exportar y verificar backups finales de SQLite y Google Sheets antes de eliminar cualquier dependencia legacy.
-4. Eliminar mocks, Google Sheets o SQLite solo cuando ningún endpoint productivo ni importador dependa de ellos.
-
-Variables clave:
-
-- `POSTGRES_ENABLED`: habilita conexión y health checks de PostgreSQL.
-- `DATA_SOURCE`: `legacy` usa Google Sheets/mocks; `postgres` usa repositorios PostgreSQL para datos operativos.
-- `CRM_SOURCE`: `sqlite` usa el archivo local; `postgres` usa tablas CRM en PostgreSQL.
-- `DEBUG_ENDPOINTS_ENABLED`: habilita endpoints de diagnóstico solo durante ventanas controladas.
-- `IMPORT_ENDPOINTS_ENABLED`: habilita endpoints de importación solo durante ventanas controladas.
-
-## Envío manual por WhatsApp Web
-La aplicación trabaja únicamente con datos reales y genera enlaces `wa.me` con el teléfono normalizado de cada miembro.
-
-Flujo recomendado:
-1. Seleccionar deudores y plantilla.
-2. Revisar el panel de confirmación (cantidad, clientes, actividad, cuota y mensaje ejemplo).
-3. Si se preparan varios mensajes, revisar el lote antes de abrir WhatsApp.
-4. Abrir WhatsApp Business Web manualmente desde cada enlace.
-5. Enviar manualmente y luego marcar estado (`opened`, `sent_manual` o `skipped`).
-
-La app no automatiza envíos: cada mensaje se confirma y envía manualmente desde WhatsApp Web.
-
-## Desarrollo
-```bash
+npm run db:migrations:check
+npm run db:migrate
 npm run dev
 ```
-Esto inicia:
-- API: http://localhost:4000
-- Web: http://localhost:5173
 
-## Scripts útiles
+Configure en `.env` una conexión PostgreSQL, un `SESSION_SECRET` local de al menos 32 caracteres y los valores marcados como obligatorios en `.env.example`. La API usa `http://localhost:4000` y Vite `http://localhost:5173`.
+
+## Validación y ejecución
+
 ```bash
 npm run typecheck
 npm run build
-npm run dev
 npm run test -w @miclub/api
-```
-
-## Endpoints principales
-- `GET /admin-movements`: movimientos parseados desde `ADMINISTRACIÓN!B12:AB3000`.
-- `GET /club-finance-summary`: primera integración global de datos operativos/financieros desde `ADMINISTRACIÓN` y celdas sectoriales `X3`; alimenta las tarjetas financieras de INICIO.
-- `GET /club-finance-debug`: diagnóstico financiero con conteos por tipo, estado, sector, categoría, celdas de liquidez y saldos sectoriales.
-- `GET /members-debug`: miembros sin filtrar por estado (Google Sheets o mock, con fallback).
-- `GET /debtors`: deudores filtrados por estado normalizado `Adeudando` (Google Sheets o mock, con fallback).
-- `GET /sync-status`: estado de sincronización `{ source, enabled, sheets, lastSyncAt?, error? }`.
-- `GET /templates`
-- `GET /history`
-- `POST /prepare-messages`
-
-## Política WhatsApp
-En Fase 1 no se automatiza el envío ni se manipula WhatsApp Web: el usuario confirma manualmente cada mensaje.
-
-## Uso local en producción
-
-1. Instalar dependencias:
-```bash
-npm install
-```
-
-2. Configurar variables de entorno en la raíz del repo:
-- Ubicación: `./.env`
-- Tomar como base `./.env.example`
-- **No subir `.env` a GitHub** (mantenerlo fuera de control de versiones).
-
-3. Compilar backend + frontend:
-```bash
-npm run build
-```
-
-4. Iniciar en modo producción local:
-```bash
 npm run start
 ```
 
-5. Abrir la app en:
-- `http://localhost:4000`
+`npm run start` sirve también `apps/web/dist`. Para un entorno desplegado use `NODE_ENV=production`, una `PUBLIC_APP_URL` HTTPS y autenticación habilitada; el validador de arranque falla de forma cerrada si falta esa configuración.
 
-6. Si en el navegador aparece el error `Frontend no compilado. Ejecutá npm run build.`, volver a compilar:
-```bash
-npm run build
-```
+## Importación excepcional desde Google Sheets
 
-Notas:
-- El backend busca `.env` en la **raíz del proyecto** (`miclub-whatsapp-crm/.env`).
-- En producción local, el servidor sirve el frontend compilado desde `apps/web/dist`.
-
-### Inicio rápido en Windows (sin VS Code)
-En la carpeta `scripts/` se incluyen:
-- `build-prod.bat`: compila todo el monorepo.
-- `start-prod.bat`: abre el navegador en `http://localhost:4000` y levanta el servidor.
-- `start-miclub-crm.bat`: compila + inicia en una sola acción (`npm run start:prod`).
-
-Para crear un acceso directo:
-1. Ir a `scripts/start-miclub-crm.bat`.
-2. Clic derecho → **Crear acceso directo**.
-3. Mover el acceso directo al Escritorio.
-4. Ejecutar el acceso directo para iniciar la app local.
-
-## Acceso remoto y autenticación
-
-Antes de publicar miClub Gestión con Cloudflare Tunnel, activá el login con cookie `httpOnly`. Las identidades y membresías se validan en PostgreSQL.
-
-Variables disponibles en `.env`:
-
-- `AUTH_ENABLED`: usá `false` para mantener el acceso directo local de siempre. Usá `true` para exigir login en toda la aplicación.
-- `AUTH_USER` y `AUTH_PASSWORD` fueron retiradas: no existe un usuario global de entorno.
-- `SESSION_SECRET`: secreto largo y aleatorio para firmar la cookie de sesión. Es obligatorio si `AUTH_ENABLED=true`.
-- `PUBLIC_APP_URL`: URL pública de la app; por ejemplo, la URL `https://...` del Cloudflare Tunnel. Ayuda a configurar cookies seguras detrás de HTTPS.
-
-Ejemplo para probar localmente:
-
-```env
-AUTH_ENABLED=true
-SESSION_SECRET=un-secreto-largo-aleatorio-de-al-menos-32-caracteres
-PUBLIC_APP_URL=http://localhost:4000
-```
-
-Luego ejecutá:
+Sheets se habilita solo durante una ventana controlada. El flujo preferido es:
 
 ```bash
-npm run build
-npm run start
-```
-
-Abrí `http://localhost:4000`. Con `AUTH_ENABLED=true` debe aparecer la pantalla de login; con credenciales correctas se ingresa al panel y el botón **Cerrar sesión** vuelve al login. Con `AUTH_ENABLED=false`, la app entra directamente como antes.
-
-Recomendaciones para acceso remoto:
-
-- Activá `AUTH_ENABLED=true` antes de exponer la app con Cloudflare Tunnel.
-- Usá una contraseña fuerte y un `SESSION_SECRET` largo, único y privado.
-- No compartas ni subas el archivo `.env` real.
-- Si usás una URL HTTPS del túnel, configurá `PUBLIC_APP_URL` con esa URL pública.
-
-## PostgreSQL schema migration for Google Sheets import
-
-Before running the Google Sheets dry-run importer, apply the versioned PostgreSQL migration that creates the `miclub` schema, required extensions, enums, tables, unique indexes used by importer `on conflict` clauses, and service views:
-
-```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
 npm run import:sheets:dry
+npm run import:sheets
+npm run audit:postgres
 ```
 
-If you connect with discrete PostgreSQL variables instead of `DATABASE_URL`, pass the same host/database/user options you use for the API, for example:
+Consulte el [runbook de importación Sheets → PostgreSQL](docs/google-sheets-postgres-migration.md). Los endpoints de importación requieren además `IMPORT_ENDPOINTS_ENABLED=true`, membresía activa y permiso `imports:run`; deben volver a apagarse al cerrar la ventana.
 
-```bash
-psql -h "$PGHOST" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f apps/api/db/migrations/202606260001_create_miclub_import_schema.sql
-npm run import:sheets:dry
-```
+## Documentación operativa
+
+- [Checkpoint canónico pre-admin](docs/checkpoint-pre-admin.md)
+- [Arquitectura actual](docs/architecture-current.md)
+- [Inventario de endpoints](docs/api-route-inventory.md)
+- [Runbook de identidad y tenant](docs/auth-tenant-remediation-runbook.md)
+- [Runbook de corte PostgreSQL](docs/postgres-cutover-runbook.md)
+- [Archivo histórico (no usar para despliegues nuevos)](docs/history/README.md)
+
+## WhatsApp
+
+La aplicación prepara enlaces `wa.me`; una persona revisa y envía cada mensaje manualmente desde WhatsApp Web. No automatiza el envío ni controla WhatsApp Web.

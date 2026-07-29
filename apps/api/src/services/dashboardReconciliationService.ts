@@ -12,6 +12,7 @@ import {
   getPostgresMembers,
   getPostgresSectorOperationalSummary,
 } from "./postgresDashboardService.js";
+import type { RequestAuthContext } from "../auth/types.js";
 
 export type ReconciliationStatus = "match" | "difference" | "missing_google_sheets" | "missing_postgres";
 
@@ -134,15 +135,15 @@ export const buildDashboardReconciliation = (input: ReconciliationInput, toleran
   };
 };
 
-export const getDashboardReconciliation = async (members?: Member[]): Promise<DashboardReconciliationResult> => {
-  const reconciliationMembers = members ?? (await getPostgresMembers());
+export const getDashboardReconciliation = async (auth: RequestAuthContext, members?: Member[]): Promise<DashboardReconciliationResult> => {
+  const reconciliationMembers = members ?? (await getPostgresMembers(auth.clubId));
   const [googleFinanceDebug, googleFinanceSummary, googleSectorDebug, googleSectorSummary, postgresFinanceSummary, postgresSectorSummary] = await Promise.all([
     getClubFinanceDebugFromGoogleSheets(reconciliationMembers),
     getClubOperationsSummaryFromGoogleSheets(reconciliationMembers),
     getSectorOperationalDebug(reconciliationMembers),
     getSectorOperationalSummary(reconciliationMembers),
-    getPostgresClubFinanceSummary(),
-    getPostgresSectorOperationalSummary(),
+    getPostgresClubFinanceSummary(auth.clubId),
+    getPostgresSectorOperationalSummary(auth.clubId),
   ]);
 
   return buildDashboardReconciliation({
