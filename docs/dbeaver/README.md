@@ -47,3 +47,5 @@ Economía, movimientos, personas, inscripciones y CRM. Debe ejecutarse manualmen
 en una réplica o entorno seguro con datos representativos, después de reemplazar
 el UUID centinela. El script es de solo lectura y **no crea índices**: cualquier
 DDL posterior requiere comparar el inventario y conservar los planes reales.
+
+- `07_integral_regression_audit_readonly.sql`: auditoría integral pre-admin, reconciliación por módulo y reporte PASS/FAIL; no modifica datos.

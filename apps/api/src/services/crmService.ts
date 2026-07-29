@@ -19,7 +19,10 @@ const sqliteAll = <T>(query: string, params: unknown[] = []): Promise<T[]> =>
 const sqliteGet = <T>(query: string, params: unknown[] = []): Promise<T | undefined> =>
   new Promise((resolve, reject) => db.get(query, params, (err, row) => (err ? reject(err) : resolve(row as T | undefined))));
 
-const getCrmSource = (): CrmSource => (process.env.CRM_SOURCE === "postgres" ? "postgres" : "sqlite");
+// SQLite is an explicitly selected legacy migration/audit source.  An absent or
+// misspelled setting must never make an ordinary CRM request fall back to it.
+export const resolveCrmSource = (configuredSource: string | undefined): CrmSource => configuredSource === "sqlite" ? "sqlite" : "postgres";
+export const getCrmSource = (): CrmSource => resolveCrmSource(process.env.CRM_SOURCE);
 
 const mapSqliteTemplate = (row: { id: string; name: string; body: string; isDefault: number; createdAt: string; updatedAt: string }): MessageTemplate => ({
   id: row.id,
