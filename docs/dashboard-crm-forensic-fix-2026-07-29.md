@@ -48,3 +48,21 @@ INICIO resuelve las seis solicitudes de forma independiente: conserva respuestas
 ## Límites de validación ambiental
 
 El contenedor no contiene `.env` ni credenciales PostgreSQL/sesión. El arranque productivo se detiene correctamente por configuración insegura antes de escuchar un puerto. El proxy de ejecución rechaza el túnel Cloudflare con HTTP 403. Por ello no fue posible afirmar resultados 200 ni datos reales en localhost/túnel desde este entorno; deben validarse con una sesión real después de desplegar este commit. Los tests con un pool PostgreSQL instrumentado comprueban el SQL exacto, parámetros y aislamiento de dos clubes, pero no sustituyen esa verificación operativa.
+# Corrección adicional: resumen financiero de Inicio
+
+El error `42703: no existe la columna club_id` en `GET /club-finance-summary`
+no demuestra que los movimientos estén desvinculados. La causa concreta era que
+`v_sector_settlement_balances`, a diferencia de las demás vistas operativas, no
+exponía `club_id`. El servicio ahora filtra la vista mediante su sector propietario
+y la migración `202607290001_scope_sector_settlement_view_by_club.sql` completa el
+contrato multitenant de la vista. Esto permite desplegar primero el binario sin una
+ventana de error y aplicar luego la migración normalmente con `npm run db:migrate`.
+
+No se recomienda borrar ni volver a importar datos por este error. Primero ejecute
+`docs/dbeaver/08_dashboard_crm_forensic_readonly.sql`. Sólo si informa filas
+`without_club` que fueron verificadas como legacy de miClub, haga backup y ejecute
+completo `docs/dbeaver/02_miclub_backfill_manual.sql`; después ejecute
+`docs/dbeaver/03_final_validation_readonly.sql`. Si hay filas asignadas a otro club,
+deténgase: reasignarlas automáticamente podría mezclar tenants. Una nueva migración
+desde Sheets sólo corresponde cuando el diagnóstico demuestra datos corruptos o de
+origen incorrecto, no para reparar una vista.
