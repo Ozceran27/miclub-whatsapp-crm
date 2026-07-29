@@ -95,9 +95,14 @@ export function useHomeDashboard() {
     setLoading(true); setError(null); setFinanceError(null); setSectorError(null);
     try {
       const payload = await loadHomeDashboardResources();
-      setSummary(payload.summary); setMembers(payload.members); setDebtors(payload.debtors); setSyncStatus(payload.syncStatus);
+      if (payload.summary.value) setSummary(payload.summary.value);
+      if (payload.members.value) setMembers(payload.members.value);
+      if (payload.debtors.value) setDebtors(payload.debtors.value);
+      if (payload.syncStatus.value) setSyncStatus(payload.syncStatus.value);
       setFinanceSummary(payload.finance.value); setFinanceError(payload.finance.error);
       setSectorSummary(payload.sector.value); setSectorError(payload.sector.error);
+      const coreErrors = [payload.summary.error, payload.members.error, payload.debtors.error, payload.syncStatus.error].filter(Boolean);
+      setError(coreErrors.length ? `Algunas secciones no se pudieron actualizar: ${coreErrors.join(' · ')}` : null);
     } catch (e) { setError(e instanceof Error ? e.message : 'Error desconocido al cargar el inicio.'); } finally { setLoading(false); }
   };
 
