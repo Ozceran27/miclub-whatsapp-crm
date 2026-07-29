@@ -6,12 +6,24 @@ import { normalizeOperationalStatus } from "../importers/normalizers.js";
 import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "../services/comparisonService.js";
 import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresReceivableEffectiveStatusDebug, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
 
-const databaseUnavailable = (res: Response, operation: string, error: unknown) => {
+type PostgresError = Error & { code?: string };
+
+export const isDatabaseUnavailableError = (error: unknown): boolean => {
+  const code = (error as PostgresError | null)?.code;
+  return Boolean(code && (code.startsWith("08") || ["57P01", "57P02", "57P03", "53300"].includes(code)))
+    || (error instanceof Error && /ECONNREFUSED|connection terminated|timeout expired/i.test(error.message));
+};
+
+const postgresFailure = (res: Response, operation: string, error: unknown, requestId?: string) => {
   const detail = error instanceof Error ? error.message : String(error);
-  console.error(`[postgres-dashboard] ${operation} no disponible: ${detail}`, error);
-  return res.status(503).json({
-    code: "DATABASE_UNAVAILABLE",
-    message: `PostgreSQL no está disponible para ${operation}.`,
+  const unavailable = isDatabaseUnavailableError(error);
+  console.error(`[postgres-dashboard] ${operation} falló (${requestId ?? "sin-request-id"}): ${detail}`, error);
+  return res.status(unavailable ? 503 : 500).json({
+    code: unavailable ? "DATABASE_UNAVAILABLE" : "DATABASE_QUERY_FAILED",
+    message: unavailable
+      ? `PostgreSQL no está disponible para ${operation}.`
+      : `No se pudo consultar ${operation}.`,
+    requestId,
     retryable: true,
   });
 };
@@ -31,58 +43,58 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
 
   router.get("/members", async (req, res) => {
     try { res.json(await getPostgresMembers(req.auth!.clubId)); }
-    catch (error) { databaseUnavailable(res, "miembros", error); }
+    catch (error) { postgresFailure(res, "miembros", error, req.requestId); }
   });
 
   router.get("/debtors", async (req, res) => {
     try { res.json(await getPostgresDebtors(req.auth!.clubId)); }
-    catch (error) { databaseUnavailable(res, "deudores", error); }
+    catch (error) { postgresFailure(res, "deudores", error, req.requestId); }
   });
 
   router.get("/summary", async (req, res) => {
     try { res.json(await getPostgresSummary(req.auth!.clubId)); }
-    catch (error) { databaseUnavailable(res, "resumen", error); }
+    catch (error) { postgresFailure(res, "resumen", error, req.requestId); }
   });
 
   router.get("/club-finance-summary", async (req, res) => {
     try { res.json(await getPostgresClubFinanceSummary(req.auth!.clubId)); }
-    catch (error) { databaseUnavailable(res, "resumen financiero", error); }
+    catch (error) { postgresFailure(res, "resumen financiero", error, req.requestId); }
   });
 
   router.get("/sector-operational-summary", async (req, res) => {
     try { res.json(await getPostgresSectorOperationalSummary(req.auth!.clubId)); }
-    catch (error) { databaseUnavailable(res, "resumen operativo por sector", error); }
+    catch (error) { postgresFailure(res, "resumen operativo por sector", error, req.requestId); }
   });
 
   router.get("/sync-status", async (_req, res) => {
     const warnings = validatePostgresEnv();
-    if (warnings.length) return databaseUnavailable(res, "estado de sincronización", new Error(warnings.join(" ")));
+    if (warnings.length) return postgresFailure(res, "estado de sincronización", Object.assign(new Error(warnings.join(" ")), { code: "08000" }), _req.requestId);
     try {
       await getPostgresHealth();
       res.json({ source: "postgres", enabled: true, ok: true, sheets: [], lastSyncAt: new Date().toISOString() });
-    } catch (error) { databaseUnavailable(res, "estado de sincronización", error); }
+    } catch (error) { postgresFailure(res, "estado de sincronización", error, _req.requestId); }
   });
 
   if (debugEndpointsEnabled) {
     router.get("/club-finance-debug", async (req, res) => {
       try { res.json(await getPostgresClubFinanceSummary(req.auth!.clubId)); }
-      catch (error) { databaseUnavailable(res, "debug financiero", error); }
+      catch (error) { postgresFailure(res, "debug financiero", error, req.requestId); }
     });
     router.get("/receivable-fees-effective-status-debug", async (req, res) => {
       try { res.json(await getPostgresReceivableEffectiveStatusDebug(req.auth!.clubId)); }
-      catch (error) { databaseUnavailable(res, "debug de cuotas", error); }
+      catch (error) { postgresFailure(res, "debug de cuotas", error, req.requestId); }
     });
     router.get("/comparison-debug", async (req, res) => {
       try { res.json(await compareLegacyWithPostgres(req.auth!)); }
-      catch (error) { databaseUnavailable(res, "diagnóstico de migración", error); }
+      catch (error) { postgresFailure(res, "diagnóstico de migración", error, req.requestId); }
     });
     router.get("/comparison-debug/summary", async (req, res) => {
       try { res.json(await compareLegacySummaryWithPostgresDashboard(req.auth!)); }
-      catch (error) { databaseUnavailable(res, "diagnóstico de resumen de migración", error); }
+      catch (error) { postgresFailure(res, "diagnóstico de resumen de migración", error, req.requestId); }
     });
     router.get("/comparison-debug/members", async (req, res) => {
       try { res.json(await compareLegacyMembersWithPostgresEnrollments(req.auth!)); }
-      catch (error) { databaseUnavailable(res, "diagnóstico de miembros de migración", error); }
+      catch (error) { postgresFailure(res, "diagnóstico de miembros de migración", error, req.requestId); }
     });
   }
 
