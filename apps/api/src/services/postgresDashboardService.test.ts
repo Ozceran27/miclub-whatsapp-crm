@@ -95,7 +95,9 @@ test("buildEnrollmentReceivablesQuery usa la vista v_enrollment_receivable_fees 
   });
 
   assert.match(query, /from miclub\.v_enrollment_receivable_fees/);
-  assert.doesNotMatch(query, /from miclub\.enrollments e/);
+  assert.match(query, /join miclub\.enrollments e on e\.id = vr\.enrollment_id/);
+  assert.match(query, /where e\.club_id = \$1/);
+  assert.match(query, /coalesce\(e\.inactive, false\) = false/);
   assert.doesNotMatch(query, /normalize_membership_fee_amount\(e\.fee_amount\)/);
 });
 
@@ -165,6 +167,9 @@ test("los cinco dashboards PostgreSQL aíslan dos clubes por club_id", async () 
   try {
     assert.equal((await getPostgresMembers(clubA))[0]?.nombre, "Ana");
     assert.equal((await getPostgresMembers(clubB))[0]?.nombre, "Bea");
+    const membersQuery = tenantQueries.find(({ text }) => text.includes("v_current_enrollments"));
+    assert.match(membersQuery?.text ?? "", /join miclub\.enrollments e on e\.id = v\.enrollment_id/);
+    assert.doesNotMatch(membersQuery?.text ?? "", /v_current_enrollments where club_id/);
     assert.equal((await getPostgresDebtors(clubA)).length, 1);
     assert.equal((await getPostgresDebtors(clubB)).length, 0);
     assert.equal((await getPostgresSummary(clubA)).totalDebtors, 1);

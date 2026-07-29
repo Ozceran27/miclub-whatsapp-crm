@@ -144,9 +144,10 @@ export const buildEnrollmentReceivablesQuery = ({
 }): string => {
   if (capabilities.hasEnrollmentReceivableFeesView) {
     return receivablesAggregateSql(
-      `select status, due_date, receivable_fee
-   from miclub.v_enrollment_receivable_fees
-   where club_id = $1`,
+      `select vr.status, vr.due_date, vr.receivable_fee
+   from miclub.v_enrollment_receivable_fees vr
+   join miclub.enrollments e on e.id = vr.enrollment_id
+   where e.club_id = $1${inactiveEnrollmentFilter}`,
     );
   }
 
@@ -275,9 +276,12 @@ export const normalizeStatusLabel = (value: unknown, _dueDate?: unknown): Debtor
 
 export const getPostgresMembers = async (clubId: string): Promise<Member[]> => {
   const pool = await getPostgresPool();
-  const inactiveFilter = await enrollmentInactiveFilter("v_current_enrollments", "v_current_enrollments");
+  const inactiveFilter = await enrollmentInactiveFilter("enrollments", "e");
   const result = await pool.query<Record<string, unknown>>(
-    `select * from miclub.v_current_enrollments where club_id = $1${inactiveFilter}`,
+    `select v.*
+     from miclub.v_current_enrollments v
+     join miclub.enrollments e on e.id = v.enrollment_id
+     where e.club_id = $1${inactiveFilter}`,
     [clubId],
   );
   return result.rows.map((row, index) => ({
