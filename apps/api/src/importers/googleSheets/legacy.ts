@@ -83,10 +83,10 @@ export interface ClubFinanceDebugInfo {
 }
 
 const MOVEMENT_HEADER_RANGES: Record<MovementSheetName, string> = {
-  FITNESS: "FITNESS!B19:AB19",
-  SALON: "SALON!B33:AB33",
-  AULA: "AULA!B33:AB33",
-  "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE?.trim() || "'LOCAL 1'!B9:AB9"
+  FITNESS: "FITNESS!B19:Y19",
+  SALON: "SALON!B33:Y33",
+  AULA: "AULA!B33:Y33",
+  "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_HEADER_RANGE?.trim() || "'LOCAL 1'!B9:Y9"
 };
 
 const MEMBER_HEADER_RANGES: Record<OperationalSheetName, string> = {
@@ -190,7 +190,7 @@ export const adminMovementFallbackIndexes: MovementColumnIndexes = {
 };
 
 export const sectorMovementFallbackIndexes: MovementColumnIndexes = {
-  // Índices relativos al rango B:AB de hojas sectoriales (FITNESS, SALON, AULA, LOCAL 1).
+  // Índices relativos al rango B:Y de hojas sectoriales (FITNESS, SALON, AULA, LOCAL 1).
   id: 0,
   fecha: 1,
   tipo: 3,
@@ -318,10 +318,10 @@ export const getGoogleSheetsConfig = () => {
     AULA: process.env.GOOGLE_SHEETS_AULA_RANGE?.trim() || "AULA!AB34:BB1500"
   };
   const movementRanges: Record<MovementSheetName, string> = {
-    FITNESS: process.env.GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE?.trim() || "FITNESS!B20:AB800",
-    SALON: process.env.GOOGLE_SHEETS_SALON_MOVEMENTS_RANGE?.trim() || "SALON!B34:AB800",
-    AULA: process.env.GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE?.trim() || "AULA!B34:AB800",
-    "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE?.trim() || "'LOCAL 1'!B10:AB3000"
+    FITNESS: process.env.GOOGLE_SHEETS_FITNESS_MOVEMENTS_RANGE?.trim() || "FITNESS!B20:Y800",
+    SALON: process.env.GOOGLE_SHEETS_SALON_MOVEMENTS_RANGE?.trim() || "SALON!B34:Y800",
+    AULA: process.env.GOOGLE_SHEETS_AULA_MOVEMENTS_RANGE?.trim() || "AULA!B34:Y800",
+    "LOCAL 1": process.env.GOOGLE_SHEETS_LOCAL_1_MOVEMENTS_RANGE?.trim() || "'LOCAL 1'!B10:Y3000"
   };
 
   return {
