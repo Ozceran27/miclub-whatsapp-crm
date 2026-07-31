@@ -122,12 +122,28 @@ export const findDuplicatePreparedMessages = async (clubId: string, memberIds: s
 export const insertHistory = async (clubId: string, history: HistoryInput): Promise<PreparedMessage> => {
   await ensureCrmSchema();
   const pool = await getPostgresPool();
+  const commonValues = [clubId, history.memberId, history.personId ?? null, history.enrollmentId ?? null, history.nombre ?? null, history.phone, history.message, history.waLink, history.status ?? "prepared", history.createdAt, history.openedAt ?? null, history.sentAt ?? null, history.note ?? null, history.templateName ?? null];
+
+  // legacy_sqlite_id has a database sequence default. A normal application
+  // insert must omit the column: explicitly sending NULL bypasses PostgreSQL's
+  // default and violates the NOT NULL constraint. Legacy migrations still
+  // supply the original id and retain their idempotent upsert behaviour.
+  if (history.legacySqliteId == null) {
+    const result = await pool.query<Record<string, unknown>>(
+      `insert into miclub.crm_message_history (club_id, member_id, person_id, enrollment_id, nombre, phone, message, wa_link, status, created_at, opened_at, sent_at, note, template_name)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       returning *`,
+      commonValues
+    );
+    return mapHistory(result.rows[0]);
+  }
+
   const result = await pool.query<Record<string, unknown>>(
     `insert into miclub.crm_message_history (club_id, legacy_sqlite_id, member_id, person_id, enrollment_id, nombre, phone, message, wa_link, status, created_at, opened_at, sent_at, note, template_name)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      on conflict (club_id, legacy_sqlite_id) do update set status=excluded.status, opened_at=excluded.opened_at, sent_at=excluded.sent_at, note=excluded.note
      returning *`,
-    [clubId, history.legacySqliteId ?? null, history.memberId, history.personId ?? null, history.enrollmentId ?? null, history.nombre ?? null, history.phone, history.message, history.waLink, history.status ?? "prepared", history.createdAt, history.openedAt ?? null, history.sentAt ?? null, history.note ?? null, history.templateName ?? null]
+    [clubId, history.legacySqliteId, ...commonValues.slice(1)]
   );
   return mapHistory(result.rows[0]);
 };
