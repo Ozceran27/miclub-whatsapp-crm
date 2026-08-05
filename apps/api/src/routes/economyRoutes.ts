@@ -1,6 +1,6 @@
 import { Router } from "express";
 import asyncHandler from "./asyncHandler.js";
-import { getAnnualSummary, getYearlyBreakdown, getByCategory, getBySector, getComparison, getInsights, getMonthlyEvolution, getPaymentMethods, getPending, getRecentMovements, getSectorRankings, getSummary } from "../services/economyService.js";
+import { getActivityRankings, getActivityTrends, getAnnualSummary, getYearlyBreakdown, getByCategory, getBySector, getComparison, getInsights, getMonthlyEvolution, getPaymentMethods, getPending, getRecentMovements, getSectorRankings, getSectorTrends, getSummary } from "../services/economyService.js";
 
 const router = Router();
 
@@ -8,6 +8,9 @@ router.get("/summary", asyncHandler(async (req, res) => res.json(await getSummar
 router.get("/monthly-evolution", asyncHandler(async (req, res) => res.json(await getMonthlyEvolution(req.auth!.clubId, req.query.year))));
 router.get("/by-sector", asyncHandler(async (req, res) => res.json(await getBySector(req.auth!.clubId, req.query.limit))));
 router.get("/sector-rankings", asyncHandler(async (req, res) => res.json(await getSectorRankings(req.auth!.clubId, req.query.limit))));
+router.get("/sector-trends", asyncHandler(async (req, res) => res.json(await getSectorTrends(req.auth!.clubId, req.query.year, req.query.limit))));
+router.get("/activity-rankings", asyncHandler(async (req, res) => res.json(await getActivityRankings(req.auth!.clubId, req.query.limit))));
+router.get("/activity-trends", asyncHandler(async (req, res) => res.json(await getActivityTrends(req.auth!.clubId, req.query.year, req.query.limit))));
 router.get("/by-category", asyncHandler(async (req, res) => res.json(await getByCategory(req.auth!.clubId, req.query.limit))));
 router.get("/payment-methods", asyncHandler(async (req, res) => res.json(await getPaymentMethods(req.auth!.clubId))));
 router.get("/recent-movements", asyncHandler(async (req, res) => res.json(await getRecentMovements(req.auth!.clubId, req.query.limit))));

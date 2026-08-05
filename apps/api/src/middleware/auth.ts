@@ -72,6 +72,11 @@ export const protectedApiPrefixes = [
   "/contacted-recent",
   "/prepare-messages",
   "/api/catalogs",
+  "/api/sectores",
+  "/api/actividades",
+  "/api/trabajadores",
+  "/api/movimientos",
+  "/api/inscripciones",
   "/api/sectors",
   "/api/activities",
   "/api/instructors",
@@ -92,7 +97,8 @@ export const protectedApiPrefixes = [
   "/api/sector-finance-summary",
   "/api/import",
   "/api/db",
-  "/api/modules"
+  "/api/modules",
+  "/api/administration"
 ];
 
 export const isProtectedApiPath = (pathName: string): boolean =>

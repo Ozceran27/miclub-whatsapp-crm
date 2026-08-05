@@ -9,6 +9,11 @@ const parseNonNegativeInteger = (value: unknown, fallback: number): number => {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
+const parsePositiveInteger = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 const boundedString = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim();
@@ -21,8 +26,27 @@ export type ListRequestQuery = {
   filters: Record<string, string | undefined>;
 };
 
-export const parseListQuery = (req: Request, filterNames: readonly string[]): ListRequestQuery => ({
-  limit: Math.min(parseNonNegativeInteger(req.query.limit, DEFAULT_LIST_LIMIT), MAX_LIST_LIMIT),
-  offset: parseNonNegativeInteger(req.query.offset, 0),
-  filters: Object.fromEntries(filterNames.map((name) => [name, boundedString(req.query[name])]))
-});
+export type ListQueryOptions = {
+  defaultLimit?: number;
+  maxLimit?: number;
+};
+
+export const parseListQuery = (
+  req: Request,
+  filterNames: readonly string[],
+  options: ListQueryOptions = {}
+): ListRequestQuery => {
+  const defaultLimit = options.defaultLimit ?? DEFAULT_LIST_LIMIT;
+  const maxLimit = options.maxLimit ?? MAX_LIST_LIMIT;
+  const page = parseNonNegativeInteger(req.query.page, 0);
+  const limit = Math.min(parsePositiveInteger(req.query.limit, defaultLimit), maxLimit);
+  const offset = req.query.offset === undefined && page > 0
+    ? (page - 1) * limit
+    : parseNonNegativeInteger(req.query.offset, 0);
+
+  return {
+    limit,
+    offset,
+    filters: Object.fromEntries(filterNames.map((name) => [name, boundedString(req.query[name])]))
+  };
+};

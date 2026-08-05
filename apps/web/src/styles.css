@@ -2942,3 +2942,12 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
     grid-template-columns: 1fr;
   }
 }
+
+.administration-header-cards .economy-top-card__detail {
+  white-space: normal;
+}
+
+.administration-header-card .economy-top-card__subtitle,
+.administration-header-card .economy-top-card__detail {
+  overflow-wrap: anywhere;
+}

@@ -47,6 +47,7 @@ import financeRoutes from "./routes/financeRoutes.js";
 import economyRoutes from "./routes/economyRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import administrationRoutes from "./routes/administrationRoutes.js";
+import readOnlyRoutes from "./routes/readOnlyRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -133,6 +134,7 @@ app.use((req, res, next) => {
 app.use("/api/import", importMutationRateLimit, importRoutes);
 app.use("/api/db", dbRoutes);
 app.use("/api/modules", moduleRoutes);
+app.use("/api", readOnlyRoutes);
 app.use("/api", catalogRoutes);
 app.use("/api", peopleRoutes);
 app.use("/api", financeRoutes);

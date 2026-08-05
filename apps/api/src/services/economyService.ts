@@ -10,8 +10,14 @@ import {
   getMovementStatusCounts,
   getPendingMovements as getPendingMovementRows,
   getPendingSummary as getPendingSummaryRows,
+  getActivityTrends as getActivityTrendRows,
+  getClubCalendarNow,
+  getClubMonthWindow,
+  getClubYearToDateWindow,
+  getRankingByActivity,
   getRankingByCategory,
   getRankingBySector,
+  getSectorTrends as getSectorTrendRows,
   getRecentMovements as getRecentMovementRows,
   getCompletedMonthMovementSummary,
   getYearlyBreakdownRows,
@@ -254,19 +260,60 @@ export const getByCategory = async (clubId: string, limitQuery?: unknown): Promi
 };
 
 
-export const getSectorRankings = async (clubId: string, limitQuery?: unknown): Promise<JsonRecord> => {
+const getEntityRankings = async (clubId: string, limitQuery: unknown, fetchRows: typeof getRankingBySector): Promise<JsonRecord> => {
   const limit = parseLimit(limitQuery, 5);
-  const month = getCurrentMonthWindow();
-  const annual = getArgentinaYearToDateWindow();
-  const [monthlyItems, annualItems] = await Promise.all([
-    getRankingBySector(month.start, new Date(), limit, clubId),
-    getRankingBySector(annual.from, annual.to, limit, clubId),
+  const calendar = await getClubCalendarNow(clubId);
+  const [month, annual] = await Promise.all([
+    getClubMonthWindow(clubId, calendar.year, calendar.month),
+    getClubYearToDateWindow(clubId, calendar.year),
   ]);
+  const [monthlyItems, annualItems] = await Promise.all([
+    fetchRows(month.from, new Date(), limit, clubId),
+    fetchRows(annual.from, annual.to, limit, clubId),
+  ]);
+  const monthLabel = new Intl.DateTimeFormat("es-AR", { timeZone: calendar.timezone, month: "long" }).format(month.from);
   return {
-    monthly: { label: month.label, items: normalizeRankingItems(monthlyItems), total: monthlyItems.length },
-    annual: { year: getArgentinaCalendarYear(annual.from), items: normalizeRankingItems(annualItems), total: annualItems.length },
+    monthly: { label: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1), year: calendar.year, month: calendar.month, timezone: calendar.timezone, items: normalizeRankingItems(monthlyItems), total: monthlyItems.length },
+    annual: { year: calendar.year, timezone: calendar.timezone, items: normalizeRankingItems(annualItems), total: annualItems.length },
   };
 };
+
+export const getSectorRankings = async (clubId: string, limitQuery?: unknown): Promise<JsonRecord> =>
+  getEntityRankings(clubId, limitQuery, getRankingBySector);
+
+export const getActivityRankings = async (clubId: string, limitQuery?: unknown): Promise<JsonRecord> =>
+  getEntityRankings(clubId, limitQuery, getRankingByActivity);
+
+const normalizeTrendItems = (rows: EconomyRow[] | JsonRecord[]): JsonRecord[] => normalizeRows(rows as EconomyRow[]).map((item) => {
+  const income = toNumber(item.income);
+  const expenses = toNumber(item.expenses);
+  return {
+    ...item,
+    id: item.id ?? null,
+    name: String(item.name || "Sin clasificar"),
+    income,
+    expenses,
+    balance: item.balance === undefined || item.balance === null ? income - expenses : toNumber(item.balance),
+    movements: toInteger(item.movements),
+    month: toInteger(item.month),
+    period: String(item.period ?? ""),
+    rank: toInteger(item.rank),
+  };
+});
+
+const getEntityTrends = async (clubId: string, yearQuery: unknown, limitQuery: unknown, fetchRows: typeof getSectorTrendRows): Promise<JsonRecord> => {
+  const calendar = await getClubCalendarNow(clubId);
+  const year = parseYear(yearQuery ?? calendar.year);
+  const limit = parseLimit(limitQuery, 5);
+  const items = normalizeTrendItems(await fetchRows(year, limit, clubId));
+  return { year, timezone: calendar.timezone, items, total: items.length };
+};
+
+export const getSectorTrends = async (clubId: string, yearQuery?: unknown, limitQuery?: unknown): Promise<JsonRecord> =>
+  getEntityTrends(clubId, yearQuery, limitQuery, getSectorTrendRows);
+
+export const getActivityTrends = async (clubId: string, yearQuery?: unknown, limitQuery?: unknown): Promise<JsonRecord> =>
+  getEntityTrends(clubId, yearQuery, limitQuery, getActivityTrendRows);
 
 const normalizePaymentItems = (rows: EconomyRow[] | JsonRecord[]): JsonRecord[] => {
   const items = normalizeRows(rows as EconomyRow[]).map((item) => ({
