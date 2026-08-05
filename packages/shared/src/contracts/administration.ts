@@ -3,23 +3,26 @@ import type { LegacyUnknownCode } from "./legacy.js";
 
 export type AdministrationApiErrorResponse = ApiErrorResponse;
 export type AdministrationPagination = PagePagination;
-export type PaginatedResponse<T> = HttpPaginatedResponse<T>;
+export type AdministrationPaginatedResponse<T> = HttpPaginatedResponse<T>;
 
 export type AdministrationRecordStatus = "active" | "inactive" | "archived" | LegacyUnknownCode<"administration-record-status">;
 export type AdministrationMovementType = "INGRESOS" | "EGRESOS" | LegacyUnknownCode<"administration-movement-type">;
 export type AdministrationFinancialStatus = "sin_movimientos" | "pendiente" | "pagado" | "parcial" | "a_liquidar" | "liquidado" | "deuda" | "vencido" | "cancelado" | "otro" | LegacyUnknownCode<"administration-financial-status">;
-export type AdministrationOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | "REVISAR" | LegacyUnknownCode<"administration-operational-status">;
+export type AdministrationOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | "ANULADO" | "REVISAR" | LegacyUnknownCode<"administration-operational-status">;
 export type AdministrationEnrollmentStatus = "al_dia" | "nuevo_inscripto" | "adeudando" | "abandonado" | "cancelado" | "otro" | LegacyUnknownCode<"administration-enrollment-status">;
 export type AdministrationTaskStatus = "pending" | "in_progress" | "blocked" | "done" | "cancelled" | LegacyUnknownCode<"administration-task-status">;
 export type AdministrationRequestStatus = "new" | "in_review" | "approved" | "rejected" | "resolved" | "cancelled" | LegacyUnknownCode<"administration-request-status">;
 export type AdministrationRequestPriority = "low" | "medium" | "high" | "urgent" | LegacyUnknownCode<"administration-request-priority">;
+export type AdministrationTrendGranularity = "day" | "week" | "month" | "quarter" | "year" | LegacyUnknownCode<"administration-trend-granularity">;
+export type AdministrationTrendDirection = "up" | "down" | "stable" | "none" | LegacyUnknownCode<"administration-trend-direction">;
+export type AdministrationEmptyStateCode = "no_data" | "no_results" | "not_configured" | "unavailable" | "permission_denied" | LegacyUnknownCode<"administration-empty-state">;
 
 export interface AdministrationMetricComparison {
   current: number;
   previous: number | null;
   absoluteChange: number | null;
   percentageChange: number | null;
-  direction: "up" | "down" | "stable" | "none" | LegacyUnknownCode<"administration-metric-direction">;
+  direction: AdministrationTrendDirection;
   comparable: boolean;
   reason?: string;
 }
@@ -29,7 +32,70 @@ export interface AdministrationMetric {
   comparison: AdministrationMetricComparison | null;
 }
 
+export interface AdministrationSummaryCard {
+  id: string;
+  label: string;
+  value: number;
+  formattedValue?: string;
+  helperText?: string | null;
+  comparison?: AdministrationMetricComparison | null;
+  tone?: "neutral" | "positive" | "negative" | "warning" | "info" | LegacyUnknownCode<"administration-summary-card-tone">;
+  href?: string;
+}
+
+export interface AdministrationCapacity {
+  totalCapacity: number;
+  occupied: number;
+  available: number;
+  occupancyRate: number;
+  sectors: AdministrationCapacityItem[];
+  activities: AdministrationCapacityItem[];
+}
+
+export interface AdministrationCapacityItem {
+  id: string;
+  name: string;
+  capacity: number | null;
+  occupied: number;
+  available: number | null;
+  occupancyRate: number | null;
+}
+
+export interface AdministrationRankingItem {
+  id: string;
+  label: string;
+  value: number;
+  rank: number;
+  formattedValue?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AdministrationRankings {
+  sectorsByBalance: AdministrationRankingItem[];
+  sectorsByMovements: AdministrationRankingItem[];
+  activitiesByEnrollments: AdministrationRankingItem[];
+  workersByTasks: AdministrationRankingItem[];
+}
+
+export interface AdministrationTrendPoint {
+  period: string;
+  granularity: AdministrationTrendGranularity;
+  income: number;
+  expenses: number;
+  balance: number;
+  movements: number;
+  enrollments?: number;
+  tasks?: number;
+  requests?: number;
+}
+
+export interface AdministrationTrends {
+  granularity: AdministrationTrendGranularity;
+  points: AdministrationTrendPoint[];
+}
+
 export interface AdministrationSummaryResponse {
+  cards?: AdministrationSummaryCard[];
   balance: {
     cutoffDate: string | null;
     liquidity: AdministrationMetric;
@@ -52,7 +118,11 @@ export interface AdministrationSummaryResponse {
     movements: AdministrationMetric;
     enrollments: AdministrationMetric;
   };
+  capacity?: AdministrationCapacity;
+  rankings?: AdministrationRankings;
+  trends?: AdministrationTrends;
   recentMovements: AdministrationMovementDto[];
+  emptyStates?: AdministrationEmptyState[];
   generatedAt: string;
   metadata?: {
     warnings?: string[];
@@ -70,6 +140,8 @@ export interface AdministrationSectorDto {
   openingTime?: string | null;
   closingTime?: string | null;
   maxCapacity?: number | null;
+  currentOccupancy?: number | null;
+  occupancyRate?: number | null;
   municipalStatus?: string | null;
   financialStatus?: AdministrationFinancialStatus | null;
   operationalStatus?: AdministrationOperationalStatus | null;
@@ -88,6 +160,7 @@ export interface AdministrationActivityDto {
   sectorName?: string | null;
   managerPersonId?: string | null;
   instructorId?: string | null;
+  instructorName?: string | null;
   code?: string | null;
   name: string;
   modality?: string | null;
@@ -96,6 +169,8 @@ export interface AdministrationActivityDto {
   clubCommissionPercent: number;
   instructorCommissionPercent: number;
   maxCapacity?: number | null;
+  currentEnrollments?: number | null;
+  occupancyRate?: number | null;
   status: AdministrationRecordStatus;
   notes?: string | null;
   createdAt: string;
@@ -117,6 +192,7 @@ export interface AdministrationWorkerDto {
   activityIds?: string[];
   role?: string | null;
   isActive: boolean;
+  openTasks?: number;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -132,6 +208,7 @@ export interface AdministrationTaskDto {
   sectorId?: string | null;
   sectorName?: string | null;
   assigneeWorkerId?: string | null;
+  assigneeName?: string | null;
   requesterPersonId?: string | null;
   dueDate?: string | null;
   completedAt?: string | null;
@@ -149,6 +226,7 @@ export interface AdministrationRequestDto {
   requesterPersonId?: string | null;
   requesterName?: string | null;
   assignedWorkerId?: string | null;
+  assignedWorkerName?: string | null;
   sectorId?: string | null;
   activityId?: string | null;
   taskId?: string | null;
@@ -188,6 +266,7 @@ export interface AdministrationEnrollmentDto {
   personId: string;
   firstName?: string | null;
   lastName?: string | null;
+  displayName?: string | null;
   dni?: string | null;
   activityId: string;
   activityName?: string | null;
@@ -202,10 +281,18 @@ export interface AdministrationEnrollmentDto {
   updatedAt: string;
 }
 
-export type AdministrationSectorsResponse = PaginatedResponse<AdministrationSectorDto>;
-export type AdministrationActivitiesResponse = PaginatedResponse<AdministrationActivityDto>;
-export type AdministrationWorkersResponse = PaginatedResponse<AdministrationWorkerDto>;
-export type AdministrationTasksResponse = PaginatedResponse<AdministrationTaskDto>;
-export type AdministrationRequestsResponse = PaginatedResponse<AdministrationRequestDto>;
-export type AdministrationMovementsResponse = PaginatedResponse<AdministrationMovementDto>;
-export type AdministrationEnrollmentsResponse = PaginatedResponse<AdministrationEnrollmentDto>;
+export interface AdministrationEmptyState {
+  code: AdministrationEmptyStateCode;
+  title: string;
+  description?: string;
+  actionLabel?: string;
+  actionHref?: string;
+}
+
+export type AdministrationSectorsResponse = AdministrationPaginatedResponse<AdministrationSectorDto>;
+export type AdministrationActivitiesResponse = AdministrationPaginatedResponse<AdministrationActivityDto>;
+export type AdministrationWorkersResponse = AdministrationPaginatedResponse<AdministrationWorkerDto>;
+export type AdministrationTasksResponse = AdministrationPaginatedResponse<AdministrationTaskDto>;
+export type AdministrationRequestsResponse = AdministrationPaginatedResponse<AdministrationRequestDto>;
+export type AdministrationMovementsResponse = AdministrationPaginatedResponse<AdministrationMovementDto>;
+export type AdministrationEnrollmentsResponse = AdministrationPaginatedResponse<AdministrationEnrollmentDto>;
