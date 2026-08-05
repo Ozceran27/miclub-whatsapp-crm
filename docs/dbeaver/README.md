@@ -104,3 +104,9 @@ a miClub, el procedimiento manual es:
 6. Cerrar sesiones abiertas, iniciar sesión de nuevo como Fernando y validar los
    cinco endpoints. Si 02 falla antes del COMMIT, ejecutar `ROLLBACK`, conservar
    el error exacto y no repetir parcialmente el script.
+
+### `09_create_employees_manual.sql`
+
+Crea manualmente `miclub.employees` sólo si no existe una tabla equivalente.
+La tabla modela datos laborales y referencia `people`, `users`,
+`user_club_memberships` y `sectors`, sin duplicar nombres, DNI, teléfono ni email.
