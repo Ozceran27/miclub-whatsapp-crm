@@ -1,6 +1,7 @@
 import { AdministrationActions } from './Administration/AdministrationActions';
 import { AdministrationHeaderCards } from './Administration/AdministrationHeaderCards';
 import { useAdministrationSummary } from './Administration/useAdministrationSummary';
+import { SectorList } from './Administration/SectorList';
 import { EconomyDashboardState } from './Economy/EconomyDashboardState';
 
 export default function AdministrationModule() {
@@ -49,6 +50,7 @@ export default function AdministrationModule() {
           <AdministrationActions />
         </section>
       )}
+      <SectorList />
     </main>
   );
 }
