@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AdministrationModule from '../modules/AdministrationModule';
 import CrmModule from '../modules/CrmModule';
 import DataMigrationModule from '../modules/DataMigrationModule';
 import EconomyModule from '../modules/EconomyModule';
@@ -13,10 +14,10 @@ import { tenantModuleKey } from '../tenantScope';
 const MODULES: ModuleDefinition[] = [
   { id: 'home', label: 'INICIO' }, { id: 'economy', label: 'ECONOMÍA CLUB' }, { id: 'fitness', label: 'ESPACIO FITNESS' },
   { id: 'salon', label: 'SALÓN' }, { id: 'aula', label: 'AULA' }, { id: 'local1', label: 'LOCAL 1' },
-  { id: 'cantina', label: 'CANTINA' }, { id: 'crm', label: 'CRM' }, { id: 'dataMigration', label: 'MIGRACIÓN' }
+  { id: 'cantina', label: 'CANTINA' }, { id: 'crm', label: 'CRM' }, { id: 'administration', label: 'ADMINISTRACIÓN' }, { id: 'dataMigration', label: 'MIGRACIÓN' }
 ];
 
-const PLACEHOLDERS: Record<Exclude<ModuleId, 'home' | 'economy' | 'crm' | 'dataMigration'>, { title: string; description: string; futureItems: string[] }> = {
+const PLACEHOLDERS: Record<Exclude<ModuleId, 'home' | 'economy' | 'crm' | 'administration' | 'dataMigration'>, { title: string; description: string; futureItems: string[] }> = {
   fitness: { title: 'Espacio Fitness', description: 'Gestión operativa del espacio de entrenamiento, cuotas, pagos y actividades vinculadas a Fitness.', futureItems: ['Inscriptos.', 'Deudores.', 'Ingresos por cuotas.', 'Últimos pagos.', 'Actividades.', 'Instructores.'] },
   salon: { title: 'Salón', description: 'Seguimiento de actividades, cuotas y posibles eventos o alquileres del salón.', futureItems: ['Actividades.', 'Inscriptos.', 'Cuotas.', 'Eventos o alquileres futuros.'] },
   aula: { title: 'Aula', description: 'Base para administrar talleres, cursos, inscriptos e ingresos asociados al aula.', futureItems: ['Talleres.', 'Cursos.', 'Inscriptos.', 'Ingresos.'] },
@@ -54,6 +55,7 @@ export default function ProtectedAppShell() {
     if (currentModule === 'home') return <HomeModule onOpenModule={selectModule} />;
     if (currentModule === 'economy') return <EconomyModule />;
     if (currentModule === 'crm') return <CrmModule />;
+    if (currentModule === 'administration') return <AdministrationModule />;
     if (currentModule === 'dataMigration') return <DataMigrationModule />;
     return <PlaceholderModule {...PLACEHOLDERS[currentModule]} />;
   };

@@ -104,3 +104,27 @@ a miClub, el procedimiento manual es:
 6. Cerrar sesiones abiertas, iniciar sesión de nuevo como Fernando y validar los
    cinco endpoints. Si 02 falla antes del COMMIT, ejecutar `ROLLBACK`, conservar
    el error exacto y no repetir parcialmente el script.
+
+### `09_create_employees_manual.sql`
+
+Crea manualmente `miclub.employees` sólo si no existe una tabla equivalente.
+La tabla modela datos laborales y referencia `people`, `users`,
+`user_club_memberships` y `sectors`, sin duplicar nombres, DNI, teléfono ni email.
+
+### `11_activities_manual_metadata_audit_and_add_columns.sql`
+
+Audita y amplía manualmente `miclub.activities` sin crear tablas paralelas de
+actividades. Agrega sólo si faltan los metadatos nuevos (`club_id`,
+`description`, `generates_enrollments`, `settlement_*`, `archived_at`,
+`created_by`, `updated_by`) y conserva los campos existentes que ya modelan
+sector, responsable, instructor, cuotas, comisiones, estado, color, código y
+notas.
+
+### `12_movements_activity_id_manual.sql`
+
+Audita `miclub.movements.activity_id`, la agrega como `uuid NULL` con referencia
+a `miclub.activities(id)` sólo si falta y crea el índice
+`movements_club_activity_date_idx` —o `movements_activity_date_idx` como
+equivalente legacy sin `club_id`— para consultas por actividad y fecha. El script
+no hace backfill por texto y conserva los movimientos históricos con
+`activity_id NULL`.
