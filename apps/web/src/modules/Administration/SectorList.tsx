@@ -1,6 +1,7 @@
 import type { AdministrationSectorDto, AdministrationSectorsResponse } from '@miclub/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { getAdministrationSectors } from '../../services/api/administrationApi';
+import { SectorDetailModal } from './SectorDetailModal';
 
 const integer = new Intl.NumberFormat('es-AR');
 
@@ -49,6 +50,7 @@ export function SectorList() {
   }, [load]);
 
   const sectors = response?.items ?? [];
+  const selectedSector = sectors.find(({ id }) => id === selectedSectorId);
 
   return (
     <section className="section-panel sector-list" aria-labelledby="sector-list-title" aria-busy={loading}>
@@ -95,6 +97,7 @@ export function SectorList() {
           ))}
         </div>
       )}
+      {selectedSector && <SectorDetailModal sector={selectedSector} onClose={() => setSelectedSectorId(null)} />}
     </section>
   );
 }
