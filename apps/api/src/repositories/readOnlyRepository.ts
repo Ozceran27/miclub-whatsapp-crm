@@ -36,11 +36,19 @@ const textSearch = (columns: string[]): FilterDefinition => ({
 
 const listDefinitions = {
   sectores: {
-    from: "miclub.sectors s",
     clubColumn: "s.club_id",
     select: `s.id, s.manager_person_id, s.code, s.name, s.color, s.opening_time, s.closing_time,
       s.max_capacity, s.municipal_status, s.financial_status, s.operational_status,
-      s.uses_enrollments, s.uses_activities, s.notes, s.created_at, s.updated_at`,
+      s.uses_enrollments, s.uses_activities, s.notes, s.created_at, s.updated_at,
+      nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name,
+      (select count(*)::integer from miclub.activities a
+        where a.club_id = s.club_id and a.sector_id = s.id and a.status = 'active') as activities_count,
+      (select count(*)::integer from miclub.enrollments e
+        join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        where e.club_id = s.club_id and a.sector_id = s.id
+          and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as active_enrollments_count,
+      true as is_system`,
+    from: "miclub.sectors s left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id",
     orderBy: "s.name asc, s.id asc",
     filters: {
       search: textSearch(["s.code", "s.name", "s.notes"]),

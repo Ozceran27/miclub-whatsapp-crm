@@ -134,6 +134,7 @@ export interface AdministrationSectorDto {
   id: string;
   clubId?: string | null;
   managerPersonId?: string | null;
+  managerName?: string | null;
   code: string;
   name: string;
   color?: string | null;
@@ -142,6 +143,9 @@ export interface AdministrationSectorDto {
   maxCapacity?: number | null;
   currentOccupancy?: number | null;
   occupancyRate?: number | null;
+  activitiesCount?: number;
+  activeEnrollmentsCount?: number;
+  isSystem?: boolean;
   municipalStatus?: string | null;
   financialStatus?: AdministrationFinancialStatus | null;
   operationalStatus?: AdministrationOperationalStatus | null;
