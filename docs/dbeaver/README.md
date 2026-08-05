@@ -119,3 +119,12 @@ actividades. Agrega sólo si faltan los metadatos nuevos (`club_id`,
 `created_by`, `updated_by`) y conserva los campos existentes que ya modelan
 sector, responsable, instructor, cuotas, comisiones, estado, color, código y
 notas.
+
+### `12_movements_activity_id_manual.sql`
+
+Audita `miclub.movements.activity_id`, la agrega como `uuid NULL` con referencia
+a `miclub.activities(id)` sólo si falta y crea el índice
+`movements_club_activity_date_idx` —o `movements_activity_date_idx` como
+equivalente legacy sin `club_id`— para consultas por actividad y fecha. El script
+no hace backfill por texto y conserva los movimientos históricos con
+`activity_id NULL`.
