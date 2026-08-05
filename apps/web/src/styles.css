@@ -2951,3 +2951,91 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .administration-header-card .economy-top-card__detail {
   overflow-wrap: anywhere;
 }
+
+.administration-actions {
+  display: grid;
+  gap: 16px;
+}
+
+.administration-actions__header p:last-child {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+.administration-actions__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.administration-action-card {
+  align-items: flex-start;
+  background: linear-gradient(135deg, rgba(40, 65, 105, 0.94), rgba(18, 29, 50, 0.96));
+  border: 1px solid rgba(143, 216, 255, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  display: flex;
+  gap: 12px;
+  min-height: 108px;
+  padding: 16px;
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  width: 100%;
+}
+
+.administration-action-card:hover,
+.administration-action-card:focus-visible {
+  border-color: rgba(143, 216, 255, 0.72);
+  box-shadow: 0 16px 34px rgba(47, 124, 206, 0.24);
+  transform: translateY(-1px);
+}
+
+.administration-action-card:focus-visible {
+  outline: 3px solid rgba(143, 216, 255, 0.42);
+  outline-offset: 3px;
+}
+
+.administration-action-card__icon {
+  align-items: center;
+  background: rgba(143, 216, 255, 0.16);
+  border: 1px solid rgba(143, 216, 255, 0.24);
+  border-radius: 14px;
+  color: #d9f0ff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 20px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.administration-action-card__content {
+  display: grid;
+  gap: 6px;
+}
+
+.administration-action-card__content strong {
+  color: #f8fbff;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.administration-action-card__content small {
+  color: #c4d6f5;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.administration-actions__feedback {
+  background: rgba(255, 207, 102, 0.12);
+  border: 1px solid rgba(255, 207, 102, 0.28);
+  border-radius: 12px;
+  color: #ffe4a3;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+  padding: 12px 14px;
+}

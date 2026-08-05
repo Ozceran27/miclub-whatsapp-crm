@@ -1,3 +1,4 @@
+import { AdministrationActions } from './Administration/AdministrationActions';
 import { AdministrationHeaderCards } from './Administration/AdministrationHeaderCards';
 import { useAdministrationSummary } from './Administration/useAdministrationSummary';
 import { EconomyDashboardState } from './Economy/EconomyDashboardState';
@@ -45,6 +46,7 @@ export default function AdministrationModule() {
       {dashboard.summary && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero administrativo del club">
           <AdministrationHeaderCards summary={dashboard.summary} />
+          <AdministrationActions />
         </section>
       )}
     </main>
