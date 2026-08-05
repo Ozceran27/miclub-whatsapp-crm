@@ -11,6 +11,12 @@ import {
 
 export { ARGENTINA_TIME_ZONE, getArgentinaCalendarYear, getArgentinaYearWindow };
 
+// Transitional in-code classification source.
+// Do not treat these arrays as the canonical catalog: miclub.movement_categories
+// remains canonical for category names, and persisted classification metadata must
+// be introduced only through a versioned migration. See
+// apps/api/docs/economy-category-classification-audit.md and
+// apps/api/db/diagnostics/202608050001_movement_categories_columns.sql.
 export const OPERATING_PROFIT_CATEGORIES = [
   "INSCRIPCIÓN",
   "CUOTA",
