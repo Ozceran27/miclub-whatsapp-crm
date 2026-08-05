@@ -8,7 +8,39 @@ export type RoleCode = KnownRole | LegacyRole;
 export const toRoleCode = (value: string): RoleCode =>
   (KNOWN_ROLES as readonly string[]).includes(value) ? value as KnownRole : asLegacyUnknownCode<"role">(value);
 
-export const KNOWN_PERMISSIONS = ["imports:run", "crm:write", "people:read", "sectors:any"] as const;
+export const KNOWN_PERMISSIONS = [
+  "imports:run",
+  "crm:write",
+  "people:read",
+  "sectors:any",
+  "administration.view",
+  "administration.configure",
+  "sectors.view",
+  "sectors.create",
+  "sectors.edit",
+  "sectors.archive",
+  "activities.view",
+  "activities.create",
+  "activities.edit",
+  "activities.archive",
+  "workers.view",
+  "workers.manage",
+  "tasks.view",
+  "tasks.create",
+  "tasks.edit",
+  "tasks.assign",
+  "requests.view",
+  "requests.approve",
+  "requests.reject",
+  "movements.view",
+  "movements.create",
+  "movements.edit",
+  "movements.cancel",
+  "enrollments.view",
+  "enrollments.create",
+  "enrollments.edit",
+  "enrollments.cancel",
+] as const;
 export type KnownPermission = typeof KNOWN_PERMISSIONS[number];
 export type LegacyPermission = LegacyUnknownCode<"permission">;
 export type PermissionCode = KnownPermission | LegacyPermission;
