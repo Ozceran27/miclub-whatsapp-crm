@@ -92,7 +92,8 @@ export const protectedApiPrefixes = [
   "/api/sector-finance-summary",
   "/api/import",
   "/api/db",
-  "/api/modules"
+  "/api/modules",
+  "/api/administration"
 ];
 
 export const isProtectedApiPath = (pathName: string): boolean =>
