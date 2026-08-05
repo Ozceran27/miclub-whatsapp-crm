@@ -46,6 +46,7 @@ import peopleRoutes from "./routes/peopleRoutes.js";
 import financeRoutes from "./routes/financeRoutes.js";
 import economyRoutes from "./routes/economyRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import administrationRoutes from "./routes/administrationRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -136,6 +137,7 @@ app.use("/api", catalogRoutes);
 app.use("/api", peopleRoutes);
 app.use("/api", financeRoutes);
 app.use("/api/economy", economyRoutes);
+app.use("/api/administration", administrationRoutes);
 app.use("/api", dashboardRoutes);
 
 app.use(createLegacyCompatRoutes(debugEndpointsEnabled));
