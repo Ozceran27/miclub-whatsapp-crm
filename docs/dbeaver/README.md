@@ -110,3 +110,12 @@ a miClub, el procedimiento manual es:
 Crea manualmente `miclub.employees` sólo si no existe una tabla equivalente.
 La tabla modela datos laborales y referencia `people`, `users`,
 `user_club_memberships` y `sectors`, sin duplicar nombres, DNI, teléfono ni email.
+
+### `11_activities_manual_metadata_audit_and_add_columns.sql`
+
+Audita y amplía manualmente `miclub.activities` sin crear tablas paralelas de
+actividades. Agrega sólo si faltan los metadatos nuevos (`club_id`,
+`description`, `generates_enrollments`, `settlement_*`, `archived_at`,
+`created_by`, `updated_by`) y conserva los campos existentes que ya modelan
+sector, responsable, instructor, cuotas, comisiones, estado, color, código y
+notas.
