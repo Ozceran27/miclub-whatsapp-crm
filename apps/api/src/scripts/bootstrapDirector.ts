@@ -2,10 +2,10 @@ import "dotenv/config";
 import { hashPassword } from "../auth/passwordHasher.js";
 import { closePostgresPool, getPostgresPool } from "../db/postgres.js";
 import { auditService } from "../services/auditService.js";
+import { ROLE_DEFAULT_PERMISSIONS } from "@miclub/shared";
 
 const EMAIL = "miclub.posadas@gmail.com";
 const DNI = "35.004.264";
-const PERMISSIONS = ["club:manage", "users:manage", "sectors:any", "finance:write", "crm:write", "imports:run"];
 
 const main = async () => {
   if (process.env.BOOTSTRAP_DIRECTOR_ENABLED !== "true") throw new Error("BOOTSTRAP_DIRECTOR_ENABLED=true es obligatorio para esta operación puntual.");
@@ -59,7 +59,7 @@ const main = async () => {
       insert into miclub.user_club_memberships (user_id, club_id, role_id, status, permissions)
       values ($1, $2, $3, 'active', $4::text[])
       on conflict (user_id, club_id) do update set role_id=excluded.role_id, status='active',
-        permissions=excluded.permissions, updated_at=now() returning id`, [userId, clubId, role.rows[0].id, PERMISSIONS]);
+        permissions=excluded.permissions, updated_at=now() returning id`, [userId, clubId, role.rows[0].id, [...ROLE_DEFAULT_PERMISSIONS.DIRECTOR]]);
     await auditService.sensitiveChange({ action: "bootstrap.director", result: "success", userId, clubId,
       membershipId: membership.rows[0].id, entityType: "user", entityId: userId,
       metadata: { source: "bootstrapDirector", personId: person.rows[0].id } }, db);

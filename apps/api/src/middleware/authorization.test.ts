@@ -24,7 +24,7 @@ test("los guards autorizan únicamente el contexto tenant de la sesión", async 
   assert.deepEqual(await request(requireAuth), { status: 200, next: true });
   assert.deepEqual(await request(requireMembership), { status: 200, next: true });
   assert.deepEqual(await request(requirePermission("people:read")), { status: 200, next: true });
-  assert.deepEqual(await request(requirePermission("people:write")), { status: 403, next: false });
+  assert.deepEqual(await request(requirePermission("finance:write")), { status: 403, next: false });
   assert.deepEqual(await request(requireRole("admin")), { status: 200, next: true });
   assert.deepEqual(await request(requireRole("viewer")), { status: 403, next: false });
   assert.deepEqual(await request(requireSectorAccess(), { params: { sectorId: "sector-1" } }), { status: 200, next: true });

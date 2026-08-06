@@ -9,6 +9,8 @@ export const toRoleCode = (value: string): RoleCode =>
   (KNOWN_ROLES as readonly string[]).includes(value) ? value as KnownRole : asLegacyUnknownCode<"role">(value);
 
 export const KNOWN_PERMISSIONS = [
+  "club:manage",
+  "users:manage",
   "imports:run",
   "crm:write",
   "people:read",
@@ -40,12 +42,20 @@ export const KNOWN_PERMISSIONS = [
   "enrollments.create",
   "enrollments.edit",
   "enrollments.cancel",
+  "finance:write",
 ] as const;
 export type KnownPermission = typeof KNOWN_PERMISSIONS[number];
 export type LegacyPermission = LegacyUnknownCode<"permission">;
 export type PermissionCode = KnownPermission | LegacyPermission;
 export const toPermissionCode = (value: string): PermissionCode =>
   (KNOWN_PERMISSIONS as readonly string[]).includes(value) ? value as KnownPermission : asLegacyUnknownCode<"permission">(value);
+
+/** Canonical defaults used only when the application creates a membership. */
+export const ROLE_DEFAULT_PERMISSIONS = {
+  owner: KNOWN_PERMISSIONS,
+  DIRECTOR: KNOWN_PERMISSIONS,
+  admin: KNOWN_PERMISSIONS,
+} as const satisfies Record<KnownRole, readonly KnownPermission[]>;
 
 /** Deliberately excludes password hashes, signed-session fields and internal membership metadata. */
 export interface PublicAuthUser {
