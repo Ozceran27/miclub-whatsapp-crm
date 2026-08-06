@@ -38,6 +38,7 @@ const isProduction = process.env.NODE_ENV === "production" || __dirname.includes
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
+import { logger } from "./lib/logger.js";
 import dbRoutes from "./routes/dbRoutes.js";
 import catalogRoutes from "./routes/catalogRoutes.js";
 import sectorMutationRoutes from "./routes/sectorMutationRoutes.js";
@@ -148,7 +149,7 @@ app.use(errorHandler);
 export const startServer = async () => {
   validateRuntimeConfig({ isProduction });
   app.listen(port, () => {
-    console.log(`API running at http://localhost:${port}`);
+    logger.info("API running", { port });
   });
 };
 
