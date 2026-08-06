@@ -3147,12 +3147,19 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .paginated-list__table td { font-size: 13px; }
 .paginated-list__table td small { color: var(--color-text-muted); display: block; margin-top: 3px; }
 .paginated-list__table tbody tr:last-child td { border-bottom: 0; }
+.paginated-list__row { cursor: pointer; }
+.paginated-list__row:hover td { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
+.paginated-list__row:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-accent) 45%, transparent); outline-offset: -3px; }
 .paginated-list__expense { color: var(--color-danger); }
 .paginated-list__pagination { align-items: center; display: flex; gap: 14px; justify-content: flex-end; }
 .paginated-list__pagination span { color: var(--color-text-muted); font-size: 13px; }
 @media (max-width: 680px) { .paginated-list__filters { grid-template-columns: 1fr; } .paginated-list__pagination { justify-content: space-between; } }
 .activity-modal__audit code { overflow-wrap: anywhere; }
 .activity-modal__notice { background: color-mix(in srgb, var(--color-accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent); border-radius: 11px; color: var(--color-text-muted); font-size: 13px; margin: 0; padding: 11px 13px; }
+.detail-modal code { overflow-wrap: anywhere; }
+.detail-modal__notes { font: inherit; margin: 0; white-space: pre-wrap; }
+.detail-modal__actions { align-items: stretch; display: grid; gap: 10px; }
+.detail-modal__actions button { justify-self: start; }
 .task-panel { display: grid; gap: 18px; }
 .task-panel__form { align-items: end; display: grid; gap: 12px; grid-template-columns: 1fr 1.5fr minmax(180px,.7fr) auto; }
 .task-panel__form label { color: var(--color-text-muted); display: grid; font-size: 12px; gap: 6px; }

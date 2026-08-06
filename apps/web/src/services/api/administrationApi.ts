@@ -37,12 +37,12 @@ export const getActivityMovements = (activityId: string, signal?: AbortSignal) =
 
 type AdministrationListFilters = Record<string, string | undefined>;
 
-const paginatedUrl = (path: string, page: number, filters: AdministrationListFilters) => {
+const paginatedUrl = (path: `/${string}`, page: number, filters: AdministrationListFilters): `/${string}` => {
   const query = new URLSearchParams({ page: String(page), limit: '20' });
   Object.entries(filters).forEach(([key, value]) => {
     if (value?.trim()) query.set(key, value.trim());
   });
-  return `${path}?${query.toString()}`;
+  return `${path}?${query.toString()}` as `/${string}`;
 };
 
 export const getAdministrationMovements = (page: number, filters: AdministrationListFilters, signal?: AbortSignal) =>
