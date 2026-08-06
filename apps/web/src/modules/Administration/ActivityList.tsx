@@ -11,7 +11,7 @@ const commission = (activity: AdministrationActivityDto) => activity.settlementM
   ? `Fijo ${money.format(activity.settlementFixedAmount ?? 0)}`
   : `${activity.clubCommissionPercent}% comisión`;
 
-export function ActivityList() {
+export function ActivityList({ canViewFinancials }: { canViewFinancials: boolean }) {
   const [activities, setActivities] = useState<AdministrationActivityDto[]>([]);
   const [ranking, setRanking] = useState<EconomySectorRankings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ export function ActivityList() {
     try {
       const [activityResponse, rankingResponse] = await Promise.all([
         getAdministrationActivities(signal),
-        getAnnualActivityRanking(signal),
+        canViewFinancials ? getAnnualActivityRanking(signal) : Promise.resolve(null),
       ]);
       setActivities(activityResponse.items);
       setRanking(rankingResponse);
@@ -33,7 +33,7 @@ export function ActivityList() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, []);
+  }, [canViewFinancials]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -59,7 +59,7 @@ export function ActivityList() {
         return <tr key={activity.id} className="activity-list__row" tabIndex={0} role="button" aria-label={`Ver detalle de ${activity.name}`} onClick={() => setSelectedActivityId(activity.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedActivityId(activity.id); } }}><td><strong>{activity.name}</strong></td><td>{activity.sectorName || 'Sin sector'}</td><td>{activity.managerName || activity.instructorName || 'Sin asignar'}</td><td><span className="activity-list__status" data-active={activity.status === 'active'}>{displayStatus(activity.status)}</span></td><td>{integer.format(activity.currentEnrollments ?? 0)}</td><td>{activity.modality || 'Sin modalidad'}</td><td>{commission(activity)}</td><td><span className="activity-list__color"><i style={{ backgroundColor: activity.color || '#91a4c8' }} />{activity.color || 'Sin color'}</span></td><td>{activity.generatesEnrollments ? 'Sí' : 'No'}</td><td>{financial ? <FinancialMetric item={financial} /> : <span className="activity-list__unlinked">sin asociación financiera directa</span>}</td></tr>;
       })}</tbody></table></div>}
       {selectedActivity && <ActivityDetailModal activity={selectedActivity} onClose={() => setSelectedActivityId(null)} />}
-      <section className="activity-ranking" aria-labelledby="activity-ranking-title"><div><p className="eyebrow">Ranking anual</p><h4 id="activity-ranking-title">Rentabilidad por actividad {ranking?.annual.year ?? ''}</h4><p>Calculado exclusivamente con movimientos asociados mediante <code>activity_id</code>.</p></div>{annualItems.length ? <ol>{annualItems.map((item, index) => <li key={item.id ?? item.name}><b>{index + 1}</b><span><strong>{item.name}</strong><small>{item.movements} movimientos · Ingresos {money.format(item.income)} · Egresos {money.format(item.expenses)}</small></span><em>{money.format(item.balance)}</em></li>)}</ol> : <p className="sector-list__state">No hay movimientos con asociación financiera directa para el año actual.</p>}</section>
+      {canViewFinancials ? <section className="activity-ranking" aria-labelledby="activity-ranking-title"><div><p className="eyebrow">Ranking anual</p><h4 id="activity-ranking-title">Rentabilidad por actividad {ranking?.annual.year ?? ''}</h4><p>Calculado exclusivamente con movimientos asociados mediante <code>activity_id</code>.</p></div>{annualItems.length ? <ol>{annualItems.map((item, index) => <li key={item.id ?? item.name}><b>{index + 1}</b><span><strong>{item.name}</strong><small>{item.movements} movimientos · Ingresos {money.format(item.income)} · Egresos {money.format(item.expenses)}</small></span><em>{money.format(item.balance)}</em></li>)}</ol> : <p className="sector-list__state">No hay movimientos con asociación financiera directa para el año actual.</p>}</section> : <p className="worker-list__notice">La información financiera de actividades no está disponible para tu membresía.</p>}
     </section>
   );
 }

@@ -10,6 +10,7 @@ import { useRouter } from '../router';
 import { useSession } from '../session';
 import { useTheme } from '../theme';
 import { tenantModuleKey } from '../tenantScope';
+import { hasAdministrationCapability, visibleModules } from '../administrationCapabilities';
 
 const MODULES: ModuleDefinition[] = [
   { id: 'home', label: 'INICIO' }, { id: 'economy', label: 'ECONOMÍA CLUB' }, { id: 'fitness', label: 'ESPACIO FITNESS' },
@@ -31,11 +32,13 @@ export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
   const rawPathModule = path.split('/')[2] ?? 'home';
   const pathModule = rawPathModule === 'migration' ? 'dataMigration' : rawPathModule;
-  const { username, clubId, logout } = useSession();
+  const { username, clubId, permissions, logout } = useSession();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const requestedModule: ModuleId = isModuleId(pathModule) ? pathModule : 'home';
   const currentModule: ModuleId = requestedModule;
+  const modules = visibleModules(MODULES, permissions);
+  const canOpenAdministration = hasAdministrationCapability(permissions, 'enter');
   const { theme, toggleTheme } = useTheme();
 
   const selectModule = (module: ModuleId) => navigate(module === 'home' ? '/app' : `/app/${module}`);
@@ -55,7 +58,10 @@ export default function ProtectedAppShell() {
     if (currentModule === 'home') return <HomeModule onOpenModule={selectModule} />;
     if (currentModule === 'economy') return <EconomyModule />;
     if (currentModule === 'crm') return <CrmModule />;
-    if (currentModule === 'administration') return <AdministrationModule />;
+    if (currentModule === 'administration') {
+      if (!canOpenAdministration) return <section className="section-panel" role="alert"><p className="eyebrow">Acceso denegado</p><h2>No tenés acceso a Administración</h2><p>Tu membresía actual no incluye permiso para consultar este módulo.</p><button className="ghost-btn" type="button" onClick={() => navigate('/app', { replace: true })}>Volver al inicio</button></section>;
+      return <AdministrationModule />;
+    }
     if (currentModule === 'dataMigration') return <DataMigrationModule />;
     return <PlaceholderModule {...PLACEHOLDERS[currentModule]} />;
   };
@@ -73,7 +79,7 @@ export default function ProtectedAppShell() {
         </div>
       </header>
       {logoutError && <p className="login-error" role="alert">{logoutError}</p>}
-      <ModuleNav modules={MODULES} currentModule={currentModule} onSelect={selectModule} />
+      <ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} />
       <div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div>
     </div>
   );
