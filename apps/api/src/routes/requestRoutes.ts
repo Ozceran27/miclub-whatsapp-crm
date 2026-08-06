@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router, type Request, type Response } from "express";
 import { requirePermission } from "../middleware/authorization.js";
 import { decideRequest, getRequest, listRequests, type RequestActor } from "../repositories/requestsRepository.js";
@@ -6,9 +7,9 @@ const router=Router(); const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89
 const fail=(res:Response,status:number,code:string,message:string)=>res.status(status).json({ok:false,error:true,status,code,message});
 const actor=(req:Request):RequestActor=>({userId:req.auth!.userId,membershipId:req.auth!.membershipId,clubId:req.auth!.clubId,requestId:req.requestId,ip:req.ip,userAgent:req.get("user-agent")});
 const validId=(res:Response,id:string)=>{if(UUID.test(id))return true;fail(res,400,"VALIDATION_ERROR","id inválido.");return false};
-router.get("/requests",requirePermission("requests.view"),asyncHandler(async(req,res)=>res.json({items:await listRequests(req.auth!.clubId)})));
-router.get("/requests/:id",requirePermission("requests.view"),asyncHandler(async(req,res)=>{const id=String(req.params.id);if(!validId(res,id))return;const item=await getRequest(req.auth!.clubId,id);return item?res.json(item):fail(res,404,"REQUEST_NOT_FOUND","Solicitud no encontrada.")}));
+router.get("/requests",requirePermission(PERMISSIONS.REQUESTS_VIEW),asyncHandler(async(req,res)=>res.json({items:await listRequests(req.auth!.clubId)})));
+router.get("/requests/:id",requirePermission(PERMISSIONS.REQUESTS_VIEW),asyncHandler(async(req,res)=>{const id=String(req.params.id);if(!validId(res,id))return;const item=await getRequest(req.auth!.clubId,id);return item?res.json(item):fail(res,404,"REQUEST_NOT_FOUND","Solicitud no encontrada.")}));
 const decision=(value:"approved"|"rejected")=>asyncHandler(async(req,res)=>{const id=String(req.params.id);if(!validId(res,id))return;const body=req.body as Record<string,unknown>;if(Object.keys(body).some(key=>key!=="reason")||(body.reason!==undefined&&(typeof body.reason!=="string"||body.reason.trim().length>1000)))return fail(res,400,"VALIDATION_ERROR","Motivo inválido.");const result=await decideRequest(actor(req),id,value,typeof body.reason==="string"?body.reason.trim()||null:null);if(result.kind==="updated")return res.json(result.request);if(result.kind==="missing")return fail(res,404,"REQUEST_NOT_FOUND","Solicitud no encontrada.");if(result.kind==="already_decided")return fail(res,409,"REQUEST_ALREADY_DECIDED","La solicitud ya fue resuelta.");return fail(res,422,"REQUEST_TYPE_UNSUPPORTED","El tipo de solicitud no tiene un handler seguro registrado.")});
-router.post("/requests/:id/approve",requirePermission("requests.approve"),decision("approved"));
-router.post("/requests/:id/reject",requirePermission("requests.reject"),decision("rejected"));
+router.post("/requests/:id/approve",requirePermission(PERMISSIONS.REQUESTS_APPROVE),decision("approved"));
+router.post("/requests/:id/reject",requirePermission(PERMISSIONS.REQUESTS_REJECT),decision("rejected"));
 export default router;

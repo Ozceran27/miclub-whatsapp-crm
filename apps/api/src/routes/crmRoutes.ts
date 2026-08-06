@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 // legacy-compat: paths raíz del CRM; no renombrar sin migración frontend.
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
@@ -47,7 +48,7 @@ export const createCrmRoutes = (options: {
 }) => {
   const router = Router();
   if (!isExplicitTestAuthBypass()) router.use(requireMembership);
-  const requireCrmWrite = isExplicitTestAuthBypass() ? (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next() : requirePermission("crm:write");
+  const requireCrmWrite = isExplicitTestAuthBypass() ? (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next() : requirePermission(PERMISSIONS.CRM_WRITE);
 
   router.get("/templates", async (req, res) => {
     try {

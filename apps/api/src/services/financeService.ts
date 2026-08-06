@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { getMovements } from "../repositories/movementsRepository.js";
 import { getPayments } from "../repositories/paymentsRepository.js";
 import { getReceivables } from "../repositories/receivablesRepository.js";
@@ -13,16 +14,16 @@ const normalizeRows = (rows: JsonRecord[]): JsonRecord[] => rows.map(normalizeRo
 type Page = { items: JsonRecord[]; total: number; limit: number; offset: number };
 const page = (result: { rows: JsonRecord[]; total: number }, limit: number, offset: number): Page => ({ items: normalizeRows(result.rows), total: result.total, limit, offset });
 
-export const listMovements = async (auth: RequestAuthContext, query: Omit<MovementQuery, "clubId" | "sectorIds">): Promise<Page> => page(await getMovements({ ...query, clubId: auth.clubId, sectorIds: auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds }), query.limit, query.offset);
+export const listMovements = async (auth: RequestAuthContext, query: Omit<MovementQuery, "clubId" | "sectorIds">): Promise<Page> => page(await getMovements({ ...query, clubId: auth.clubId, sectorIds: auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? undefined : auth.sectorIds }), query.limit, query.offset);
 export const listReceivables = async (auth: RequestAuthContext, query: Omit<ReceivableQuery, "clubId">): Promise<Page> => page(await getReceivables({ ...query, clubId: auth.clubId }), query.limit, query.offset);
 export const listPayments = async (auth: RequestAuthContext, query: Omit<PaymentQuery, "clubId">): Promise<Page> => page(await getPayments({ ...query, clubId: auth.clubId }), query.limit, query.offset);
 
 export const getOperationalBalances = async (auth: RequestAuthContext): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = normalizeRows(await getSectorFinanceSummary(auth.clubId, auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds));
+  const items = normalizeRows(await getSectorFinanceSummary(auth.clubId, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? undefined : auth.sectorIds));
   return { items, total: items.length };
 };
 
 export const getSectorSettlements = async (auth: RequestAuthContext): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = normalizeRows(await getSectorFinanceSummary(auth.clubId, auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds));
+  const items = normalizeRows(await getSectorFinanceSummary(auth.clubId, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? undefined : auth.sectorIds));
   return { items, total: items.length };
 };

@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { AdministrationActions } from './Administration/AdministrationActions';
 import { AdministrationHeaderCards } from './Administration/AdministrationHeaderCards';
 import { useAdministrationSummary } from './Administration/useAdministrationSummary';
@@ -16,7 +17,7 @@ import { useState } from 'react';
 
 export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
-  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false); const canCreate=session.permissions.includes('movements.create'),canCreateEnrollment=session.permissions.includes('club:manage');
+  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false); const canCreate=session.permissions.includes(PERMISSIONS.MOVEMENTS_CREATE),canCreateEnrollment=session.permissions.includes(PERMISSIONS.CLUB_MANAGE);
 
   return (
     <main className="module-content">
