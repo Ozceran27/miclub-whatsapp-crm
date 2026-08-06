@@ -29,13 +29,13 @@ type Props = {
 export function PaginatedList({ id, eyebrow, title, description, searchLabel, search, status, statusLabel, statusOptions, loading, error, total, page, pageSize, children, emptyMessage, onSearchChange, onStatusChange, onFilter, onPageChange, onRetry }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return <section className="section-panel paginated-list" aria-labelledby={`${id}-title`} aria-busy={loading}>
-    <div className="section-header"><div><p className="eyebrow">{eyebrow}</p><h3 id={`${id}-title`}>{title}</h3><p>{description}</p></div><strong className="paginated-list__total">{total.toLocaleString('es-AR')} en total</strong></div>
+    <div className="section-header"><div><p className="eyebrow">{eyebrow}</p><h3 id={`${id}-title`}>{title}</h3><p>{description}</p></div><strong className="paginated-list__total">{error ? 'Total no disponible' : `${total.toLocaleString('es-AR')} en total`}</strong></div>
     <form className="paginated-list__filters" onSubmit={onFilter}>
       <label><span>{searchLabel}</span><input type="search" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Buscar…" /></label>
       <label><span>{statusLabel}</span><select value={status} onChange={(event) => onStatusChange(event.target.value)}><option value="">Todos</option>{statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       <button className="ghost-btn" type="submit" disabled={loading}>{loading ? 'Cargando…' : 'Aplicar filtros'}</button>
     </form>
-    {error ? <div className="sector-list__state sector-list__state--error" role="alert"><span>{error}</span><button type="button" onClick={onRetry}>Reintentar</button></div> : total === 0 && !loading ? <p className="sector-list__state">{emptyMessage}</p> : children}
+    {loading ? <p className="sector-list__state" role="status">Cargando resultados…</p> : error ? <div className="sector-list__state sector-list__state--error" role="alert"><span>{error}</span><button type="button" onClick={onRetry}>Reintentar</button></div> : total === 0 ? <p className="sector-list__state">{emptyMessage}</p> : children}
     <nav className="paginated-list__pagination" aria-label={`Paginación de ${title}`}><button type="button" onClick={() => onPageChange(page - 1)} disabled={loading || page <= 1}>Anterior</button><span>Página <strong>{page}</strong> de <strong>{totalPages}</strong></span><button type="button" onClick={() => onPageChange(page + 1)} disabled={loading || page >= totalPages}>Siguiente</button></nav>
   </section>;
 }
