@@ -12,6 +12,8 @@ Estado: Versión Estable
 
 Logo: apps/web/public/logo/miClub - Logo trans.png
 
+Actualización post-admin: 06/08/2026. El capítulo operativo vigente de Administración se incorpora al final de este documento. Los artefactos HTML/PDF deben regenerarse antes de distribución externa.
+
 
 
 ÍNDICE
@@ -206,3 +208,38 @@ Categorías operativas para ingresos y gastos operativos: INSCRIPCIÓN, CUOTA, T
 El clasificador único de gastos aplica prioridad DEBT, SERVICES, TAXES, OPERATING, NON_OPERATING y UNCLASSIFIED. Las categorías no operativas son PUBLICIDAD, SALARIOS, MANTENIM., DEPÓSITOS, EXTRACCIONES, DÓLARES, REPARACIONES, VIÁTICOS, GANANCIA, PÉRDIDA, CMV, SEGUROS, LIMPIEZA, LIBRERÍA y OTROS. Deudas/Pasivos usa DEUDA y DEUDAS; Servicios usa LUZ, AGUA e INTERNET; Impuestos usa IMPUESTO e IMPUESTOS.
 
 Convención de signos del gráfico “Gastos por Tipo”: para Gastos Operativos y Gastos No Operativos se suman únicamente EGRESOS; para Deudas/Pasivos, Servicios e Impuestos se calcula EGRESOS - INGRESOS y se preserva el signo sin `ABS()`. Un valor negativo representa ingreso/reintegro neto superior al egreso del mes. Los movimientos no clasificados se reportan en metadata y en el script `npm run audit:economy-yearly-breakdown -- --asOf=AAAA-MM-DD` sin reclasificarlos como OTROS.
+
+
+CAPÍTULO 10 — ADMINISTRACIÓN (ACTUALIZACIÓN POST-ADMIN)
+
+### Acceso y navegación
+
+Ingresar con una membresía activa que tenga `administration.view` y elegir **Administración** en la navegación. Si aparece “No autorizado”, solicitar el permiso a un administrador; cambiar la URL o enviar otro `clubId` no cambia el club de la sesión. El panel muestra estados de carga, vacío y error con opción de reintentar.
+
+### Lectura del panel
+
+Las tarjetas superiores resumen inscripciones activas, capacidad, trabajadores y actividades, con comparaciones cuando existe historial suficiente. Revisar la fecha y el mensaje de disponibilidad antes de interpretar una variación. Los rankings y tendencias son indicadores operativos, no un cierre contable.
+
+En **Sectores**, seleccionar una fila para consultar responsable, capacidad, actividades y movimientos relacionados. Los sectores de sistema están protegidos. En **Actividades**, seleccionar una fila para consultar configuración, inscriptos, movimientos asociados mediante `activity_id` y auditoría. En **Trabajadores**, abrir la ficha para consultar relación laboral, acceso, permisos y actividades. Estas tres fichas son de sólo lectura.
+
+Si Trabajadores muestra una advertencia de fuente legacy, salario y fecha de ingreso pueden no estar disponibles; no completar esos datos por inferencia. **Actualizar** vuelve a consultar PostgreSQL y no importa datos externos.
+
+### Movimientos e inscripciones
+
+**Cargar Movimiento** sólo se habilita con `movements.create`. Completar fecha, ingreso/egreso, categoría, sector, actividad si corresponde, concepto, contraparte, importe, medio de pago y estado inicial. El formulario envía una clave de idempotencia para evitar duplicados ante reintentos. Confirmar el resultado antes de volver a cargarlo. Un movimiento conciliado o aplicado a un pago no puede editarse; anular exige motivo y permisos elevados.
+
+**Cargar Inscripción** requiere actualmente `club:manage`. Elegir una persona y una actividad activa que genere inscripciones, indicar cuota, estado y fechas. El sistema rechaza referencias de otro club y una inscripción activa duplicada.
+
+### Tareas y solicitudes
+
+En **Tareas**, crear título, descripción opcional y vencimiento; luego cambiar entre Pendiente, En curso, Completada o Cancelada, o archivar. Si otra sesión modificó la tarea, recargar antes de reintentar. La etiqueta Vencida se calcula para tareas pendientes cuya fecha ya pasó.
+
+Las solicitudes se pueden consultar con `requests.view`. Aprobar o rechazar requiere el permiso correspondiente; una decisión ya tomada no se repite y los tipos sin handler seguro no se ejecutan. Registrar un motivo claro aun cuando sea opcional.
+
+### Acciones todavía no disponibles
+
+Gestionar categorías, trabajadores, cuotas y socios desde las tarjetas rápidas todavía no abre un flujo completo. Reservas y Membresías aparecen como **Próximamente** hasta definir modelo, disponibilidad, pagos y cancelaciones. No usar SQL manual para sustituir esas funciones.
+
+### Buenas prácticas y soporte
+
+Actualizar el panel antes de decidir, no compartir sesiones, no modificar el tenant desde herramientas del navegador y conservar el `requestId` de cualquier error. Ante una falla de escritura, no repetir compulsivamente: verificar primero si la operación quedó registrada. El estado técnico, permisos efectivos, SQL, rollback, aceptación y pendientes viven en `docs/checkpoint-post-admin.md`.
