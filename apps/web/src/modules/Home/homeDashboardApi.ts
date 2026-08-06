@@ -6,14 +6,14 @@ const settled = async <T>(promise: Promise<T>, fallback: string) => promise
   .catch((error: unknown) => ({ value: null, error: message(error, fallback) }));
 
 /** Loads the home resources while keeping optional dashboard panels independently fallible. */
-export const loadHomeDashboardResources = async () => {
+export const loadHomeDashboardResources = async (signal?: AbortSignal) => {
   const [summary, members, debtors, syncStatus, finance, sector] = await Promise.all([
-    settled(homeApi.getSummary(), 'Resumen de membresías no disponible.'),
-    settled(homeApi.getMembers(), 'Miembros no disponibles.'),
-    settled(homeApi.getDebtors(), 'Deudores no disponibles.'),
-    settled(homeApi.getSyncStatus(), 'Estado de sincronización no disponible.'),
-    settled(homeApi.getFinanceSummary(), 'Resumen financiero no disponible.'),
-    settled(homeApi.getSectorSummary(), 'Resumen operativo por sector no disponible.'),
+    settled(homeApi.getSummary(signal), 'Resumen de membresías no disponible.'),
+    settled(homeApi.getMembers(signal), 'Miembros no disponibles.'),
+    settled(homeApi.getDebtors(signal), 'Deudores no disponibles.'),
+    settled(homeApi.getSyncStatus(signal), 'Estado de sincronización no disponible.'),
+    settled(homeApi.getFinanceSummary(signal), 'Resumen financiero no disponible.'),
+    settled(homeApi.getSectorSummary(signal), 'Resumen operativo por sector no disponible.'),
   ]);
   return { summary, members, debtors, syncStatus, finance, sector };
 };

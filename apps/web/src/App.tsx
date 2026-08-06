@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedAppShell from './pages/ProtectedAppShell';
 import RegisterPage from './pages/RegisterPage';
+import { TenantCacheBoundary } from './serverState/TenantCacheBoundary';
 
 function AppRoutes() {
   const { path, navigate } = useRouter();
@@ -28,7 +29,7 @@ export default function App() {
   return (
     <Router>
       <SessionProvider>
-        <AppRoutes />
+        <TenantCacheBoundary><AppRoutes /></TenantCacheBoundary>
       </SessionProvider>
     </Router>
   );

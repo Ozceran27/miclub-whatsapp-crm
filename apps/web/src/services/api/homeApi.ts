@@ -2,13 +2,13 @@ import type { ClubOperationsSummary, Member, SectorOperationalSummary } from '@m
 import { apiJson } from '../../api';
 import type { Summary, SyncStatus } from '../../modules/Home/useHomeDashboard';
 
-const get = <T>(path: `/${string}`) => apiJson<T>(path, { cache: 'no-store' });
+const get = <T>(path: `/${string}`, signal?: AbortSignal) => apiJson<T>(path, { cache: 'no-store', signal });
 
 export const homeApi = {
-  getSummary: () => get<Summary>('/summary'),
-  getMembers: () => get<Member[]>('/members'),
-  getDebtors: () => get<Member[]>('/debtors'),
-  getSyncStatus: () => get<SyncStatus>('/sync-status'),
-  getFinanceSummary: () => get<ClubOperationsSummary>('/club-finance-summary'),
-  getSectorSummary: () => get<SectorOperationalSummary>('/sector-operational-summary')
+  getSummary: (signal?: AbortSignal) => get<Summary>('/summary', signal),
+  getMembers: (signal?: AbortSignal) => get<Member[]>('/members', signal),
+  getDebtors: (signal?: AbortSignal) => get<Member[]>('/debtors', signal),
+  getSyncStatus: (signal?: AbortSignal) => get<SyncStatus>('/sync-status', signal),
+  getFinanceSummary: (signal?: AbortSignal) => get<ClubOperationsSummary>('/club-finance-summary', signal),
+  getSectorSummary: (signal?: AbortSignal) => get<SectorOperationalSummary>('/sector-operational-summary', signal)
 };

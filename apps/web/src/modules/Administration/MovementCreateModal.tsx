@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { createAdministrationMovement, getMovementFormCatalogs, type MovementCatalogItem } from '../../services/api/administrationApi';
+import { invalidateMovementQueries } from '../../serverState/invalidation';
+import { useSession } from '../../session';
 
 type Props={open:boolean;onClose:()=>void;onCreated:()=>void};
 const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
 const Field=({label,children}:{label:string;children:ReactNode})=><label className="movement-form__field"><span>{label}</span>{children}</label>;
 
 export function MovementCreateModal({open,onClose,onCreated}:Props){
+ const {clubId}=useSession();
  const [catalogs,setCatalogs]=useState<{categories:MovementCatalogItem[];sectors:MovementCatalogItem[];activities:MovementCatalogItem[];paymentMethods:MovementCatalogItem[]}|null>(null);
  const [type,setType]=useState<'INGRESOS'|'EGRESOS'>('INGRESOS'),[sectorId,setSectorId]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{if(!open)return;const c=new AbortController();setError('');void getMovementFormCatalogs(c.signal).then(setCatalogs).catch(e=>setError(e instanceof Error?e.message:'No se pudieron cargar los catálogos.'));return()=>c.abort()},[open]);
  const categories=useMemo(()=>catalogs?.categories.filter(x=>x.direction===type&&x.isActive!==false)??[],[catalogs,type]);
  const activities=useMemo(()=>catalogs?.activities.filter(x=>x.sectorId===sectorId)??[],[catalogs,sectorId]);
  if(!open)return null;
- const submit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();setBusy(true);setError('');const data=new FormData(event.currentTarget);try{await createAdministrationMovement({concept:data.get('concept'),amount:Number(data.get('amount')),movementType:type,categoryId:data.get('categoryId'),sectorId,activityId:data.get('activityId')||null,paymentMethodId:data.get('paymentMethodId'),counterpartyText:data.get('counterpartyText'),movementDate:data.get('movementDate'),operationalStatus:data.get('operationalStatus')},crypto.randomUUID());window.dispatchEvent(new Event('miclub:movement-created'));onCreated();onClose()}catch(e){setError(e instanceof Error?e.message:'No se pudo registrar el movimiento.')}finally{setBusy(false)}};
+ const submit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();setBusy(true);setError('');const data=new FormData(event.currentTarget);try{await createAdministrationMovement({concept:data.get('concept'),amount:Number(data.get('amount')),movementType:type,categoryId:data.get('categoryId'),sectorId,activityId:data.get('activityId')||null,paymentMethodId:data.get('paymentMethodId'),counterpartyText:data.get('counterpartyText'),movementDate:data.get('movementDate'),operationalStatus:data.get('operationalStatus')},crypto.randomUUID());invalidateMovementQueries(clubId);onCreated();onClose()}catch(e){setError(e instanceof Error?e.message:'No se pudo registrar el movimiento.')}finally{setBusy(false)}};
  return <div className="sector-modal__backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section className="sector-modal movement-form-modal" role="dialog" aria-modal="true" aria-labelledby="movement-form-title">
   <header className="sector-modal__header"><div><p className="eyebrow">Economía</p><h2 id="movement-form-title">Cargar movimiento</h2><p>Registrá un ingreso o egreso con clasificación canónica.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label="Cerrar">×</button></header>
   {!catalogs&&!error?<p>Cargando catálogos…</p>:<form className="movement-form" onSubmit={submit}>

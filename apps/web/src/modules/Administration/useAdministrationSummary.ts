@@ -1,6 +1,10 @@
 import type { AdministrationSummaryResponse } from '@miclub/shared';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { getAdministrationSummary } from '../../services/api/administrationApi';
+import { useSession } from '../../session';
+import { keys } from '../../serverState/queryKeys';
+import { policies } from '../../serverState/policies';
+import { useServerQuery } from '../../serverState/client';
 
 type AdministrationSummaryError = { message: string };
 export type AdministrationSummaryStatus = 'loading' | 'error' | 'empty' | 'ready';
@@ -22,29 +26,13 @@ const hasSummaryData = (summary: AdministrationSummaryResponse | null) => {
 };
 
 export function useAdministrationSummary() {
-  const [summary, setSummary] = useState<AdministrationSummaryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<AdministrationSummaryError | null>(null);
-
-  const loadAdministrationSummary = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      setSummary(await getAdministrationSummary(signal));
-    } catch (loadError) {
-      if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
-      setError({ message: loadError instanceof Error ? loadError.message : 'Error desconocido al cargar Administración.' });
-      setSummary(null);
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadAdministrationSummary(controller.signal);
-    return () => controller.abort();
-  }, [loadAdministrationSummary]);
+  const { clubId } = useSession();
+  const queryFn = useCallback(({signal}:{signal:AbortSignal}) => getAdministrationSummary(signal), []);
+  const query = useServerQuery({ key: keys.administrationSummary(clubId), queryFn, policy: policies.dashboard });
+  const summary = query.data ?? null;
+  const loading = query.loading;
+  const error: AdministrationSummaryError | null = query.error ? { message: query.error instanceof Error ? query.error.message : 'Error desconocido al cargar Administración.' } : null;
+  const loadAdministrationSummary = useCallback(async () => { await query.refetch(); }, [query.refetch]);
 
   return useMemo(() => {
     const status: AdministrationSummaryStatus = loading ? 'loading' : error ? 'error' : hasSummaryData(summary) ? 'ready' : 'empty';
