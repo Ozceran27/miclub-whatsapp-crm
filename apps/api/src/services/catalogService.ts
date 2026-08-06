@@ -23,7 +23,7 @@ export const normalizeCatalogRow = (row: CatalogRow): NormalizedCatalogItem =>
 export const listCatalogs = (): CatalogName[] => catalogNames;
 
 export const getCatalog = async (auth: RequestAuthContext, catalog: CatalogName): Promise<CatalogResponse> => {
-  const rows = await getCatalogRows(catalog, auth.clubId);
+  const rows = await getCatalogRows(catalog, auth.clubId, auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds);
   const items = rows.map(normalizeCatalogRow);
   return { catalog, items, total: items.length };
 };

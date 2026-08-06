@@ -10,6 +10,6 @@ export const getDashboardBasic = async (auth: RequestAuthContext): Promise<{ ite
 };
 
 export const getSectorFinanceSummary = async (auth: RequestAuthContext): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = normalizeRows(await getSectorFinanceSummaryRows(auth.clubId));
+  const items = normalizeRows(await getSectorFinanceSummaryRows(auth.clubId, auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds));
   return { items, total: items.length };
 };

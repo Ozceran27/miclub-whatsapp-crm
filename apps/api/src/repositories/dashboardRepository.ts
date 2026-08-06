@@ -13,13 +13,14 @@ export const getDashboardBasic = async (clubId: string): Promise<DashboardRow[]>
   return result.rows;
 };
 
-export const getSectorFinanceSummary = async (clubId: string): Promise<SectorFinanceSummaryRow[]> => {
+export const getSectorFinanceSummary = async (clubId: string, sectorIds?: readonly string[]): Promise<SectorFinanceSummaryRow[]> => {
   const pool = await getPostgresPool();
   const result = await pool.query<SectorFinanceSummaryRow>(`
     select *
     from miclub.v_sector_finance_summary
     where club_id = $1
+      and ($2::uuid[] is null or sector_id = any($2))
     order by sector_name asc nulls last, sector_id asc nulls last
-  `, [clubId]);
+  `, [clubId, sectorIds ?? null]);
   return result.rows;
 };
