@@ -199,11 +199,23 @@ export interface AdministrationWorkerDto {
   sectorIds?: string[];
   activityIds?: string[];
   role?: string | null;
+  sector?: string | null;
+  salary?: number | null;
+  status: string;
+  systemAccess: boolean;
+  employmentStartDate?: string | null;
   isActive: boolean;
   openTasks?: number;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AdministrationWorkersDataSource = "employees" | "legacy";
+
+export interface AdministrationWorkersResponse extends AdministrationPaginatedResponse<AdministrationWorkerDto> {
+  dataSource: AdministrationWorkersDataSource;
+  limitations: string[];
 }
 
 export interface AdministrationTaskDto {
@@ -300,7 +312,6 @@ export interface AdministrationEmptyState {
 
 export type AdministrationSectorsResponse = AdministrationPaginatedResponse<AdministrationSectorDto>;
 export type AdministrationActivitiesResponse = AdministrationPaginatedResponse<AdministrationActivityDto>;
-export type AdministrationWorkersResponse = AdministrationPaginatedResponse<AdministrationWorkerDto>;
 export type AdministrationTasksResponse = AdministrationPaginatedResponse<AdministrationTaskDto>;
 export type AdministrationRequestsResponse = AdministrationPaginatedResponse<AdministrationRequestDto>;
 export type AdministrationMovementsResponse = AdministrationPaginatedResponse<AdministrationMovementDto>;
