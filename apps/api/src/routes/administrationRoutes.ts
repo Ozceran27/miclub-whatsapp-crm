@@ -3,6 +3,8 @@ import { rejectClientClubId, requireAuth, requireMembership, requirePermission }
 import { getAdministrationInitialReadModel } from "../services/administration/administrationReadService.js";
 import { getAdministrationSummary } from "../services/administration/administrationSummaryService.js";
 import asyncHandler from "./asyncHandler.js";
+import { getAdministrationWorkers } from "../services/administration/workersService.js";
+import { parseListQuery } from "./listQuery.js";
 
 const router = Router();
 
@@ -10,6 +12,11 @@ router.use(requireAuth, requireMembership, rejectClientClubId, requirePermission
 
 router.get("/summary", asyncHandler(async (req, res) => {
   res.json(await getAdministrationSummary(req.auth!.clubId));
+}));
+
+router.get("/workers", asyncHandler(async (req, res) => {
+  const { limit, offset } = parseListQuery(req, [], { defaultLimit: 50, maxLimit: 100 });
+  res.json(await getAdministrationWorkers(req.auth!.clubId, limit, offset));
 }));
 
 router.get("/", asyncHandler(async (req, res) => {

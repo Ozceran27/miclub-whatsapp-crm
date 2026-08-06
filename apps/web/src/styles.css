@@ -3041,6 +3041,15 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 }
 
 .sector-list { display: grid; gap: 18px; }
+.worker-list { display: grid; gap: 14px; }
+.worker-list__header { align-items: center; }
+.worker-list__notice { background: rgba(255, 207, 102, .1); border: 1px solid rgba(255, 207, 102, .28); border-radius: 10px; color: #ffe4a3; margin: 0; padding: 10px 12px; }
+.worker-list__table-wrap { overflow-x: auto; }
+.worker-list__table { border-collapse: collapse; min-width: 900px; width: 100%; }
+.worker-list__table th, .worker-list__table td { border-bottom: 1px solid var(--color-border); padding: 12px 10px; text-align: left; }
+.worker-list__table th { color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; }
+.worker-list__badge { border: 1px solid var(--color-border); border-radius: 999px; display: inline-block; font-size: 11px; font-weight: 800; padding: 5px 8px; white-space: nowrap; }
+.worker-list__badge[data-active='true'] { background: color-mix(in srgb, var(--color-success) 13%, transparent); border-color: color-mix(in srgb, var(--color-success) 40%, transparent); color: var(--color-success); }
 .sector-list__header { align-items: center; }
 .sector-list__grid { display: grid; gap: 10px; }
 .sector-list__row {
