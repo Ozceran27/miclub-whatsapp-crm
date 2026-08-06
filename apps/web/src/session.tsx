@@ -10,6 +10,7 @@ type SessionValue = {
   username: string | null;
   clubId: string | null;
   membershipId: string | null;
+  permissions: readonly string[];
   authenticate: (username: string | null, user?: SessionTenant | null) => void;
   selectClub: (membershipId: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -30,6 +31,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [clubId, setClubId] = useState<string | null>(null);
   const [membershipId, setMembershipId] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<readonly string[]>([]);
   const sessionChannel = useRef<BroadcastChannel | null>(null);
   const authGeneration = useRef(0);
 
@@ -37,6 +39,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const tenant = readSessionTenant(user);
     setClubId(tenant.clubId);
     setMembershipId(tenant.membershipId);
+    setPermissions(user?.permissions ?? []);
   }, []);
 
   const authenticate = useCallback((nextUsername: string | null, user?: SessionTenant | null) => {
@@ -112,9 +115,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [expireSession]);
 
   const value = useMemo(() => ({
-    status, authEnabled, isAuthenticated: status === 'authenticated', username, clubId, membershipId,
+    status, authEnabled, isAuthenticated: status === 'authenticated', username, clubId, membershipId, permissions,
     authenticate, selectClub, logout
-  }), [authEnabled, authenticate, clubId, logout, membershipId, selectClub, status, username]);
+  }), [authEnabled, authenticate, clubId, logout, membershipId, permissions, selectClub, status, username]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

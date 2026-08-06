@@ -107,6 +107,7 @@ export function useHomeDashboard() {
   };
 
   useEffect(() => { void loadHome(); }, []);
+  useEffect(()=>{const refresh=()=>void loadHome();window.addEventListener('miclub:movement-created',refresh);return()=>window.removeEventListener('miclub:movement-created',refresh)},[]);
 
   return useMemo(() => {
     const syncLabel = !syncStatus ? 'No disponible' : syncStatus.error ? 'Con advertencias' : 'PostgreSQL conectado';

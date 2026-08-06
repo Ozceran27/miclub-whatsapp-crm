@@ -74,6 +74,7 @@ export function useEconomyDashboard() {
     void loadEconomyDashboard(controller.signal);
     return () => controller.abort();
   }, [loadEconomyDashboard]);
+  useEffect(()=>{const refresh=()=>void loadEconomyDashboard();window.addEventListener('miclub:movement-created',refresh);return()=>window.removeEventListener('miclub:movement-created',refresh)},[loadEconomyDashboard]);
 
   return useMemo(() => {
     const isEmpty = !loading && !error && Boolean(data) && data?.summary.totalMovements === 0 && data?.recentMovements.total === 0 && data?.pending.total === 0;

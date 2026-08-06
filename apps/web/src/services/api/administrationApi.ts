@@ -50,3 +50,13 @@ export const getAdministrationMovements = (page: number, filters: Administration
 
 export const getAdministrationEnrollments = (page: number, filters: AdministrationListFilters, signal?: AbortSignal) =>
   apiJson<AdministrationEnrollmentsResponse>(paginatedUrl('/api/inscripciones', page, filters), { cache: 'no-store', signal });
+
+export type MovementCatalogItem = { id: string; name: string; sectorId?: string; direction?: 'INGRESOS'|'EGRESOS'; isActive?: boolean };
+export const getMovementFormCatalogs = async (signal?: AbortSignal) => {
+  const [categories,sectors,activities,paymentMethods]=await Promise.all([
+    apiJson<MovementCatalogItem[]>('/api/movement-categories',{signal}), apiJson<MovementCatalogItem[]>('/api/sectors',{signal}),
+    apiJson<MovementCatalogItem[]>('/api/activities',{signal}), apiJson<MovementCatalogItem[]>('/api/payment-methods',{signal})
+  ]); return {categories,sectors,activities,paymentMethods};
+};
+export const createAdministrationMovement = (input: Record<string,unknown>, idempotencyKey: string) =>
+  apiJson<Record<string,unknown>>('/api/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify(input)});

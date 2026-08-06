@@ -50,4 +50,5 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608060001_activity_mutation_model.sql", sha256: "a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b" },
   { path: "202608060002_tasks.sql", sha256: "d92b6d148bbfd7eed676822e7fb4b8ad8c93b5e2d9cf44cd9ccf2e3930d6b1a3" },
   { path: "202608060003_movement_mutation_model.sql", sha256: "1e448a1a46dc0401f89ff105397af8779602dd97e89e3c297033de3558afe628" },
+  { path: "202608060004_manual_movement_creation.sql", sha256: "561cb4ca1198dbbb40c37e46aced504e0c5f809b3a4d8458e9c9200a496e28b0" },
 ];

@@ -1,6 +1,7 @@
 export type SessionTenant = {
   clubId?: string | null;
   membershipId?: string | null;
+  permissions?: readonly string[];
 };
 
 export const readSessionTenant = (user?: SessionTenant | null) => ({
