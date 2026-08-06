@@ -5,6 +5,7 @@ import { SectorList } from './Administration/SectorList';
 import { ActivityList } from './Administration/ActivityList';
 import { EconomyDashboardState } from './Economy/EconomyDashboardState';
 import { WorkerList } from './Administration/WorkerList';
+import { TaskPanel } from './Administration/TaskPanel';
 
 export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
@@ -55,6 +56,7 @@ export default function AdministrationModule() {
       <SectorList />
       <ActivityList />
       <WorkerList />
+      <TaskPanel />
     </main>
   );
 }

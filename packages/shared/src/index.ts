@@ -10,3 +10,4 @@ export * from "./contracts/legacy.js";
 export * from "./contracts/http.js";
 export * from "./contracts/administration.js";
 export * from "./contracts/auth.js";
+export * from "./contracts/tasks.js";
