@@ -1,5 +1,6 @@
+import { PERMISSIONS } from "@miclub/shared";
 import type { Request, RequestHandler } from "express";
-import type { KnownPermission } from "@miclub/shared";
+import type { PermissionCode } from "@miclub/shared";
 import type { AuthenticatedContext } from "../auth/types.js";
 
 const reject = (status: 401 | 403, message: string, code = status === 401 ? "AUTHENTICATION_REQUIRED" : "FORBIDDEN"): RequestHandler =>
@@ -17,7 +18,7 @@ export const requireMembership: RequestHandler = (req, res, next) => {
   next();
 };
 
-export const requirePermission = (...permissions: KnownPermission[]): RequestHandler => (req, res, next) => {
+export const requirePermission = (...permissions: PermissionCode[]): RequestHandler => (req, res, next) => {
   if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
   if (!permissions.every((permission) => req.auth!.permissions.includes(permission))) {
     return reject(403, "Permiso insuficiente")(req, res, next);
@@ -45,7 +46,7 @@ export const isImportOperator = (
   const hasTenantPermission = Boolean(
     auth?.userId
     && auth.membershipId
-    && auth.permissions?.includes("imports:run"),
+    && auth.permissions?.includes(PERMISSIONS.IMPORTS_RUN),
   );
   return hasTenantPermission && (!configuredUser || normalizeIdentity(auth?.email) === configuredUser);
 };
@@ -65,7 +66,7 @@ export const requireSectorAccess = (getSectorId: (req: Request) => unknown = (re
     if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
     const value = getSectorId(req);
     const sectorId = typeof value === "string" ? value : "";
-    if (!sectorId || (!req.auth.permissions.includes("sectors:any") && !req.auth.sectorIds.includes(sectorId))) {
+    if (!sectorId || (!req.auth.permissions.includes(PERMISSIONS.SECTORS_ANY) && !req.auth.sectorIds.includes(sectorId))) {
       return reject(403, "Acceso al sector denegado")(req, res, next);
     }
     next();

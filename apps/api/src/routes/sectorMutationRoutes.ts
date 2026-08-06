@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router, type Request, type Response } from "express";
 import { requirePermission, requireSectorAccess } from "../middleware/authorization.js";
 import { archiveSector, setSectorStatus, updateSector, type SectorActor, type SectorMutationResult, type SectorUpdate } from "../repositories/sectorsRepository.js";
@@ -32,7 +33,7 @@ const respond = (res: Response, result: SectorMutationResult) => {
   return fail(res, 409, "SECTOR_HAS_DEPENDENCIES", "El sector tiene dependencias y no puede archivarse.", result.dependencies);
 };
 
-router.patch("/sectors/:id", requirePermission("sectors.edit"), requireSectorAccess((req) => req.params.id), asyncHandler(async (req, res) => {
+router.patch("/sectors/:id", requirePermission(PERMISSIONS.SECTORS_EDIT), requireSectorAccess((req) => req.params.id), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
   if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id de sector inválido.");
   const body = req.body as Record<string, unknown>;
@@ -52,7 +53,7 @@ router.patch("/sectors/:id", requirePermission("sectors.edit"), requireSectorAcc
   return respond(res, await updateSector(actor(req), id, version, input));
 }));
 
-router.post("/sectors/:id/archive", requirePermission("sectors.archive"), requireSectorAccess((req) => req.params.id), asyncHandler(async (req, res) => {
+router.post("/sectors/:id/archive", requirePermission(PERMISSIONS.SECTORS_ARCHIVE), requireSectorAccess((req) => req.params.id), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
   if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id de sector inválido.");
   const body = req.body as Record<string, unknown>;
@@ -61,7 +62,7 @@ router.post("/sectors/:id/archive", requirePermission("sectors.archive"), requir
   if (version) return respond(res, await archiveSector(actor(req), id, version));
 }));
 
-router.patch("/sectors/:id/status", requirePermission("sectors.edit"), requireSectorAccess((req) => req.params.id), asyncHandler(async (req, res) => {
+router.patch("/sectors/:id/status", requirePermission(PERMISSIONS.SECTORS_EDIT), requireSectorAccess((req) => req.params.id), asyncHandler(async (req, res) => {
   const id = String(req.params.id);
   if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id de sector inválido.");
   const body = req.body as Record<string, unknown>;

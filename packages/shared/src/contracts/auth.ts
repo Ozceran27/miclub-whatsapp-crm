@@ -8,49 +8,60 @@ export type RoleCode = KnownRole | LegacyRole;
 export const toRoleCode = (value: string): RoleCode =>
   (KNOWN_ROLES as readonly string[]).includes(value) ? value as KnownRole : asLegacyUnknownCode<"role">(value);
 
-export const KNOWN_PERMISSIONS = [
-  "club:manage",
-  "users:manage",
-  "imports:run",
-  "crm:write",
-  "crm:read",
-  "people:read",
-  "finance:read",
-  "dashboard:read",
-  "sectors:any",
-  "administration.view",
-  "administration.configure",
-  "sectors.view",
-  "sectors.create",
-  "sectors.edit",
-  "sectors.archive",
-  "activities.view",
-  "activities.create",
-  "activities.edit",
-  "activities.archive",
-  "workers.view",
-  "workers.manage",
-  "tasks.view",
-  "tasks.create",
-  "tasks.edit",
-  "tasks.assign",
-  "requests.view",
-  "requests.approve",
-  "requests.reject",
-  "movements.view",
-  "movements.create",
-  "movements.edit",
-  "movements.cancel",
-  "enrollments.view",
-  "enrollments.create",
-  "enrollments.edit",
-  "enrollments.cancel",
-  "finance:write",
-] as const;
-export type KnownPermission = typeof KNOWN_PERMISSIONS[number];
+/**
+ * Stable permission spellings used by persisted memberships and application code.
+ *
+ * The mixed `domain:action` / `domain.action` convention is intentional: these
+ * values already exist in production. New names must be introduced through a
+ * compatibility migration rather than by changing a value here.
+ */
+export const PERMISSIONS = {
+  CLUB_MANAGE: "club:manage",
+  USERS_MANAGE: "users:manage",
+  IMPORTS_RUN: "imports:run",
+  CRM_WRITE: "crm:write",
+  CRM_READ: "crm:read",
+  PEOPLE_READ: "people:read",
+  FINANCE_READ: "finance:read",
+  DASHBOARD_READ: "dashboard:read",
+  SECTORS_ANY: "sectors:any",
+  ADMINISTRATION_VIEW: "administration.view",
+  ADMINISTRATION_CONFIGURE: "administration.configure",
+  SECTORS_VIEW: "sectors.view",
+  SECTORS_CREATE: "sectors.create",
+  SECTORS_EDIT: "sectors.edit",
+  SECTORS_ARCHIVE: "sectors.archive",
+  ACTIVITIES_VIEW: "activities.view",
+  ACTIVITIES_CREATE: "activities.create",
+  ACTIVITIES_EDIT: "activities.edit",
+  ACTIVITIES_ARCHIVE: "activities.archive",
+  WORKERS_VIEW: "workers.view",
+  WORKERS_MANAGE: "workers.manage",
+  TASKS_VIEW: "tasks.view",
+  TASKS_CREATE: "tasks.create",
+  TASKS_EDIT: "tasks.edit",
+  TASKS_ASSIGN: "tasks.assign",
+  REQUESTS_VIEW: "requests.view",
+  REQUESTS_APPROVE: "requests.approve",
+  REQUESTS_REJECT: "requests.reject",
+  MOVEMENTS_VIEW: "movements.view",
+  MOVEMENTS_CREATE: "movements.create",
+  MOVEMENTS_EDIT: "movements.edit",
+  MOVEMENTS_CANCEL: "movements.cancel",
+  ENROLLMENTS_VIEW: "enrollments.view",
+  ENROLLMENTS_CREATE: "enrollments.create",
+  ENROLLMENTS_EDIT: "enrollments.edit",
+  ENROLLMENTS_CANCEL: "enrollments.cancel",
+  FINANCE_WRITE: "finance:write",
+} as const;
+
+export type PermissionCode = typeof PERMISSIONS[keyof typeof PERMISSIONS];
+
+export const KNOWN_PERMISSIONS: readonly PermissionCode[] = Object.values(PERMISSIONS);
+export type KnownPermission = PermissionCode;
 export type LegacyPermission = LegacyUnknownCode<"permission">;
-export type PermissionCode = KnownPermission | LegacyPermission;
-export const toPermissionCode = (value: string): PermissionCode =>
+export type StoredPermissionCode = PermissionCode | LegacyPermission;
+export const toPermissionCode = (value: string): StoredPermissionCode =>
   (KNOWN_PERMISSIONS as readonly string[]).includes(value) ? value as KnownPermission : asLegacyUnknownCode<"permission">(value);
 
 /** Canonical defaults used only when the application creates a membership. */
@@ -60,6 +71,12 @@ export const ROLE_DEFAULT_PERMISSIONS = {
   admin: KNOWN_PERMISSIONS,
 } as const satisfies Record<KnownRole, readonly KnownPermission[]>;
 
+/** Machine-readable role matrix shared by tests and manual SQL generators. */
+export const ROLE_PERMISSION_MATRIX: readonly Readonly<{
+  role: KnownRole;
+  permissions: readonly PermissionCode[];
+}>[] = KNOWN_ROLES.map((role) => ({ role, permissions: ROLE_DEFAULT_PERMISSIONS[role] }));
+
 /** Deliberately excludes password hashes, signed-session fields and internal membership metadata. */
 export interface PublicAuthUser {
   userId: string;
@@ -67,7 +84,7 @@ export interface PublicAuthUser {
   clubId: string;
   membershipId: string;
   role: RoleCode;
-  permissions: readonly PermissionCode[];
+  permissions: readonly StoredPermissionCode[];
 }
 
 export interface AuthResponse {

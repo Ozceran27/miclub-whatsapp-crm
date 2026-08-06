@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router } from "express";
 import { rejectClientClubId, requireAuth, requireMembership, requirePermission } from "../middleware/authorization.js";
 import { getAdministrationInitialReadModel } from "../services/administration/administrationReadService.js";
@@ -8,7 +9,7 @@ import { parseListQuery } from "./listQuery.js";
 
 const router = Router();
 
-router.use(requireAuth, requireMembership, rejectClientClubId, requirePermission("administration.view"));
+router.use(requireAuth, requireMembership, rejectClientClubId, requirePermission(PERMISSIONS.ADMINISTRATION_VIEW));
 
 router.get("/summary", asyncHandler(async (req, res) => {
   res.json(await getAdministrationSummary(req.auth!.clubId));

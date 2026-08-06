@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router } from "express";
 import { getConfiguredDataSource, isPostgresEnabled } from "../config/featureFlags.js";
 import { validatePostgresEnv } from "../config/env.js";
@@ -37,7 +38,7 @@ router.get("/health", async (_req, res) => {
 
 router.use(requireMembership);
 
-router.get("/enrollment-fee-audit", requirePermission("finance:write"), async (req, res) => {
+router.get("/enrollment-fee-audit", requirePermission(PERMISSIONS.FINANCE_WRITE), async (req, res) => {
   try {
     const pool = await getPostgresPool();
     const params: unknown[] = [];
@@ -87,7 +88,7 @@ router.get("/enrollment-fee-audit", requirePermission("finance:write"), async (r
   }
 });
 
-router.get("/crm/audit", requirePermission("crm:write"), async (_req, res) => {
+router.get("/crm/audit", requirePermission(PERMISSIONS.CRM_WRITE), async (_req, res) => {
   try {
     res.json(await auditSqliteCrmData());
   } catch (error) {
@@ -96,7 +97,7 @@ router.get("/crm/audit", requirePermission("crm:write"), async (_req, res) => {
   }
 });
 
-router.post("/crm/migrate", requirePermission("crm:write"), async (req, res) => {
+router.post("/crm/migrate", requirePermission(PERMISSIONS.CRM_WRITE), async (req, res) => {
   const dryRun = req.body?.dryRun !== false;
   const phase = ["templates", "history", "all"].includes(req.body?.phase) ? req.body.phase : "all";
   try {

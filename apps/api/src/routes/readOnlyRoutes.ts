@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router } from "express";
 import { getReadOnlyPage, type ReadOnlyResource } from "../repositories/readOnlyRepository.js";
 import { normalizeCatalogRow } from "../services/catalogService.js";
@@ -17,8 +18,8 @@ const filtersByResource = {
 } as const satisfies Record<ReadOnlyResource, readonly string[]>;
 
 const permissionsByResource = {
-  sectores: "sectors.view", actividades: "activities.view", trabajadores: "workers.view",
-  movimientos: "finance:read", inscripciones: "enrollments.view"
+  sectores: PERMISSIONS.SECTORS_VIEW, actividades: PERMISSIONS.ACTIVITIES_VIEW, trabajadores: PERMISSIONS.WORKERS_VIEW,
+  movimientos: PERMISSIONS.FINANCE_READ, inscripciones: PERMISSIONS.ENROLLMENTS_VIEW
 } as const satisfies Record<ReadOnlyResource, KnownPermission>;
 
 const createReadOnlyHandler = (resource: ReadOnlyResource) => asyncHandler(async (req, res) => {
@@ -28,7 +29,7 @@ const createReadOnlyHandler = (resource: ReadOnlyResource) => asyncHandler(async
     limit: query.limit,
     offset: query.offset,
     filters: query.filters,
-    sectorIds: req.auth!.permissions.includes("sectors:any") ? undefined : req.auth!.sectorIds
+    sectorIds: req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? undefined : req.auth!.sectorIds
   });
 
   res.json({

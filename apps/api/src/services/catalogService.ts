@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { catalogNames, getCatalogRows, type CatalogName, type CatalogRow } from "../repositories/catalogRepository.js";
 import type { RequestAuthContext } from "../auth/types.js";
 
@@ -23,7 +24,7 @@ export const normalizeCatalogRow = (row: CatalogRow): NormalizedCatalogItem =>
 export const listCatalogs = (): CatalogName[] => catalogNames;
 
 export const getCatalog = async (auth: RequestAuthContext, catalog: CatalogName): Promise<CatalogResponse> => {
-  const rows = await getCatalogRows(catalog, auth.clubId, auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds);
+  const rows = await getCatalogRows(catalog, auth.clubId, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? undefined : auth.sectorIds);
   const items = rows.map(normalizeCatalogRow);
   return { catalog, items, total: items.length };
 };

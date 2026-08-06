@@ -63,6 +63,8 @@ import { validateRuntimeConfig } from "./config/env.js";
 import { createAuthProtection, isExplicitTestAuthBypass, isProtectedApiPath, isTenantScopedPath } from "./middleware/auth.js";
 import { rejectClientClubId, requireAuth, requireMembership } from "./middleware/authorization.js";
 import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importMutationRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
+import { getPostgresPool } from "./db/postgres.js";
+import { diagnosePermissions } from "./auth/permissionDiagnostics.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -148,6 +150,19 @@ app.use(errorHandler);
 
 export const startServer = async () => {
   validateRuntimeConfig({ isProduction });
+  try {
+    const diagnostic = await diagnosePermissions(await getPostgresPool());
+    if (diagnostic.unknownStoredPermissions.length) {
+      logger.warn("Se detectaron permisos almacenados fuera del catálogo canónico", { permissions: diagnostic.unknownStoredPermissions });
+    }
+    if (diagnostic.ungrantedCodePermissions.length) {
+      logger.warn("Hay permisos requeridos por código sin concesión en ningún rol activo", { permissions: diagnostic.ungrantedCodePermissions });
+    }
+  } catch (error) {
+    // Availability remains the responsibility of health checks; this audit must
+    // not turn a diagnostic catalog mismatch into an unrelated boot outage.
+    logger.warn("No se pudo ejecutar el diagnóstico de permisos de startup", { error: error instanceof Error ? error.message : String(error) });
+  }
   app.listen(port, () => {
     logger.info("API running", { port });
   });

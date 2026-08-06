@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router } from "express";
 import asyncHandler from "./asyncHandler.js";
 import { getCatalog, getCatalogItems, listCatalogs } from "../services/catalogService.js";
@@ -9,15 +10,15 @@ import type { KnownPermission } from "@miclub/shared";
 const router = Router();
 
 const catalogEndpoints: Array<{ path: string; catalog: CatalogName; permission: KnownPermission }> = [
-  { path: "/sectors", catalog: "sectors", permission: "sectors.view" },
-  { path: "/activities", catalog: "activities", permission: "activities.view" },
-  { path: "/instructors", catalog: "instructors", permission: "workers.view" },
-  { path: "/movement-categories", catalog: "movement-categories", permission: "finance:read" },
-  { path: "/payment-methods", catalog: "payment-methods", permission: "finance:read" },
-  { path: "/currencies", catalog: "currencies", permission: "finance:read" },
-  { path: "/system-months", catalog: "system-months", permission: "finance:read" },
-  { path: "/discount-rates", catalog: "discount-rates", permission: "administration.view" },
-  { path: "/salon-hour-prices", catalog: "salon-hour-prices", permission: "administration.view" }
+  { path: "/sectors", catalog: "sectors", permission: PERMISSIONS.SECTORS_VIEW },
+  { path: "/activities", catalog: "activities", permission: PERMISSIONS.ACTIVITIES_VIEW },
+  { path: "/instructors", catalog: "instructors", permission: PERMISSIONS.WORKERS_VIEW },
+  { path: "/movement-categories", catalog: "movement-categories", permission: PERMISSIONS.FINANCE_READ },
+  { path: "/payment-methods", catalog: "payment-methods", permission: PERMISSIONS.FINANCE_READ },
+  { path: "/currencies", catalog: "currencies", permission: PERMISSIONS.FINANCE_READ },
+  { path: "/system-months", catalog: "system-months", permission: PERMISSIONS.FINANCE_READ },
+  { path: "/discount-rates", catalog: "discount-rates", permission: PERMISSIONS.ADMINISTRATION_VIEW },
+  { path: "/salon-hour-prices", catalog: "salon-hour-prices", permission: PERMISSIONS.ADMINISTRATION_VIEW }
 ];
 
 for (const endpoint of catalogEndpoints) {
@@ -32,7 +33,7 @@ for (const endpoint of catalogEndpoints) {
 
 router.get(
   "/catalogs",
-  requirePermission("administration.view"),
+  requirePermission(PERMISSIONS.ADMINISTRATION_VIEW),
   asyncHandler(async (_req, res) => {
     res.json({ catalogs: listCatalogs() });
   })
@@ -40,7 +41,7 @@ router.get(
 
 router.get(
   "/catalogs/:catalog",
-  requirePermission("administration.view"),
+  requirePermission(PERMISSIONS.ADMINISTRATION_VIEW),
   asyncHandler(async (req, res) => {
     const catalog = String(req.params.catalog);
 

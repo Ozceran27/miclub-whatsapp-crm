@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { getDashboardBasic as getDashboardBasicRows, getSectorFinanceSummary as getSectorFinanceSummaryRows } from "../repositories/dashboardRepository.js";
 import type { RequestAuthContext } from "../auth/types.js";
 import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
@@ -10,6 +11,6 @@ export const getDashboardBasic = async (auth: RequestAuthContext): Promise<{ ite
 };
 
 export const getSectorFinanceSummary = async (auth: RequestAuthContext): Promise<{ items: JsonRecord[]; total: number }> => {
-  const items = normalizeRows(await getSectorFinanceSummaryRows(auth.clubId, auth.permissions.includes("sectors:any") ? undefined : auth.sectorIds));
+  const items = normalizeRows(await getSectorFinanceSummaryRows(auth.clubId, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? undefined : auth.sectorIds));
   return { items, total: items.length };
 };

@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@miclub/shared";
 import { Router, type Request, type Response } from "express";
 import { requirePermission, requireSectorAccess } from "../middleware/authorization.js";
 import { archiveActivity, createActivity, setActivityStatus, updateActivity, type ActivityActor, type ActivityInput, type ActivityMutationResult } from "../repositories/activitiesRepository.js";
@@ -9,7 +10,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/;
 const fail = (res: Response, status: number, code: string, message: string, details?: unknown) => res.status(status).json({ ok: false, error: true, status, code, message, details });
 const actor = (req: Request): ActivityActor => ({
   userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId,
-  sectorIds: req.auth!.sectorIds, canAccessAnySector: req.auth!.permissions.includes("sectors:any"),
+  sectorIds: req.auth!.sectorIds, canAccessAnySector: req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY),
   requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent"),
 });
 
@@ -45,9 +46,9 @@ const respond = (res: Response, result: ActivityMutationResult) => {
   const [status, code, message] = errors[result.kind]; return fail(res, status, code, message, "dependencies" in result ? result.dependencies : undefined);
 };
 
-router.post("/activities", requirePermission("activities.create"), requireSectorAccess((req) => req.body?.sectorId), asyncHandler(async (req, res) => { const input = parseInput(req.body, res); if (input) return respond(res, await createActivity(actor(req), input)); }));
-router.patch("/activities/:id", requirePermission("activities.edit"), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); const expected = version(req.body, res); const input = parseInput(req.body, res); if (expected && input) return respond(res, await updateActivity(actor(req), id, expected, input)); }));
-router.patch("/activities/:id/status", requirePermission("activities.edit"), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); if (Object.keys(req.body).some((key) => !["updatedAt", "status"].includes(key)) || !["active", "inactive"].includes(req.body.status)) return fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); const expected = version(req.body, res); if (expected) return respond(res, await setActivityStatus(actor(req), id, expected, req.body.status)); }));
-router.post("/activities/:id/archive", requirePermission("activities.archive"), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); if (Object.keys(req.body).some((key) => key !== "updatedAt")) return fail(res, 400, "VALIDATION_ERROR", "Campos no permitidos."); const expected = version(req.body, res); if (expected) return respond(res, await archiveActivity(actor(req), id, expected)); }));
+router.post("/activities", requirePermission(PERMISSIONS.ACTIVITIES_CREATE), requireSectorAccess((req) => req.body?.sectorId), asyncHandler(async (req, res) => { const input = parseInput(req.body, res); if (input) return respond(res, await createActivity(actor(req), input)); }));
+router.patch("/activities/:id", requirePermission(PERMISSIONS.ACTIVITIES_EDIT), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); const expected = version(req.body, res); const input = parseInput(req.body, res); if (expected && input) return respond(res, await updateActivity(actor(req), id, expected, input)); }));
+router.patch("/activities/:id/status", requirePermission(PERMISSIONS.ACTIVITIES_EDIT), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); if (Object.keys(req.body).some((key) => !["updatedAt", "status"].includes(key)) || !["active", "inactive"].includes(req.body.status)) return fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); const expected = version(req.body, res); if (expected) return respond(res, await setActivityStatus(actor(req), id, expected, req.body.status)); }));
+router.post("/activities/:id/archive", requirePermission(PERMISSIONS.ACTIVITIES_ARCHIVE), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); if (Object.keys(req.body).some((key) => key !== "updatedAt")) return fail(res, 400, "VALIDATION_ERROR", "Campos no permitidos."); const expected = version(req.body, res); if (expected) return respond(res, await archiveActivity(actor(req), id, expected)); }));
 
 export default router;
