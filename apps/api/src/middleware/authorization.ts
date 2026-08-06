@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from "express";
+import type { KnownPermission } from "@miclub/shared";
 import type { AuthenticatedContext } from "../auth/types.js";
 
 const reject = (status: 401 | 403, message: string, code = status === 401 ? "AUTHENTICATION_REQUIRED" : "FORBIDDEN"): RequestHandler =>
@@ -16,7 +17,7 @@ export const requireMembership: RequestHandler = (req, res, next) => {
   next();
 };
 
-export const requirePermission = (...permissions: string[]): RequestHandler => (req, res, next) => {
+export const requirePermission = (...permissions: KnownPermission[]): RequestHandler => (req, res, next) => {
   if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
   if (!permissions.every((permission) => req.auth!.permissions.includes(permission))) {
     return reject(403, "Permiso insuficiente")(req, res, next);
