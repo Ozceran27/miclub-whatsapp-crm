@@ -1,11 +1,19 @@
 export type MigrationManifestEntry = Readonly<{
   path: string;
   sha256: string;
+  /** Paths are the immutable IDs; `name` in the registry remains the basename for compatibility. */
+  dependsOn?: readonly string[];
+  /** PostgreSQL objects are `schema.kind.name` or `schema.table.column`. */
+  provides?: readonly string[];
+  requires?: readonly string[];
 }>;
 
-// Append new migrations in dependency order. Never reorder or rename an entry that
-// may already be present in public.miclub_schema_migrations without auditing that
-// table first.
+// This array, not directory traversal or lexical sorting, is the execution order.
+// Root and multitenant migrations are deliberately interleaved below. Append only:
+// YYYYMMDDHHMM_<unique-description>.sql, with a timestamp never used before in
+// either directory. Historical duplicate timestamps are frozen compatibility
+// exceptions because the registry stores basenames. Never reorder/rename an applied
+// entry without a registry-compatible rollout for public.miclub_schema_migrations.
 export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202606260001_create_miclub_import_schema.sql", sha256: "6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908" },
   { path: "202606270001_align_existing_miclub_for_sheets_import.sql", sha256: "06a39926e25c5c743658a57fb33550129ed679d0659e55702bb4e77c2eefa155" },
@@ -28,10 +36,10 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202607030005_document_receivable_status_rule_and_debug.sql", sha256: "d0242b4a049a4f573df469788a22b5e251f7787fb9eeed0b1d961a50bd4232bc" },
   { path: "202607160001_add_enrollment_date_for_growth.sql", sha256: "db7d29f13055087109abd24230be38e1eb36afdc6064847385d7bfe84d79de57" },
   { path: "202607160002_add_missing_enrollment_review_batch.sql", sha256: "0ec78489690b95da51066ba7d9c040163060fc769c44c350b9235fe8d9d10fd8" },
-  { path: "multitenant/202607240001_create_clubs.sql", sha256: "adaad54f84493db5ec7f0a44d174f844d532eb5f9af02cfe98c991c2b09db4a8" },
-  { path: "multitenant/202607240002_create_club_memberships.sql", sha256: "d981fa52b3763dbe7d69bfe3c089da5f358a94d1b6d741f6388b5d7fdcfcf5ac" },
-  { path: "multitenant/202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql", sha256: "9a1bedeee40744bfc69cd29e3ad7efd3cd581c611e959f5ba9f9b4148f9e955a" },
-  { path: "multitenant/202607250001_backfill_and_scope_unique_constraints.sql", sha256: "83630f77ba399958cdf2af8672a9532643bc05fd9bdff9c23e803040349b8843" },
+  { path: "multitenant/202607240001_create_clubs.sql", sha256: "adaad54f84493db5ec7f0a44d174f844d532eb5f9af02cfe98c991c2b09db4a8", provides: ["miclub.table.clubs"] },
+  { path: "multitenant/202607240002_create_club_memberships.sql", sha256: "d981fa52b3763dbe7d69bfe3c089da5f358a94d1b6d741f6388b5d7fdcfcf5ac", dependsOn: ["multitenant/202607240001_create_clubs.sql"], requires: ["miclub.table.clubs"], provides: ["miclub.table.club_memberships"] },
+  { path: "multitenant/202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql", sha256: "9a1bedeee40744bfc69cd29e3ad7efd3cd581c611e959f5ba9f9b4148f9e955a", dependsOn: ["multitenant/202607240001_create_clubs.sql"], requires: ["miclub.table.clubs"], provides: ["miclub.people.club_id", "miclub.activities.club_id", "miclub.movements.club_id"] },
+  { path: "multitenant/202607250001_backfill_and_scope_unique_constraints.sql", sha256: "83630f77ba399958cdf2af8672a9532643bc05fd9bdff9c23e803040349b8843", dependsOn: ["multitenant/202607240002_create_club_memberships.sql", "multitenant/202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql"], requires: ["miclub.table.clubs", "miclub.table.club_memberships", "miclub.people.club_id"] },
   { path: "202607250002_evolve_app_users_auth.sql", sha256: "acafa9181e13e211454bf086a617c72b9bfcd83cce37d33122abccc6e8f316d7" },
   { path: "202607250003_create_user_club_authorization.sql", sha256: "dfbf9cfc1e8b3b851aee1adc8d6093d2f79f362df69f9797b84dd6eb865cc587" },
   { path: "multitenant/202607250004_scope_operational_views_by_club.sql", sha256: "2189d62fdfdb293d814704fb0010e50360c98ad45faa1363e7e17fb471802007" },
@@ -53,3 +61,55 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608060004_manual_movement_creation.sql", sha256: "561cb4ca1198dbbb40c37e46aced504e0c5f809b3a4d8458e9c9200a496e28b0" },
   { path: "202608060005_grant_read_permissions.sql", sha256: "03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb" },
 ];
+
+/** Duplicate timestamps that predate the manifest policy. Do not extend this set. */
+export const legacyDuplicateTimestamps = new Set(["202606280003", "202607020001", "202607020004", "202607250006"]);
+
+export function validateMigrationGraph(entries: readonly MigrationManifestEntry[]): string[] {
+  const errors: string[] = [];
+  const positions = new Map(entries.map((entry, index) => [entry.path, index]));
+  const providers = new Map<string, number>();
+  const timestamps = new Map<string, string[]>();
+  entries.forEach((entry, index) => {
+    const match = pathBasename(entry.path).match(/^(\d{12})_[a-z0-9]+(?:_[a-z0-9]+)*\.sql$/);
+    if (!match) errors.push(`Nombre inválido: ${entry.path}`);
+    else timestamps.set(match[1], [...(timestamps.get(match[1]) ?? []), entry.path]);
+    for (const object of entry.provides ?? []) {
+      if (providers.has(object)) errors.push(`Objeto con múltiples creadores: ${object}`);
+      else providers.set(object, index);
+    }
+  });
+  for (const [timestamp, paths] of timestamps) {
+    if (paths.length > 1 && !legacyDuplicateTimestamps.has(timestamp)) errors.push(`Timestamp repetido: ${timestamp}`);
+  }
+  entries.forEach((entry, index) => {
+    for (const dependency of entry.dependsOn ?? []) {
+      const dependencyIndex = positions.get(dependency);
+      if (dependencyIndex === undefined) errors.push(`Dependencia no registrada: ${entry.path} -> ${dependency}`);
+      else if (dependencyIndex >= index) errors.push(`Dependencia imposible: ${entry.path} -> ${dependency}`);
+    }
+    for (const object of entry.requires ?? []) {
+      const providerIndex = providers.get(object);
+      if (providerIndex !== undefined && providerIndex >= index) errors.push(`Objeto usado antes de crearse: ${entry.path} -> ${object}`);
+    }
+  });
+  return errors;
+}
+
+export function hasOpenTransaction(sql: string): boolean {
+  // Migration files may own their transaction. Ignore comments and only reject a
+  // final BEGIN without COMMIT/ROLLBACK; a leading defensive ROLLBACK is allowed.
+  const statements = sql
+    .replace(/--.*$/gm, "")
+    .match(/\b(?:begin|start\s+transaction|commit|rollback)\s*;/gi) ?? [];
+  let open = false;
+  for (const statement of statements) {
+    if (/^(begin|start)/i.test(statement.trim())) open = true;
+    else open = false;
+  }
+  return open;
+}
+
+function pathBasename(value: string): string {
+  return value.slice(value.lastIndexOf("/") + 1);
+}

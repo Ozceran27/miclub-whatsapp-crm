@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPostgresPool, closePostgresPool } from "../db/postgres.js";
-import { migrationManifest } from "./migrationManifest.js";
+import { hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 
@@ -15,6 +15,9 @@ const discoveredPaths = [
 ];
 const manifestPaths = migrationManifest.map((entry) => entry.path);
 const migrationNames = manifestPaths.map((migrationPath) => path.basename(migrationPath));
+
+const graphErrors = validateMigrationGraph(migrationManifest);
+if (graphErrors.length > 0) throw new Error(`Grafo de migraciones inválido:\n${graphErrors.join("\n")}`);
 
 const duplicates = migrationNames.filter((name, index) => migrationNames.indexOf(name) !== index);
 if (duplicates.length > 0) throw new Error(`Nombres de migración repetidos: ${[...new Set(duplicates)].join(", ")}`);
@@ -29,6 +32,7 @@ const migrations = await Promise.all(migrationManifest.map(async (migration) => 
   const sql = await readFile(path.join(migrationsDir, migration.path), "utf8");
   const checksum = createHash("sha256").update(sql).digest("hex");
   if (checksum !== migration.sha256) throw new Error(`Checksum no coincide con el manifiesto: ${migration.path}`);
+  if (hasOpenTransaction(sql)) throw new Error(`La migración deja una transacción abierta: ${migration.path}`);
   return { ...migration, name: path.basename(migration.path), sql, checksum };
 }));
 

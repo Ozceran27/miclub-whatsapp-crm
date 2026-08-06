@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { migrationManifest } from "./migrationManifest.js";
+import { hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 
@@ -28,7 +28,26 @@ test("el manifiesto incluye exactamente una vez cada SQL versionado y conserva s
   for (const migration of migrationManifest) {
     const sql = await readFile(path.join(migrationsDir, migration.path), "utf8");
     assert.equal(createHash("sha256").update(sql).digest("hex"), migration.sha256, migration.path);
+    assert.equal(hasOpenTransaction(sql), false, `transacción abierta en ${migration.path}`);
   }
+});
+
+test("el grafo no tiene nombres, timestamps ni dependencias imposibles", () => {
+  assert.deepEqual(validateMigrationGraph(migrationManifest), []);
+});
+
+test("el grafo rechaza una dependencia futura y timestamps nuevos repetidos", () => {
+  const invalid = [
+    { path: "209901010001_consumer.sql", sha256: "x", dependsOn: ["209901010002_provider.sql"], requires: ["miclub.table.future"] },
+    { path: "209901010002_provider.sql", sha256: "y", provides: ["miclub.table.future"] },
+    { path: "nested/209901010002_duplicate.sql", sha256: "z" },
+  ];
+  assert.deepEqual(validateMigrationGraph(invalid), [
+    "Timestamp repetido: 209901010002",
+    "Dependencia imposible: 209901010001_consumer.sql -> 209901010002_provider.sql",
+    "Objeto usado antes de crearse: 209901010001_consumer.sql -> miclub.table.future",
+  ]);
+  assert.equal(hasOpenTransaction("BEGIN; select 1"), true);
 });
 
 test("las fases multitenant preceden a sus vistas y repositorios dependientes", () => {
