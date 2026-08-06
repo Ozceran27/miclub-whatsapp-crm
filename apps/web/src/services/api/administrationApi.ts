@@ -60,3 +60,12 @@ export const getMovementFormCatalogs = async (signal?: AbortSignal) => {
 };
 export const createAdministrationMovement = (input: Record<string,unknown>, idempotencyKey: string) =>
   apiJson<Record<string,unknown>>('/api/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify(input)});
+
+export type EnrollmentCatalogItem={id:string;name:string;status?:string;generatesEnrollments?:boolean};
+export const getEnrollmentFormCatalogs=async(signal?:AbortSignal)=>{const [peopleResponse,activitiesResponse]=await Promise.all([
+  apiJson<{items:Array<{id:string;firstName?:string;lastName?:string;dni?:string}>}>('/api/people?limit=200',{signal}),
+  apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100',{signal})
+]);
+ return {people:peopleResponse.items.map(person=>({id:person.id,name:`${person.firstName??''} ${person.lastName??''}`.trim()+(person.dni?` · DNI ${person.dni}`:'')})),activities:activitiesResponse.items.map(activity=>({id:activity.id,name:activity.name,status:activity.status,generatesEnrollments:activity.generatesEnrollments}))};
+};
+export const createAdministrationEnrollment=(input:Record<string,unknown>)=>apiJson<Record<string,unknown>>('/api/inscripciones',{method:'POST',body:JSON.stringify(input)});
