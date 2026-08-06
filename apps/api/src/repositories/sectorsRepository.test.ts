@@ -66,6 +66,17 @@ test("archiveSector protege nombres reservados y no consulta dependencias", asyn
   assert.equal(queries.some(({ sql }) => sql.includes("miclub.activities")), false);
 });
 
+test("archiveSector protege un sector de sistema aunque su nombre no sea reservado", async () => {
+  const before = { id: "44444444-4444-4444-8444-444444444444", name: "CONFIGURACIÓN INTERNA", is_system: true, updated_at: updatedAt };
+  const queries = fakePool((sql) => {
+    if (sql.includes("from miclub.sectors")) return { rows: [before] };
+    throw new Error(`No debía ejecutar: ${sql}`);
+  });
+
+  assert.deepEqual(await archiveSector(actor, before.id, updatedAt), { kind: "protected" });
+  assert.equal(queries.some(({ sql }) => sql.includes("update miclub.sectors") || sql.includes("audit_log")), false);
+});
+
 test("archiveSector bloquea actividades, movimientos y membresías dependientes", async () => {
   const before = { id: "44444444-4444-4444-8444-444444444444", name: "SALÓN", is_system: false, updated_at: updatedAt };
   fakePool((sql) => {
