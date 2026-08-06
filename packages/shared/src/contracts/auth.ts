@@ -57,6 +57,34 @@ export const PERMISSIONS = {
 
 export type PermissionCode = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 
+/**
+ * Definitive operation-to-permission matrix. Legacy alternatives are temporary
+ * input compatibility only; they must never be used when provisioning a new
+ * membership. Remove them after 2026-11-06 once the migration audit confirms
+ * that every active legacy holder also has each canonical permission.
+ */
+export const AUTHORIZATION_CAPABILITIES = {
+  MOVEMENTS_CREATE: { permission: PERMISSIONS.MOVEMENTS_CREATE },
+  MOVEMENTS_EDIT: { permission: PERMISSIONS.MOVEMENTS_EDIT, legacyPermission: PERMISSIONS.FINANCE_WRITE },
+  MOVEMENTS_CANCEL: { permission: PERMISSIONS.MOVEMENTS_CANCEL, legacyPermission: PERMISSIONS.FINANCE_WRITE },
+  ENROLLMENTS_CREATE: { permission: PERMISSIONS.ENROLLMENTS_CREATE, legacyPermission: PERMISSIONS.CLUB_MANAGE },
+  ENROLLMENTS_EDIT: { permission: PERMISSIONS.ENROLLMENTS_EDIT, legacyPermission: PERMISSIONS.CLUB_MANAGE },
+  ENROLLMENTS_CANCEL: { permission: PERMISSIONS.ENROLLMENTS_CANCEL, legacyPermission: PERMISSIONS.CLUB_MANAGE },
+} as const satisfies Record<string, Readonly<{ permission: PermissionCode; legacyPermission?: PermissionCode }>>;
+
+export type AuthorizationCapability = keyof typeof AUTHORIZATION_CAPABILITIES;
+export const LEGACY_PERMISSION_COMPATIBILITY_ENDS_ON = "2026-11-06" as const;
+
+/** Effective check shared by API guards and UI visibility during the transition. */
+export const hasAuthorizationCapability = (
+  permissions: readonly string[],
+  capability: AuthorizationCapability,
+): boolean => {
+  const rule = AUTHORIZATION_CAPABILITIES[capability];
+  return permissions.includes(rule.permission)
+    || ("legacyPermission" in rule && permissions.includes(rule.legacyPermission));
+};
+
 export const KNOWN_PERMISSIONS: readonly PermissionCode[] = Object.values(PERMISSIONS);
 export type KnownPermission = PermissionCode;
 export type LegacyPermission = LegacyUnknownCode<"permission">;

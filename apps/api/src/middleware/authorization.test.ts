@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
-import { isImportOperator, requireAuth, requireImportOperator, requireMembership, requirePermission, requireRole, requireSectorAccess, rejectClientClubId } from "./authorization.js";
+import { AUTHORIZATION_CAPABILITIES, PERMISSIONS } from "@miclub/shared";
+import { isImportOperator, requireAuth, requireAuthorizationCapability, requireImportOperator, requireMembership, requirePermission, requireRole, requireSectorAccess, rejectClientClubId } from "./authorization.js";
 import type { RequestAuthContext } from "../auth/types.js";
 
 const auth: RequestAuthContext = {
@@ -29,6 +30,21 @@ test("los guards autorizan únicamente el contexto tenant de la sesión", async 
   assert.deepEqual(await request(requireRole("viewer")), { status: 403, next: false });
   assert.deepEqual(await request(requireSectorAccess(), { params: { sectorId: "sector-1" } }), { status: 200, next: true });
   assert.deepEqual(await request(requireSectorAccess(), { params: { sectorId: "sector-2" } }), { status: 403, next: false });
+});
+
+test("cada operación granular permite su permiso canónico o legacy y deniega permisos ajenos", async () => {
+  for (const [capability, rule] of Object.entries(AUTHORIZATION_CAPABILITIES)) {
+    const guard = requireAuthorizationCapability(capability as keyof typeof AUTHORIZATION_CAPABILITIES);
+    assert.deepEqual(await request(guard, { auth: { ...auth, permissions: [rule.permission] } }), { status: 200, next: true }, `${capability}: canonical`);
+    if ("legacyPermission" in rule) {
+      assert.deepEqual(await request(guard, { auth: { ...auth, permissions: [rule.legacyPermission] } }), { status: 200, next: true }, `${capability}: legacy`);
+    }
+    assert.deepEqual(await request(guard, { auth: { ...auth, permissions: [PERMISSIONS.PEOPLE_READ] } }), { status: 403, next: false }, `${capability}: denied`);
+  }
+});
+
+test("el guard de capacidad requiere autenticación", async () => {
+  assert.deepEqual(await request(requireAuthorizationCapability("MOVEMENTS_EDIT"), { auth: undefined }), { status: 401, next: false });
 });
 
 test("clubId nunca se acepta desde el frontend", async () => {

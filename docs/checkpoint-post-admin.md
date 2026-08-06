@@ -47,10 +47,10 @@ Todas las rutas listadas abajo requieren sesión válida, membresía activa, ten
 | Ver solicitudes | `requests.view` |
 | Aprobar / rechazar solicitudes | `requests.approve` / `requests.reject` |
 | Crear movimiento manual | `movements.create` |
-| Editar / anular movimiento | `finance:write` (permiso legacy efectivo del router) |
-| Crear inscripción | `club:manage` (permiso legacy efectivo del router) |
+| Editar / anular movimiento | `movements.edit` / `movements.cancel` |
+| Crear / editar / cancelar inscripción | `enrollments.create` / `enrollments.edit` / `enrollments.cancel` |
 
-`workers.view`, `workers.manage`, `tasks.assign`, `movements.edit`, `movements.cancel` y los permisos `enrollments.*` ya figuran en el contrato compartido, pero no todos tienen hoy una ruta o enforcement homónimo. No conceden por sí solos las operaciones legacy `finance:write` o `club:manage`. Esta diferencia queda como pendiente explícito, no como equivalencia implícita.
+La matriz definitiva vive en `packages/shared/src/contracts/auth.ts`. Hasta el **2026-11-06**, el middleware explícito `requireAuthorizationCapability` acepta también `finance:write` para editar/anular movimientos y `club:manage` para crear/editar/cancelar inscripciones. La migración `202608060007` añade los permisos granulares a titulares activos del legacy sin reemplazar permisos personalizados y revoca sus sesiones. La compatibilidad se retira en una nueva versión cuando una consulta del entorno confirme cero membresías activas con permiso legacy a las que falte cualquiera de sus equivalentes; después de esa fecha, un hallazgo bloquea el despliegue en vez de extender silenciosamente el fallback.
 
 ## Endpoints post-admin
 
@@ -75,9 +75,9 @@ Todos los paths son tenant-scoped. Los GET paginados aceptan `page`/`limit` y s�
 | GET | `/api/requests`, `/api/requests/:id` | `requests.view` |
 | POST | `/api/requests/:id/approve`, `/api/requests/:id/reject` | permiso de decisión correspondiente; sólo handlers seguros |
 | POST | `/api/movements` | `movements.create`; exige `Idempotency-Key` |
-| PATCH | `/api/movements/:id` | `finance:write`; requiere `updatedAt` |
-| POST | `/api/movements/:id/void` | `finance:write`; requiere `updatedAt` y motivo |
-| POST | `/api/inscripciones` | `club:manage`; alta validada y auditada |
+| PATCH | `/api/movements/:id` | `movements.edit`; requiere `updatedAt` |
+| POST | `/api/movements/:id/void` | `movements.cancel`; requiere `updatedAt` y motivo |
+| POST | `/api/inscripciones` | `enrollments.create`; alta validada y auditada |
 
 El inventario completo reconciliado está en [`api-route-inventory.md`](api-route-inventory.md).
 
@@ -129,7 +129,7 @@ Registrar commit, entorno, backup restaurable, salida del ledger SQL, resultado 
 
 ## Pendientes
 
-1. Alinear `finance:write` y `club:manage` con los permisos granulares `movements.*` y `enrollments.*`, incluida migración de membresías y pruebas de compatibilidad.
+1. Retirar el fallback legacy el 2026-11-06 después de auditar que ningún titular activo carece de sus equivalentes granulares.
 2. Aplicar permisos granulares a los GET administrativos que hoy dependen sólo del gate tenant o de `administration.view`.
 3. Implementar UI de edición para sectores, actividades y trabajadores; las fichas actuales son de sólo lectura.
 4. Implementar gestión de categorías, cuotas y socios desde las acciones rápidas.

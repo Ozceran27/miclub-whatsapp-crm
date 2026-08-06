@@ -1,4 +1,4 @@
-import { PERMISSIONS } from "@miclub/shared";
+import { hasAuthorizationCapability, PERMISSIONS, type AuthorizationCapability } from "@miclub/shared";
 import type { Request, RequestHandler } from "express";
 import type { PermissionCode } from "@miclub/shared";
 import type { AuthenticatedContext } from "../auth/types.js";
@@ -21,6 +21,19 @@ export const requireMembership: RequestHandler = (req, res, next) => {
 export const requirePermission = (...permissions: PermissionCode[]): RequestHandler => (req, res, next) => {
   if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
   if (!permissions.every((permission) => req.auth!.permissions.includes(permission))) {
+    return reject(403, "Permiso insuficiente")(req, res, next);
+  }
+  next();
+};
+
+/**
+ * Temporary, centralized compatibility guard for a granular operation. It
+ * accepts its canonical permission or the legacy equivalent declared in the
+ * shared matrix. See LEGACY_PERMISSION_COMPATIBILITY_ENDS_ON in shared/auth.
+ */
+export const requireAuthorizationCapability = (capability: AuthorizationCapability): RequestHandler => (req, res, next) => {
+  if (!req.auth) return reject(401, "Autenticación requerida")(req, res, next);
+  if (!hasAuthorizationCapability(req.auth.permissions, capability)) {
     return reject(403, "Permiso insuficiente")(req, res, next);
   }
   next();

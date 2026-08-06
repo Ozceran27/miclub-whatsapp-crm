@@ -86,11 +86,11 @@ Todas requieren sesión, membresía activa, tenant derivado por el servidor y re
 | GET | `/api/requests`, `/api/requests/:id` | `requests.view` |
 | POST | `/api/requests/:id/approve`, `/api/requests/:id/reject` | `requests.approve` / `requests.reject` |
 | POST | `/api/movements` | `movements.create` |
-| PATCH | `/api/movements/:id` | `finance:write` |
-| POST | `/api/movements/:id/void` | `finance:write` |
-| POST | `/api/inscripciones` | `club:manage` |
+| PATCH | `/api/movements/:id` | `movements.edit` (`finance:write` sólo por compatibilidad temporal) |
+| POST | `/api/movements/:id/void` | `movements.cancel` (`finance:write` sólo por compatibilidad temporal) |
+| POST | `/api/inscripciones` | `enrollments.create` (`club:manage` sólo por compatibilidad temporal) |
 
-Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La diferencia entre los permisos legacy efectivos `finance:write`/`club:manage` y los permisos granulares declarados queda registrada en [`checkpoint-post-admin.md`](checkpoint-post-admin.md).
+Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La compatibilidad legacy está centralizada, vence el 2026-11-06 y su criterio de retiro queda registrado en [`checkpoint-post-admin.md`](checkpoint-post-admin.md); no forma parte del permiso canónico de las rutas.
 
 ## Compatibilidad PostgreSQL y CRM
 
