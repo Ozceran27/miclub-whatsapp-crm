@@ -47,4 +47,5 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202607280002_retention_and_crm_template_archive.sql", sha256: "8727f7a14f6276c8541cf9bc6eef5bbce161e69b91397d78fdc5c062499716cc" },
   { path: "202607290002_reconcile_canceled_sheet_movements.sql", sha256: "6d14defb3b1b18ba7d6046cabbbfb33c7429d49308726e59bd4ee18e17fee6d4" },
   { path: "multitenant/202607290001_scope_sector_settlement_view_by_club.sql", sha256: "d5f1f35b18555b8188a9185ea46ab122a9f83ebabaa0dd950a3dd19669ac9fd3" },
+  { path: "202608060001_activity_mutation_model.sql", sha256: "a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b" },
 ];
