@@ -1,4 +1,4 @@
-import { KNOWN_PERMISSIONS, type PermissionCode } from "@miclub/shared";
+import { KNOWN_PERMISSIONS, KNOWN_ROLES, type PermissionCode } from "@miclub/shared";
 import type { QueryExecutor } from "../db/postgres.js";
 
 type StoredAuthorizationRow = { role: string; permission: string };
@@ -18,11 +18,14 @@ export const diagnosePermissions = async (db: QueryExecutor): Promise<Permission
     select distinct role.code as role, permission
       from miclub.user_club_memberships membership
       join miclub.roles role on role.id = membership.role_id
-      cross join lateral unnest(coalesce(membership.permissions, '{}'::text[])) permission
+     cross join lateral unnest(coalesce(membership.permissions, '{}'::text[])) permission
      where membership.status = 'active'
   `);
   const known = new Set<string>(KNOWN_PERMISSIONS);
-  const granted = new Set(result.rows.map(({ permission }) => permission));
+  const administrativeRoles = new Set<string>(KNOWN_ROLES);
+  const granted = new Set(result.rows
+    .filter(({ role }) => administrativeRoles.has(role))
+    .map(({ permission }) => permission));
 
   return {
     unknownStoredPermissions: [...new Set(result.rows.map(({ permission }) => permission).filter((permission) => !known.has(permission)))].sort(),

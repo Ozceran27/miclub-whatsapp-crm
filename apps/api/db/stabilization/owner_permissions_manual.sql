@@ -9,7 +9,10 @@ WITH canonical(permission) AS (
     ('users:manage'),
     ('imports:run'),
     ('crm:write'),
+    ('crm:read'),
     ('people:read'),
+    ('finance:read'),
+    ('dashboard:read'),
     ('sectors:any'),
     ('administration.view'),
     ('administration.configure'),
@@ -55,7 +58,8 @@ CREATE TEMP TABLE approved_memberships (id uuid PRIMARY KEY) ON COMMIT DROP;
 
 WITH canonical(permission) AS (
   VALUES
-    ('club:manage'), ('users:manage'), ('imports:run'), ('crm:write'), ('people:read'), ('sectors:any'),
+    ('club:manage'), ('users:manage'), ('imports:run'), ('crm:write'), ('crm:read'), ('people:read'),
+    ('finance:read'), ('dashboard:read'), ('sectors:any'),
     ('administration.view'), ('administration.configure'),
     ('sectors.view'), ('sectors.create'), ('sectors.edit'), ('sectors.archive'),
     ('activities.view'), ('activities.create'), ('activities.edit'), ('activities.archive'),
@@ -65,6 +69,11 @@ WITH canonical(permission) AS (
     ('enrollments.view'), ('enrollments.create'), ('enrollments.edit'), ('enrollments.cancel'), ('finance:write')
 )
 UPDATE miclub.user_club_memberships membership
-   SET permissions = ARRAY(SELECT permission FROM canonical), updated_at = now()
+   SET permissions = ARRAY(
+         SELECT DISTINCT permission
+           FROM unnest(coalesce(membership.permissions, '{}'::text[]) ||
+                       ARRAY(SELECT permission FROM canonical)) AS permission
+          ORDER BY permission
+       ), updated_at = now()
  WHERE membership.id IN (SELECT id FROM approved_memberships);
 COMMIT;

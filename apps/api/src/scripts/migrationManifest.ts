@@ -60,6 +60,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608060003_movement_mutation_model.sql", sha256: "1e448a1a46dc0401f89ff105397af8779602dd97e89e3c297033de3558afe628" },
   { path: "202608060004_manual_movement_creation.sql", sha256: "561cb4ca1198dbbb40c37e46aced504e0c5f809b3a4d8458e9c9200a496e28b0" },
   { path: "202608060005_grant_read_permissions.sql", sha256: "03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb" },
+  { path: "202608060006_provision_administrative_permissions.sql", sha256: "77332672f70089e44787361c334bb5975cf2b0490d1b290100f346194561d2f2" },
 ];
 
 /** Duplicate timestamps that predate the manifest policy. Do not extend this set. */
