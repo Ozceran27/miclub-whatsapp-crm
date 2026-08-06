@@ -3117,3 +3117,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .activity-ranking li > span { display: grid; gap: 2px; }
 .activity-ranking li small { color: var(--color-text-muted); }
 .activity-ranking li em { color: var(--color-success); font-style: normal; font-weight: 800; }
+.activity-list__row { cursor: pointer; }
+.activity-list__row:hover td, .activity-list__row:focus-visible td { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
+.activity-list__row:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-accent) 45%, transparent); outline-offset: -3px; }
+.activity-modal__audit code { overflow-wrap: anywhere; }
+.activity-modal__notice { background: color-mix(in srgb, var(--color-accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent); border-radius: 11px; color: var(--color-text-muted); font-size: 13px; margin: 0; padding: 11px 13px; }

@@ -1,4 +1,4 @@
-import type { AdministrationActivitiesResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, EconomySectorRankings } from '@miclub/shared';
+import type { AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -25,3 +25,9 @@ export const getSectorActivities = (sectorId: string, signal?: AbortSignal) =>
 
 export const getSectorMovements = (sectorId: string, signal?: AbortSignal) =>
   apiJson<AdministrationMovementsResponse>(`/api/movimientos?page=1&limit=20&sectorId=${encodeURIComponent(sectorId)}`, { cache: 'no-store', signal });
+
+export const getActivityEnrollments = (activityId: string, signal?: AbortSignal) =>
+  apiJson<AdministrationEnrollmentsResponse>(`/api/inscripciones?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });
+
+export const getActivityMovements = (activityId: string, signal?: AbortSignal) =>
+  apiJson<AdministrationMovementsResponse>(`/api/movimientos?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });
