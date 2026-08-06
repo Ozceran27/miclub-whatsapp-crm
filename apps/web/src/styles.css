@@ -3135,6 +3135,22 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .activity-list__row { cursor: pointer; }
 .activity-list__row:hover td, .activity-list__row:focus-visible td { background: color-mix(in srgb, var(--color-accent) 7%, transparent); }
 .activity-list__row:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-accent) 45%, transparent); outline-offset: -3px; }
+.paginated-list { display: grid; gap: 18px; }
+.paginated-list__total { align-self: center; color: var(--color-accent-2); white-space: nowrap; }
+.paginated-list__filters { align-items: end; display: grid; gap: 12px; grid-template-columns: minmax(220px, 2fr) minmax(170px, 1fr) auto; }
+.paginated-list__filters label { color: var(--color-text-muted); display: grid; font-size: 12px; font-weight: 800; gap: 6px; }
+.paginated-list__filters input, .paginated-list__filters select { min-height: 42px; width: 100%; }
+.paginated-list__table-wrap { border: 1px solid var(--color-border); border-radius: 14px; overflow-x: auto; }
+.paginated-list__table { border-collapse: collapse; min-width: 780px; width: 100%; }
+.paginated-list__table th, .paginated-list__table td { border-bottom: 1px solid var(--color-border); padding: 11px 10px; text-align: left; }
+.paginated-list__table th { background: var(--color-card-muted); color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; }
+.paginated-list__table td { font-size: 13px; }
+.paginated-list__table td small { color: var(--color-text-muted); display: block; margin-top: 3px; }
+.paginated-list__table tbody tr:last-child td { border-bottom: 0; }
+.paginated-list__expense { color: var(--color-danger); }
+.paginated-list__pagination { align-items: center; display: flex; gap: 14px; justify-content: flex-end; }
+.paginated-list__pagination span { color: var(--color-text-muted); font-size: 13px; }
+@media (max-width: 680px) { .paginated-list__filters { grid-template-columns: 1fr; } .paginated-list__pagination { justify-content: space-between; } }
 .activity-modal__audit code { overflow-wrap: anywhere; }
 .activity-modal__notice { background: color-mix(in srgb, var(--color-accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent); border-radius: 11px; color: var(--color-text-muted); font-size: 13px; margin: 0; padding: 11px 13px; }
 .task-panel { display: grid; gap: 18px; }
