@@ -21,7 +21,7 @@ const administrationActions: AdministrationAction[] = [
   { label: 'Gestionar Membresías', description: 'Configurar membresías, planes y condiciones comerciales.', icon: '🎟️' }
 ];
 
-export function AdministrationActions({onCreateMovement,canCreateMovement}:{onCreateMovement:()=>void;canCreateMovement:boolean}) {
+export function AdministrationActions({onCreateMovement,onCreateEnrollment,canCreateMovement,canCreateEnrollment}:{onCreateMovement:()=>void;onCreateEnrollment:()=>void;canCreateMovement:boolean;canCreateEnrollment:boolean}) {
   const feedbackId = useId();
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
 
@@ -47,8 +47,8 @@ export function AdministrationActions({onCreateMovement,canCreateMovement}:{onCr
             aria-label={`${action.label}. ${action.description}`}
             className="administration-action-card"
             key={action.label}
-            onClick={() => action.label==='Cargar Movimiento'?onCreateMovement():handlePreparedAction(action.label)}
-            disabled={action.label==='Cargar Movimiento'&&!canCreateMovement}
+            onClick={() => action.label==='Cargar Movimiento'?onCreateMovement():action.label==='Cargar Inscripción'?onCreateEnrollment():handlePreparedAction(action.label)}
+            disabled={(action.label==='Cargar Movimiento'&&!canCreateMovement)||(action.label==='Cargar Inscripción'&&!canCreateEnrollment)}
             type="button"
           >
             <span className="administration-action-card__icon" aria-hidden="true">{action.icon}</span>
@@ -60,7 +60,7 @@ export function AdministrationActions({onCreateMovement,canCreateMovement}:{onCr
         ))}
       </div>
 
-      {!canCreateMovement&&<p className="administration-actions__feedback">No tenés el permiso movements.create para cargar movimientos.</p>}<p className="administration-actions__feedback" id={feedbackId} role="status" aria-live="polite">
+      {!canCreateMovement&&<p className="administration-actions__feedback">No tenés el permiso movements.create para cargar movimientos.</p>}{!canCreateEnrollment&&<p className="administration-actions__feedback">No tenés el permiso club:manage para cargar inscripciones.</p>}<p className="administration-actions__feedback" id={feedbackId} role="status" aria-live="polite">
         {feedbackMessage}
       </p>
     </section>
