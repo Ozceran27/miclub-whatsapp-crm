@@ -196,8 +196,11 @@ export interface AdministrationWorkerDto {
   dni?: string | null;
   phone?: string | null;
   email?: string | null;
+  employmentEndDate?: string | null;
   sectorIds?: string[];
   activityIds?: string[];
+  activities?: Array<{ id: string; name: string; status: string }>;
+  permissions?: string[];
   role?: string | null;
   sector?: string | null;
   salary?: number | null;
@@ -207,6 +210,12 @@ export interface AdministrationWorkerDto {
   isActive: boolean;
   openTasks?: number;
   notes?: string | null;
+  roleGuard?: {
+    isDirector: boolean;
+    activeDirectorCount: number;
+    canRemoveDirectorRole: boolean;
+    reason?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
