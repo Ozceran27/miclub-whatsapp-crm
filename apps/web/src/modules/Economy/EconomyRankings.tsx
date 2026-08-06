@@ -59,7 +59,7 @@ function RankingCard({ title, subtitle, items, accent }: RankingCardProps) {
           </div>
           <ol className="economy-ranking-list economy-ranking-list--compact">
             {items.map((item, index) => {
-              const sectorMeta = getSectorVisualMeta(item.name);
+              const sectorMeta = getSectorVisualMeta();
 
               return (
                 <li className={`economy-ranking-item economy-ranking-item--${sectorMeta.accent}`} key={`${item.id ?? item.name}-${index}`}>

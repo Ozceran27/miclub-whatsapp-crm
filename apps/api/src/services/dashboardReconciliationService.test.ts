@@ -35,6 +35,7 @@ const financeSummary = (overrides: Partial<ClubOperationsSummary> = {}): ClubOpe
 });
 
 const sectorSummary = (overrides: Partial<SectorOperationalSummary> = {}): SectorOperationalSummary => ({
+  sectors: [],
   fitness: {
     totalMembers: 0,
     activeMembers: 0,

@@ -59,7 +59,8 @@ export type SectorCardConfig = {
   moduleId: ModuleId;
   subtitle: string;
   icon: string;
-  accent: 'fitness' | 'salon' | 'aula' | 'local1' | 'cantina' | 'crm';
+  accent: 'default';
+  color?: string;
   mainMetric: SectorMetric;
   secondaryMetrics: SectorMetric[];
   featuredMetric?: SectorFeaturedMetric;
@@ -128,25 +129,29 @@ export function useHomeDashboard() {
     const expenseBySectorLines: FinancialLine[] = financeSummary?.expenseBySector.length ? financeSummary.expenseBySector.map((item, index) => ({ id: `expense-${item.name}`, label: item.name, value: formatArPeso(item.amount), highlight: index === 0 ? 'negativeCritical' : undefined, iconAfter: index === 0 ? '🔻' : undefined })) : [{ id: 'expense-unavailable', label: 'Egresos', value: unavailableLabel }];
     const formatOptionalNumber = (value: number | null | undefined) => isFiniteNumber(value) ? value.toLocaleString('es-AR') : '—';
     const formatOptionalMoney = (value: number | null | undefined) => isFiniteNumber(value) ? formatArPeso(value) : '—';
-    const formatOptionalPercent = (value: number | null | undefined) => isFiniteNumber(value) ? new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 2 }).format(value > 1 ? value / 100 : value) : '—';
-    const pendingMetricLabel = '— · pendiente de cálculo';
-    const unavailableMetricTitle = 'Métrica pendiente de cálculo en PostgreSQL';
-    const isSectorMetricUnavailable = (path: string) => sectorSummary?.metadata?.sourceCompleteness?.[path]?.status === 'unavailable';
-    const formatSectorMoney = (path: string, value: number | null | undefined) => isSectorMetricUnavailable(path) ? pendingMetricLabel : formatOptionalMoney(value);
-    const formatSectorPercent = (path: string, value: number | null | undefined) => isSectorMetricUnavailable(path) ? pendingMetricLabel : formatOptionalPercent(value);
-    const pendingMetricProps = (path: string) => isSectorMetricUnavailable(path) ? { className: 'area-card__metric--pending', title: unavailableMetricTitle } : {};
-    const formatArDate = (value?: string) => { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-AR'); };
-    const formatActivityHighlight = (name?: string, count?: number, featured = false) => name ? `${featured ? '⭐ ' : ''}${name} · ${formatOptionalNumber(count)}` : '—';
     const currentMonthProfitabilityLabel = `RENTABILIDAD ${getCurrentSpanishMonthUpper()}`;
-    const highlightedLocalIncome = sectorSummary?.local1.highlightedIncome;
-    const sectorCards: SectorCardConfig[] = [
-      { key: 'fitness', title: 'Espacio Fitness', moduleId: 'fitness', subtitle: 'Membresías y liquidación', icon: getSectorVisualMeta('Espacio Fitness').icon, accent: 'fitness', mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('fitness.totalProfitability', sectorSummary?.fitness.totalProfitability), ...pendingMetricProps('fitness.totalProfitability') }, secondaryMetrics: [{ label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.fitness.totalMembers) }, { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.fitness.activeMembers) }, { label: 'ADEUDADOS', value: formatOptionalNumber(sectorSummary?.fitness.totalDebtors) }, { label: 'MONTO ADEUDADOS', value: formatOptionalMoney(sectorSummary?.fitness.totalDebtAmount) }, { label: currentMonthProfitabilityLabel, value: formatSectorMoney('fitness.currentMonthProfitability', sectorSummary?.fitness.currentMonthProfitability), ...pendingMetricProps('fitness.currentMonthProfitability') }, { label: 'SALDO A LIQUIDAR', value: formatSectorMoney('fitness.settlementBalance', sectorSummary?.fitness.settlementBalance), ...pendingMetricProps('fitness.settlementBalance') }] },
-      { key: 'local1', title: 'Local 1', moduleId: 'local1', subtitle: 'Ingresos relevantes', icon: getSectorVisualMeta('Local 1').icon, accent: 'local1', mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('local1.totalProfitability', sectorSummary?.local1.totalProfitability), ...pendingMetricProps('local1.totalProfitability') }, secondaryMetrics: [{ label: 'TOTAL VENTAS', value: formatOptionalNumber(sectorSummary?.local1.totalRelevantIncomeMovements) }, { label: 'Últ. 30 días', value: formatOptionalNumber(sectorSummary?.local1.last30DaysRelevantIncomeMovements) }, { label: currentMonthProfitabilityLabel, value: formatSectorMoney('local1.currentMonthProfitability', sectorSummary?.local1.currentMonthProfitability), ...pendingMetricProps('local1.currentMonthProfitability') }, { label: 'SALDO A LIQUIDAR', value: formatSectorMoney('local1.settlementBalance', sectorSummary?.local1.settlementBalance), ...pendingMetricProps('local1.settlementBalance') }], featuredMetric: highlightedLocalIncome ? { label: 'Ingreso destacado', value: formatOptionalMoney(highlightedLocalIncome.amount), detail: `${highlightedLocalIncome.concept} · ${formatArDate(highlightedLocalIncome.date)}` } : { label: 'Ingreso destacado', value: '—' } },
-      { key: 'salon', title: 'Salón', moduleId: 'salon', subtitle: 'Actividades EC', icon: getSectorVisualMeta('Salón').icon, accent: 'salon', mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('salon.totalProfitability', sectorSummary?.salon.totalProfitability), ...pendingMetricProps('salon.totalProfitability') }, secondaryMetrics: [{ label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.salon.totalMembers) }, { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.salon.activeMembers) }, { label: currentMonthProfitabilityLabel, value: formatSectorMoney('salon.currentMonthProfitability', sectorSummary?.salon.currentMonthProfitability), ...pendingMetricProps('salon.currentMonthProfitability') }, { label: 'MENOS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.leastPopularActivity?.name, sectorSummary?.salon.leastPopularActivity?.members), className: 'area-card__metric--subtle-alert' }], featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.salon.mostPopularActivity?.name, sectorSummary?.salon.mostPopularActivity?.members, true) } },
-      { key: 'aula', title: 'Aula', moduleId: 'aula', subtitle: 'Talleres y comisiones', icon: getSectorVisualMeta('Aula').icon, accent: 'aula', mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatSectorMoney('aula.totalProfitability', sectorSummary?.aula.totalProfitability), ...pendingMetricProps('aula.totalProfitability') }, secondaryMetrics: [{ label: 'INSCRIPTOS', value: formatOptionalNumber(sectorSummary?.aula.totalMembers) }, { label: 'ACTIVOS', value: formatOptionalNumber(sectorSummary?.aula.activeMembers) }, { label: currentMonthProfitabilityLabel, value: formatSectorMoney('aula.currentMonthProfitability', sectorSummary?.aula.currentMonthProfitability), ...pendingMetricProps('aula.currentMonthProfitability') }, { label: 'Comisión prom.', value: formatSectorPercent('aula.averageCommission', sectorSummary?.aula.averageCommission), ...pendingMetricProps('aula.averageCommission') }], featuredMetric: { label: 'MÁS POPULAR', value: formatActivityHighlight(sectorSummary?.aula.mostPopularActivity?.name, sectorSummary?.aula.mostPopularActivity?.members, true) } },
-      { key: 'cantina', title: 'Cantina', moduleId: 'cantina', subtitle: 'Ventas y CMV', icon: getSectorVisualMeta('Cantina').icon, accent: 'cantina', mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sectorSummary?.cantina.totalProfitability) }, secondaryMetrics: [{ label: 'KIOSCO', value: formatOptionalMoney(sectorSummary?.cantina.kioskIncome) }, { label: 'BEBIDAS', value: formatOptionalMoney(sectorSummary?.cantina.drinksIncome) }, { label: 'CMV', value: formatOptionalMoney(sectorSummary?.cantina.cmv) }] },
-      { key: 'crm', title: 'CRM', moduleId: 'crm', subtitle: 'Inscriptos y cobranzas', icon: getSectorVisualMeta('CRM').icon, accent: 'crm', mainMetric: { label: 'Inscriptos', value: formatOptionalNumber(sectorSummary?.crm.totalMembers) }, secondaryMetrics: [{ label: 'Activos', value: formatOptionalNumber(sectorSummary?.crm.activeMembers) }, { label: 'Adeudados', value: formatOptionalNumber(sectorSummary?.crm.totalDebtors) }, { label: 'Monto adeudado', value: formatOptionalMoney(sectorSummary?.crm.totalDebtAmount) }] }
-    ];
+    const sectorCards: SectorCardConfig[] = (sectorSummary?.sectors ?? []).map((sector) => {
+      const visual = getSectorVisualMeta(sector);
+      return {
+        key: sector.id,
+        title: sector.name,
+        moduleId: 'administration',
+        subtitle: sector.code,
+        icon: visual.icon,
+        accent: visual.accent,
+        color: visual.color,
+        mainMetric: { label: 'RENTABILIDAD TOTAL', value: formatOptionalMoney(sector.totalProfitability) },
+        secondaryMetrics: [
+          { label: 'INSCRIPTOS', value: formatOptionalNumber(sector.totalMembers) },
+          { label: 'ACTIVOS', value: formatOptionalNumber(sector.activeMembers) },
+          { label: 'ADEUDADOS', value: formatOptionalNumber(sector.totalDebtors) },
+          { label: 'MONTO ADEUDADO', value: formatOptionalMoney(sector.totalDebtAmount) },
+          { label: currentMonthProfitabilityLabel, value: formatOptionalMoney(sector.currentMonthProfitability) },
+          { label: 'SALDO A LIQUIDAR', value: formatOptionalMoney(sector.settlementBalance) },
+        ],
+        ...(sector.mostPopularActivity ? { featuredMetric: { label: 'MÁS POPULAR', value: `${sector.mostPopularActivity.name} · ${formatOptionalNumber(sector.mostPopularActivity.members)}` } } : {}),
+      };
+    });
     return { loading, error, financeError, sectorError, syncStatus, syncBadgeLabel: syncLabel, lastSyncLabel: `Última sync: ${formatDateTime(syncStatus?.lastSyncAt)}`, loadHome, enrollmentStats, weightedAverageFeeLabel: weightedAverageFee === undefined ? '—' : formatArPeso(weightedAverageFee), mainDebtorBreakdown, remainingDebtorActivities: Math.max(debtorBreakdown.length - mainDebtorBreakdown.length, 0), totalDebtors: debtorBreakdown.reduce((total, item) => total + item.count, 0), maxDebtorActivityCount: mainDebtorBreakdown[0]?.count ?? 0, mainActiveActivityBreakdown, remainingActiveActivities: Math.max(activeActivityBreakdown.length - mainActiveActivityBreakdown.length, 0), maxActiveActivityCount: mainActiveActivityBreakdown[0]?.count ?? 0, financialSummaryLines, operationalBalanceLines, incomeBySectorLines, expenseBySectorLines, financeSummary, sectorCards };
   }, [debtors, error, financeError, financeSummary, loading, members, sectorError, sectorSummary, summary, syncStatus]);
 }
