@@ -1,4 +1,3 @@
-import { PERMISSIONS } from "@miclub/shared";
 import { AdministrationActions } from './Administration/AdministrationActions';
 import { AdministrationHeaderCards } from './Administration/AdministrationHeaderCards';
 import { useAdministrationSummary } from './Administration/useAdministrationSummary';
@@ -14,10 +13,16 @@ import { MovementCreateModal } from './Administration/MovementCreateModal';
 import { EnrollmentCreateModal } from './Administration/EnrollmentCreateModal';
 import { useSession } from '../session';
 import { useState } from 'react';
+import { getAdministrationCapabilities, type AdministrationCapability } from '../administrationCapabilities';
+
+function UnavailableSurface({ capability, title }: { capability: AdministrationCapability; title: string }) {
+  return <section className="section-panel" data-capability={capability}><p className="eyebrow">{title}</p><h3>Contenido no disponible</h3><p>Tu membresía no permite consultar este recurso. Si necesitás acceso, contactá a una persona administradora del club.</p></section>;
+}
 
 export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
-  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false); const canCreate=session.permissions.includes(PERMISSIONS.MOVEMENTS_CREATE),canCreateEnrollment=session.permissions.includes(PERMISSIONS.CLUB_MANAGE);
+  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false);
+  const capabilities = getAdministrationCapabilities(session.permissions);
 
   return (
     <main className="module-content">
@@ -59,18 +64,18 @@ export default function AdministrationModule() {
       {dashboard.summary && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero administrativo del club">
           <AdministrationHeaderCards summary={dashboard.summary} />
-          <AdministrationActions onCreateMovement={()=>setMovementOpen(true)} onCreateEnrollment={()=>setEnrollmentOpen(true)} canCreateMovement={canCreate} canCreateEnrollment={canCreateEnrollment}/>
+          <AdministrationActions onCreateMovement={()=>setMovementOpen(true)} onCreateEnrollment={()=>setEnrollmentOpen(true)} canCreateMovement={capabilities.createMovement} canCreateEnrollment={capabilities.createEnrollment}/>
         </section>
       )}
-      <SectorList />
-      <ActivityList />
-      <EnrollmentList />
-      <MovementList />
-      <WorkerList />
-      <TaskPanel />
-      <RequestPanel />
-      <MovementCreateModal open={movementOpen} onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>
-      <EnrollmentCreateModal open={enrollmentOpen} onClose={()=>setEnrollmentOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>
+      {capabilities.sectors ? <SectorList /> : <UnavailableSurface capability="sectors" title="Sectores" />}
+      {capabilities.activities ? <ActivityList canViewFinancials={capabilities.activityFinancials} /> : <UnavailableSurface capability="activities" title="Actividades" />}
+      {capabilities.enrollments ? <EnrollmentList /> : <UnavailableSurface capability="enrollments" title="Inscripciones" />}
+      {capabilities.movements ? <MovementList /> : <UnavailableSurface capability="movements" title="Movimientos" />}
+      {capabilities.workers ? <WorkerList /> : <UnavailableSurface capability="workers" title="Trabajadores" />}
+      {capabilities.tasks ? <TaskPanel canCreate={capabilities.createTask} canEdit={capabilities.editTask} /> : <UnavailableSurface capability="tasks" title="Tareas" />}
+      {capabilities.requests ? <RequestPanel canApprove={capabilities.approveRequest} canReject={capabilities.rejectRequest} /> : <UnavailableSurface capability="requests" title="Solicitudes" />}
+      {capabilities.createMovement && <MovementCreateModal open={movementOpen} onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
+      {capabilities.createEnrollment && <EnrollmentCreateModal open={enrollmentOpen} onClose={()=>setEnrollmentOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
     </main>
   );
 }
