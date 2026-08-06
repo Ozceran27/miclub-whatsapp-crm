@@ -76,6 +76,84 @@ FROM information_schema.tables t LEFT JOIN information_schema.columns c
  ON c.table_schema=t.table_schema AND c.table_name=t.table_name AND c.column_name='club_id'
 WHERE t.table_schema='miclub' AND t.table_type='BASE TABLE' ORDER BY t.table_name;
 
+-- Canonical inventory.  INDIRECT TENANT tables belong to a tenant through their
+-- parent and must acquire club_id before RLS can be approved.  A row returned by
+-- either of the following two queries is an approval blocker.
+WITH inventory(table_name,scope,area) AS (VALUES
+ ('activities','TENANT','catalog'),('activity_fee_cleanup_candidates','TENANT','audit'),
+ ('activity_fee_history','TENANT','audit'),('activity_schedules','INDIRECT TENANT','catalog'),
+ ('approval_requests','TENANT','requests'),('audit_log','TENANT','audit'),
+ ('club_memberships','TENANT','membership'),('crm_message_history','TENANT','crm'),
+ ('crm_message_templates','TENANT','crm'),('discount_rates','TENANT','catalog'),
+ ('employees','TENANT','workers'),('enrollment_fee_audit','TENANT','audit'),
+ ('enrollments','TENANT','operations'),('import_batches','TENANT','imports'),
+ ('import_errors','TENANT','imports'),('instructors','TENANT','catalog'),
+ ('movement_categories','TENANT','catalog'),('movements','TENANT','operations'),
+ ('operational_balances','TENANT','operations'),('payment_allocations','TENANT','operations'),
+ ('payment_methods','TENANT','catalog'),('payments','TENANT','operations'),
+ ('people','TENANT','crm'),('person_kind_links','TENANT','crm'),
+ ('receivables','TENANT','operations'),('roles','TENANT','authorization'),
+ ('salon_hour_prices','TENANT','catalog'),('sector_settlements','INDIRECT TENANT','operations'),
+ ('sectors','TENANT','catalog'),('sheet_metric_snapshots','TENANT','imports'),
+ ('tasks','TENANT','tasks'),('user_club_memberships','TENANT','authorization'),
+ ('app_sessions','GLOBAL','authorization'),('clubs','GLOBAL','catalog'),
+ ('currencies','GLOBAL','catalog'),('import_amount_normalization_rules','GLOBAL','imports'),
+ ('rate_limit_buckets','GLOBAL','security'),('system_months','GLOBAL','catalog'),
+ ('users','GLOBAL','authorization')
+), actual AS (
+ SELECT t.table_name,CASE WHEN c.column_name IS NULL THEN false ELSE true END has_club_id,
+        c.is_nullable
+ FROM information_schema.tables t LEFT JOIN information_schema.columns c
+ ON c.table_schema=t.table_schema AND c.table_name=t.table_name AND c.column_name='club_id'
+ WHERE t.table_schema='miclub' AND t.table_type='BASE TABLE'
+)
+SELECT i.*,a.has_club_id,a.is_nullable,
+ CASE WHEN a.table_name IS NULL THEN 'MISSING TABLE'
+      WHEN i.scope IN ('TENANT','INDIRECT TENANT') AND NOT a.has_club_id THEN 'BLOCK: club_id missing'
+      WHEN i.scope='TENANT' AND a.is_nullable='YES' THEN 'BLOCK: club_id nullable'
+      WHEN i.scope='GLOBAL' AND a.has_club_id THEN 'BLOCK: inventory mismatch'
+      ELSE 'OK' END decision
+FROM inventory i LEFT JOIN actual a USING(table_name)
+UNION ALL
+SELECT a.table_name,'UNCLASSIFIED','unknown',a.has_club_id,a.is_nullable,'BLOCK: classify table'
+FROM actual a WHERE NOT EXISTS (SELECT FROM inventory i WHERE i.table_name=a.table_name)
+ORDER BY 2,1;
+
+-- Existing RLS and policies.  relrowsecurity=false, relforcerowsecurity=false,
+-- no policy, a permissive role target, or an expression other than app.club_id
+-- must be reviewed before approval. FORCE is required because the dump owner is
+-- also currently miclub_app and table owners otherwise bypass RLS.
+SELECT c.relname AS table_name,c.relowner::regrole AS owner,c.relrowsecurity AS rls_enabled,
+       c.relforcerowsecurity AS rls_forced,p.polname,p.polpermissive,
+       CASE WHEN p.polroles='{0}' THEN 'PUBLIC' ELSE
+         array_to_string(ARRAY(SELECT r.rolname FROM pg_roles r WHERE r.oid=ANY(p.polroles)),',') END roles,
+       pg_get_expr(p.polqual,p.polrelid) AS using_expression,
+       pg_get_expr(p.polwithcheck,p.polrelid) AS check_expression
+FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+LEFT JOIN pg_policy p ON p.polrelid=c.oid
+WHERE n.nspname='miclub' AND c.relkind IN ('r','p') ORDER BY 1,6;
+
+-- Every FK between two club_id-bearing tables must carry club_id on both sides.
+-- Any row is a cross-tenant association vulnerability, even when current data is clean.
+SELECT child.relname AS child_table,con.conname,pg_get_constraintdef(con.oid,true) definition,
+       parent.relname AS parent_table
+FROM pg_constraint con JOIN pg_class child ON child.oid=con.conrelid
+JOIN pg_class parent ON parent.oid=con.confrelid JOIN pg_namespace n ON n.oid=child.relnamespace
+WHERE con.contype='f' AND n.nspname='miclub'
+  AND EXISTS (SELECT FROM pg_attribute WHERE attrelid=child.oid AND attname='club_id' AND NOT attisdropped)
+  AND EXISTS (SELECT FROM pg_attribute WHERE attrelid=parent.oid AND attname='club_id' AND NOT attisdropped)
+  AND NOT EXISTS (SELECT FROM unnest(con.conkey) k JOIN pg_attribute a ON a.attrelid=child.oid AND a.attnum=k WHERE a.attname='club_id')
+ORDER BY 1,2;
+
+-- Role separation gate: runtime and workers must not own tables or bypass RLS;
+-- backfill is the only expected BYPASSRLS role and must not be used by the API.
+SELECT r.rolname,r.rolcanlogin,r.rolsuper,r.rolbypassrls,
+       count(c.oid) FILTER (WHERE n.nspname='miclub') AS owned_miclub_relations
+FROM pg_roles r LEFT JOIN pg_class c ON c.relowner=r.oid
+LEFT JOIN pg_namespace n ON n.oid=c.relnamespace
+WHERE r.rolname IN ('miclub_runtime','miclub_worker','miclub_operations','miclub_backfill')
+GROUP BY r.oid,r.rolname,r.rolcanlogin,r.rolsuper,r.rolbypassrls ORDER BY 1;
+
 SELECT 'activities' table_name,count(*) FILTER (WHERE club_id IS NULL) null_club FROM miclub.activities
 UNION ALL SELECT 'enrollments',count(*) FILTER (WHERE club_id IS NULL) FROM miclub.enrollments
 UNION ALL SELECT 'movements',count(*) FILTER (WHERE club_id IS NULL) FROM miclub.movements

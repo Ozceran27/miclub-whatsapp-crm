@@ -19,3 +19,18 @@ export const withTransaction = async <T>(
     client.release();
   }
 };
+
+/**
+ * Transaction boundary for queries executed as an RLS-protected application role.
+ * Repositories must keep their explicit club_id predicates: this setting is a
+ * second, database-enforced boundary and is intentionally transaction-local.
+ */
+export const withTenantTransaction = async <T>(
+  clubId: string,
+  callback: (executor: QueryExecutor) => Promise<T>,
+  pool?: Pick<PgPool, "connect">,
+): Promise<T> => withTransaction(async (executor) => {
+  // set_config with true is SET LOCAL while keeping the value parameterized.
+  await executor.query("SELECT set_config('app.club_id', $1, true)", [clubId]);
+  return callback(executor);
+}, pool);
