@@ -58,11 +58,15 @@ const listDefinitions = {
     }
   },
   actividades: {
-    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id",
+    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id",
     clubColumn: "a.club_id",
-    select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id, a.instructor_id,
+    select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
+      nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name, a.instructor_id,
       i.display_name as instructor_name, a.code, a.name, a.modality, a.color, a.monthly_fee,
       a.club_commission_percent, a.instructor_commission_percent, a.max_capacity,
+      a.settlement_mode, a.settlement_fixed_amount, a.generates_enrollments,
+      (select count(*)::integer from miclub.enrollments e where e.club_id = a.club_id
+        and e.activity_id = a.id and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as current_enrollments,
       a.status, a.notes, a.created_at, a.updated_at`,
     orderBy: "a.name asc, a.id asc",
     filters: {

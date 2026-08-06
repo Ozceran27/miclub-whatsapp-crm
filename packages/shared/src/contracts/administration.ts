@@ -165,6 +165,7 @@ export interface AdministrationActivityDto {
   managerPersonId?: string | null;
   instructorId?: string | null;
   instructorName?: string | null;
+  managerName?: string | null;
   code?: string | null;
   name: string;
   modality?: string | null;
@@ -172,6 +173,9 @@ export interface AdministrationActivityDto {
   monthlyFee: number;
   clubCommissionPercent: number;
   instructorCommissionPercent: number;
+  settlementMode?: string | null;
+  settlementFixedAmount?: number | null;
+  generatesEnrollments: boolean;
   maxCapacity?: number | null;
   currentEnrollments?: number | null;
   occupancyRate?: number | null;
