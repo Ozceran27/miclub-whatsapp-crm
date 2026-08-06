@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@miclub/shared": "0.1.0",

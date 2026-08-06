@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # `npm install` also validates and refreshes the lock when analysis tooling
+      # versions are intentionally upgraded in the same pull request.
+      - run: npm install
+      - run: npm run lint -ws
+      - run: npm run deadcode
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test -ws --if-present
