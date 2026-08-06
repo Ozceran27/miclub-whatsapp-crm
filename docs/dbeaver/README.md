@@ -27,6 +27,12 @@ que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 5. Reconectar la aplicación para forzar un login nuevo y ejecutar
    `03_final_validation_readonly.sql`. Todas las filas deben mostrar `PASS`.
 
+## Scripts administrativos post-admin
+
+Los archivos de `administration/` son diagnósticos y remediaciones **manuales para instalaciones legacy**. Su presencia en Git no demuestra que hayan sido ejecutados y no reemplazan `npm run db:migrate`. El estado, orden de migraciones versionadas y evidencia exigida se documentan en [`../checkpoint-post-admin.md`](../checkpoint-post-admin.md).
+
+Antes de ejecutar uno, registrar backup, entorno, operador y checksum. Ejecutar primero `administration/01_admin_schema_diagnostic_readonly.sql`; no aplicar DDL manual si el objeto equivalente ya existe por migración. `administration/99_admin_rollback_manual.sql` sólo revierte objetos manuales vacíos, no el ledger de migraciones ni datos productivos.
+
 ## Errores corregidos
 
 - `min(uuid)` no existe en PostgreSQL: el backfill ahora cuenta candidatos sin

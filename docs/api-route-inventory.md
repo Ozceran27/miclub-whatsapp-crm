@@ -1,6 +1,6 @@
 # Inventario de rutas API
 
-**Generado y reconciliado:** 2026-07-28 a partir de los `Router` montados en `apps/api/src/index.ts`. Se inventarían rutas HTTP de API, no el fallback SPA de `frontendRoutes.ts`.
+**Generado y reconciliado:** 2026-08-06 a partir de los `Router` montados en `apps/api/src/index.ts`. Se inventarían rutas HTTP de API, no el fallback SPA de `frontendRoutes.ts`.
 
 ## Convenciones de acceso
 
@@ -67,6 +67,30 @@ Todas requieren sesión + tenant.
 | `/api/economy` | `/api/economy/summary`, `/api/economy/monthly-evolution`, `/api/economy/by-sector`, `/api/economy/sector-rankings` | `economyRoutes.ts` |
 | `/api/economy` | `/api/economy/by-category`, `/api/economy/payment-methods`, `/api/economy/recent-movements`, `/api/economy/pending` | `economyRoutes.ts` |
 | `/api/economy` | `/api/economy/annual-summary`, `/api/economy/yearly-breakdown`, `/api/economy/comparison`, `/api/economy/insights` | `economyRoutes.ts` |
+
+## Administración y mutaciones operativas
+
+Todas requieren sesión, membresía activa, tenant derivado por el servidor y rechazo de `clubId` enviado por el cliente. `updatedAt` es obligatorio en mutaciones con control optimista; crear un movimiento requiere además `Idempotency-Key`.
+
+| Método | Path | Permiso efectivo |
+| --- | --- | --- |
+| GET | `/api/administration`, `/api/administration/summary`, `/api/administration/workers` | `administration.view` |
+| PATCH | `/api/sectors/:id`, `/api/sectors/:id/status` | `sectors.edit` + acceso al sector |
+| POST | `/api/sectors/:id/archive` | `sectors.archive` + acceso al sector |
+| POST | `/api/activities` | `activities.create` + acceso al sector |
+| PATCH | `/api/activities/:id`, `/api/activities/:id/status` | `activities.edit` + acceso al sector |
+| POST | `/api/activities/:id/archive` | `activities.archive` + acceso al sector |
+| GET / POST | `/api/tasks` | `tasks.view` / `tasks.create` |
+| PATCH | `/api/tasks/:id`, `/api/tasks/:id/status` | `tasks.edit` |
+| POST | `/api/tasks/:id/archive` | `tasks.edit` |
+| GET | `/api/requests`, `/api/requests/:id` | `requests.view` |
+| POST | `/api/requests/:id/approve`, `/api/requests/:id/reject` | `requests.approve` / `requests.reject` |
+| POST | `/api/movements` | `movements.create` |
+| PATCH | `/api/movements/:id` | `finance:write` |
+| POST | `/api/movements/:id/void` | `finance:write` |
+| POST | `/api/inscripciones` | `club:manage` |
+
+Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La diferencia entre los permisos legacy efectivos `finance:write`/`club:manage` y los permisos granulares declarados queda registrada en [`checkpoint-post-admin.md`](checkpoint-post-admin.md).
 
 ## Compatibilidad PostgreSQL y CRM
 
