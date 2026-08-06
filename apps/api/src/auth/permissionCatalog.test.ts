@@ -3,7 +3,14 @@ import test from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KNOWN_PERMISSIONS, PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, ROLE_PERMISSION_MATRIX } from "@miclub/shared";
+import {
+  FUTURE_ROLE_DEFAULT_PERMISSIONS,
+  KNOWN_PERMISSIONS,
+  PERMISSIONS,
+  ROLE_DEFAULT_PERMISSIONS,
+  ROLE_PERMISSION_MATRIX,
+  SECTOR_OPERATOR_PERMISSIONS,
+} from "@miclub/shared";
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -11,7 +18,7 @@ test("el inventario estático de rutas no contiene permisos huérfanos", async (
   const routeDir = path.join(apiRoot, "src/routes");
   const files = (await readdir(routeDir)).filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"));
   const permissionConstants = PERMISSIONS as Record<string, string>;
-  const granted = new Set<string>(ROLE_PERMISSION_MATRIX.flatMap(({ permissions }) => permissions));
+  const grantsByRole = ROLE_PERMISSION_MATRIX.map(({ role, permissions }) => ({ role, granted: new Set<string>(permissions) }));
   let requirements = 0;
   for (const file of files) {
     const source = await readFile(path.join(routeDir, file), "utf8");
@@ -19,10 +26,19 @@ test("el inventario estático de rutas no contiene permisos huérfanos", async (
       requirements += 1;
       const permission = permissionConstants[match[1]];
       assert.ok(permission, `${file} referencia la constante de permiso desconocida ${match[1]}`);
-      assert.ok(granted.has(permission), `${file} exige ${permission}, pero ningún rol esperado lo recibe`);
+      for (const { role, granted } of grantsByRole) {
+        assert.ok(granted.has(permission), `${file} exige ${permission}, pero ${role} no lo recibe`);
+      }
     }
   }
   assert.ok(requirements > 0, "el inventario debe encontrar rutas protegidas");
+});
+
+test("operadores sectoriales y roles futuros siguen una política de privilegio mínimo", () => {
+  assert.ok(SECTOR_OPERATOR_PERMISSIONS.length > 0);
+  assert.ok(!SECTOR_OPERATOR_PERMISSIONS.includes(PERMISSIONS.SECTORS_ANY as never));
+  assert.ok(!SECTOR_OPERATOR_PERMISSIONS.includes(PERMISSIONS.ADMINISTRATION_CONFIGURE as never));
+  assert.deepEqual(FUTURE_ROLE_DEFAULT_PERMISSIONS, []);
 });
 
 test("las migraciones y el SQL manual no introducen permisos fuera del catálogo", async () => {
@@ -43,4 +59,5 @@ test("las migraciones y el SQL manual no introducen permisos fuera del catálogo
   assert.ok(marker, "el SQL manual debe publicar su matriz canónica");
   assert.deepEqual(JSON.parse(marker[1]), [...ROLE_DEFAULT_PERMISSIONS.owner]);
   assert.deepEqual(ROLE_PERMISSION_MATRIX.find(({ role }) => role === "owner")?.permissions, ROLE_DEFAULT_PERMISSIONS.owner);
+  assert.match(manualSql, /UPDATE miclub\.user_club_memberships AS membership\s+SET permissions/s);
 });
