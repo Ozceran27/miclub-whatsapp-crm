@@ -79,6 +79,7 @@ export const protectedApiPrefixes = [
   "/api/inscripciones",
   "/api/sectors",
   "/api/activities",
+  "/api/tasks",
   "/api/instructors",
   "/api/movement-categories",
   "/api/payment-methods",
