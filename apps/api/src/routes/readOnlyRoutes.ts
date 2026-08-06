@@ -3,6 +3,8 @@ import { getReadOnlyPage, type ReadOnlyResource } from "../repositories/readOnly
 import { normalizeCatalogRow } from "../services/catalogService.js";
 import asyncHandler from "./asyncHandler.js";
 import { parseListQuery } from "./listQuery.js";
+import { requirePermission } from "../middleware/authorization.js";
+import type { KnownPermission } from "@miclub/shared";
 
 const router = Router();
 
@@ -14,13 +16,19 @@ const filtersByResource = {
   inscripciones: ["search", "status", "sectorId", "activityId", "dueFrom", "dueTo"]
 } as const satisfies Record<ReadOnlyResource, readonly string[]>;
 
+const permissionsByResource = {
+  sectores: "sectors.view", actividades: "activities.view", trabajadores: "workers.view",
+  movimientos: "finance:read", inscripciones: "enrollments.view"
+} as const satisfies Record<ReadOnlyResource, KnownPermission>;
+
 const createReadOnlyHandler = (resource: ReadOnlyResource) => asyncHandler(async (req, res) => {
   const query = parseListQuery(req, filtersByResource[resource], { defaultLimit: 20, maxLimit: 100 });
   const { rows, total } = await getReadOnlyPage(resource, {
     clubId: req.auth!.clubId,
     limit: query.limit,
     offset: query.offset,
-    filters: query.filters
+    filters: query.filters,
+    sectorIds: req.auth!.permissions.includes("sectors:any") ? undefined : req.auth!.sectorIds
   });
 
   res.json({
@@ -31,10 +39,8 @@ const createReadOnlyHandler = (resource: ReadOnlyResource) => asyncHandler(async
   });
 });
 
-router.get("/sectores", createReadOnlyHandler("sectores"));
-router.get("/actividades", createReadOnlyHandler("actividades"));
-router.get("/trabajadores", createReadOnlyHandler("trabajadores"));
-router.get("/movimientos", createReadOnlyHandler("movimientos"));
-router.get("/inscripciones", createReadOnlyHandler("inscripciones"));
+for (const resource of Object.keys(permissionsByResource) as ReadOnlyResource[]) {
+  router.get(`/${resource}`, requirePermission(permissionsByResource[resource]), createReadOnlyHandler(resource));
+}
 
 export default router;

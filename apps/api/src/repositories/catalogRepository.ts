@@ -107,10 +107,15 @@ export const catalogNames = Object.keys(catalogQueries) as CatalogName[];
 export const isCatalogName = (value: string): value is CatalogName =>
   Object.prototype.hasOwnProperty.call(catalogQueries, value);
 
-export const getCatalogRows = async (catalogName: CatalogName, clubId: string): Promise<CatalogRow[]> => {
+export const getCatalogRows = async (catalogName: CatalogName, clubId: string, sectorIds?: readonly string[]): Promise<CatalogRow[]> => {
   const pool = await getPostgresPool();
   const query = catalogQueries[catalogName];
-  const result = await pool.query<CatalogRow>(query.sql, query.tenantScoped ? [clubId] : []);
+  const sectorColumn = catalogName === "sectors" ? "id" : catalogName === "activities" ? "sector_id" : undefined;
+  const scopedSql = sectorIds !== undefined && sectorColumn
+    ? query.sql.replace(/\border by\b/i, `and ${sectorColumn} = any($2::uuid[]) order by`)
+    : query.sql;
+  const params = query.tenantScoped ? (sectorIds !== undefined && sectorColumn ? [clubId, sectorIds] : [clubId]) : [];
+  const result = await pool.query<CatalogRow>(scopedSql, params);
   return result.rows;
 };
 

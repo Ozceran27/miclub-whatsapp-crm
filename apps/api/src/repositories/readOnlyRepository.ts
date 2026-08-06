@@ -7,6 +7,8 @@ export type PageQuery = {
   limit: number;
   offset: number;
   filters: Record<string, string | undefined>;
+  /** Undefined means sectors:any; an empty array intentionally returns no sector rows. */
+  sectorIds?: readonly string[];
 };
 
 export type ReadOnlyPage = {
@@ -27,6 +29,7 @@ type ListDefinition = {
   orderBy: string;
   filters: Record<string, FilterDefinition>;
   baseWhere?: string;
+  sectorColumn?: string;
 };
 
 const textSearch = (columns: string[]): FilterDefinition => ({
@@ -36,6 +39,7 @@ const textSearch = (columns: string[]): FilterDefinition => ({
 
 const listDefinitions = {
   sectores: {
+    sectorColumn: "s.id",
     clubColumn: "s.club_id",
     select: `s.id, s.manager_person_id, s.code, s.name, s.color, s.opening_time, s.closing_time,
       s.max_capacity, s.municipal_status, s.financial_status, s.operational_status,
@@ -58,6 +62,7 @@ const listDefinitions = {
     }
   },
   actividades: {
+    sectorColumn: "a.sector_id",
     from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id",
     clubColumn: "a.club_id",
     select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
@@ -93,6 +98,7 @@ const listDefinitions = {
     }
   },
   movimientos: {
+    sectorColumn: "m.sector_id",
     from: "miclub.v_movements_enriched m",
     clubColumn: "m.club_id",
     select: `m.id, m.external_id, m.movement_date, m.movement_type, m.category_id, m.category,
@@ -115,6 +121,7 @@ const listDefinitions = {
     }
   },
   inscripciones: {
+    sectorColumn: "a.sector_id",
     from: `miclub.enrollments e
       join miclub.people p on p.id = e.person_id and p.club_id = e.club_id
       join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
@@ -145,6 +152,10 @@ const buildWhere = (definition: ListDefinition, query: PageQuery): { sql: string
   const params: unknown[] = [query.clubId];
   const clauses = [`${definition.clubColumn} = $1`];
   if (definition.baseWhere) clauses.push(definition.baseWhere);
+  if (query.sectorIds !== undefined && definition.sectorColumn) {
+    params.push(query.sectorIds);
+    clauses.push(`${definition.sectorColumn} = any($${params.length}::uuid[])`);
+  }
 
   for (const [name, value] of Object.entries(query.filters)) {
     const filter = definition.filters[name];

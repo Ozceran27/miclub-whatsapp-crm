@@ -5,6 +5,7 @@ import { getPostgresHealth } from "../db/health.js";
 import { normalizeOperationalStatus } from "../importers/normalizers.js";
 import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "../services/comparisonService.js";
 import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresReceivableEffectiveStatusDebug, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
+import { requirePermission } from "../middleware/authorization.js";
 
 type PostgresError = Error & { code?: string };
 
@@ -41,32 +42,32 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
 
   router.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
 
-  router.get("/members", async (req, res) => {
+  router.get("/members", requirePermission("people:read"), async (req, res) => {
     try { res.json(await getPostgresMembers(req.auth!.clubId)); }
     catch (error) { postgresFailure(res, "miembros", error, req.requestId); }
   });
 
-  router.get("/debtors", async (req, res) => {
+  router.get("/debtors", requirePermission("finance:read"), async (req, res) => {
     try { res.json(await getPostgresDebtors(req.auth!.clubId)); }
     catch (error) { postgresFailure(res, "deudores", error, req.requestId); }
   });
 
-  router.get("/summary", async (req, res) => {
+  router.get("/summary", requirePermission("dashboard:read"), async (req, res) => {
     try { res.json(await getPostgresSummary(req.auth!.clubId)); }
     catch (error) { postgresFailure(res, "resumen", error, req.requestId); }
   });
 
-  router.get("/club-finance-summary", async (req, res) => {
+  router.get("/club-finance-summary", requirePermission("finance:read"), async (req, res) => {
     try { res.json(await getPostgresClubFinanceSummary(req.auth!.clubId)); }
     catch (error) { postgresFailure(res, "resumen financiero", error, req.requestId); }
   });
 
-  router.get("/sector-operational-summary", async (req, res) => {
+  router.get("/sector-operational-summary", requirePermission("dashboard:read"), async (req, res) => {
     try { res.json(await getPostgresSectorOperationalSummary(req.auth!.clubId)); }
     catch (error) { postgresFailure(res, "resumen operativo por sector", error, req.requestId); }
   });
 
-  router.get("/sync-status", async (_req, res) => {
+  router.get("/sync-status", requirePermission("administration.view"), async (_req, res) => {
     const warnings = validatePostgresEnv();
     if (warnings.length) return postgresFailure(res, "estado de sincronización", Object.assign(new Error(warnings.join(" ")), { code: "08000" }), _req.requestId);
     try {
@@ -76,23 +77,23 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
   });
 
   if (debugEndpointsEnabled) {
-    router.get("/club-finance-debug", async (req, res) => {
+    router.get("/club-finance-debug", requirePermission("administration.configure"), async (req, res) => {
       try { res.json(await getPostgresClubFinanceSummary(req.auth!.clubId)); }
       catch (error) { postgresFailure(res, "debug financiero", error, req.requestId); }
     });
-    router.get("/receivable-fees-effective-status-debug", async (req, res) => {
+    router.get("/receivable-fees-effective-status-debug", requirePermission("administration.configure"), async (req, res) => {
       try { res.json(await getPostgresReceivableEffectiveStatusDebug(req.auth!.clubId)); }
       catch (error) { postgresFailure(res, "debug de cuotas", error, req.requestId); }
     });
-    router.get("/comparison-debug", async (req, res) => {
+    router.get("/comparison-debug", requirePermission("administration.configure"), async (req, res) => {
       try { res.json(await compareLegacyWithPostgres(req.auth!)); }
       catch (error) { postgresFailure(res, "diagnóstico de migración", error, req.requestId); }
     });
-    router.get("/comparison-debug/summary", async (req, res) => {
+    router.get("/comparison-debug/summary", requirePermission("administration.configure"), async (req, res) => {
       try { res.json(await compareLegacySummaryWithPostgresDashboard(req.auth!)); }
       catch (error) { postgresFailure(res, "diagnóstico de resumen de migración", error, req.requestId); }
     });
-    router.get("/comparison-debug/members", async (req, res) => {
+    router.get("/comparison-debug/members", requirePermission("administration.configure"), async (req, res) => {
       try { res.json(await compareLegacyMembersWithPostgresEnrollments(req.auth!)); }
       catch (error) { postgresFailure(res, "diagnóstico de miembros de migración", error, req.requestId); }
     });

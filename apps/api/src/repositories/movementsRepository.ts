@@ -4,9 +4,9 @@ import { auditService } from "../services/auditService.js";
 
 export type MovementRow = Record<string, unknown>;
 export type MovementFilters = { from?: string; to?: string; type?: string; status?: string; sectorId?: string; personId?: string };
-export type MovementQuery = MovementFilters & { clubId: string; limit: number; offset: number };
+export type MovementQuery = MovementFilters & { clubId: string; limit: number; offset: number; sectorIds?: readonly string[] };
 
-export const getMovements = async ({ clubId, limit, offset, from, to, type, status, sectorId, personId }: MovementQuery): Promise<{ rows: MovementRow[]; total: number }> => {
+export const getMovements = async ({ clubId, limit, offset, from, to, type, status, sectorId, personId, sectorIds }: MovementQuery): Promise<{ rows: MovementRow[]; total: number }> => {
   const pool = await getPostgresPool();
   const result = await pool.query<MovementRow & { total_count: string | number }>(`
     select *, count(*) over() as total_count
@@ -18,9 +18,10 @@ export const getMovements = async ({ clubId, limit, offset, from, to, type, stat
       and ($5::text is null or operational_status::text = $5 or financial_status::text = $5)
       and ($6::uuid is null or sector_id = $6)
       and ($7::uuid is null or person_id = $7)
+      and ($8::uuid[] is null or sector_id = any($8))
     order by movement_date desc nulls last, created_at desc nulls last, id desc nulls last
-    limit $8 offset $9
-  `, [clubId, from ?? null, to ?? null, type ?? null, status ?? null, sectorId ?? null, personId ?? null, limit, offset]);
+    limit $9 offset $10
+  `, [clubId, from ?? null, to ?? null, type ?? null, status ?? null, sectorId ?? null, personId ?? null, sectorIds ?? null, limit, offset]);
   const total = Number(result.rows[0]?.total_count ?? 0);
   return { rows: result.rows.map(({ total_count: _, ...row }) => row), total };
 };
