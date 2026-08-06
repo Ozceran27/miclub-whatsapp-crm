@@ -8,6 +8,7 @@ import {
   getPendingMovements,
   getRankingBySector,
   getRecentMovements,
+  getSectorTrends,
 } from "./economyRepository.js";
 
 const CLUB_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -103,5 +104,28 @@ test("rankings, pendientes y movimientos recientes nunca mezclan tenants", async
       assert.doesNotMatch(call.sql, /select\s+\*/i);
       assert.doesNotMatch(call.sql, /source_payload|created_at\s*,|updated_at/i);
     }
+  });
+});
+
+test("rankings y trends respetan club, límite, año y joins tenant", async () => {
+  await withTenantFixture(async (calls) => {
+    const from = new Date("2026-01-01T00:00:00Z");
+    const to = new Date("2027-01-01T00:00:00Z");
+    await getRankingBySector(from, to, 7, CLUB_A);
+    await getSectorTrends(2026, 4, CLUB_B);
+
+    assert.deepEqual(calls[0].params.slice(0, 3), [from, to, 7]);
+    assert.equal(calls[0].params[4], CLUB_A);
+    assert.match(calls[0].sql, /m\.club_id = \$5/);
+    assert.match(calls[0].sql, /s\.club_id = m\.club_id/);
+    assert.match(calls[0].sql, /order by balance desc, income desc/);
+    assert.match(calls[0].sql, /limit \$3::integer/);
+
+    assert.deepEqual(calls[1].params.slice(0, 3), [2026, 4, CLUB_B]);
+    assert.match(calls[1].sql, /where id = \$3/);
+    assert.match(calls[1].sql, /m\.club_id = \$3/);
+    assert.match(calls[1].sql, /s\.club_id = m\.club_id/);
+    assert.match(calls[1].sql, /partition by month order by balance desc, income desc/);
+    assert.match(calls[1].sql, /rank <= \$2::integer/);
   });
 });
