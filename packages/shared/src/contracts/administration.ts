@@ -253,6 +253,7 @@ export interface AdministrationMovementDto {
   sectorId?: string | null;
   sectorCode?: string | null;
   sector: string | null;
+  activityId?: string | null;
   concept: string | null;
   personId?: string | null;
   counterpartyText?: string | null;

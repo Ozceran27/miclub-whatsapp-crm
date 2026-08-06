@@ -10,7 +10,7 @@ const filtersByResource = {
   sectores: ["search", "status", "usesEnrollments", "usesActivities"],
   actividades: ["search", "sectorId", "status", "modality"],
   trabajadores: ["search", "kind"],
-  movimientos: ["search", "type", "sectorId", "categoryId", "paymentMethodId", "financialStatus", "operationalStatus", "from", "to"],
+  movimientos: ["search", "type", "sectorId", "activityId", "categoryId", "paymentMethodId", "financialStatus", "operationalStatus", "from", "to"],
   inscripciones: ["search", "status", "sectorId", "activityId", "dueFrom", "dueTo"]
 } as const satisfies Record<ReadOnlyResource, readonly string[]>;
 
