@@ -3,7 +3,6 @@ import type { Member } from "@miclub/shared";
 import { validatePostgresEnv } from "../config/env.js";
 import { getPostgresHealth } from "../db/health.js";
 import { normalizeOperationalStatus } from "../importers/normalizers.js";
-import { compareLegacyMembersWithPostgresEnrollments, compareLegacySummaryWithPostgresDashboard, compareLegacyWithPostgres } from "../services/comparisonService.js";
 import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresReceivableEffectiveStatusDebug, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
 import { requirePermission } from "../middleware/authorization.js";
 
@@ -86,15 +85,15 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       catch (error) { postgresFailure(res, "debug de cuotas", error, req.requestId); }
     });
     router.get("/comparison-debug", requirePermission("administration.configure"), async (req, res) => {
-      try { res.json(await compareLegacyWithPostgres(req.auth!)); }
+      try { const { compareLegacyWithPostgres } = await import("../services/comparisonService.js"); res.json(await compareLegacyWithPostgres(req.auth!)); }
       catch (error) { postgresFailure(res, "diagnóstico de migración", error, req.requestId); }
     });
     router.get("/comparison-debug/summary", requirePermission("administration.configure"), async (req, res) => {
-      try { res.json(await compareLegacySummaryWithPostgresDashboard(req.auth!)); }
+      try { const { compareLegacySummaryWithPostgresDashboard } = await import("../services/comparisonService.js"); res.json(await compareLegacySummaryWithPostgresDashboard(req.auth!)); }
       catch (error) { postgresFailure(res, "diagnóstico de resumen de migración", error, req.requestId); }
     });
     router.get("/comparison-debug/members", requirePermission("administration.configure"), async (req, res) => {
-      try { res.json(await compareLegacyMembersWithPostgresEnrollments(req.auth!)); }
+      try { const { compareLegacyMembersWithPostgresEnrollments } = await import("../services/comparisonService.js"); res.json(await compareLegacyMembersWithPostgresEnrollments(req.auth!)); }
       catch (error) { postgresFailure(res, "diagnóstico de miembros de migración", error, req.requestId); }
     });
   }

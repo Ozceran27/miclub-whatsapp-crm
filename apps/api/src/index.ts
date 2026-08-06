@@ -38,8 +38,6 @@ const isProduction = process.env.NODE_ENV === "production" || __dirname.includes
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
-import db from "./lib/sqlite.js";
-import { templates } from "./data/mockData.js";
 import dbRoutes from "./routes/dbRoutes.js";
 import catalogRoutes from "./routes/catalogRoutes.js";
 import sectorMutationRoutes from "./routes/sectorMutationRoutes.js";
@@ -54,7 +52,6 @@ import economyRoutes from "./routes/economyRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import administrationRoutes from "./routes/administrationRoutes.js";
 import readOnlyRoutes from "./routes/readOnlyRoutes.js";
-import importRoutes from "./routes/importRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { createCrmRoutes } from "./routes/crmRoutes.js";
@@ -80,29 +77,6 @@ if (isProduction) {
   app.use(express.static(webDistPath));
 }
 
-
-const runDb = (query: string, params: unknown[] = []): Promise<void> =>
-  new Promise((resolve, reject) => {
-    db.run(query, params, (err) => (err ? reject(err) : resolve()));
-  });
-
-const allDb = <T>(query: string, params: unknown[] = []): Promise<T[]> =>
-  new Promise((resolve, reject) => {
-    db.all(query, params, (err, rows) => (err ? reject(err) : resolve(rows as T[])));
-  });
-
-const seedDefaultTemplates = async () => {
-  const [{ total }] = await allDb<{ total: number }>("SELECT COUNT(1) as total FROM message_templates");
-  if (total > 0) return;
-  const now = new Date().toISOString();
-  for (const template of templates) {
-    await runDb(
-      `INSERT INTO message_templates (id, name, body, isDefault, createdAt, updatedAt)
-       VALUES (?, ?, ?, 1, ?, ?)`,
-      [template.id, template.name, template.body, now, now]
-    );
-  }
-};
 
 app.use(["/auth/login", "/auth/register"], authRateLimit);
 app.use("/auth", (_req, res, next) => {
@@ -137,7 +111,14 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use("/api/import", importMutationRateLimit, importRoutes);
+// Google Sheets belongs to an operational migration window. Keeping the import
+// dynamic prevents googleapis and the backfill graph from entering normal boot.
+if (process.env.IMPORT_ENDPOINTS_ENABLED === "true") {
+  app.use("/api/import", importMutationRateLimit, async (req, res, next) => {
+    const { default: importRoutes } = await import("./routes/importRoutes.js");
+    importRoutes(req, res, next);
+  });
+}
 app.use("/api/db", dbRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api", readOnlyRoutes);
@@ -166,7 +147,6 @@ app.use(errorHandler);
 
 export const startServer = async () => {
   validateRuntimeConfig({ isProduction });
-  await seedDefaultTemplates();
   app.listen(port, () => {
     console.log(`API running at http://localhost:${port}`);
   });
