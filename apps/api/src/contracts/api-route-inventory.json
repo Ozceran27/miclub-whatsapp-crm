@@ -1,0 +1,2077 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": [
+    "apps/api/src/index.ts",
+    "apps/api/src/routes/"
+  ],
+  "routes": [
+    {
+      "id": "DELETE /templates/:id",
+      "method": "DELETE",
+      "path": "/templates/:id",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/actividades",
+      "method": "GET",
+      "path": "/api/actividades",
+      "source": "apps/api/src/routes/readOnlyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/activities",
+      "method": "GET",
+      "path": "/api/activities",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration",
+      "method": "GET",
+      "path": "/api/administration",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration/summary",
+      "method": "GET",
+      "path": "/api/administration/summary",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration/workers",
+      "method": "GET",
+      "path": "/api/administration/workers",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/catalogs",
+      "method": "GET",
+      "path": "/api/catalogs",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/catalogs/:catalog",
+      "method": "GET",
+      "path": "/api/catalogs/:catalog",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/currencies",
+      "method": "GET",
+      "path": "/api/currencies",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/dashboard-reconciliation",
+      "method": "GET",
+      "path": "/api/dashboard-reconciliation",
+      "source": "apps/api/src/routes/dashboardRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "dashboard.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/dashboard/basic",
+      "method": "GET",
+      "path": "/api/dashboard/basic",
+      "source": "apps/api/src/routes/dashboardRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "dashboard.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/db/crm/audit",
+      "method": "GET",
+      "path": "/api/db/crm/audit",
+      "source": "apps/api/src/routes/dbRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/db/enrollment-fee-audit",
+      "method": "GET",
+      "path": "/api/db/enrollment-fee-audit",
+      "source": "apps/api/src/routes/dbRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/db/health",
+      "method": "GET",
+      "path": "/api/db/health",
+      "source": "apps/api/src/routes/dbRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/discount-rates",
+      "method": "GET",
+      "path": "/api/discount-rates",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/activity-rankings",
+      "method": "GET",
+      "path": "/api/economy/activity-rankings",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/activity-trends",
+      "method": "GET",
+      "path": "/api/economy/activity-trends",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/annual-summary",
+      "method": "GET",
+      "path": "/api/economy/annual-summary",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/by-category",
+      "method": "GET",
+      "path": "/api/economy/by-category",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/by-sector",
+      "method": "GET",
+      "path": "/api/economy/by-sector",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/comparison",
+      "method": "GET",
+      "path": "/api/economy/comparison",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/insights",
+      "method": "GET",
+      "path": "/api/economy/insights",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/monthly-evolution",
+      "method": "GET",
+      "path": "/api/economy/monthly-evolution",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/payment-methods",
+      "method": "GET",
+      "path": "/api/economy/payment-methods",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/pending",
+      "method": "GET",
+      "path": "/api/economy/pending",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/recent-movements",
+      "method": "GET",
+      "path": "/api/economy/recent-movements",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/sector-rankings",
+      "method": "GET",
+      "path": "/api/economy/sector-rankings",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/sector-trends",
+      "method": "GET",
+      "path": "/api/economy/sector-trends",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/summary",
+      "method": "GET",
+      "path": "/api/economy/summary",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/economy/yearly-breakdown",
+      "method": "GET",
+      "path": "/api/economy/yearly-breakdown",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/import/batches",
+      "method": "GET",
+      "path": "/api/import/batches",
+      "source": "apps/api/src/routes/importRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "imports.run",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/import/batches/:id/errors",
+      "method": "GET",
+      "path": "/api/import/batches/:id/errors",
+      "source": "apps/api/src/routes/importRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "imports.run",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/import/google-sheets/admin-movements",
+      "method": "GET",
+      "path": "/api/import/google-sheets/admin-movements",
+      "source": "apps/api/src/routes/importRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "imports.run",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/import/google-sheets/movements/audit",
+      "method": "GET",
+      "path": "/api/import/google-sheets/movements/audit",
+      "source": "apps/api/src/routes/importRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "imports.run",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/inscripciones",
+      "method": "GET",
+      "path": "/api/inscripciones",
+      "source": "apps/api/src/routes/readOnlyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "enrollments.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/instructors",
+      "method": "GET",
+      "path": "/api/instructors",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/modules/economy/movements",
+      "method": "GET",
+      "path": "/api/modules/economy/movements",
+      "source": "apps/api/src/routes/moduleRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/modules/economy/sector-balances",
+      "method": "GET",
+      "path": "/api/modules/economy/sector-balances",
+      "source": "apps/api/src/routes/moduleRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/modules/economy/summary",
+      "method": "GET",
+      "path": "/api/modules/economy/summary",
+      "source": "apps/api/src/routes/moduleRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/movement-categories",
+      "method": "GET",
+      "path": "/api/movement-categories",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/movements",
+      "method": "GET",
+      "path": "/api/movements",
+      "source": "apps/api/src/routes/financeRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/movimientos",
+      "method": "GET",
+      "path": "/api/movimientos",
+      "source": "apps/api/src/routes/readOnlyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/operational-balances",
+      "method": "GET",
+      "path": "/api/operational-balances",
+      "source": "apps/api/src/routes/financeRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/payment-methods",
+      "method": "GET",
+      "path": "/api/payment-methods",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/payments",
+      "method": "GET",
+      "path": "/api/payments",
+      "source": "apps/api/src/routes/financeRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/people",
+      "method": "GET",
+      "path": "/api/people",
+      "source": "apps/api/src/routes/peopleRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "people.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/receivables",
+      "method": "GET",
+      "path": "/api/receivables",
+      "source": "apps/api/src/routes/financeRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/requests",
+      "method": "GET",
+      "path": "/api/requests",
+      "source": "apps/api/src/routes/requestRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "requests.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/requests/:id",
+      "method": "GET",
+      "path": "/api/requests/:id",
+      "source": "apps/api/src/routes/requestRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "requests.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/salon-hour-prices",
+      "method": "GET",
+      "path": "/api/salon-hour-prices",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/sector-finance-summary",
+      "method": "GET",
+      "path": "/api/sector-finance-summary",
+      "source": "apps/api/src/routes/dashboardRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "dashboard.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/sector-settlements",
+      "method": "GET",
+      "path": "/api/sector-settlements",
+      "source": "apps/api/src/routes/financeRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/sectores",
+      "method": "GET",
+      "path": "/api/sectores",
+      "source": "apps/api/src/routes/readOnlyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/sectors",
+      "method": "GET",
+      "path": "/api/sectors",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/system-months",
+      "method": "GET",
+      "path": "/api/system-months",
+      "source": "apps/api/src/routes/catalogRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/tasks",
+      "method": "GET",
+      "path": "/api/tasks",
+      "source": "apps/api/src/routes/taskRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "tasks.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/trabajadores",
+      "method": "GET",
+      "path": "/api/trabajadores",
+      "source": "apps/api/src/routes/readOnlyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /auth/clubs",
+      "method": "GET",
+      "path": "/auth/clubs",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "session",
+      "membership": "none",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /auth/me",
+      "method": "GET",
+      "path": "/auth/me",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "session",
+      "membership": "none",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /club-finance-debug",
+      "method": "GET",
+      "path": "/club-finance-debug",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.configure",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /club-finance-summary",
+      "method": "GET",
+      "path": "/club-finance-summary",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /comparison-debug",
+      "method": "GET",
+      "path": "/comparison-debug",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.configure",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /comparison-debug/members",
+      "method": "GET",
+      "path": "/comparison-debug/members",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.configure",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /comparison-debug/summary",
+      "method": "GET",
+      "path": "/comparison-debug/summary",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.configure",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /contacted-recent",
+      "method": "GET",
+      "path": "/contacted-recent",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /debtors",
+      "method": "GET",
+      "path": "/debtors",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /health",
+      "method": "GET",
+      "path": "/health",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "public",
+      "membership": "none",
+      "permission": "none",
+      "role": "any",
+      "sectorScope": "none",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /history",
+      "method": "GET",
+      "path": "/history",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /members",
+      "method": "GET",
+      "path": "/members",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "people.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /receivable-fees-effective-status-debug",
+      "method": "GET",
+      "path": "/receivable-fees-effective-status-debug",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.configure",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /sector-operational-summary",
+      "method": "GET",
+      "path": "/sector-operational-summary",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "dashboard.read",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /summary",
+      "method": "GET",
+      "path": "/summary",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "dashboard.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /sync-status",
+      "method": "GET",
+      "path": "/sync-status",
+      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /templates",
+      "method": "GET",
+      "path": "/templates",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/activities/:id",
+      "method": "PATCH",
+      "path": "/api/activities/:id",
+      "source": "apps/api/src/routes/activityMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.edit",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/activities/:id/status",
+      "method": "PATCH",
+      "path": "/api/activities/:id/status",
+      "source": "apps/api/src/routes/activityMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.edit",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/movements/:id",
+      "method": "PATCH",
+      "path": "/api/movements/:id",
+      "source": "apps/api/src/routes/movementMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/sectors/:id",
+      "method": "PATCH",
+      "path": "/api/sectors/:id",
+      "source": "apps/api/src/routes/sectorMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.edit",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/sectors/:id/status",
+      "method": "PATCH",
+      "path": "/api/sectors/:id/status",
+      "source": "apps/api/src/routes/sectorMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.edit",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/tasks/:id",
+      "method": "PATCH",
+      "path": "/api/tasks/:id",
+      "source": "apps/api/src/routes/taskRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "tasks.edit",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /api/tasks/:id/status",
+      "method": "PATCH",
+      "path": "/api/tasks/:id/status",
+      "source": "apps/api/src/routes/taskRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "tasks.edit",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /history/:id/status",
+      "method": "PATCH",
+      "path": "/history/:id/status",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "PATCH /templates/:id",
+      "method": "PATCH",
+      "path": "/templates/:id",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/activities",
+      "method": "POST",
+      "path": "/api/activities",
+      "source": "apps/api/src/routes/activityMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.create",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/activities/:id/archive",
+      "method": "POST",
+      "path": "/api/activities/:id/archive",
+      "source": "apps/api/src/routes/activityMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.archive",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/db/crm/migrate",
+      "method": "POST",
+      "path": "/api/db/crm/migrate",
+      "source": "apps/api/src/routes/dbRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/import/google-sheets",
+      "method": "POST",
+      "path": "/api/import/google-sheets",
+      "source": "apps/api/src/routes/importRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "imports.run",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/import/google-sheets/enrollments/delete-missing",
+      "method": "POST",
+      "path": "/api/import/google-sheets/enrollments/delete-missing",
+      "source": "apps/api/src/routes/importRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "imports.run",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/inscripciones",
+      "method": "POST",
+      "path": "/api/inscripciones",
+      "source": "apps/api/src/routes/enrollmentMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "club.manage",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/movements",
+      "method": "POST",
+      "path": "/api/movements",
+      "source": "apps/api/src/routes/movementMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "movements.create",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "key-required",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/movements/:id/void",
+      "method": "POST",
+      "path": "/api/movements/:id/void",
+      "source": "apps/api/src/routes/movementMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/requests/:id/approve",
+      "method": "POST",
+      "path": "/api/requests/:id/approve",
+      "source": "apps/api/src/routes/requestRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "requests.approve",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/requests/:id/reject",
+      "method": "POST",
+      "path": "/api/requests/:id/reject",
+      "source": "apps/api/src/routes/requestRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "requests.reject",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/sectors/:id/archive",
+      "method": "POST",
+      "path": "/api/sectors/:id/archive",
+      "source": "apps/api/src/routes/sectorMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.archive",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/tasks",
+      "method": "POST",
+      "path": "/api/tasks",
+      "source": "apps/api/src/routes/taskRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "tasks.create",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/tasks/:id/archive",
+      "method": "POST",
+      "path": "/api/tasks/:id/archive",
+      "source": "apps/api/src/routes/taskRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "tasks.edit",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /auth/clubs/select",
+      "method": "POST",
+      "path": "/auth/clubs/select",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "session",
+      "membership": "none",
+      "permission": "none",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /auth/login",
+      "method": "POST",
+      "path": "/auth/login",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "public",
+      "membership": "none",
+      "permission": "none",
+      "role": "any",
+      "sectorScope": "none",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /auth/logout",
+      "method": "POST",
+      "path": "/auth/logout",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "optional",
+      "membership": "none",
+      "permission": "none",
+      "role": "any",
+      "sectorScope": "none",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /auth/register",
+      "method": "POST",
+      "path": "/auth/register",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "public",
+      "membership": "none",
+      "permission": "none",
+      "role": "any",
+      "sectorScope": "none",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /prepare-messages",
+      "method": "POST",
+      "path": "/prepare-messages",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /prepare-messages/validate",
+      "method": "POST",
+      "path": "/prepare-messages/validate",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /templates",
+      "method": "POST",
+      "path": "/templates",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /templates/reset-defaults",
+      "method": "POST",
+      "path": "/templates/reset-defaults",
+      "source": "apps/api/src/routes/crmRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "crm.write",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "non-idempotent",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    }
+  ]
+}

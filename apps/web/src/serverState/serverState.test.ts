@@ -49,3 +49,21 @@ test('mutation cache updates and targeted invalidation only refetch matching res
   client.invalidateQueries(key => key[1] === 'a' && key[2] === 'economy-summary');
   assert.equal(client.snapshot(summary).updatedAt, 0); assert.deepEqual(client.snapshot(catalog).data, ['base', 'new']); assert.notEqual(client.snapshot(catalog).updatedAt, 0);
 });
+
+test('logout and club switch abort requests and leave no data from the previous tenant', async () => {
+  const client = new QueryClient();
+  await client.fetchQuery(keys.home('club-a'), async () => ({ tenant: 'club-a' }), policy);
+  let aborted = false;
+  const inFlight = client.fetchQuery(keys.economy('club-a', 'summary'), ({ signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => { aborted = true; reject(new DOMException('Aborted', 'AbortError')); });
+  }), policy);
+
+  // TenantCacheBoundary performs this transition both on selectClub and logout.
+  client.removeClub('club-a');
+  await assert.rejects(inFlight, /Aborted/);
+  assert.equal(aborted, true);
+  assert.equal(client.snapshot(keys.home('club-a')).data, undefined);
+  await client.fetchQuery(keys.home('club-b'), async () => ({ tenant: 'club-b' }), policy);
+  assert.deepEqual(client.snapshot(keys.home('club-b')).data, { tenant: 'club-b' });
+  assert.equal(JSON.stringify(client.snapshot(keys.home('club-b')).data).includes('club-a'), false);
+});
