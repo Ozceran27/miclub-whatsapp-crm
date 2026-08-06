@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const sql = (name: string) => readFileSync(new URL(`../../../../docs/dbeaver/${name}`, import.meta.url), "utf8");
+const stabilizationSql = (name: string) => sql(`stabilization-2026-08/${name}`);
 
 test("SQL DBeaver usa las columnas reales y recupera transacciones abortadas", () => {
   const diagnostic = sql("01_auth_tenant_diagnostic_readonly.sql");
@@ -18,6 +19,31 @@ test("SQL DBeaver usa las columnas reales y recupera transacciones abortadas", (
   assert.doesNotMatch(backfill, /min\s*\(\s*id\s*\)/i);
   assert.match(backfill, /movement_type::text/);
   assert.match(validation, /movement_type::text/);
+});
+
+test("estabilización DBeaver mantiene auditoría y validación estrictamente read-only", () => {
+  for (const name of ["01_audit.sql", "05_validation.sql"]) {
+    const script = stabilizationSql(name);
+    assert.match(script, /BEGIN TRANSACTION READ ONLY;/i);
+    assert.match(script, /ROLLBACK;/i);
+    assert.doesNotMatch(script, /\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE|CALL)\b/i);
+  }
+});
+
+test("estabilización DBeaver corresponde apply/rollback y conserva ejecución manual", () => {
+  const cleanup = stabilizationSql("02_cleanup.sql");
+  const constraints = stabilizationSql("03_constraints.sql");
+  const indexes = stabilizationSql("04_indexes.sql");
+  const rollback = stabilizationSql("06_rollback.sql");
+  const appliedConstraints = [...constraints.matchAll(/ADD CONSTRAINT\s+(\w+)/gi)].map((match) => match[1]);
+  const rolledBackConstraints = [...rollback.matchAll(/DROP CONSTRAINT IF EXISTS\s+(\w+)/gi)].map((match) => match[1]);
+  assert.deepEqual(rolledBackConstraints.sort(), appliedConstraints.sort());
+  assert.match(cleanup, /DROP INDEX miclub\.tasks_active_due_idx/i);
+  assert.match(rollback, /CREATE INDEX CONCURRENTLY IF NOT EXISTS tasks_active_due_idx/i);
+  assert.match(indexes, /CREATE INDEX CONCURRENTLY IF NOT EXISTS approval_requests_club_active_created_idx/i);
+  assert.match(rollback, /DROP INDEX CONCURRENTLY IF EXISTS miclub\.approval_requests_club_active_created_idx/i);
+  assert.doesNotMatch(cleanup, /\b(?:INSERT|UPDATE|DELETE|MERGE|TRUNCATE)\b/i);
+  assert.doesNotMatch([cleanup, constraints, indexes, rollback].join("\n"), /runMigrations|postgres\.ts|node\s/i);
 });
 
 test("SQL de planes es manual, de solo lectura y no crea índices", () => {
