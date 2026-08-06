@@ -34,3 +34,19 @@ export const getActivityEnrollments = (activityId: string, signal?: AbortSignal)
 
 export const getActivityMovements = (activityId: string, signal?: AbortSignal) =>
   apiJson<AdministrationMovementsResponse>(`/api/movimientos?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });
+
+type AdministrationListFilters = Record<string, string | undefined>;
+
+const paginatedUrl = (path: string, page: number, filters: AdministrationListFilters) => {
+  const query = new URLSearchParams({ page: String(page), limit: '20' });
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value?.trim()) query.set(key, value.trim());
+  });
+  return `${path}?${query.toString()}`;
+};
+
+export const getAdministrationMovements = (page: number, filters: AdministrationListFilters, signal?: AbortSignal) =>
+  apiJson<AdministrationMovementsResponse>(paginatedUrl('/api/movimientos', page, filters), { cache: 'no-store', signal });
+
+export const getAdministrationEnrollments = (page: number, filters: AdministrationListFilters, signal?: AbortSignal) =>
+  apiJson<AdministrationEnrollmentsResponse>(paginatedUrl('/api/inscripciones', page, filters), { cache: 'no-store', signal });

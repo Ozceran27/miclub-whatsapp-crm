@@ -7,6 +7,8 @@ import { EconomyDashboardState } from './Economy/EconomyDashboardState';
 import { WorkerList } from './Administration/WorkerList';
 import { TaskPanel } from './Administration/TaskPanel';
 import { RequestPanel } from './Administration/RequestPanel';
+import { MovementList } from './Administration/MovementList';
+import { EnrollmentList } from './Administration/EnrollmentList';
 
 export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
@@ -56,6 +58,8 @@ export default function AdministrationModule() {
       )}
       <SectorList />
       <ActivityList />
+      <EnrollmentList />
+      <MovementList />
       <WorkerList />
       <TaskPanel />
       <RequestPanel />
