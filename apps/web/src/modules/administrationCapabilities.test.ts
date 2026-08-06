@@ -34,3 +34,13 @@ test('sin administration.view oculta navegación y no habilita ningún endpoint 
   assert.equal(capabilities.enter, false);
   assert.deepEqual(invokedFor(permissions), []);
 });
+
+test('las altas usan la matriz efectiva granular y su compatibilidad legacy centralizada', () => {
+  const movementReads = [PERMISSIONS.ADMINISTRATION_VIEW, PERMISSIONS.FINANCE_READ, PERMISSIONS.SECTORS_VIEW, PERMISSIONS.ACTIVITIES_VIEW];
+  const enrollmentReads = [PERMISSIONS.ADMINISTRATION_VIEW, PERMISSIONS.PEOPLE_READ, PERMISSIONS.ACTIVITIES_VIEW];
+  assert.equal(getAdministrationCapabilities([...movementReads, PERMISSIONS.MOVEMENTS_CREATE]).createMovement, true);
+  assert.equal(getAdministrationCapabilities(movementReads).createMovement, false);
+  assert.equal(getAdministrationCapabilities([...enrollmentReads, PERMISSIONS.ENROLLMENTS_CREATE]).createEnrollment, true);
+  assert.equal(getAdministrationCapabilities([...enrollmentReads, PERMISSIONS.CLUB_MANAGE]).createEnrollment, true);
+  assert.equal(getAdministrationCapabilities(enrollmentReads).createEnrollment, false);
+});

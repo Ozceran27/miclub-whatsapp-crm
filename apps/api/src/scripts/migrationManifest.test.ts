@@ -65,7 +65,7 @@ test("las fases multitenant preceden a sus vistas y repositorios dependientes", 
 
 test("la provisión administrativa es append-only, acotada e idempotente", async () => {
   const migrationPath = "202608060006_provision_administrative_permissions.sql";
-  assert.equal(migrationManifest.at(-1)?.path, migrationPath);
+  assert.ok(migrationManifest.some(({ path: registeredPath }) => registeredPath === migrationPath));
   const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
 
   assert.match(sql, /membership\.status = 'active'/);
@@ -74,4 +74,17 @@ test("la provisión administrativa es append-only, acotada e idempotente", async
   assert.match(sql, /AND EXISTS \(\s*SELECT permission FROM canonical\s*EXCEPT/s);
   assert.match(sql, /session_revoked_before = now\(\)/);
   assert.doesNotMatch(sql, /lower\(role\.code\)/);
+});
+
+test("el backfill granular preserva grants personalizados y renueva sesiones", async () => {
+  const migrationPath = "202608060007_backfill_granular_mutation_permissions.sql";
+  assert.equal(migrationManifest.at(-1)?.path, migrationPath);
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+  for (const permission of ["movements.edit", "movements.cancel", "enrollments.create", "enrollments.edit", "enrollments.cancel"]) {
+    assert.match(sql, new RegExp(permission.replace(".", "\\.")));
+  }
+  assert.match(sql, /coalesce\(membership\.permissions, '\{\}'::text\[\]\)/);
+  assert.match(sql, /membership\.status = 'active'/);
+  assert.match(sql, /session_revoked_before = now\(\)/);
+  assert.doesNotMatch(sql, /role\.code/);
 });

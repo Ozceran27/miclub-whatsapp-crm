@@ -87,7 +87,7 @@ export function AdministrationActions({onCreateMovement,onCreateEnrollment,canCr
         ))}
       </div>
 
-      {!canCreateMovement&&<p className="administration-actions__feedback">No tenés el permiso movements.create para cargar movimientos.</p>}{!canCreateEnrollment&&<p className="administration-actions__feedback">No tenés el permiso club:manage para cargar inscripciones.</p>}<p className="administration-actions__feedback" id={feedbackId} role="status" aria-live="polite">
+      {!canCreateMovement&&<p className="administration-actions__feedback">No tenés el permiso movements.create para cargar movimientos.</p>}{!canCreateEnrollment&&<p className="administration-actions__feedback">No tenés el permiso enrollments.create para cargar inscripciones.</p>}<p className="administration-actions__feedback" id={feedbackId} role="status" aria-live="polite">
         {feedbackMessage}
       </p>
     </section>

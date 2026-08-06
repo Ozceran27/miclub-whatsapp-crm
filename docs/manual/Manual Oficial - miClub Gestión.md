@@ -226,9 +226,9 @@ Si Trabajadores muestra una advertencia de fuente legacy, salario y fecha de ing
 
 ### Movimientos e inscripciones
 
-**Cargar Movimiento** sólo se habilita con `movements.create`. Completar fecha, ingreso/egreso, categoría, sector, actividad si corresponde, concepto, contraparte, importe, medio de pago y estado inicial. El formulario envía una clave de idempotencia para evitar duplicados ante reintentos. Confirmar el resultado antes de volver a cargarlo. Un movimiento conciliado o aplicado a un pago no puede editarse; anular exige motivo y permisos elevados.
+**Cargar Movimiento** sólo se habilita con `movements.create`. Completar fecha, ingreso/egreso, categoría, sector, actividad si corresponde, concepto, contraparte, importe, medio de pago y estado inicial. El formulario envía una clave de idempotencia para evitar duplicados ante reintentos. Confirmar el resultado antes de volver a cargarlo. Un movimiento conciliado o aplicado a un pago no puede editarse; editar requiere `movements.edit` y anular exige motivo y `movements.cancel`.
 
-**Cargar Inscripción** requiere actualmente `club:manage`. Elegir una persona y una actividad activa que genere inscripciones, indicar cuota, estado y fechas. El sistema rechaza referencias de otro club y una inscripción activa duplicada.
+**Cargar Inscripción** requiere `enrollments.create`. Elegir una persona y una actividad activa que genere inscripciones, indicar cuota, estado y fechas. El sistema rechaza referencias de otro club y una inscripción activa duplicada. Las futuras operaciones de edición y cancelación usarán `enrollments.edit` y `enrollments.cancel`. Los permisos amplios `finance:write` y `club:manage` sólo se aceptan como transición hasta el 2026-11-06; las membresías nuevas deben recibir siempre los permisos granulares.
 
 ### Tareas y solicitudes
 
