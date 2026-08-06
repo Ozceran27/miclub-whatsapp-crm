@@ -7,7 +7,11 @@ const router = Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/;
 const fail = (res: Response, status: number, code: string, message: string, details?: unknown) => res.status(status).json({ ok: false, error: true, status, code, message, details });
-const actor = (req: Request): ActivityActor => ({ userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId, requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent") });
+const actor = (req: Request): ActivityActor => ({
+  userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId,
+  sectorIds: req.auth!.sectorIds, canAccessAnySector: req.auth!.permissions.includes("sectors:any"),
+  requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent"),
+});
 
 const version = (body: Record<string, unknown>, res: Response): string | null => {
   if (typeof body.updatedAt !== "string" || !ISO_DATE.test(body.updatedAt) || !Number.isFinite(Date.parse(body.updatedAt))) {
@@ -42,7 +46,7 @@ const respond = (res: Response, result: ActivityMutationResult) => {
 };
 
 router.post("/activities", requirePermission("activities.create"), requireSectorAccess((req) => req.body?.sectorId), asyncHandler(async (req, res) => { const input = parseInput(req.body, res); if (input) return respond(res, await createActivity(actor(req), input)); }));
-router.patch("/activities/:id", requirePermission("activities.edit"), requireSectorAccess((req) => req.body?.sectorId), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); const expected = version(req.body, res); const input = parseInput(req.body, res); if (expected && input) return respond(res, await updateActivity(actor(req), id, expected, input)); }));
+router.patch("/activities/:id", requirePermission("activities.edit"), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); const expected = version(req.body, res); const input = parseInput(req.body, res); if (expected && input) return respond(res, await updateActivity(actor(req), id, expected, input)); }));
 router.patch("/activities/:id/status", requirePermission("activities.edit"), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); if (Object.keys(req.body).some((key) => !["updatedAt", "status"].includes(key)) || !["active", "inactive"].includes(req.body.status)) return fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); const expected = version(req.body, res); if (expected) return respond(res, await setActivityStatus(actor(req), id, expected, req.body.status)); }));
 router.post("/activities/:id/archive", requirePermission("activities.archive"), asyncHandler(async (req, res) => { const id = String(req.params.id); if (!UUID.test(id)) return fail(res, 400, "VALIDATION_ERROR", "id inválido."); if (Object.keys(req.body).some((key) => key !== "updatedAt")) return fail(res, 400, "VALIDATION_ERROR", "Campos no permitidos."); const expected = version(req.body, res); if (expected) return respond(res, await archiveActivity(actor(req), id, expected)); }));
 

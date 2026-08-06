@@ -6,7 +6,10 @@ import { auditService } from "../services/auditService.js";
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 export const ACTIVITY_MUTATION_MODEL_MIGRATION = "202608060001_activity_mutation_model.sql";
 
-export type ActivityActor = { userId: string; membershipId: string; clubId: string; requestId?: string; ip?: string; userAgent?: string };
+export type ActivityActor = {
+  userId: string; membershipId: string; clubId: string; sectorIds: readonly string[]; canAccessAnySector: boolean;
+  requestId?: string; ip?: string; userAgent?: string;
+};
 export type ActivityInput = {
   sectorId: string; name: string; managerPersonId: string | null; instructorId?: string | null; code?: string | null;
   modality?: string | null; color?: string | null; monthlyFee?: number; clubCommissionPercent: number;
@@ -64,7 +67,9 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
   const pool = await getPostgresPool();
   return withTransaction(async (executor) => {
     if (!await modelApplied(executor)) return { kind: "model_not_applied" };
-    const current = await executor.query<ActivityRow>(`select ${activityColumns} from miclub.activities where club_id=$1 and id=$2 for update`, [actor.clubId, id]);
+    const current = await executor.query<ActivityRow>(`select ${activityColumns} from miclub.activities
+      where club_id=$1 and id=$2 and ($3::boolean or sector_id = any($4::uuid[])) for update`,
+    [actor.clubId, id, actor.canAccessAnySector, actor.sectorIds]);
     const before = current.rows[0];
     if (!before) return { kind: "missing" };
     if (new Date(before.updated_at).toISOString() !== new Date(expectedUpdatedAt).toISOString()) return { kind: "conflict" };
@@ -88,6 +93,9 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
       return { kind: "updated", activity: result.rows[0] };
     }
     const value = input as ActivityInput;
+    // A reassignment requires access to both ends. The current sector was checked
+    // by the authorized lookup above; do not reveal whether an inaccessible target exists.
+    if (!actor.canAccessAnySector && !actor.sectorIds.includes(value.sectorId)) return { kind: "missing" };
     const invalid = await validReferences(executor, actor, value);
     if (invalid) return { kind: invalid };
     const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, monthly_fee=$10, club_commission_percent=$11, instructor_commission_percent=$12, max_capacity=$13, status=$14, notes=$15, updated_at=now(), updated_by=$16::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
