@@ -59,4 +59,5 @@ test("las migraciones y el SQL manual no introducen permisos fuera del catálogo
   assert.ok(marker, "el SQL manual debe publicar su matriz canónica");
   assert.deepEqual(JSON.parse(marker[1]), [...ROLE_DEFAULT_PERMISSIONS.owner]);
   assert.deepEqual(ROLE_PERMISSION_MATRIX.find(({ role }) => role === "owner")?.permissions, ROLE_DEFAULT_PERMISSIONS.owner);
+  assert.match(manualSql, /UPDATE miclub\.user_club_memberships AS membership\s+SET permissions/s);
 });

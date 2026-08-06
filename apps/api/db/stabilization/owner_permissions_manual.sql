@@ -44,10 +44,10 @@ WITH canonical(permission) AS (
     ('finance:write')
 )
 SELECT membership.id AS membership_id, role.code,
-       ARRAY(SELECT permission FROM canonical EXCEPT SELECT unnest(membership.permissions)) AS missing_permissions,
-       ARRAY(SELECT unnest(membership.permissions) EXCEPT SELECT permission FROM canonical) AS custom_permissions
-  FROM miclub.user_club_memberships membership
-  JOIN miclub.roles role ON role.id = membership.role_id AND role.club_id = membership.club_id
+       ARRAY(SELECT permission FROM canonical EXCEPT SELECT unnest(coalesce(membership.permissions, '{}'::text[]))) AS missing_permissions,
+       ARRAY(SELECT unnest(coalesce(membership.permissions, '{}'::text[])) EXCEPT SELECT permission FROM canonical) AS custom_permissions
+  FROM miclub.user_club_memberships AS membership
+  JOIN miclub.roles AS role ON role.id = membership.role_id AND role.club_id = membership.club_id
  WHERE lower(role.code) IN ('owner', 'admin', 'director');
 
 -- CORRECCIÓN MANUAL. La tabla temporal vacía hace que ejecutar el archivo sea inocuo.
@@ -68,7 +68,7 @@ WITH canonical(permission) AS (
     ('movements.view'), ('movements.create'), ('movements.edit'), ('movements.cancel'),
     ('enrollments.view'), ('enrollments.create'), ('enrollments.edit'), ('enrollments.cancel'), ('finance:write')
 )
-UPDATE miclub.user_club_memberships membership
+UPDATE miclub.user_club_memberships AS membership
    SET permissions = ARRAY(
          SELECT DISTINCT permission
            FROM unnest(coalesce(membership.permissions, '{}'::text[]) ||
