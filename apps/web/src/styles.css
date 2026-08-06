@@ -3022,6 +3022,29 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   line-height: 1.2;
 }
 
+.administration-action-card__title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.administration-action-card__badge {
+  background: rgba(255, 207, 102, 0.14);
+  border: 1px solid rgba(255, 207, 102, 0.34);
+  border-radius: 999px;
+  color: #ffe4a3;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.administration-action-card--placeholder {
+  border-style: dashed;
+}
+
 .administration-action-card__content small {
   color: #c4d6f5;
   font-size: 12px;
