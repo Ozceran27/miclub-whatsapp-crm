@@ -1,1 +1,1 @@
-export { emptyPostgresSectorOperationalSummary, getPostgresSectorOperationalSummary } from './implementation.js';
+export { emptyPostgresSectorOperationalSummary, getPostgresSectorOperationalSummary, mapSectorCatalogRows } from './implementation.js';

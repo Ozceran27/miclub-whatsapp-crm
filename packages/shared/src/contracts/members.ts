@@ -131,8 +131,36 @@ export interface HighlightedIncome {
   date: string;
 }
 
+/** Tenant-owned sector identity and optional presentation attributes. */
+export interface SectorCatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+}
+
+export interface SectorOperationalItem extends SectorCatalogItem {
+  totalMembers: number;
+  activeMembers: number;
+  totalDebtors: number;
+  totalDebtAmount: number;
+  totalProfitability: number;
+  currentMonthProfitability: number;
+  settlementBalance: number | null;
+  mostPopularActivity: SectorActivityStat | null;
+  leastPopularActivity: SectorActivityStat | null;
+}
+
 export interface SectorOperationalSummary {
   metadata?: SummaryMetadata;
+  /** Authoritative tenant catalog. Sector id, never its display name, is identity. */
+  sectors: SectorOperationalItem[];
+  /**
+   * @deprecated Import compatibility only. Remove after every tenant has been
+   * re-imported from PostgreSQL and no consumer reads legacy sheet metrics
+   * (target: 2026-12-31). New UI code must consume `sectors`.
+   */
   fitness: {
     totalMembers: number;
     activeMembers: number;

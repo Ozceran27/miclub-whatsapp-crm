@@ -2,7 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeMembershipFeeUnit, normalizeReceivableAggregate } from "@miclub/shared";
 import { setPostgresPoolForTests } from "../db/postgres.js";
-import { buildEnrollmentReceivablesQuery, calculateOperationalProjectedBalance, getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
+import { buildEnrollmentReceivablesQuery, calculateOperationalProjectedBalance, getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary, mapSectorCatalogRows, normalizePostgresSourceSheet, normalizeStatusLabel, normalizeSuspiciousArsAmount, normalizeSuspiciousMembershipFee, selectCuotasACobrar } from "./postgresDashboardService.js";
+
+test("sector catalog preserves tenant ids for arbitrary, duplicate and renamed labels", () => {
+  const clubA = mapSectorCatalogRows([
+    { id: "a-1", code: "NORTE", name: "Cancha azul", color: "#123456", total_members: 3 },
+    { id: "a-2", code: "SUR", name: "Laboratorio", total_members: 1 },
+  ]);
+  const clubB = mapSectorCatalogRows([{ id: "b-9", code: "OTRO", name: "Cancha azul", total_members: 8 }]);
+
+  assert.deepEqual(clubA.map(({ id, name }) => ({ id, name })), [
+    { id: "a-1", name: "Cancha azul" },
+    { id: "a-2", name: "Laboratorio" },
+  ]);
+  assert.equal(clubB[0]?.id, "b-9", "duplicate names in different clubs retain distinct identities");
+  assert.equal(clubA.some(({ name }) => name === "Fitness" || name === "Cantina"), false, "absent historical sectors are not synthesized");
+
+  const renamed = mapSectorCatalogRows([{ id: "a-1", code: "NORTE", name: "Cancha principal", total_members: 3 }]);
+  assert.equal(renamed[0]?.id, clubA[0]?.id);
+  assert.equal(renamed[0]?.name, "Cancha principal");
+});
 
 test("moneyNormalization normaliza cuotas unitarias y agregados compartidos", () => {
   assert.equal(normalizeMembershipFeeUnit("30.000"), 30_000);

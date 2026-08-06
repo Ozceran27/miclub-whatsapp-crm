@@ -67,6 +67,23 @@ const pickString = (
 const pickNumber = (row: Record<string, unknown>, keys: string[]): number =>
   toNumber(pick(row, keys));
 
+/** Maps catalog rows without deriving identity from a mutable display label. */
+export const mapSectorCatalogRows = (rows: Record<string, unknown>[]) => rows.map((row) => ({
+  id: pickString(row, ["id"]),
+  code: pickString(row, ["code"]),
+  name: pickString(row, ["name"]),
+  color: toStringValue(pick(row, ["color"])) ?? null,
+  totalMembers: pickNumber(row, ["total_members"]),
+  activeMembers: pickNumber(row, ["active_members"]),
+  totalDebtors: pickNumber(row, ["total_debtors"]),
+  totalDebtAmount: normalizeSuspiciousArsAmount(pickNumber(row, ["total_debt_amount"])),
+  totalProfitability: pickNumber(row, ["total_profitability"]),
+  currentMonthProfitability: pickNumber(row, ["current_month_profitability"]),
+  settlementBalance: pick(row, ["settlement_balance"]) == null ? null : pickNumber(row, ["settlement_balance"]),
+  mostPopularActivity: null,
+  leastPopularActivity: null,
+}));
+
 export const normalizeSuspiciousArsAmount = (value: number): number => normalizeReceivableAggregate(value);
 
 export const normalizeSuspiciousMembershipFee = (value: number): number => normalizeMembershipFeeUnit(value);
@@ -645,7 +662,42 @@ export const getPostgresSectorOperationalSummary =
     const pool = await getPostgresPool();
     const inactiveEnrollmentFilter = await enrollmentInactiveFilter("enrollments", "e");
     const monthWindow = getArgentinaMonthWindow();
-    const [sectorResult, sectorProfitabilityResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
+    const [catalogResult, sectorResult, sectorProfitabilityResult, local1Result, cantinaResult, snapshotResult, activityResult, debtBySectorResult] = await Promise.all([
+      pool.query<Record<string, unknown>>(
+        `with enrollment_totals as (
+           select a.sector_id,
+             count(*)::integer as total_members,
+             count(*) filter (where e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status]))::integer as active_members,
+             count(*) filter (where e.status = 'adeudando'::miclub.enrollment_status)::integer as total_debtors,
+             coalesce(sum(case when e.status = 'adeudando'::miclub.enrollment_status then e.fee_amount else 0 end), 0) as total_debt_amount
+           from miclub.enrollments e
+           join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+           where e.club_id = $1${inactiveEnrollmentFilter}
+           group by a.sector_id
+         ), movement_totals as (
+           select m.sector_id,
+             coalesce(sum(case when m.movement_type = 'INGRESOS' then abs(m.amount) when m.movement_type = 'EGRESOS' then -abs(m.amount) else 0 end), 0) as total_profitability,
+             coalesce(sum(case when m.movement_date >= $2 and m.movement_date < $3 and m.movement_type = 'INGRESOS' then abs(m.amount) when m.movement_date >= $2 and m.movement_date < $3 and m.movement_type = 'EGRESOS' then -abs(m.amount) else 0 end), 0) as current_month_profitability
+           from miclub.movements m
+           where m.club_id = $1 and m.operational_status::text in ('COMPLETADO', 'COMPLETED')
+           group by m.sector_id
+         )
+         select s.id, s.code, s.name, s.color,
+           coalesce(et.total_members, 0) as total_members,
+           coalesce(et.active_members, 0) as active_members,
+           coalesce(et.total_debtors, 0) as total_debtors,
+           coalesce(et.total_debt_amount, 0) as total_debt_amount,
+           coalesce(mt.total_profitability, 0) as total_profitability,
+           coalesce(mt.current_month_profitability, 0) as current_month_profitability,
+           ssb.settlement_balance
+         from miclub.sectors s
+         left join enrollment_totals et on et.sector_id = s.id
+         left join movement_totals mt on mt.sector_id = s.id
+         left join miclub.v_sector_settlement_balances ssb on ssb.sector_id = s.id
+         where s.club_id = $1
+         order by s.name asc, s.id asc`,
+        [clubId, monthWindow.from, monthWindow.to],
+      ),
       pool.query<Record<string, unknown>>(
         `select * from miclub.v_sector_finance_summary where club_id = $1`, [clubId],
       ),
@@ -856,6 +908,7 @@ export const getPostgresSectorOperationalSummary =
       ),
     ]);
     const sectors = sectorResult.rows;
+    const catalogSectors = mapSectorCatalogRows(catalogResult.rows);
     const snapshots = Object.fromEntries(
       snapshotResult.rows.map((row) => [
         pickString(row, ["metric_key"], ""),
@@ -965,6 +1018,7 @@ export const getPostgresSectorOperationalSummary =
         sourceCompleteness,
         warnings: Object.keys(sourceCompleteness).length > 0 ? ["Algunas métricas PostgreSQL están pendientes de cálculo."] : [],
       },
+      sectors: catalogSectors,
       fitness: {
         ...base("FITNESS"),
         totalProfitability: fitnessTotalProfitability,
@@ -1076,6 +1130,7 @@ export const emptyPostgresClubFinanceSummary = (): ClubOperationsSummary => ({
 export const emptyPostgresSectorOperationalSummary =
   (): SectorOperationalSummary => ({
     metadata: { coverage: "unavailable", warnings: ["Resumen sectorial PostgreSQL no disponible."], sourceCompleteness: {} },
+    sectors: [],
     fitness: {
       totalMembers: 0,
       activeMembers: 0,

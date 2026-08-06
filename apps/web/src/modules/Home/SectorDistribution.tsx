@@ -18,7 +18,7 @@ export function SectorDistribution({ sectorError, sectorCards, loadHome, onOpenM
       {sectorError && <small className="integration-note">{sectorError}</small>}
       <div className="area-grid">
         {sectorCards.map((area) => (
-          <article key={area.key} className={`area-card area-card--${area.accent}`}>
+          <article key={area.key} className={`area-card area-card--${area.accent}`} style={area.color ? { borderColor: area.color } : undefined}>
             <div className="area-card__topline" aria-hidden="true" />
             <div className="area-card__heading">
               <span className="area-card__icon" aria-hidden="true">{area.icon}</span>

@@ -1073,6 +1073,9 @@ const buildSectorOperationalSummary = (members: Member[], rawRanges: Record<stri
   const local1Stats = getLocal1Stats(movements);
 
   return {
+    // LEGACY ADAPTER (remove 2026-12-31): Sheets have no stable tenant sector ids.
+    // They must never synthesize catalog entries; PostgreSQL owns the catalog.
+    sectors: [],
     fitness: {
       totalMembers: fitnessMembers.length,
       activeMembers: fitnessMembers.filter(isActiveMember).length,
