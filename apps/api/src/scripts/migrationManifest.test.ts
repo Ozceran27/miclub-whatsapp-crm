@@ -62,3 +62,16 @@ test("las fases multitenant preceden a sus vistas y repositorios dependientes", 
   before("202607250002_evolve_app_users_auth.sql", "multitenant/202607250006_scope_people_and_link_global_users.sql");
   before("multitenant/202607250004_scope_operational_views_by_club.sql", "202607250010_align_import_conflict_targets.sql");
 });
+
+test("la provisión administrativa es append-only, acotada e idempotente", async () => {
+  const migrationPath = "202608060006_provision_administrative_permissions.sql";
+  assert.equal(migrationManifest.at(-1)?.path, migrationPath);
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+
+  assert.match(sql, /membership\.status = 'active'/);
+  assert.match(sql, /role\.code IN \('owner', 'DIRECTOR', 'admin'\)/);
+  assert.match(sql, /coalesce\(membership\.permissions, '\{\}'::text\[\]\) \|\|/);
+  assert.match(sql, /AND EXISTS \(\s*SELECT permission FROM canonical\s*EXCEPT/s);
+  assert.match(sql, /session_revoked_before = now\(\)/);
+  assert.doesNotMatch(sql, /lower\(role\.code\)/);
+});

@@ -77,6 +77,24 @@ export const ROLE_PERMISSION_MATRIX: readonly Readonly<{
   permissions: readonly PermissionCode[];
 }>[] = KNOWN_ROLES.map((role) => ({ role, permissions: ROLE_DEFAULT_PERMISSIONS[role] }));
 
+/**
+ * Suggested least-privilege baseline for a sector-scoped operator. Sector IDs
+ * remain mandatory authorization boundaries; `sectors:any` is intentionally
+ * absent. Creating a persisted role still requires an explicit product decision.
+ */
+export const SECTOR_OPERATOR_PERMISSIONS = [
+  PERMISSIONS.DASHBOARD_READ,
+  PERMISSIONS.SECTORS_VIEW,
+  PERMISSIONS.ACTIVITIES_VIEW,
+  PERMISSIONS.TASKS_VIEW,
+  PERMISSIONS.REQUESTS_VIEW,
+  PERMISSIONS.MOVEMENTS_VIEW,
+  PERMISSIONS.ENROLLMENTS_VIEW,
+] as const satisfies readonly PermissionCode[];
+
+/** Unknown/future roles receive no implicit grants; provision them explicitly. */
+export const FUTURE_ROLE_DEFAULT_PERMISSIONS = [] as const satisfies readonly PermissionCode[];
+
 /** Deliberately excludes password hashes, signed-session fields and internal membership metadata. */
 export interface PublicAuthUser {
   userId: string;
