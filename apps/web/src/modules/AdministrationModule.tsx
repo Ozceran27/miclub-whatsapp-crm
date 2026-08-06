@@ -9,9 +9,13 @@ import { TaskPanel } from './Administration/TaskPanel';
 import { RequestPanel } from './Administration/RequestPanel';
 import { MovementList } from './Administration/MovementList';
 import { EnrollmentList } from './Administration/EnrollmentList';
+import { MovementCreateModal } from './Administration/MovementCreateModal';
+import { useSession } from '../session';
+import { useState } from 'react';
 
 export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
+  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false); const canCreate=session.permissions.includes('movements.create');
 
   return (
     <main className="module-content">
@@ -53,7 +57,7 @@ export default function AdministrationModule() {
       {dashboard.summary && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero administrativo del club">
           <AdministrationHeaderCards summary={dashboard.summary} />
-          <AdministrationActions />
+          <AdministrationActions onCreateMovement={()=>setMovementOpen(true)} canCreateMovement={canCreate}/>
         </section>
       )}
       <SectorList />
@@ -63,6 +67,7 @@ export default function AdministrationModule() {
       <WorkerList />
       <TaskPanel />
       <RequestPanel />
+      <MovementCreateModal open={movementOpen} onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>
     </main>
   );
 }
