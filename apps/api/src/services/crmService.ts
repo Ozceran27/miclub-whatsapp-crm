@@ -1,23 +1,28 @@
 import type { ContactedRecentResponse, MessageTemplate, PaginatedHistoryResponse, PreparedMessage } from "@miclub/shared";
-import db from "../lib/sqlite.js";
 import * as postgresCrm from "../repositories/crmRepository.js";
 
 export type CrmSource = "sqlite" | "postgres";
 export type CrmMigrationPhase = "templates" | "history" | "all";
 
-const sqliteRun = (query: string, params: unknown[] = []): Promise<{ lastID?: number }> =>
-  new Promise((resolve, reject) => {
+const sqliteRun = async (query: string, params: unknown[] = []): Promise<{ lastID?: number }> => {
+  const { default: db } = await import("../lib/sqlite.js");
+  return new Promise((resolve, reject) => {
     db.run(query, params, function onRun(err) {
       if (err) return reject(err);
       resolve({ lastID: this.lastID });
     });
   });
+};
 
-const sqliteAll = <T>(query: string, params: unknown[] = []): Promise<T[]> =>
-  new Promise((resolve, reject) => db.all(query, params, (err, rows) => (err ? reject(err) : resolve(rows as T[]))));
+const sqliteAll = async <T>(query: string, params: unknown[] = []): Promise<T[]> => {
+  const { default: db } = await import("../lib/sqlite.js");
+  return new Promise((resolve, reject) => db.all(query, params, (err, rows) => (err ? reject(err) : resolve(rows as T[]))));
+};
 
-const sqliteGet = <T>(query: string, params: unknown[] = []): Promise<T | undefined> =>
-  new Promise((resolve, reject) => db.get(query, params, (err, row) => (err ? reject(err) : resolve(row as T | undefined))));
+const sqliteGet = async <T>(query: string, params: unknown[] = []): Promise<T | undefined> => {
+  const { default: db } = await import("../lib/sqlite.js");
+  return new Promise((resolve, reject) => db.get(query, params, (err, row) => (err ? reject(err) : resolve(row as T | undefined))));
+};
 
 // SQLite is an explicitly selected legacy migration/audit source.  An absent or
 // misspelled setting must never make an ordinary CRM request fall back to it.
