@@ -6,6 +6,8 @@ export type MigrationManifestEntry = Readonly<{
   /** PostgreSQL objects are `schema.kind.name` or `schema.table.column`. */
   provides?: readonly string[];
   requires?: readonly string[];
+  /** Release-checkpoint description. Entries carrying it are rendered in the post-admin checkpoint. */
+  checkpointPurpose?: string;
 }>;
 
 // This array, not directory traversal or lexical sorting, is the execution order.
@@ -55,14 +57,36 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202607280002_retention_and_crm_template_archive.sql", sha256: "8727f7a14f6276c8541cf9bc6eef5bbce161e69b91397d78fdc5c062499716cc" },
   { path: "202607290002_reconcile_canceled_sheet_movements.sql", sha256: "6d14defb3b1b18ba7d6046cabbbfb33c7429d49308726e59bd4ee18e17fee6d4" },
   { path: "multitenant/202607290001_scope_sector_settlement_view_by_club.sql", sha256: "d5f1f35b18555b8188a9185ea46ab122a9f83ebabaa0dd950a3dd19669ac9fd3" },
-  { path: "202608060001_activity_mutation_model.sql", sha256: "a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b" },
-  { path: "202608060002_tasks.sql", sha256: "d92b6d148bbfd7eed676822e7fb4b8ad8c93b5e2d9cf44cd9ccf2e3930d6b1a3" },
-  { path: "202608060003_movement_mutation_model.sql", sha256: "1e448a1a46dc0401f89ff105397af8779602dd97e89e3c297033de3558afe628" },
-  { path: "202608060004_manual_movement_creation.sql", sha256: "561cb4ca1198dbbb40c37e46aced504e0c5f809b3a4d8458e9c9200a496e28b0" },
-  { path: "202608060005_grant_read_permissions.sql", sha256: "03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb" },
-  { path: "202608060006_provision_administrative_permissions.sql", sha256: "77332672f70089e44787361c334bb5975cf2b0490d1b290100f346194561d2f2" },
-  { path: "202608060007_backfill_granular_mutation_permissions.sql", sha256: "5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685" },
+  { path: "202608060001_activity_mutation_model.sql", sha256: "a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b", dependsOn: ["multitenant/202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql"], checkpointPurpose: "Añade archivo, actor, índice activo e invariantes para mutaciones de actividades." },
+  { path: "202608060002_tasks.sql", sha256: "d92b6d148bbfd7eed676822e7fb4b8ad8c93b5e2d9cf44cd9ccf2e3930d6b1a3", dependsOn: ["202607250003_create_user_club_authorization.sql"], checkpointPurpose: "Crea tareas tenant-scoped con normalización, restricciones e índices operativos." },
+  { path: "202608060003_movement_mutation_model.sql", sha256: "1e448a1a46dc0401f89ff105397af8779602dd97e89e3c297033de3558afe628", dependsOn: ["202607280001_enforce_operational_movement_status.sql"], checkpointPurpose: "Añade conciliación y anulación, y protege movimientos finalizados o vinculados a pagos." },
+  { path: "202608060004_manual_movement_creation.sql", sha256: "561cb4ca1198dbbb40c37e46aced504e0c5f809b3a4d8458e9c9200a496e28b0", dependsOn: ["202608060001_activity_mutation_model.sql", "202608060003_movement_mutation_model.sql"], checkpointPurpose: "Añade actividad e idempotencia para la creación manual de movimientos." },
+  { path: "202608060005_grant_read_permissions.sql", sha256: "03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb", dependsOn: ["202607250003_create_user_club_authorization.sql"], checkpointPurpose: "Conserva el acceso de lectura de roles administrativos al hacer explícitos los permisos read." },
+  { path: "202608060006_provision_administrative_permissions.sql", sha256: "77332672f70089e44787361c334bb5975cf2b0490d1b290100f346194561d2f2", dependsOn: ["202607250009_add_session_revocation.sql", "202608060005_grant_read_permissions.sql"], checkpointPurpose: "Provisiona permisos administrativos canónicos sin eliminar grants personalizados y revoca sesiones afectadas." },
+  { path: "202608060007_backfill_granular_mutation_permissions.sql", sha256: "5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685", dependsOn: ["202608060006_provision_administrative_permissions.sql"], checkpointPurpose: "Completa permisos granulares desde grants legacy, preserva permisos personalizados y revoca sesiones afectadas." },
 ];
+
+export const POST_ADMIN_MIGRATIONS_START = "202608060001";
+
+/** Canonical Markdown used by the release checkpoint and its static consistency check. */
+export function renderPostAdminMigrationTable(entries: readonly MigrationManifestEntry[] = migrationManifest): string {
+  const postAdmin = entries.filter((entry) => pathBasename(entry.path) >= POST_ADMIN_MIGRATIONS_START);
+  const missingPurpose = postAdmin.filter((entry) => !entry.checkpointPurpose);
+  if (missingPurpose.length > 0) {
+    throw new Error(`Falta finalidad de checkpoint: ${missingPurpose.map((entry) => entry.path).join(", ")}`);
+  }
+  const rows = postAdmin.map((entry) => {
+    const dependency = entry.dependsOn?.length
+      ? `Después de ${entry.dependsOn.map((item) => `\`${pathBasename(item)}\``).join(" y ")}.`
+      : "Sin dependencia operativa adicional.";
+    return `| \`${pathBasename(entry.path)}\` | ${entry.checkpointPurpose} | \`${entry.sha256}\` | ${dependency} |`;
+  });
+  return [
+    "| Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |",
+    "| --- | --- | --- | --- |",
+    ...rows,
+  ].join("\n");
+}
 
 /** Duplicate timestamps that predate the manifest policy. Do not extend this set. */
 export const legacyDuplicateTimestamps = new Set(["202606280003", "202607020001", "202607020004", "202607250006"]);
