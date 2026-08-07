@@ -63,7 +63,7 @@ export const createMovement = async (actor: MovementActor, input: MovementInput,
 };
 
 const lockMovement = async (db: Parameters<typeof auditService.movement>[1] & { query: Function }, actor: MovementActor, id: string, expected: string) => {
-  const result = await db.query(`select ${movementColumns}, exists(select 1 from miclub.payment_allocations pa where pa.movement_id=m.id) as linked_payment from miclub.movements m where m.club_id=$1 and m.id=$2 for update`,[actor.clubId,id]);
+  const result = await db.query(`select ${movementColumns}, miclub.movement_has_payment_allocation(m.id) as linked_payment from miclub.movements m where m.club_id=$1 and m.id=$2 for update`,[actor.clubId,id]);
   const row=result.rows[0] as MovementRow|undefined; if(!row)return {kind:"missing" as const};
   if(new Date(String(row.updated_at)).toISOString()!==new Date(expected).toISOString())return {kind:"conflict" as const};
   const reasons=[]; if(row.reconciled_at)reasons.push("reconciled"); if(row.linked_payment)reasons.push("payment");
