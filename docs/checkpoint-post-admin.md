@@ -12,14 +12,19 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 
 ## SQL incorporado y estado de aplicación
 
-Las siguientes migraciones versionadas están incorporadas al manifiesto y deben aplicarse, en este orden, con `npm run db:migrate`:
+La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
-| Migración | Cambio |
-| --- | --- |
-| `202608060001_activity_mutation_model.sql` | `activities.archived_at`, `updated_by`, índice activo y trigger de invariantes. |
-| `202608060002_tasks.sql` | tabla `tasks`, normalización, constraints e índices tenant-scoped. |
-| `202608060003_movement_mutation_model.sql` | conciliación/anulación de movimientos y protección de movimientos finalizados. |
-| `202608060004_manual_movement_creation.sql` | `activity_id`, `idempotency_key` e índices para creación manual idempotente. |
+<!-- POST_ADMIN_MIGRATIONS:START -->
+| Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
+| --- | --- | --- | --- |
+| `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
+| `202608060002_tasks.sql` | Crea tareas tenant-scoped con normalización, restricciones e índices operativos. | `d92b6d148bbfd7eed676822e7fb4b8ad8c93b5e2d9cf44cd9ccf2e3930d6b1a3` | Después de `202607250003_create_user_club_authorization.sql`. |
+| `202608060003_movement_mutation_model.sql` | Añade conciliación y anulación, y protege movimientos finalizados o vinculados a pagos. | `1e448a1a46dc0401f89ff105397af8779602dd97e89e3c297033de3558afe628` | Después de `202607280001_enforce_operational_movement_status.sql`. |
+| `202608060004_manual_movement_creation.sql` | Añade actividad e idempotencia para la creación manual de movimientos. | `561cb4ca1198dbbb40c37e46aced504e0c5f809b3a4d8458e9c9200a496e28b0` | Después de `202608060001_activity_mutation_model.sql` y `202608060003_movement_mutation_model.sql`. |
+| `202608060005_grant_read_permissions.sql` | Conserva el acceso de lectura de roles administrativos al hacer explícitos los permisos read. | `03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb` | Después de `202607250003_create_user_club_authorization.sql`. |
+| `202608060006_provision_administrative_permissions.sql` | Provisiona permisos administrativos canónicos sin eliminar grants personalizados y revoca sesiones afectadas. | `77332672f70089e44787361c334bb5975cf2b0490d1b290100f346194561d2f2` | Después de `202607250009_add_session_revocation.sql` y `202608060005_grant_read_permissions.sql`. |
+| `202608060007_backfill_granular_mutation_permissions.sql` | Completa permisos granulares desde grants legacy, preserva permisos personalizados y revoca sesiones afectadas. | `5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685` | Después de `202608060006_provision_administrative_permissions.sql`. |
+<!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
 

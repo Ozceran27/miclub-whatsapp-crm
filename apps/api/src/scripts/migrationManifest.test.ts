@@ -4,9 +4,23 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
+import { hasOpenTransaction, migrationManifest, renderPostAdminMigrationTable, validateMigrationGraph } from "./migrationManifest.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+test("el checkpoint post-admin se genera desde las entradas correspondientes del manifiesto", async () => {
+  const checkpoint = await readFile(path.join(repositoryRoot, "docs/checkpoint-post-admin.md"), "utf8");
+  const startMarker = "<!-- POST_ADMIN_MIGRATIONS:START -->";
+  const endMarker = "<!-- POST_ADMIN_MIGRATIONS:END -->";
+  const start = checkpoint.indexOf(startMarker);
+  const end = checkpoint.indexOf(endMarker);
+  assert.notEqual(start, -1, `falta ${startMarker}`);
+  assert.ok(end > start, `falta ${endMarker}`);
+  const documentedTable = checkpoint.slice(start + startMarker.length, end).trim();
+
+  assert.equal(documentedTable, renderPostAdminMigrationTable());
+});
 
 test("el manifiesto incluye exactamente una vez cada SQL versionado y conserva sus checksums", async () => {
   const versionedSql = [
