@@ -6,6 +6,11 @@ que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 
 ## Orden
 
+Para el backfill histórico integral posterior a la reestructuración, utilizar el
+runbook autocontenido [`integral-backfill-2026-08/README.md`](integral-backfill-2026-08/README.md).
+Sus scripts exigen primero evidencia de cardinalidad e indican puntos de parada;
+no reemplazar ese orden con ejecuciones parciales.
+
 1. Abrir una conexión nueva y ejecutar `01_auth_tenant_diagnostic_readonly.sql`.
 2. Confirmar que existe exactamente un club candidato `miClub`.
 3. Ejecutar el diagnóstico 08. Si todas las filas muestran `PASS`, no ejecutar
