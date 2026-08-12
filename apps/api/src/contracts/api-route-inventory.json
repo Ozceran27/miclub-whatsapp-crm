@@ -2072,6 +2072,66 @@
         "validation",
         "success"
       ]
+    },
+    {
+      "source": "apps/api/src/routes/onboardingRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "id": "GET /api/onboarding",
+      "method": "GET",
+      "path": "/api/onboarding",
+      "permission": "onboarding.read",
+      "mutability": "read",
+      "idempotency": "idempotent"
+    },
+    {
+      "source": "apps/api/src/routes/onboardingRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "id": "PATCH /api/onboarding/advance",
+      "method": "PATCH",
+      "path": "/api/onboarding/advance",
+      "permission": "onboarding.write",
+      "mutability": "write",
+      "idempotency": "idempotent"
+    },
+    {
+      "source": "apps/api/src/routes/onboardingRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "id": "POST /api/onboarding/complete",
+      "method": "POST",
+      "path": "/api/onboarding/complete",
+      "permission": "onboarding.write",
+      "mutability": "write",
+      "idempotency": "idempotent"
     }
   ]
 }

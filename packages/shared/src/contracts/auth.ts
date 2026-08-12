@@ -53,6 +53,8 @@ export const PERMISSIONS = {
   ENROLLMENTS_EDIT: "enrollments.edit",
   ENROLLMENTS_CANCEL: "enrollments.cancel",
   FINANCE_WRITE: "finance:write",
+  ONBOARDING_READ: "onboarding.read",
+  ONBOARDING_WRITE: "onboarding.write",
 } as const;
 
 export type PermissionCode = typeof PERMISSIONS[keyof typeof PERMISSIONS];

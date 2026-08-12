@@ -12,3 +12,4 @@ export * from "./contracts/administration.js";
 export * from "./contracts/auth.js";
 export * from "./contracts/tasks.js";
 export * from "./contracts/requests.js";
+export * from "./contracts/onboarding.js";

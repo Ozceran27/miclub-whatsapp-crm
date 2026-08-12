@@ -52,6 +52,7 @@ import enrollmentMutationRoutes from "./routes/enrollmentMutationRoutes.js";
 import economyRoutes from "./routes/economyRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import administrationRoutes from "./routes/administrationRoutes.js";
+import onboardingRoutes from "./routes/onboardingRoutes.js";
 import readOnlyRoutes from "./routes/readOnlyRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -136,6 +137,7 @@ app.use("/api", movementMutationRoutes);
 app.use("/api", enrollmentMutationRoutes);
 app.use("/api/economy", economyRoutes);
 app.use("/api/administration", administrationRoutes);
+app.use("/api", onboardingRoutes);
 app.use("/api", dashboardRoutes);
 
 app.use(createLegacyCompatRoutes(debugEndpointsEnabled));

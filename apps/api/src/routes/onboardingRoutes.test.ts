@@ -1,0 +1,9 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, SECTOR_OPERATOR_PERMISSIONS } from "@miclub/shared";
+import { rejectClientClubId, requirePermission } from "../middleware/authorization.js";
+
+const invoke=(middleware:ReturnType<typeof requirePermission>,permissions?:readonly string[])=>{let status=200,next=false;const req=permissions===undefined?{}:{auth:{permissions}};const res={status(code:number){status=code;return this;},json(){return this;}};middleware(req as never,res as never,()=>{next=true;});return {status,next};};
+test("lectura y escritura requieren sus permisos separados",()=>{assert.deepEqual(invoke(requirePermission(PERMISSIONS.ONBOARDING_READ)),{status:401,next:false});assert.deepEqual(invoke(requirePermission(PERMISSIONS.ONBOARDING_READ),[]),{status:403,next:false});assert.deepEqual(invoke(requirePermission(PERMISSIONS.ONBOARDING_READ),[PERMISSIONS.ONBOARDING_READ]),{status:200,next:true});assert.deepEqual(invoke(requirePermission(PERMISSIONS.ONBOARDING_WRITE),[PERMISSIONS.ONBOARDING_READ]),{status:403,next:false});});
+test("Director recibe onboarding pero trabajadores e instructores sectoriales no",()=>{assert.ok(ROLE_DEFAULT_PERMISSIONS.DIRECTOR.includes(PERMISSIONS.ONBOARDING_READ));assert.ok(ROLE_DEFAULT_PERMISSIONS.DIRECTOR.includes(PERMISSIONS.ONBOARDING_WRITE));assert.ok(!SECTOR_OPERATOR_PERMISSIONS.includes(PERMISSIONS.ONBOARDING_READ as never));assert.ok(!SECTOR_OPERATOR_PERMISSIONS.includes(PERMISSIONS.ONBOARDING_WRITE as never));});
+test("clubId controlado por el cliente se rechaza",()=>{let status=200,next=false;const req={params:{},query:{},body:{clubId:"otro-club"}};const res={status(code:number){status=code;return this;},json(){return this;}};rejectClientClubId(req as never,res as never,()=>{next=true;});assert.deepEqual({status,next},{status:400,next:false});});
