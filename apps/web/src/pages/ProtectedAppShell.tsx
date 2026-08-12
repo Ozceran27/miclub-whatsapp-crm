@@ -11,6 +11,7 @@ import { useSession } from '../session';
 import { useTheme } from '../theme';
 import { tenantModuleKey } from '../tenantScope';
 import { hasAdministrationCapability, visibleModules } from '../administrationCapabilities';
+import { OnboardingGate } from '../modules/Onboarding/OnboardingGate';
 
 const MODULES: ModuleDefinition[] = [
   { id: 'home', label: 'INICIO' }, { id: 'economy', label: 'ECONOMÍA CLUB' }, { id: 'fitness', label: 'ESPACIO FITNESS' },
@@ -67,7 +68,7 @@ export default function ProtectedAppShell() {
   };
 
   return (
-    <div className="container app-shell">
+    <OnboardingGate><div className="container app-shell">
       <header className="app-header">
         <img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" />
         <div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div>
@@ -81,6 +82,6 @@ export default function ProtectedAppShell() {
       {logoutError && <p className="login-error" role="alert">{logoutError}</p>}
       <ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} />
       <div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div>
-    </div>
+    </div></OnboardingGate>
   );
 }

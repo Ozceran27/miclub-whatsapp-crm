@@ -3191,6 +3191,29 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .detail-modal__notes { font: inherit; margin: 0; white-space: pre-wrap; }
 .detail-modal__actions { align-items: stretch; display: grid; gap: 10px; }
 .detail-modal__actions button { justify-self: start; }
+
+/* Onboarding is intentionally above the application shell and cannot be dismissed externally. */
+.onboarding-backdrop { align-items: center; background: rgba(3, 8, 20, .82); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 1000; }
+.onboarding-dialog { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 22px; box-shadow: 0 28px 80px rgba(0,0,0,.45); display: grid; gap: 20px; max-height: calc(100vh - 40px); max-width: 720px; overflow: auto; padding: 28px; width: 100%; }
+.onboarding-progress { align-items: center; color: var(--color-text-muted); display: flex; font-size: 12px; font-weight: 800; gap: 16px; }
+.onboarding-progress progress { accent-color: var(--color-accent); flex: 1; height: 8px; }
+.onboarding-viewport { overflow: hidden; }
+.onboarding-step { animation: onboarding-slide .28s ease-out; display: grid; gap: 14px; }
+.onboarding-step h2, .onboarding-step p { margin: 0; }
+.onboarding-step > p, .onboarding-step li { color: var(--color-text-muted); }
+.onboarding-hero { font-size: 68px; text-align: center; }
+.onboarding-checklist { display: flex; flex-wrap: wrap; gap: 10px; }
+.onboarding-checklist span { background: color-mix(in srgb, var(--color-success) 12%, transparent); border-radius: 999px; color: var(--color-success); font-weight: 800; padding: 8px 12px; }
+.onboarding-actions { align-items: center; display: flex; gap: 12px; justify-content: flex-end; }
+.onboarding-error { color: var(--color-danger); margin: 0; }
+.onboarding-gate-status { align-items: center; display: flex; flex-direction: column; gap: 12px; justify-content: center; min-height: 100vh; }
+.setup-form { border: 1px solid var(--color-border); border-radius: 14px; display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); padding: 18px; }
+.setup-form legend { font-weight: 800; padding: 0 7px; }
+.setup-form label { color: var(--color-text-muted); display: grid; font-size: 12px; font-weight: 700; gap: 6px; }
+.setup-form input, .setup-form select { width: 100%; }
+@keyframes onboarding-slide { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .onboarding-step { animation: none; } }
+@media (max-width: 680px) { .onboarding-dialog { border-radius: 18px; padding: 20px; } .setup-form { grid-template-columns: 1fr; } }
 .task-panel { display: grid; gap: 18px; }
 .task-panel__form { align-items: end; display: grid; gap: 12px; grid-template-columns: 1fr 1.5fr minmax(180px,.7fr) auto; }
 .task-panel__form label { color: var(--color-text-muted); display: grid; font-size: 12px; gap: 6px; }
