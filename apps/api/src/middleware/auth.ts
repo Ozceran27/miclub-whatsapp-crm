@@ -100,6 +100,7 @@ export const protectedApiPrefixes = [
   "/api/db",
   "/api/modules",
   "/api/administration"
+  ,"/api/onboarding"
 ];
 
 export const isProtectedApiPath = (pathName: string): boolean =>

@@ -1,0 +1,11 @@
+import { PERMISSIONS, type OnboardingStep } from "@miclub/shared";
+import { Router, type Request } from "express";
+import { requirePermission } from "../middleware/authorization.js";
+import { onboardingService } from "../services/onboardingService.js";
+import asyncHandler from "./asyncHandler.js";
+const router=Router();
+const actor=(req:Request)=>({userId:req.auth!.userId,membershipId:req.auth!.membershipId,clubId:req.auth!.clubId,requestId:req.requestId,ip:req.ip,userAgent:req.get("user-agent")});
+router.get("/onboarding",requirePermission(PERMISSIONS.ONBOARDING_READ),asyncHandler(async(req,res)=>res.json(await onboardingService.read(req.auth!.clubId))));
+router.patch("/onboarding/advance",requirePermission(PERMISSIONS.ONBOARDING_WRITE),asyncHandler(async(req,res)=>{const body=req.body as Record<string,unknown>;if(Object.keys(body).some(k=>k!=="currentStep")||!Number.isInteger(body.currentStep)||Number(body.currentStep)<1||Number(body.currentStep)>7)return res.status(400).json({code:"VALIDATION_ERROR",message:"currentStep debe estar entre 1 y 7"});return res.json(await onboardingService.advance(actor(req),body.currentStep as OnboardingStep));}));
+router.post("/onboarding/complete",requirePermission(PERMISSIONS.ONBOARDING_WRITE),asyncHandler(async(req,res)=>{if(Object.keys(req.body as object).length)return res.status(400).json({code:"VALIDATION_ERROR",message:"La finalización no acepta body"});return res.json(await onboardingService.complete(actor(req)));}));
+export default router;
