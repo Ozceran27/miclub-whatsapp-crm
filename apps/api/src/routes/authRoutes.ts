@@ -4,7 +4,7 @@ import { getActiveMembershipContext, listActiveMemberships, postgresUserReposito
 import { isSessionRevoked } from "../auth/sessionService.js";
 import { clearSessionCookie, getSession, isAuthEnabled, setSessionCookie } from "../middleware/auth.js";
 import asyncHandler from "./asyncHandler.js";
-import { registerClubOwner, RegistrationError } from "../auth/registrationService.js";
+import { registerClub, RegistrationError } from "../auth/registrationService.js";
 import { auditService } from "../services/auditService.js";
 import { toPermissionCode, toRoleCode, type PublicAuthUser } from "@miclub/shared";
 
@@ -43,14 +43,11 @@ router.post("/login", asyncHandler(async (req, res) => {
 
 router.post("/register", asyncHandler(async (req, res) => {
   if (!isAuthEnabled() || process.env.PUBLIC_REGISTRATION_ENABLED !== "true") return res.status(404).json({ authenticated: false, message: "El registro público no está habilitado." });
-  const body = req.body as { clubName?: unknown; email?: unknown; password?: unknown };
   try {
-    const context = await registerClubOwner(body.clubName, body.email, body.password);
-    setSessionCookie(req, res, context);
-    await auditService.registration({ action: "auth.registration", result: "success", userId: context.userId, clubId: context.clubId, membershipId: context.membershipId, ip: req.ip, userAgent: req.get("user-agent"), requestId: req.requestId }).catch((error) => console.error("No se pudo auditar el registro", error));
-    return res.status(201).json({ authenticated: true, username: context.email, user: publicUser(context) });
+    await registerClub(req.body);
+    return res.status(201).json({ success: true, message: "¡Usuario creado de manera exitosa!" });
   } catch (error) {
-    if (error instanceof RegistrationError) return res.status(error.code === "email_exists" ? 409 : 400).json({ authenticated: false, message: error.message });
+    if (error instanceof RegistrationError) return res.status(error.code === "invalid_input" ? 400 : 409).json({ success: false, code: error.code, message: error.message });
     throw error;
   }
 }));

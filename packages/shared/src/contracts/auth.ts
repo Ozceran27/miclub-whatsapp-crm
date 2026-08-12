@@ -140,3 +140,22 @@ export interface AuthResponse {
   message?: string;
   user?: PublicAuthUser;
 }
+
+/** Public tenant registration input. It intentionally contains no role or permission fields. */
+export interface ClubRegistrationDto {
+  firstName: string;
+  lastName: string;
+  dni: string;
+  phone: string;
+  email: string;
+  password: string;
+  club: {
+    name: string;
+  };
+}
+
+/** Registration creates an account, but never creates an authenticated session. */
+export interface ClubRegistrationResponse {
+  success: true;
+  message: string;
+}
