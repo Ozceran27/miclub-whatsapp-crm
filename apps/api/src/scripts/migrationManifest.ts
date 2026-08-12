@@ -64,6 +64,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608060005_grant_read_permissions.sql", sha256: "03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb", dependsOn: ["202607250003_create_user_club_authorization.sql"], checkpointPurpose: "Conserva el acceso de lectura de roles administrativos al hacer explícitos los permisos read." },
   { path: "202608060006_provision_administrative_permissions.sql", sha256: "77332672f70089e44787361c334bb5975cf2b0490d1b290100f346194561d2f2", dependsOn: ["202607250009_add_session_revocation.sql", "202608060005_grant_read_permissions.sql"], checkpointPurpose: "Provisiona permisos administrativos canónicos sin eliminar grants personalizados y revoca sesiones afectadas." },
   { path: "202608060007_backfill_granular_mutation_permissions.sql", sha256: "5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685", dependsOn: ["202608060006_provision_administrative_permissions.sql"], checkpointPurpose: "Completa permisos granulares desde grants legacy, preserva permisos personalizados y revoca sesiones afectadas." },
+  { path: "202608120001_registration_bootstrap_constraints.sql", sha256: "8f4cb77195bedd70a0df5a39ee8f7eba2fac799d7d6b0550da6c4dd9441823b8", dependsOn: ["202608060007_backfill_granular_mutation_permissions.sql"], checkpointPurpose: "Impide relaciones laborales vigentes duplicadas por persona y club durante el bootstrap de tenants." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

@@ -92,7 +92,7 @@ test("la provisión administrativa es append-only, acotada e idempotente", async
 
 test("el backfill granular preserva grants personalizados y renueva sesiones", async () => {
   const migrationPath = "202608060007_backfill_granular_mutation_permissions.sql";
-  assert.equal(migrationManifest.at(-1)?.path, migrationPath);
+  assert.ok(migrationManifest.some(({ path: registeredPath }) => registeredPath === migrationPath));
   const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
   for (const permission of ["movements.edit", "movements.cancel", "enrollments.create", "enrollments.edit", "enrollments.cancel"]) {
     assert.match(sql, new RegExp(permission.replace(".", "\\.")));

@@ -1,5 +1,5 @@
 import { apiJson } from '../../api';
-import type { AuthResponse } from '@miclub/shared';
+import type { AuthResponse, ClubRegistrationDto, ClubRegistrationResponse } from '@miclub/shared';
 
 export type { AuthResponse } from '@miclub/shared';
 
@@ -7,6 +7,6 @@ export const login = (username: string, password: string) => apiJson<AuthRespons
   method: 'POST', body: JSON.stringify({ username, password })
 }, { revalidate401: false });
 
-export const register = (clubName: string, email: string, password: string) => apiJson<AuthResponse>('/auth/register', {
-  method: 'POST', body: JSON.stringify({ clubName, email, password })
+export const register = (input: ClubRegistrationDto) => apiJson<ClubRegistrationResponse>('/auth/register', {
+  method: 'POST', body: JSON.stringify(input)
 }, { revalidate401: false });
