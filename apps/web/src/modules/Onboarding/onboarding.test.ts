@@ -28,3 +28,10 @@ test('gate recupera currentStep del servidor y persiste cada avance', () => {
   assert.match(source, /getOnboarding\(signal\)/); assert.match(source, /state\.currentStep/);
   assert.match(source, /advanceOnboarding\(step\)/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
 });
+
+test('advierte que los saldos iniciales son capital histórico y enlaza conciliación', () => {
+  const source = readFileSync(new URL('./steps.tsx', import.meta.url), 'utf8');
+  assert.match(source, /capital histórico/i);
+  assert.match(source, /no ingresos del período/i);
+  assert.match(source, /conciliacion=apertura/);
+});
