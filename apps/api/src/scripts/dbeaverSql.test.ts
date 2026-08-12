@@ -68,3 +68,22 @@ test("diagnóstico de dashboard resuelve miClub sin pedir parámetros ni modific
   assert.doesNotMatch(dashboard, /:club_id/);
   assert.doesNotMatch(dashboard, /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)\b/i);
 });
+
+test("saldos iniciales usan cuentas, moneda ISO y reemplazo idempotente auditable", () => {
+  const script = sql("15_financial_accounts_and_opening_balances_manual.sql");
+  for (const currency of ["ARS", "USD", "BRL", "EUR"]) assert.match(script, new RegExp(`'${currency}'`));
+  for (const account of ["CASH", "BANK", "USD_CASH"]) assert.match(script, new RegExp(`'${account}'`));
+  assert.match(script, /UNIQUE \(club_id, code\)/i);
+  assert.match(script, /account_id uuid/);
+  assert.match(script, /payment_method_id[\s\S]*Canal[\s\S]*no representa la cuenta/i);
+  assert.match(script, /movement_type,concept[\s\S]*'CAPITAL'/);
+  assert.match(script, /'COMPLETADO','onboarding'/);
+  assert.match(script, /operation IN \('REPLACE','REVERSE'\)/);
+  assert.match(script, /p_cash IS NULL[\s\S]*p_cash < 0 OR p_bank < 0 OR p_usd_cash < 0/);
+  assert.match(script, /idempotency_key=p_idempotency_key/);
+  assert.match(script, /VALUES \('CASH',p_cash\),\('BANK',p_bank\),\('USD_CASH',p_usd_cash\)/);
+  assert.match(script, /replace_opening_balances\(p_club_id,0,0,0[\s\S]*'REVERSE'/);
+  assert.match(script, /v_financial_account_liquidity/);
+  assert.match(script, /Snapshot\/cache reconciliable/);
+  assert.doesNotMatch(script, /DELETE\s+FROM\s+miclub\.movements/i);
+});
