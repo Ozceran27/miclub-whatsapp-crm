@@ -48,8 +48,10 @@ test("las migraciones y el SQL manual no introducen permisos fuera del catálogo
   for (const file of files) {
     const sql = await readFile(path.join(migrationDir, file), "utf8");
     for (const match of sql.matchAll(/'([a-z]+(?:[.:][a-z]+)+)'/g)) {
-      if (match[1].includes(":" ) || match[1].includes(".")) {
-        assert.ok(declared.has(match[1]), `${file} contiene el permiso no declarado ${match[1]}`);
+      const candidate = match[1];
+      // Qualified PostgreSQL identifiers (for example miclub.users) are not permissions.
+      if (!candidate.startsWith("miclub.") && (candidate.includes(":") || candidate.includes("."))) {
+        assert.ok(declared.has(candidate), `${file} contiene el permiso no declarado ${candidate}`);
       }
     }
   }

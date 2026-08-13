@@ -97,6 +97,7 @@ export const protectedApiPrefixes = [
   "/api/dashboard-reconciliation",
   "/api/sector-finance-summary",
   "/api/import",
+  "/api/migration",
   "/api/db",
   "/api/modules",
   "/api/administration"

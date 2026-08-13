@@ -102,3 +102,14 @@ test("el backfill granular preserva grants personalizados y renueva sesiones", a
   assert.match(sql, /session_revoked_before = now\(\)/);
   assert.doesNotMatch(sql, /role\.code/);
 });
+
+
+test("la migración XLSX referencia la tabla canónica de usuarios", async () => {
+  const migrationPath = "202608130004_secure_xlsx_import.sql";
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+
+  assert.match(sql, /references miclub\.users\(id\) on delete set null/i);
+  assert.doesNotMatch(sql, /references miclub\.app_users/i);
+  assert.match(sql, /to_regclass\('miclub\.users'\)/i);
+  assert.match(sql, /begin;[\s\S]*commit;/i);
+});
