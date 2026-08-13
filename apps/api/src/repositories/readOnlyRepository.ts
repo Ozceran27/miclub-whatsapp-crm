@@ -63,13 +63,14 @@ const listDefinitions = {
   },
   actividades: {
     sectorColumn: "a.sector_id",
-    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id",
+    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.monthly_fixed_fee, t.club_share_percentage, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true",
     clubColumn: "a.club_id",
     select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name, a.instructor_id,
-      i.display_name as instructor_name, a.code, a.name, a.modality, a.color, a.monthly_fee,
+      i.display_name as instructor_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
       a.club_commission_percent, a.instructor_commission_percent, a.max_capacity,
-      a.settlement_mode, a.settlement_fixed_amount, a.generates_enrollments,
+      lower(terms.mode) as settlement_mode, terms.monthly_fixed_fee as settlement_fixed_amount,
+      terms.club_share_percentage, terms.effective_from as terms_effective_from, terms.effective_to as terms_effective_to, a.generates_enrollments,
       (select count(*)::integer from miclub.enrollments e where e.club_id = a.club_id
         and e.activity_id = a.id and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as current_enrollments,
       a.status, a.notes, a.created_at, a.updated_at`,

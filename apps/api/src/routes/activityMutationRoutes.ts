@@ -22,15 +22,15 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "managerPersonId", "instructorId", "code", "name", "modality", "color", "monthlyFee", "clubCommissionPercent", "instructorCommissionPercent", "maxCapacity", "status", "notes"]);
+  const allowed = new Set(["updatedAt", "sectorId", "managerPersonId", "instructorId", "code", "name", "modality", "color", "iconKey", "enrollmentFee", "clubCommissionPercent", "instructorCommissionPercent", "maxCapacity", "status", "notes"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
   for (const field of ["managerPersonId", "instructorId"] as const) if (body[field] !== undefined && body[field] !== null && (typeof body[field] !== "string" || !UUID.test(body[field]))) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser UUID o null.`); return null; }
-  for (const field of ["monthlyFee", "instructorCommissionPercent"] as const) if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]) || body[field] < 0)) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser un número no negativo.`); return null; }
+  for (const field of ["enrollmentFee", "instructorCommissionPercent"] as const) if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]) || body[field] < 0)) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser un número no negativo.`); return null; }
   if (typeof body.clubCommissionPercent !== "number" || !Number.isFinite(body.clubCommissionPercent) || body.clubCommissionPercent < 0 || body.clubCommissionPercent > 100) { fail(res, 400, "VALIDATION_ERROR", "clubCommissionPercent debe estar entre 0 y 100."); return null; }
   if (body.maxCapacity !== undefined && body.maxCapacity !== null && (!Number.isInteger(body.maxCapacity) || Number(body.maxCapacity) < 0)) { fail(res, 400, "VALIDATION_ERROR", "maxCapacity debe ser entero no negativo."); return null; }
   if (body.status !== undefined && !["active", "inactive"].includes(String(body.status))) { fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); return null; }
-  if ((body.status ?? "inactive") === "active" && (typeof body.managerPersonId !== "string" || !UUID.test(body.managerPersonId))) { fail(res, 400, "ACTIVE_ACTIVITY_REQUIRES_MANAGER", "Una actividad activa requiere responsable principal."); return null; }
+  if ((body.status ?? "inactive") === "active" && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "ACTIVE_ACTIVITY_REQUIRES_INSTRUCTOR", "Una actividad activa requiere instructor responsable."); return null; }
   return { ...body, managerPersonId: body.managerPersonId ?? null, name: body.name.trim() } as ActivityInput;
 };
 

@@ -64,6 +64,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608060005_grant_read_permissions.sql", sha256: "03d44d929656622877bff202c1ba7f791c8058d59052a7333caf189cba3ffffb", dependsOn: ["202607250003_create_user_club_authorization.sql"], checkpointPurpose: "Conserva el acceso de lectura de roles administrativos al hacer explícitos los permisos read." },
   { path: "202608060006_provision_administrative_permissions.sql", sha256: "77332672f70089e44787361c334bb5975cf2b0490d1b290100f346194561d2f2", dependsOn: ["202607250009_add_session_revocation.sql", "202608060005_grant_read_permissions.sql"], checkpointPurpose: "Provisiona permisos administrativos canónicos sin eliminar grants personalizados y revoca sesiones afectadas." },
   { path: "202608060007_backfill_granular_mutation_permissions.sql", sha256: "5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685", dependsOn: ["202608060006_provision_administrative_permissions.sql"], checkpointPurpose: "Completa permisos granulares desde grants legacy, preserva permisos personalizados y revoca sesiones afectadas." },
+  { path: "202608130001_version_activity_terms.sql", sha256: "45075d69c380cba75c46d8c9fd3a0db918f002d30e22fabc0401385c012aaffa", dependsOn: ["202608060001_activity_mutation_model.sql"], checkpointPurpose: "Versiona términos de actividades, incorpora el catálogo de iconos y protege tenant e historia." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";
