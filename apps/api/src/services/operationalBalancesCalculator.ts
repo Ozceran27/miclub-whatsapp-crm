@@ -44,6 +44,8 @@ export interface FeesToCollectBreakdown {
   enrollmentCount: number;
 }
 
+export interface DynamicSectorBalance { sectorId: string; sectorName: string; amount: number }
+
 const normalizeText = (value: unknown): string => String(value ?? "")
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -153,4 +155,15 @@ export const calculateOperationalBalances = (input: OperationalBalancesInput) =>
     pendingBalance,
     projectedBalance: money(liquidity + feesToCollect + settlementBalance + pendingBalance),
   };
+};
+
+/** Tenant-scoped replacement for fixed Fitness/Salón/Aula/Local keys. */
+export const calculateDynamicSettlementBalance = (settlements: DynamicSectorBalance[]) => {
+  const bySector = new Map<string, DynamicSectorBalance>();
+  for (const row of settlements) {
+    if (!row.sectorId || bySector.has(row.sectorId)) continue;
+    bySector.set(row.sectorId, { ...row, amount: money(normalizeMovementAmount(row.amount)) });
+  }
+  const sectors = [...bySector.values()].sort((a, b) => a.sectorName.localeCompare(b.sectorName, "es"));
+  return { sectors, total: money(sectors.reduce((sum, row) => sum + row.amount, 0)) };
 };

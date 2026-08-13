@@ -61,24 +61,20 @@ export const getAnnualEvolution = async (clubId: string, year = getArgentinaCale
         select count(e.id)::integer
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
-        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
           and e.club_id = $3
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
-          and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
       ), 0) as cumulative_enrollments,
       lag(monthly.growth_income) over (order by monthly.month_start) as previous_growth_income,
       lag(coalesce((
         select count(e.id)::integer
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
-        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
           and e.club_id = $3
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
-          and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
       ), 0)) over (order by monthly.month_start) as previous_cumulative_enrollments,
       monthly.growth_income
     from monthly
@@ -174,12 +170,10 @@ export const getGrowthSummary = async (previousStart: Date, currentStart: Date, 
         select count(e.id)::integer
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
-        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < (p.end_at at time zone 'America/Argentina/Buenos_Aires')::date
           and e.club_id = $4
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
-          and upper(regexp_replace(translate(trim(s.name), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) in ('FITNESS', 'SALON', 'AULA')
       ), 0) as enrollments
     from periods p
     order by case p.period_key when 'previous' then 1 else 2 end

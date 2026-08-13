@@ -11,7 +11,7 @@ import {
 } from "@miclub/shared";
 import { getPostgresPool } from "../../db/postgres.js";
 import { getArgentinaMonthWindow } from "../../domain/argentinaTime.js";
-import { calculateOperationalBalances, calculateSettlementBalance } from "../operationalBalancesCalculator.js";
+import { calculateDynamicSettlementBalance, calculateOperationalBalances } from "../operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "../../importers/normalizers.js";
 import { OPERATING_CATEGORIES } from "../economyDomain.js";
 import { getClubFinanceSummary } from "../../repositories/economyRepository.js";
@@ -467,7 +467,6 @@ export const getPostgresClubFinanceSummary =
       expenseBySector,
       incomeByCategory,
       expenseByCategory,
-      settlementSnapshots,
       receivablesFallback,
       pendingFallback,
     ] = await Promise.all([
@@ -497,13 +496,6 @@ export const getPostgresClubFinanceSummary =
         clubId, "EGRESOS",
       ]),
       pool.query<Record<string, unknown>>(
-        `select distinct on (metric_key) metric_key, metric_value
-         from miclub.sheet_metric_snapshots
-         where club_id = $1 and metric_key = any($2::text[])
-         order by metric_key, captured_at desc`,
-        [clubId, ["fitness.settlement_balance", "salon.settlement_balance", "aula.settlement_balance", "local1.settlement_balance"]],
-      ),
-      pool.query<Record<string, unknown>>(
         buildEnrollmentReceivablesQuery({
           capabilities: dashboardCapabilities,
           inactiveEnrollmentFilter,
@@ -525,37 +517,14 @@ export const getPostgresClubFinanceSummary =
       ...(dashboard.rows[0] ?? {}),
       ...(latestOperationalBalances.rows[0] ?? {}),
     };
-    const sectorBalancesByName = new Map<string, { sector: string; amount: number }>();
-    const upsertSectorBalance = (sector: string, amount: number) => {
-      if (!Number.isFinite(amount) || amount === 0) return;
-      const key = normalizePostgresSourceSheet(sector);
-      if (!["FITNESS", "SALON", "AULA", "LOCAL_1"].includes(key)) return;
-      sectorBalancesByName.set(key, { sector, amount });
-    };
-    sectors.rows.forEach((sector) => {
-      upsertSectorBalance(
-        pickString(sector, ["sector_name", "sector"], "Sin sector"),
-        pickNumber(sector, ["settlement_balance", "amount"]),
-      );
-    });
-    settlementSnapshots.rows.forEach((snapshot) => {
-      const metricKey = pickString(snapshot, ["metric_key"]);
-      const amount = pickNumber(snapshot, ["metric_value"]);
-      if (metricKey === "fitness.settlement_balance") {
-        upsertSectorBalance("Espacio Fitness", amount);
-      } else if (metricKey === "salon.settlement_balance") {
-        upsertSectorBalance("Salón", amount);
-      } else if (metricKey === "aula.settlement_balance") {
-        upsertSectorBalance("Aula", amount);
-      } else if (metricKey === "local1.settlement_balance") {
-        upsertSectorBalance("Local 1", amount);
-      }
-    });
-    const sectorBalances = Array.from(sectorBalancesByName.values()).sort(
-      (a, b) => a.sector.localeCompare(b.sector, "es"),
-    );
-    const settlementBreakdown = calculateSettlementBalance(sectorBalances.map((sector) => ({ sector: sector.sector, amount: sector.amount })));
-    const derivedSettlementBalance = settlementBreakdown.total;
+    const dynamicSettlements = calculateDynamicSettlementBalance(sectors.rows.map((sector) => ({
+      sectorId: pickString(sector, ["sector_id"]),
+      sectorName: pickString(sector, ["sector_name", "sector"], "Sin sector"),
+      amount: pickNumber(sector, ["settlement_balance", "amount"]),
+    })));
+    const sectorBalances = dynamicSettlements.sectors.map(({ sectorName: sector, amount }) => ({ sector, amount }));
+    // Positive source balances are liabilities to responsibles, hence negative in the projection.
+    const derivedSettlementBalance = money(dynamicSettlements.total * -1);
     const breakdown = (rows: Record<string, unknown>[]) =>
       rows.map((item) => ({
         name: pickString(item, ["name"], "Sin datos"),

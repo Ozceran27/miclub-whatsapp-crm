@@ -86,3 +86,19 @@ Ejemplo: `$1.000 + $180 - $100 + $300 = $1.380`.
 - `pendingNetBalance` ya no incluye cuotas futuras del mes ni cuentas a cobrar.
 - `projectedBalance` ya no usa `- saldosAPagar`; suma `settlementBalance` porque el valor ya es negativo.
 - Los fallbacks no deben producir cifras diferentes silenciosamente; si hay diferencias se registran como advertencias.
+# Convención de liquidaciones de actividades
+
+El saldo de una actividad es positivo cuando se le debe dinero al responsable. En la
+proyección del club esa obligación se expresa con signo negativo. No se persiste un
+saldo manual en `sectors`: los resultados se calculan por actividad y luego se agrupan
+dinámicamente por `activities.sector_id`, siempre dentro del tenant.
+
+Para términos `VARIABLE`, el saldo es `ingresos operativos completados × porcentaje
+del responsable − asignaciones completadas`. Para `FIXED`, la regla aprobada es
+`ingresos completados − monthly_fixed_fee − asignaciones completadas`; por lo tanto,
+el resultado también representa el saldo del responsable (no la utilidad del club).
+Pendientes, cancelados y registros anulados no intervienen en el cálculo ordinario.
+
+La fórmula proyectada conserva una única convención:
+`liquidez + cuotas a cobrar + saldo a liquidar + pendientes`, donde `saldo a liquidar`
+es negativo si constituye una deuda del club con responsables.
