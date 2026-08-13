@@ -744,6 +744,63 @@ export const processMember = async (
   return ext;
 };
 
+type MovementRelation = {
+  activityId: string | null;
+  sectorId: string | null;
+  matchedBy: "activity" | "counterparty_dni" | "none";
+};
+
+/**
+ * Resolves relations without adding redundant columns to the source sheets.
+ * An explicit activity header wins when an existing activity matches uniquely.
+ * Otherwise a DNI in Contra-parte can identify a unique active enrollment and,
+ * through it, both the activity and its canonical sector.
+ */
+export const resolveMovementRelation = async (
+  pool: Pool,
+  clubId: string,
+  input: { activity: string; counterparty: string },
+): Promise<MovementRelation> => {
+  const activity = normalizeSheetText(input.activity);
+  if (activity) {
+    const result = await pool.query<{ id: string; sector_id: string }>(
+      `select a.id, a.sector_id
+         from miclub.activities a
+         where a.club_id = $1
+           and trim(regexp_replace(translate(lower(a.name), 'áéíóúüñ', 'aeiouun'), '[^a-z0-9]+', ' ', 'g')) = $2
+         order by a.id
+         limit 2`,
+      [clubId, normalizeActivityName(activity)],
+    );
+    if (result.rows.length === 1) {
+      return { activityId: result.rows[0].id, sectorId: result.rows[0].sector_id, matchedBy: "activity" };
+    }
+  }
+
+  const dni = normalizeDni(input.counterparty);
+  if (dni) {
+    const result = await pool.query<{ activity_id: string; sector_id: string }>(
+      `select distinct e.activity_id, a.sector_id
+         from miclub.people p
+         join miclub.enrollments e on e.person_id = p.id and e.club_id = p.club_id
+         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+         where p.club_id = $1
+           and p.normalized_dni = $2
+           and e.status <> all (array['abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status])
+           and coalesce((to_jsonb(e)->>'inactive')::boolean, false) = false
+           and to_jsonb(e)->>'superseded_at' is null
+         order by e.activity_id
+         limit 2`,
+      [clubId, dni],
+    );
+    if (result.rows.length === 1) {
+      return { activityId: result.rows[0].activity_id, sectorId: result.rows[0].sector_id, matchedBy: "counterparty_dni" };
+    }
+  }
+
+  return { activityId: null, sectorId: null, matchedBy: "none" };
+};
+
 export const processMovement = async (
   pool: Pool,
   row: SheetRow,
@@ -797,13 +854,19 @@ export const processMovement = async (
     throw new Error(
       `Movimiento sin fecha válida en hoja ${row.sheet}, fila ${row.rowNumber}. Valor recibido: ${rawMovementDate || "vacío"}.`,
     );
-  const sectorId = await upsertSector(
+  const relation = await resolveMovementRelation(pool, summary.clubId, {
+    activity: movementValue(row.row, movementIndexes, "actividad"),
+    counterparty: rawCounterparty,
+  });
+  const sectorId = relation.sectorId ?? await upsertSector(
     pool,
     summary.clubId,
     movementValue(row.row, movementIndexes, "sector") || row.sheet,
   );
-  summary.sectorsProcessed += 1;
-  summary.attemptedWrites += 1;
+  if (!relation.sectorId) {
+    summary.sectorsProcessed += 1;
+    summary.attemptedWrites += 1;
+  }
   const categoryId = await upsertCategory(
     pool,
     summary.clubId,
@@ -828,9 +891,9 @@ export const processMovement = async (
       amount,
     );
   await pool.query(
-    `insert into miclub.movements (club_id,external_id,movement_date,movement_type,category_id,sector_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
-     values ($1,$2,$3,$4::miclub.movement_type,$5,$6,$7,$8,$9,$10,$11,$12::miclub.financial_status,$13::miclub.movement_status,'google_sheets',$14::jsonb)
-     on conflict (club_id, external_id) where external_id is not null do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
+    `insert into miclub.movements (club_id,external_id,movement_date,movement_type,category_id,sector_id,activity_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
+     values ($1,$2,$3,$4::miclub.movement_type,$5,$6,$7,$8,$9,$10,$11,$12,$13::miclub.financial_status,$14::miclub.movement_status,'google_sheets',$15::jsonb)
+     on conflict (club_id, external_id) where external_id is not null do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, activity_id=excluded.activity_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
     [
       summary.clubId,
       externalId("google_sheets", "movement", ext),
@@ -838,6 +901,7 @@ export const processMovement = async (
       movementType,
       categoryId,
       sectorId,
+      relation.activityId,
       concept,
       movementValue(row.row, movementIndexes, "contraparte") || null,
       amount,
@@ -855,6 +919,7 @@ export const processMovement = async (
         sheet: row.sheet,
         rowNumber: row.rowNumber,
         row: row.row,
+        relation: { matchedBy: relation.matchedBy },
       }),
     ],
   );
