@@ -14,6 +14,8 @@ type WorkerRow = {
   role: string | null;
   sector: string | null;
   salary: string | number | null;
+  payment_mode: "FIXED" | "VARIABLE" | null;
+  monthly_fixed_amount: string | number | null;
   status: string;
   system_access: boolean;
   employment_start_date: string | null;
@@ -50,13 +52,13 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
         select e.id::text, e.club_id::text, e.person_id::text, null::text as code,
           p.first_name, p.last_name, p.dni, p.phone, p.email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), 'Sin nombre') as display_name,
-          coalesce(e.position, r.name) as role, s.name as sector, e.salary, e.status,
+          r.code as role, s.name as sector, e.salary, e.payment_mode, e.monthly_fixed_amount, e.status,
           (e.user_id is not null and ucm.status = 'active' and coalesce(u.is_active, false) and u.status = 'active') as system_access,
           e.employment_start_date::text, e.employment_end_date::text, e.notes,
           coalesce(ucm.permissions, '{}'::text[]) as permissions,
           case when e.sector_id is null then '{}'::uuid[] else array[e.sector_id] end::text[] as sector_ids,
           coalesce(activities.items, '[]'::json) as activities,
-          count(*) filter (where lower(coalesce(e.position, r.code, r.name, '')) = 'director' and e.status = 'active') over() as active_director_count,
+          count(*) filter (where r.code = 'DIRECTOR' and e.status = 'active' and ucm.status = 'active') over() as active_director_count,
           e.created_at::text, e.updated_at::text,
           count(*) over() as total_count
         from miclub.employees e
@@ -77,14 +79,14 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
         select p.id::text, p.club_id::text, p.id::text as person_id, null::text as code,
           p.first_name, p.last_name, p.dni, p.phone, p.email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), i.display_name, 'Sin nombre') as display_name,
-          coalesce(r.name, case when i.id is not null then 'Instructor' end) as role,
-          sectors.names as sector, null::numeric as salary,
+          coalesce(r.code, case when i.id is not null then 'INSTRUCTOR' end) as role,
+          sectors.names as sector, null::numeric as salary, null::text as payment_mode, null::numeric as monthly_fixed_amount,
           case when coalesce(ucm.status, 'active') = 'active' and p.status::text in ('activa', 'active') then 'active' else 'inactive' end as status,
           (ucm.status = 'active' and coalesce(u.is_active, false) and u.status = 'active') as system_access,
           null::text as employment_start_date, null::text as employment_end_date, null::text as notes,
           coalesce(ucm.permissions, '{}'::text[]) as permissions, coalesce(ucm.sector_ids, '{}'::uuid[])::text[] as sector_ids,
           coalesce(activities.items, '[]'::json) as activities,
-          count(*) filter (where lower(coalesce(r.code, r.name, '')) = 'director' and ucm.status = 'active') over() as active_director_count,
+          count(*) filter (where r.code = 'DIRECTOR' and ucm.status = 'active') over() as active_director_count,
           p.created_at::text, p.updated_at::text,
           count(*) over() as total_count
         from miclub.people p

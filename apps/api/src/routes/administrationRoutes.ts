@@ -1,5 +1,5 @@
 import { PERMISSIONS } from "@miclub/shared";
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { rejectClientClubId, requireAuth, requireMembership, requirePermission } from "../middleware/authorization.js";
 import { getAdministrationInitialReadModel } from "../services/administration/administrationReadService.js";
 import { getAdministrationSummary } from "../services/administration/administrationSummaryService.js";
@@ -7,6 +7,7 @@ import asyncHandler from "./asyncHandler.js";
 import { getAdministrationWorkers } from "../services/administration/workersService.js";
 import { parseListQuery } from "./listQuery.js";
 import { createSector, listSectorTemplates, type SectorActor } from "../repositories/sectorsRepository.js";
+import { archiveWorker, createWorker, updateWorker, WorkerMutationError, type WorkerActor } from "../services/administration/workerMutationService.js";
 
 const router = Router();
 
@@ -20,6 +21,18 @@ router.get("/workers", asyncHandler(async (req, res) => {
   const { limit, offset } = parseListQuery(req, [], { defaultLimit: 50, maxLimit: 100 });
   res.json(await getAdministrationWorkers(req.auth!.clubId, limit, offset));
 }));
+
+const workerActor = (req: Request): WorkerActor => ({ userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId, requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent") });
+const workerMutation = (operation: (actor: WorkerActor, id: string, body: unknown) => Promise<unknown>) => asyncHandler(async (req, res) => {
+  try { res.json(await operation(workerActor(req), String(req.params.id), req.body)); }
+  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; const status = error.code === "not_found" ? 404 : error.code === "invalid_input" ? 400 : 409; res.status(status).json({ error: true, code: error.code.toUpperCase(), message: error.message }); }
+});
+router.post("/workers", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHandler(async (req, res) => {
+  try { res.status(201).json(await createWorker(workerActor(req), req.body)); }
+  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; res.status(error.code === "invalid_input" ? 400 : 409).json({ error: true, code: error.code.toUpperCase(), message: error.message }); }
+}));
+router.put("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id, body) => updateWorker(actor, id, body)));
+router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id) => archiveWorker(actor, id)));
 
 router.get("/sector-templates", requirePermission(PERMISSIONS.SECTORS_VIEW), asyncHandler(async (_req, res) => {
   res.json({ items: await listSectorTemplates() });

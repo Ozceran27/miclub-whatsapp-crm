@@ -1,4 +1,4 @@
-import type { AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
+import type { AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -24,6 +24,9 @@ export const getAdministrationActivities = (signal?: AbortSignal) =>
 
 export const getAdministrationWorkers = (signal?: AbortSignal) =>
   apiJson<AdministrationWorkersResponse>('/api/administration/workers?page=1&limit=100', { cache: 'no-store', signal });
+export const createAdministrationWorker = (input: AdministrationWorkerMutationDto) => apiJson('/api/administration/workers', { method: 'POST', body: JSON.stringify(input) });
+export const updateAdministrationWorker = (id: string, input: AdministrationWorkerMutationDto) => apiJson(`/api/administration/workers/${encodeURIComponent(id)}` as `/${string}`, { method: 'PUT', body: JSON.stringify(input) });
+export const archiveAdministrationWorker = (id: string) => apiJson(`/api/administration/workers/${encodeURIComponent(id)}` as `/${string}`, { method: 'DELETE' });
 
 export const getAnnualActivityRanking = (signal?: AbortSignal) =>
   apiJson<EconomySectorRankings>('/api/economy/activity-rankings?limit=100', { cache: 'no-store', signal });

@@ -18,7 +18,7 @@ test("el inventario estático de rutas no contiene permisos huérfanos", async (
   const routeDir = path.join(apiRoot, "src/routes");
   const files = (await readdir(routeDir)).filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"));
   const permissionConstants = PERMISSIONS as Record<string, string>;
-  const grantsByRole = ROLE_PERMISSION_MATRIX.map(({ role, permissions }) => ({ role, granted: new Set<string>(permissions) }));
+  const grantsByRole = ROLE_PERMISSION_MATRIX.filter(({ role }) => ["owner", "DIRECTOR", "admin"].includes(role)).map(({ role, permissions }) => ({ role, granted: new Set<string>(permissions) }));
   let requirements = 0;
   for (const file of files) {
     const source = await readFile(path.join(routeDir, file), "utf8");

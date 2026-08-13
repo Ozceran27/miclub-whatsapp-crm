@@ -1,7 +1,7 @@
 import type { LegacyUnknownCode } from "./legacy.js";
 import { asLegacyUnknownCode } from "./legacy.js";
 
-export const KNOWN_ROLES = ["owner", "DIRECTOR", "admin"] as const;
+export const KNOWN_ROLES = ["owner", "DIRECTOR", "admin", "TRABAJADOR", "INSTRUCTOR"] as const;
 export type KnownRole = typeof KNOWN_ROLES[number];
 export type LegacyRole = LegacyUnknownCode<"role">;
 export type RoleCode = KnownRole | LegacyRole;
@@ -99,6 +99,8 @@ export const ROLE_DEFAULT_PERMISSIONS = {
   owner: KNOWN_PERMISSIONS,
   DIRECTOR: KNOWN_PERMISSIONS,
   admin: KNOWN_PERMISSIONS,
+  TRABAJADOR: [PERMISSIONS.DASHBOARD_READ, PERMISSIONS.TASKS_VIEW] as const,
+  INSTRUCTOR: [PERMISSIONS.DASHBOARD_READ, PERMISSIONS.SECTORS_VIEW, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.TASKS_VIEW, PERMISSIONS.ENROLLMENTS_VIEW] as const,
 } as const satisfies Record<KnownRole, readonly KnownPermission[]>;
 
 /** Machine-readable role matrix shared by tests and manual SQL generators. */

@@ -6,6 +6,13 @@ import { hashPassword } from "./passwordHasher.js";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DNI_PATTERN = /^\d{7,9}$/;
 
+export const validatePublicPassword = (password: unknown): string => {
+  if (typeof password !== "string" || password.length < 10 || password.length > 128 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    throw new RegistrationError("invalid_input", "La contraseña debe tener entre 10 y 128 caracteres e incluir letras y números.");
+  }
+  return password;
+};
+
 export class RegistrationError extends Error {
   constructor(public readonly code: "invalid_input" | "email_exists" | "dni_exists", message: string) { super(message); }
 }
@@ -23,7 +30,7 @@ export const validateRegistration = (body: unknown): ClubRegistrationDto => {
   if (phone.length < 6 || phone.length > 30) throw new RegistrationError("invalid_input", "El teléfono no es válido.");
   if (clubName.length < 2 || clubName.length > 120) throw new RegistrationError("invalid_input", "El nombre del club debe tener entre 2 y 120 caracteres.");
   if (email.length > 254 || !EMAIL_PATTERN.test(email)) throw new RegistrationError("invalid_input", "El correo electrónico no es válido.");
-  if (password.length < 10 || password.length > 128 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) throw new RegistrationError("invalid_input", "La contraseña debe tener entre 10 y 128 caracteres e incluir letras y números.");
+  validatePublicPassword(password);
   return { firstName, lastName, dni, phone, email, password, club: { name: clubName } };
 };
 
