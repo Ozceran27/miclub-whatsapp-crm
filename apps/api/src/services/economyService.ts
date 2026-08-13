@@ -137,6 +137,9 @@ type YearlyBreakdownAggregateRow = {
   month?: unknown;
   normalizedCategory?: unknown;
   normalized_category?: unknown;
+  categoryCode?: unknown;
+  category_code?: unknown;
+  classification?: unknown;
   categoryLabel?: unknown;
   category_label?: unknown;
   movementType?: unknown;
@@ -160,9 +163,6 @@ const expenseValueForMovement = (group: ExpenseTypeKey, movementType: string, am
 export const buildYearlyBreakdown = (window: ReturnType<typeof getRollingInterannualMonthWindow>, rows: YearlyBreakdownAggregateRow[]): JsonRecord => {
   const monthIndexByKey = new Map(window.months.map((month, index) => [month.key, index]));
   const incomeByCategory = new Map<string, { key: string; label: string; annualTotal: number; values: number[] }>();
-  for (const category of OPERATING_CATEGORIES) {
-    incomeByCategory.set(category, { key: category, label: labelForOperatingCategory(category), annualTotal: 0, values: Array(window.months.length).fill(0) });
-  }
   const expenses = new Map<string, { key: string; label: string; values: number[] }>();
   for (const key of EXPENSE_TYPE_KEYS) expenses.set(key, { key, label: EXPENSE_TYPE_LABELS[key], values: Array(window.months.length).fill(0) });
   const unclassified = new Map<string, number>();
@@ -173,21 +173,22 @@ export const buildYearlyBreakdown = (window: ReturnType<typeof getRollingInteran
     const month = toInteger(raw.month);
     const monthIndex = monthIndexByKey.get(`${year}-${String(month).padStart(2, '0')}`);
     if (monthIndex === undefined) continue;
-    const category = normalizeCategoryName(raw.normalizedCategory ?? raw.normalized_category ?? raw.categoryLabel ?? raw.category_label);
+    const category = normalizeCategoryName(raw.categoryCode ?? raw.category_code ?? raw.normalizedCategory ?? raw.normalized_category);
+    const classification = normalizeCategoryName(raw.classification) || ({ OPERATING: 'OPERATIONAL', NON_OPERATING: 'NON_OPERATIONAL', TAXES: 'TAX', SERVICES: 'SERVICE', DEBT: 'LIABILITY' } as const)[classifyExpenseCategory(category) as Exclude<ExpenseTypeKey, 'UNCLASSIFIED'>] || '';
+    const categoryLabel = String(raw.categoryLabel ?? raw.category_label ?? category);
     const movementType = normalizeCategoryName(raw.movementType ?? raw.movement_type);
     const amount = toNumber(raw.amount);
     const movements = toInteger(raw.movements);
     consideredMovements += movements;
 
-    if (movementType === 'INGRESOS' && category !== 'CAPITAL' && (OPERATING_CATEGORIES as readonly string[]).includes(category)) {
-      const series = incomeByCategory.get(category);
-      if (series) {
-        series.values[monthIndex] += amount;
-        series.annualTotal += amount;
-      }
+    if (movementType === 'INGRESOS' && classification === 'OPERATIONAL') {
+      const series = incomeByCategory.get(category) ?? { key: category, label: categoryLabel, annualTotal: 0, values: Array(window.months.length).fill(0) };
+      series.values[monthIndex] += amount;
+      series.annualTotal += amount;
+      incomeByCategory.set(category, series);
     }
 
-    const group = classifyExpenseCategory(category);
+    const group = classifyExpenseCategory({ classification });
     if (group === 'UNCLASSIFIED') {
       if (movementType === 'EGRESOS') unclassified.set(category || 'SIN CLASIFICAR', (unclassified.get(category || 'SIN CLASIFICAR') ?? 0) + movements);
       continue;

@@ -109,10 +109,10 @@ test("sector profitability uses completed operating income minus expenses", () =
 
 test("canonical operating profitability categories keep UI accents and normalize internally", () => {
   assert.deepEqual(getOperatingCategories(), [
-    "INSCRIPCIÓN",
+    "INSCRIPCION",
     "CUOTA",
     "TURNOS",
-    "COMISIÓN",
+    "COMISION",
     "ALQUILER",
     "EVENTOS",
     "VENTAS",
@@ -328,4 +328,25 @@ test("yearly breakdown returns thirteen interannual positions and does not merge
   assert.equal((expenses.get("SERVICES") as number[])[12], 350);
   assert.equal((expenses.get("TAXES") as number[])[1], 600);
   assert.equal(result.metadata.unclassifiedExpenseCount, 1);
+});
+
+test("persisted classification keeps profitability stable when display labels change", async () => {
+  const { calculateClassifiedBalance } = await import("./economyDomain.js");
+  const movements = [
+    { movement_type: "INGRESOS", category: "Etiqueta renombrada", categoryCode: "CUOTA", classification: "OPERATIONAL", operational_status: "COMPLETADO", amount: 1200 },
+    { movement_type: "EGRESOS", category: "Otro texto visible", categoryCode: "BEBIDAS", classification: "OPERATIONAL", operational_status: "COMPLETADO", amount: 200 },
+  ];
+  assert.deepEqual(calculateClassifiedBalance(movements, "OPERATIONAL"), { income: 1200, expenses: 200, balance: 1000, movementsCount: 2 });
+});
+
+test("taxes, services and liabilities use persisted classification instead of labels", async () => {
+  const { calculateClassifiedBalance } = await import("./economyDomain.js");
+  const movements = [
+    { movement_type: "EGRESOS", category: "AFIP nuevo label", classification: "TAX", operational_status: "COMPLETADO", amount: 300 },
+    { movement_type: "EGRESOS", category: "Proveedor de energía", classification: "SERVICE", operational_status: "COMPLETADO", amount: 150 },
+    { movement_type: "INGRESOS", category: "Financiación", classification: "LIABILITY", operational_status: "COMPLETADO", amount: 500 },
+  ];
+  assert.equal(calculateClassifiedBalance(movements, "TAX").balance, -300);
+  assert.equal(calculateClassifiedBalance(movements, "SERVICE").balance, -150);
+  assert.equal(calculateClassifiedBalance(movements, "LIABILITY").balance, 500);
 });

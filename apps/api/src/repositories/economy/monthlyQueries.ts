@@ -61,6 +61,7 @@ export const getAnnualEvolution = async (clubId: string, year = getArgentinaCale
         select count(e.id)::integer
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
           and e.club_id = $3
           and coalesce(e.inactive, false) = false
@@ -71,6 +72,7 @@ export const getAnnualEvolution = async (clubId: string, year = getArgentinaCale
         select count(e.id)::integer
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < ((monthly.month_start + interval '1 month') at time zone 'America/Argentina/Buenos_Aires')::date
           and e.club_id = $3
           and coalesce(e.inactive, false) = false
@@ -170,6 +172,7 @@ export const getGrowthSummary = async (previousStart: Date, currentStart: Date, 
         select count(e.id)::integer
         from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
+        join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
         where e.enrollment_date < (p.end_at at time zone 'America/Argentina/Buenos_Aires')::date
           and e.club_id = $4
           and coalesce(e.inactive, false) = false
@@ -187,13 +190,15 @@ export const getYearlyBreakdownRows = async (from: Date, to: Date, clubId: strin
     select
       extract(year from (m.movement_date at time zone 'America/Argentina/Buenos_Aires'))::integer as year,
       extract(month from (m.movement_date at time zone 'America/Argentina/Buenos_Aires'))::integer as month,
-      upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category,
-      coalesce(nullif(trim(c.name), ''), 'Sin clasificar') as category_label,
+      cc.code as category_code,
+      cc.classification,
+      cc.display_name as category_label,
       m.movement_type,
       coalesce(sum(m.amount), 0) as amount,
       count(m.id)::integer as movements
     from miclub.movements m
     left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
+    left join miclub.category_catalog cc on cc.id = c.catalog_id
     where m.movement_date >= $1::timestamptz
       and m.movement_date < $2::timestamptz
       and m.club_id = $3
