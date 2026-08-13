@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isImportSchemaConflictConfiguration, parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints } from './googleSheetsImporter.js';
+import { isImportSchemaConflictConfiguration, parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints, resolveMovementRelation } from './googleSheetsImporter.js';
 import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeMovementOperationalStatus, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
@@ -109,10 +109,10 @@ test('processMovement importa movimientos operativos con monto cero', async () =
   assert.ok(insert, 'expected a movement insert query');
   assert.match(insert.sql, /on conflict \(club_id, external_id\) where external_id is not null do update/i);
   assert.equal(insert.params?.[3], 'INGRESOS');
-  assert.equal(insert.params?.[6], 'Bonificación 100%');
-  assert.equal(insert.params?.[8], 0);
-  assert.equal(insert.params?.[11], 'pagado');
-  assert.equal(insert.params?.[12], 'COMPLETADO');
+  assert.equal(insert.params?.[7], 'Bonificación 100%');
+  assert.equal(insert.params?.[9], 0);
+  assert.equal(insert.params?.[12], 'pagado');
+  assert.equal(insert.params?.[13], 'COMPLETADO');
   assert.equal(summary.movementsProcessed, 1);
 });
 
@@ -124,6 +124,31 @@ test('processMovement omite filas de movimientos realmente vacías', async () =>
 
   assert.equal(summary.movementsProcessed, 0);
   assert.equal(summary.attemptedWrites, 0);
+});
+
+test('resolveMovementRelation deriva actividad y sector desde DNI de contraparte', async () => {
+  const pool = { query: async (sql: string, params?: unknown[]) => {
+    assert.match(sql, /join miclub\.enrollments/);
+    assert.deepEqual(params, ['club-1', '30111222']);
+    return { rows: [{ activity_id: 'activity-1', sector_id: 'sector-1' }] };
+  } };
+
+  assert.deepEqual(await resolveMovementRelation(pool as never, 'club-1', {
+    activity: '',
+    counterparty: '30.111.222',
+  }), { activityId: 'activity-1', sectorId: 'sector-1', matchedBy: 'counterparty_dni' });
+});
+
+test('resolveMovementRelation no inventa relación cuando el DNI tiene varias actividades', async () => {
+  const pool = { query: async () => ({ rows: [
+    { activity_id: 'activity-1', sector_id: 'sector-1' },
+    { activity_id: 'activity-2', sector_id: 'sector-1' },
+  ] }) };
+
+  assert.deepEqual(await resolveMovementRelation(pool as never, 'club-1', {
+    activity: '',
+    counterparty: '30.111.222',
+  }), { activityId: null, sectorId: null, matchedBy: 'none' });
 });
 
 
@@ -188,10 +213,10 @@ test('processMovement importa movimientos de LOCAL 1 con layout sectorial sin co
   assert.equal(sectorLookup.params?.[1], 'LOCAL 1');
   assert.ok(insert, 'expected a movement insert query');
   assert.equal(insert.params?.[3], 'INGRESOS');
-  assert.equal(insert.params?.[6], 'Pago (PARCIAL) Tattoo - Proyecto Fabian');
-  assert.equal(insert.params?.[8], 50000);
-  assert.equal(insert.params?.[11], 'pagado');
-  assert.equal(insert.params?.[12], 'COMPLETADO');
+  assert.equal(insert.params?.[7], 'Pago (PARCIAL) Tattoo - Proyecto Fabian');
+  assert.equal(insert.params?.[9], 50000);
+  assert.equal(insert.params?.[12], 'pagado');
+  assert.equal(insert.params?.[13], 'COMPLETADO');
   assert.equal(summary.movementsProcessed, 1);
 });
 

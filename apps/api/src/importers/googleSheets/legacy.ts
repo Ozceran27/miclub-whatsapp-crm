@@ -13,7 +13,7 @@ type MovementSheetName = (typeof MOVEMENT_SHEET_NAMES)[number];
 type SourceType = "mock" | "google_sheets" | "postgres";
 type SectorBalanceSheetName = (typeof SECTOR_BALANCE_SHEET_NAMES)[number];
 
-export type MovementColumnKey = "id" | "fecha" | "tipo" | "categoria" | "concepto" | "contraparte" | "sector" | "monto" | "impuestos" | "estadoFinan" | "estado" | "medioPago";
+export type MovementColumnKey = "id" | "fecha" | "tipo" | "categoria" | "concepto" | "contraparte" | "sector" | "actividad" | "monto" | "impuestos" | "estadoFinan" | "estado" | "medioPago";
 export type MemberColumnKey = "id" | "fecha" | "nombre" | "apellido" | "dni" | "tel" | "actividad" | "modalidad" | "cuota" | "estado" | "instructor" | "vence";
 
 export type MovementColumnIndexes = Partial<Record<MovementColumnKey, number>>;
@@ -167,6 +167,7 @@ export const movementColumnAliases: Record<MovementColumnKey, string[]> = {
   concepto: ["concepto"],
   contraparte: ["contraparte", "contra"],
   sector: ["sector"],
+  actividad: ["actividad", "actividad asociada"],
   monto: ["monto"],
   impuestos: ["imp", "impuesto", "impuestos", "taxes"],
   estadoFinan: ["estadofinan", "estadofinanciero", "estadofin", "estadofinanc", "estadofinanzas"],
