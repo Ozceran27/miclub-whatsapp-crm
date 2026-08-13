@@ -100,9 +100,9 @@ const listDefinitions = {
   },
   movimientos: {
     sectorColumn: "m.sector_id",
-    from: "miclub.v_movements_enriched m",
+    from: "miclub.v_movements_enriched m join miclub.movements movement_sequence on movement_sequence.club_id=m.club_id and movement_sequence.id=m.id",
     clubColumn: "m.club_id",
-    select: `m.id, m.external_id, m.movement_date, m.movement_type, m.category_id, m.category,
+    select: `m.id, movement_sequence.sequence_number, m.external_id, m.movement_date, m.movement_type, m.category_id, m.category,
       m.sector_id, m.sector_code, m.sector_name, m.activity_id, m.concept, m.person_id, m.first_name,
       m.last_name, m.dni, m.counterparty_text, m.amount, m.taxes, m.payment_method_id,
       m.payment_method, m.financial_status, m.operational_status, m.source,
@@ -129,7 +129,7 @@ const listDefinitions = {
       join miclub.sectors s on s.id = a.sector_id and s.club_id = e.club_id
       left join miclub.instructors i on i.id = a.instructor_id and i.club_id = e.club_id`,
     clubColumn: "e.club_id",
-    select: `e.id, e.external_id, e.person_id, p.first_name, p.last_name, p.dni, p.phone,
+    select: `e.id, e.sequence_number, e.external_id, e.person_id, p.first_name, p.last_name, p.dni, p.phone,
       e.activity_id, a.name as activity_name, a.modality, a.sector_id, s.code as sector_code,
       s.name as sector_name, i.display_name as instructor_name, e.fee_amount, e.status,
       e.due_date, e.enrollment_date, e.source, e.notes, e.created_at, e.updated_at`,

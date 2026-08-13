@@ -42,7 +42,7 @@ export function MovementDetailModal({ movement, onClose }: Props) {
     <div className="sector-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={dialogRef} tabIndex={-1}>
       <header className="sector-modal__header"><div><p className="eyebrow">Detalle de movimiento</p><h2 id={titleId}>{title}</h2><p id={descriptionId}>Información contable, asociaciones y trazabilidad de solo lectura.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${title}`}>×</button></header>
       <section><h3>Movimiento</h3><dl className="sector-modal__facts">
-        <div><dt>Fecha</dt><dd>{showDate(movement.date)}</dd></div><div><dt>Tipo</dt><dd>{showStatus(movement.type)}</dd></div><div><dt>Estado operativo</dt><dd>{showStatus(movement.status)}</dd></div>
+        <div><dt>Número</dt><dd>#{movement.sequenceNumber}</dd></div><div><dt>Fecha</dt><dd>{showDate(movement.date)}</dd></div><div><dt>Tipo</dt><dd>{showStatus(movement.type)}</dd></div><div><dt>Estado operativo</dt><dd>{showStatus(movement.status)}</dd></div>
         <div><dt>Monto</dt><dd>{money.format(movement.amount)}</dd></div><div><dt>Impuestos</dt><dd>{movement.taxes == null ? 'No informados' : money.format(movement.taxes)}</dd></div><div><dt>Estado financiero</dt><dd>{showStatus(movement.financialStatus)}</dd></div>
         <div><dt>Categoría</dt><dd>{showText(movement.category)}</dd></div><div><dt>Medio de pago</dt><dd>{showText(movement.paymentMethod)}</dd></div><div><dt>Contraparte</dt><dd>{showText(movement.counterpartyText)}</dd></div>
         <div className="sector-modal__fact--wide"><dt>Concepto</dt><dd>{showText(movement.concept)}</dd></div>

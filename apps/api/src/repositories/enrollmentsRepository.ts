@@ -6,7 +6,7 @@ export type EnrollmentActor = { userId: string; membershipId: string; clubId: st
 export type EnrollmentInput = { personId: string; activityId: string; feeAmount: number; status: "al_dia" | "nuevo_inscripto" | "adeudando"; dueDate?: string | null; enrollmentDate: string };
 export type EnrollmentResult = { kind: "created"; enrollment: Record<string, unknown> } | { kind: "duplicate"; enrollment: Record<string, unknown> } | { kind: "invalid_reference" };
 
-const columns = "id, club_id, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, created_at, updated_at";
+const columns = "id, club_id, sequence_number, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, created_at, updated_at";
 
 /** Audits the tenant-owned person, activity and existing enrollment before inserting anything. */
 export const createEnrollment = async (actor: EnrollmentActor, input: EnrollmentInput): Promise<EnrollmentResult> => {
@@ -31,8 +31,8 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
 
     const inserted = await db.query<Record<string, unknown>>(`
       insert into miclub.enrollments
-        (club_id, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source)
-      values ($1, 'manual:'||gen_random_uuid(), $2, $3, $4, $5, $6, $7, 'manual')
+        (club_id, sequence_number, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source)
+      values ($1, miclub.next_tenant_sequence($1, 'enrollment'), 'manual:'||gen_random_uuid(), $2, $3, $4, $5, $6, $7, 'manual')
       returning ${columns}
     `, [actor.clubId, input.personId, input.activityId, input.feeAmount, input.status, input.dueDate ?? null, input.enrollmentDate]);
     const enrollment = inserted.rows[0];

@@ -692,8 +692,8 @@ export const processMember = async (
     );
   } else {
     enrollmentResult = await pool.query<{ id: string }>(
-      `insert into miclub.enrollments (club_id, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
-       values ($1,$2,$3,$4,$5,$6::miclub.enrollment_status,$7,$8,'google_sheets',$9,$10,$11,$12,$13,now())
+      `insert into miclub.enrollments (club_id, sequence_number, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, notes, raw_fee_amount_text, raw_fee_amount, normalized_fee_amount, fee_normalization_reason, fee_normalized_at)
+       values ($1,miclub.next_tenant_sequence($1,'enrollment'),$2,$3,$4,$5,$6::miclub.enrollment_status,$7,$8,'google_sheets',$9,$10,$11,$12,$13,now())
        on conflict (club_id, external_id) where external_id is not null do update set person_id=excluded.person_id, activity_id=excluded.activity_id, fee_amount=excluded.fee_amount, status=excluded.status, due_date=excluded.due_date, enrollment_date=coalesce(miclub.enrollments.enrollment_date, excluded.enrollment_date), notes=excluded.notes, raw_fee_amount_text=excluded.raw_fee_amount_text, raw_fee_amount=excluded.raw_fee_amount, normalized_fee_amount=excluded.normalized_fee_amount, fee_normalization_reason=excluded.fee_normalization_reason, fee_normalized_at=now(), missing_from_import_batch_id=null, updated_at=now()${reactivateOnConflict}
        returning id`,
       [
@@ -891,8 +891,8 @@ export const processMovement = async (
       amount,
     );
   await pool.query(
-    `insert into miclub.movements (club_id,external_id,movement_date,movement_type,category_id,sector_id,activity_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
-     values ($1,$2,$3,$4::miclub.movement_type,$5,$6,$7,$8,$9,$10,$11,$12,$13::miclub.financial_status,$14::miclub.movement_status,'google_sheets',$15::jsonb)
+    `insert into miclub.movements (club_id,sequence_number,external_id,movement_date,movement_type,category_id,sector_id,activity_id,concept,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source,source_payload)
+     values ($1,miclub.next_tenant_sequence($1,'movement'),$2,$3,$4::miclub.movement_type,$5,$6,$7,$8,$9,$10,$11,$12,$13::miclub.financial_status,$14::miclub.movement_status,'google_sheets',$15::jsonb)
      on conflict (club_id, external_id) where external_id is not null do update set movement_date=excluded.movement_date, movement_type=excluded.movement_type, category_id=excluded.category_id, sector_id=excluded.sector_id, activity_id=excluded.activity_id, concept=excluded.concept, counterparty_text=excluded.counterparty_text, amount=excluded.amount, taxes=excluded.taxes, payment_method_id=excluded.payment_method_id, financial_status=excluded.financial_status, operational_status=excluded.operational_status, source_payload=excluded.source_payload, updated_at=now()`,
     [
       summary.clubId,

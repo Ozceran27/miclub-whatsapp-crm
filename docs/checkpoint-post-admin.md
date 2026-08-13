@@ -30,6 +30,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608130003_global_category_catalog.sql` | Crea el catálogo económico global clasificado y conserva movement_categories como referencia tenant compatible. | `1292c2c65f2a57029854b6ce60f4dfe72ca9c9ce16ff2a178bc589d94bda722f` | Después de `202608060003_movement_mutation_model.sql`. |
 | `202608130004_secure_xlsx_import.sql` | Añade trazabilidad, idempotencia y errores estructurados al importador XLSX seguro. | `2a9f8ff8547fb63ec6d10d51ac19374ef1dd6209529b6f63b25509bb30167837` | Después de `202607250002_evolve_app_users_auth.sql` y `202607250003_create_user_club_authorization.sql`. |
 | `202608130005_xlsx_batch_identity.sql` | Impide reejecutar un lote XLSX real exacto salvo retry/reversal explícito. | `10ea1c80c9543c6791a0894e8283d92dacee92afaf547b7794e57715e589eeb4` | Después de `202608130004_secure_xlsx_import.sql`. |
+| `202608130006_tenant_entity_sequences.sql` | Asigna números correlativos transaccionales e independientes por club a movimientos e inscripciones. | `8192e26dc9ba52e9b553eeac38c43b3a900150e7ec8f5f9660b0f9e3a9134485` | Después de `202607250001_backfill_and_scope_unique_constraints.sql`. |
 
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
