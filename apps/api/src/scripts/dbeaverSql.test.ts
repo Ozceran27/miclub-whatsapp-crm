@@ -104,3 +104,60 @@ test("catálogo de sectores reutiliza códigos sistémicos existentes sin violar
   assert.match(script, /CHECK\(status IS NULL OR status IN \('active','inactive','under_repair','archived'\)\) NOT VALID/);
   assert.doesNotMatch(script, /pg_get_constraintdef\(c\.oid\) ILIKE '%status%'/);
 });
+
+const tenantDeletionSql = (name: string) => sql(`tenant-deletion/${name}`);
+
+function withoutSqlComments(source: string): string {
+  return source.replace(/--.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {
+  const diagnostic = tenantDeletionSql("01_tenant_inventory_readonly.sql");
+  assert.match(diagnostic, /BEGIN TRANSACTION READ ONLY;/i);
+  assert.match(diagnostic, /current_database\(\)='miclub_gestion'/);
+  assert.match(diagnostic, /to_regnamespace\('miclub'\)/);
+  assert.match(diagnostic, /to_regnamespace\('public'\)/);
+  assert.match(diagnostic, /information_schema\.columns/);
+  assert.match(diagnostic, /pg_constraint/);
+  assert.match(diagnostic, /ORDER BY con\.confrelid::regclass::text,con\.conrelid::regclass::text,con\.conname/);
+  assert.doesNotMatch(diagnostic, /ORDER BY incoming_to::text,outgoing_from::text/);
+  assert.match(diagnostic, /query_to_xml/);
+  assert.match(diagnostic, /public\.miclub_schema_migrations/);
+  assert.match(diagnostic, /to_regclass\('public\.miclub_schema_migrations'\)/);
+  assert.match(diagnostic, /BLOCKED_TENANT_DELETE_LEDGER_MISSING/);
+  assert.match(diagnostic, /c\.relname ILIKE '%schema%migration%'/);
+  assert.match(diagnostic, /NOT_COMPARABLE: ledger ausente/);
+  assert.match(diagnostic, /THEN NULL\s+ELSE count\(\*\) FILTER/);
+  assert.match(diagnostic, /query_to_xml\('SELECT name, checksum FROM public\.miclub_schema_migrations/);
+  assert.doesNotMatch(diagnostic, /actual AS \(\s*SELECT name,checksum FROM public\.miclub_schema_migrations/);
+  assert.match(diagnostic, /mismatches/);
+  assert.doesNotMatch(withoutSqlComments(diagnostic), /\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE|CALL)\b/i);
+});
+
+test("baja tenant manual exige identidad, backup, manifest, orden FK y rollback seguro", async () => {
+  const script = tenantDeletionSql("02_delete_tenant_manual.sql");
+  const { migrationManifest } = await import("./migrationManifest.js");
+
+  assert.match(script, /\$\{club_id\}/);
+  assert.match(script, /\$\{expected_club_name\}/);
+  assert.match(script, /\$\{backup_reference\}/);
+  assert.match(script, /^--[\s\S]*\nBEGIN;/);
+  assert.match(script, /_backup_/);
+  assert.match(script, /pg_constraint/);
+  assert.match(script, /NOT EXISTS\(SELECT 1 FROM miclub\.user_club_memberships m WHERE m\.user_id=u\.id\)/);
+  assert.match(script, /_global_before/);
+  assert.match(script, /fk\.confrelid=to_regclass\('miclub\.users'\) AND fk\.confdeltype='c'/);
+  assert.match(script, /se eliminó un usuario que conserva membresías/);
+  assert.match(script, /ROLLBACK;\s*$/);
+  assert.doesNotMatch(withoutSqlComments(script), /\bTRUNCATE\b/i);
+  assert.match(script, /NO usar desde la app ni migration runner/i);
+  assert.match(script, /public\.miclub_schema_migrations no existe/);
+  assert.match(script, /EXECUTE 'SELECT count\(\*\) FROM _expected_manifest/);
+
+  for (const entry of migrationManifest) {
+    const basename = entry.path.split("/").at(-1)!;
+    assert.match(script, new RegExp(`\\('${basename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}', '${entry.sha256}'\\)`));
+  }
+  const manifestRows = [...script.matchAll(/^\s*\('[^']+\.sql', '[0-9a-f]{64}'\)[,;]$/gm)];
+  assert.equal(manifestRows.length, migrationManifest.length);
+});
