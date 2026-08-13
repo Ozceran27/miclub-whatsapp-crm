@@ -172,11 +172,18 @@ export interface AdministrationActivityDto {
   name: string;
   modality?: string | null;
   color?: string | null;
+  iconKey?: string | null;
+  /** Cuota cobrada al inscribirse; no representa la liquidación mensual del club. */
+  enrollmentFee: number;
+  /** @deprecated Usar enrollmentFee. */
   monthlyFee: number;
   clubCommissionPercent: number;
+  clubSharePercentage?: number | null;
   instructorCommissionPercent: number;
   settlementMode?: string | null;
   settlementFixedAmount?: number | null;
+  termsEffectiveFrom?: string | null;
+  termsEffectiveTo?: string | null;
   generatesEnrollments: boolean;
   maxCapacity?: number | null;
   currentEnrollments?: number | null;
