@@ -11,8 +11,8 @@ import {
   getPostgresClubFinanceSummary,
   getPostgresMembers,
   getPostgresSectorOperationalSummary,
-} from "./postgresDashboardService.js";
-import type { RequestAuthContext } from "../auth/types.js";
+} from "../../services/postgresDashboardService.js";
+import type { RequestAuthContext } from "../../auth/types.js";
 
 export type ReconciliationStatus = "match" | "difference" | "missing_google_sheets" | "missing_postgres";
 

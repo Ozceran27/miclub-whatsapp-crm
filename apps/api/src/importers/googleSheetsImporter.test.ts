@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isImportSchemaConflictConfiguration, parseMissingEnrollmentStrategy, processMember, processMovement, processRowsWithSavepoints, resolveMovementRelation } from './googleSheetsImporter.js';
-import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../services/googleSheets.js';
+import { movementValue, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../legacy/googleSheets/googleSheets.js';
 import { formatArgentinaTimestampForPostgres, formatDateOnlyForPostgres, normalizeMovementOperationalStatus, parseArgentinianDate, parseSheetDateToLocalDate } from './normalizers.js';
 
 

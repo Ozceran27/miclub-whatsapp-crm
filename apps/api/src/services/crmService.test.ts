@@ -7,6 +7,6 @@ test("CRM usa PostgreSQL cuando CRM_SOURCE está ausente o es inválido", () => 
   assert.equal(resolveCrmSource("postgress"), "postgres");
 });
 
-test("SQLite requiere selección legacy explícita", () => {
-  assert.equal(resolveCrmSource("sqlite"), "sqlite");
+test("SQLite tampoco puede seleccionarse como fallback productivo", () => {
+  assert.equal(resolveCrmSource("sqlite"), "postgres");
 });

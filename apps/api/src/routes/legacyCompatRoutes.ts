@@ -85,18 +85,6 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       try { res.json(await getPostgresReceivableEffectiveStatusDebug(req.auth!.clubId)); }
       catch (error) { postgresFailure(res, "debug de cuotas", error, req.requestId); }
     });
-    router.get("/comparison-debug", requirePermission(PERMISSIONS.ADMINISTRATION_CONFIGURE), async (req, res) => {
-      try { const { compareLegacyWithPostgres } = await import("../services/comparisonService.js"); res.json(await compareLegacyWithPostgres(req.auth!)); }
-      catch (error) { postgresFailure(res, "diagnóstico de migración", error, req.requestId); }
-    });
-    router.get("/comparison-debug/summary", requirePermission(PERMISSIONS.ADMINISTRATION_CONFIGURE), async (req, res) => {
-      try { const { compareLegacySummaryWithPostgresDashboard } = await import("../services/comparisonService.js"); res.json(await compareLegacySummaryWithPostgresDashboard(req.auth!)); }
-      catch (error) { postgresFailure(res, "diagnóstico de resumen de migración", error, req.requestId); }
-    });
-    router.get("/comparison-debug/members", requirePermission(PERMISSIONS.ADMINISTRATION_CONFIGURE), async (req, res) => {
-      try { const { compareLegacyMembersWithPostgresEnrollments } = await import("../services/comparisonService.js"); res.json(await compareLegacyMembersWithPostgresEnrollments(req.auth!)); }
-      catch (error) { postgresFailure(res, "diagnóstico de miembros de migración", error, req.requestId); }
-    });
   }
 
   return router;

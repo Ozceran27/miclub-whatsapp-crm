@@ -1,4 +1,5 @@
-export type ModuleId = 'home' | 'economy' | 'fitness' | 'salon' | 'aula' | 'local1' | 'cantina' | 'crm' | 'administration' | 'dataMigration';
+export type CoreModuleId = 'home' | 'economy' | 'crm' | 'administration' | 'dataMigration';
+export type ModuleId = CoreModuleId | `sector:${string}`;
 
 export type ModuleDefinition = {
   id: ModuleId;

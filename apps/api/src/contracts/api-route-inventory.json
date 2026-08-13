@@ -186,26 +186,6 @@
       ]
     },
     {
-      "id": "GET /api/dashboard-reconciliation",
-      "method": "GET",
-      "path": "/api/dashboard-reconciliation",
-      "source": "apps/api/src/routes/dashboardRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "dashboard.read",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
       "id": "GET /api/dashboard/basic",
       "method": "GET",
       "path": "/api/dashboard/basic",
@@ -213,26 +193,6 @@
       "authentication": "session",
       "membership": "active",
       "permission": "dashboard.read",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /api/db/crm/audit",
-      "method": "GET",
-      "path": "/api/db/crm/audit",
-      "source": "apps/api/src/routes/dbRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "crm.write",
       "role": "any-with-permission",
       "sectorScope": "tenant",
       "mutability": "read",
@@ -593,86 +553,6 @@
       "authentication": "session",
       "membership": "active",
       "permission": "finance.read",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /api/import/batches",
-      "method": "GET",
-      "path": "/api/import/batches",
-      "source": "apps/api/src/routes/importRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "imports.run",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /api/import/batches/:id/errors",
-      "method": "GET",
-      "path": "/api/import/batches/:id/errors",
-      "source": "apps/api/src/routes/importRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "imports.run",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /api/import/google-sheets/admin-movements",
-      "method": "GET",
-      "path": "/api/import/google-sheets/admin-movements",
-      "source": "apps/api/src/routes/importRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "imports.run",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /api/import/google-sheets/movements/audit",
-      "method": "GET",
-      "path": "/api/import/google-sheets/movements/audit",
-      "source": "apps/api/src/routes/importRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "imports.run",
       "role": "any-with-permission",
       "sectorScope": "tenant",
       "mutability": "read",
@@ -1226,66 +1106,6 @@
       ]
     },
     {
-      "id": "GET /comparison-debug",
-      "method": "GET",
-      "path": "/comparison-debug",
-      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "administration.configure",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /comparison-debug/members",
-      "method": "GET",
-      "path": "/comparison-debug/members",
-      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "administration.configure",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /comparison-debug/summary",
-      "method": "GET",
-      "path": "/comparison-debug/summary",
-      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "administration.configure",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
       "id": "GET /contacted-recent",
       "method": "GET",
       "path": "/contacted-recent",
@@ -1694,66 +1514,6 @@
       "sectorScope": "restricted",
       "mutability": "write",
       "idempotency": "optimistic-lock",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "POST /api/db/crm/migrate",
-      "method": "POST",
-      "path": "/api/db/crm/migrate",
-      "source": "apps/api/src/routes/dbRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "crm.write",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "write",
-      "idempotency": "non-idempotent",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "POST /api/import/google-sheets",
-      "method": "POST",
-      "path": "/api/import/google-sheets",
-      "source": "apps/api/src/routes/importRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "imports.run",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "write",
-      "idempotency": "non-idempotent",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "POST /api/import/google-sheets/enrollments/delete-missing",
-      "method": "POST",
-      "path": "/api/import/google-sheets/enrollments/delete-missing",
-      "source": "apps/api/src/routes/importRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "imports.run",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "write",
-      "idempotency": "non-idempotent",
       "testCategories": [
         "authentication",
         "authorization",
@@ -2232,6 +1992,26 @@
       ],
       "mutability": "archive",
       "idempotency": "idempotent"
+    },
+    {
+      "id": "GET /api/modules/navigation",
+      "method": "GET",
+      "path": "/api/modules/navigation",
+      "source": "apps/api/src/routes/moduleRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "dashboard:read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant-catalog",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
     }
   ]
 }

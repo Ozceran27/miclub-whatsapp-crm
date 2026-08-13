@@ -35,24 +35,19 @@ npm run start
 
 `npm run start` sirve también `apps/web/dist`. Para un entorno desplegado use `NODE_ENV=production`, una `PUBLIC_APP_URL` HTTPS y autenticación habilitada; el validador de arranque falla de forma cerrada si falta esa configuración.
 
-## Importación excepcional desde Google Sheets
+## Importación XLSX
 
-Sheets se habilita solo durante una ventana controlada. El flujo preferido es:
-
-```bash
-npm run import:sheets:dry
-npm run import:sheets
-npm run audit:postgres
-```
-
-Consulte el [runbook de importación Sheets → PostgreSQL](docs/google-sheets-postgres-migration.md). Los endpoints de importación requieren además `IMPORT_ENDPOINTS_ENABLED=true`, membresía activa y permiso `imports:run`; deben volver a apagarse al cerrar la ventana.
+La vía soportada es el importador XLSX autenticado. Ejecute siempre dry-run y conserve el hash y reporte del lote antes de confirmar. Google Sheets y SQLite están fuera del runtime productivo; consulte el [runbook XLSX](docs/import-xlsx.md).
 
 ## Documentación operativa
 
 - [Checkpoint canónico pre-admin](docs/checkpoint-pre-admin.md)
-- [Arquitectura actual](docs/architecture-current.md)
+- [Arquitectura canónica](docs/architecture.md)
 - [Inventario de endpoints](docs/api-route-inventory.md)
-- [Runbook de identidad y tenant](docs/auth-tenant-remediation-runbook.md)
+- [Tenant canónico](docs/tenant.md)
+- [Onboarding canónico](docs/onboarding.md)
+- [Economía canónica](docs/economy.md)
+- [Despliegue](docs/deployment-runbook.md)
 - [Runbook de corte PostgreSQL](docs/postgres-cutover-runbook.md)
 - [Archivo histórico (no usar para despliegues nuevos)](docs/history/README.md)
 
