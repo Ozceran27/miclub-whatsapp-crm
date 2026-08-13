@@ -15,6 +15,7 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
+
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -26,6 +27,8 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608060007_backfill_granular_mutation_permissions.sql` | Completa permisos granulares desde grants legacy, preserva permisos personalizados y revoca sesiones afectadas. | `5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685` | Después de `202608060006_provision_administrative_permissions.sql`. |
 | `202608130001_version_activity_terms.sql` | Versiona términos de actividades, incorpora el catálogo de iconos y protege tenant e historia. | `45075d69c380cba75c46d8c9fd3a0db918f002d30e22fabc0401385c012aaffa` | Después de `202608060001_activity_mutation_model.sql`. |
 | `202608130002_activity_settlements.sql` | Modela liquidaciones y asignaciones explícitas por actividad sin inferir pagos históricos. | `684a7d82d658db5305ebd696a0b3b761b105c2eee975b1af8abef9e691f32d37` | Después de `202608130001_version_activity_terms.sql` y `202608060003_movement_mutation_model.sql`. |
+| `202608130003_global_category_catalog.sql` | Crea el catálogo económico global clasificado y conserva movement_categories como referencia tenant compatible. | `1292c2c65f2a57029854b6ce60f4dfe72ca9c9ce16ff2a178bc589d94bda722f` | Después de `202608060003_movement_mutation_model.sql`. |
+
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:

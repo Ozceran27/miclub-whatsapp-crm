@@ -66,6 +66,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608060007_backfill_granular_mutation_permissions.sql", sha256: "5d43fd56388bcd855deb7b0040dd415e429628b0123e48aa8c0301d8a743e685", dependsOn: ["202608060006_provision_administrative_permissions.sql"], checkpointPurpose: "Completa permisos granulares desde grants legacy, preserva permisos personalizados y revoca sesiones afectadas." },
   { path: "202608130001_version_activity_terms.sql", sha256: "45075d69c380cba75c46d8c9fd3a0db918f002d30e22fabc0401385c012aaffa", dependsOn: ["202608060001_activity_mutation_model.sql"], checkpointPurpose: "Versiona términos de actividades, incorpora el catálogo de iconos y protege tenant e historia." },
   { path: "202608130002_activity_settlements.sql", sha256: "684a7d82d658db5305ebd696a0b3b761b105c2eee975b1af8abef9e691f32d37", dependsOn: ["202608130001_version_activity_terms.sql", "202608060003_movement_mutation_model.sql"], checkpointPurpose: "Modela liquidaciones y asignaciones explícitas por actividad sin inferir pagos históricos." },
+  { path: "202608130003_global_category_catalog.sql", sha256: "1292c2c65f2a57029854b6ce60f4dfe72ca9c9ce16ff2a178bc589d94bda722f", dependsOn: ["202608060003_movement_mutation_model.sql"], provides: ["miclub.table.category_catalog"], checkpointPurpose: "Crea el catálogo económico global clasificado y conserva movement_categories como referencia tenant compatible." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

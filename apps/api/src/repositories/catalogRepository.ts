@@ -55,9 +55,12 @@ const catalogQueries: Record<CatalogName, CatalogQuery> = {
   "movement-categories": {
     tenantScoped: true,
     sql: `
-      select id, code, name, direction, is_active, created_at
-      from miclub.movement_categories where club_id = $1
-      order by direction asc, name asc
+      select mc.id, cc.code, cc.display_name as name, cc.display_name, cc.classification,
+        mc.direction, (mc.is_active and cc.is_active) as is_active, cc.display_order, mc.created_at
+      from miclub.movement_categories mc
+      join miclub.category_catalog cc on cc.id = mc.catalog_id
+      where mc.club_id = $1 and cc.is_active
+      order by cc.display_order asc
     `
   },
   "payment-methods": {
