@@ -10,6 +10,7 @@ import { XLSX_POLICY, TEMPLATE_FILENAME } from "../services/xlsxMigration/policy
 import { validateWorkbook } from "../services/xlsxMigration/validator.js";
 import { projectWrites } from "../services/xlsxMigration/projector.js";
 import { saveBatch } from "../services/xlsxMigration/persistence.js";
+import { loadReferenceCatalog, resolveReferenceRows } from "../services/xlsxMigration/referenceResolver.js";
 
 const router=Router(); router.use(requireMembership,requireImportOperator);
 const templatePath=path.resolve(process.cwd(),"apps/api/data/db",TEMPLATE_FILENAME);
@@ -24,8 +25,12 @@ router.post("/uploads",asyncHandler(async(req,res)=>{
   if(!file?.filename) return res.status(400).json({code:"FILE_REQUIRED",message:"Falta el campo file."});
   if(file.data.length>XLSX_POLICY.maxCompressedBytes) return res.status(413).json({code:"COMPRESSED_SIZE_LIMIT",message:"El archivo excede 8 MiB."});
   let validation; try { validation=validateWorkbook(file.data,file.filename,file.mime??""); } catch(error){ const code=typeof error==='object'&&error&&'code'in error?String(error.code):'INVALID_XLSX'; return res.status(422).json({code,message:error instanceof Error?error.message:"XLSX inválido."}); }
-  const sha256=createHash("sha256").update(file.data).digest("hex"), writes=projectWrites(validation.rowCounts); const dry=parsePart(raw,boundary,"dryRunOfBatchId")?.data.toString().trim()||null; const idempotency=req.get("idempotency-key")?.trim()||null; const referenceConfigHash=createHash("sha256").update("xlsx-reference-config:v1").digest("hex");
-  let batch; try { batch=await saveBatch({clubId:req.auth!.clubId,userId:req.auth!.userId,sha256,templateVersion:XLSX_POLICY.templateVersion,sourceFile:file.filename,idempotencyKey:idempotency,referenceConfigHash,dryRunOfBatchId:dry,rows:writes.total,projectedWrites:writes.total,errors:validation.errors,metadata:{sheets:validation.sheets,rowCounts:validation.rowCounts,writes}}); } catch(error){ if(typeof error==='object'&&error&&'code'in error&&error.code==='MATCHING_DRY_RUN_REQUIRED') return res.status(409).json({code:error.code,message:error instanceof Error?error.message:String(error)}); throw error; }
+  const sha256=createHash("sha256").update(file.data).digest("hex"), writes=projectWrites(validation.rowCounts); const dry=parsePart(raw,boundary,"dryRunOfBatchId")?.data.toString().trim()||null; const idempotency=req.get("idempotency-key")?.trim()||null; const referenceConfigHash=createHash("sha256").update("xlsx-reference-config:v2").digest("hex");
+  const operation=(req.get("x-import-operation")??(dry?"apply":"dry_run")).toLowerCase(); if(!["dry_run","apply","retry","reversal"].includes(operation)) return res.status(400).json({code:"INVALID_IMPORT_OPERATION",message:"Operación de importación inválida."});
+  if(operation==="apply"&&!dry) return res.status(409).json({code:"MATCHING_DRY_RUN_REQUIRED",message:"La aplicación real requiere el identificador de un dry-run equivalente."});
+  const references=resolveReferenceRows(validation.referenceRows,await loadReferenceCatalog(req.auth!.clubId)); validation.errors.push(...references.errors);
+  const batchIdentity=createHash("sha256").update([sha256,XLSX_POLICY.templateVersion,req.auth!.clubId,operation].join(":"),"utf8").digest("hex");
+  let batch; try { batch=await saveBatch({clubId:req.auth!.clubId,userId:req.auth!.userId,sha256,batchIdentity,operation,templateVersion:XLSX_POLICY.templateVersion,sourceFile:file.filename,idempotencyKey:idempotency,referenceConfigHash,dryRunOfBatchId:dry,rows:writes.total,projectedWrites:writes.total,errors:validation.errors,metadata:{sheets:validation.sheets,rowCounts:validation.rowCounts,writes,rows:references.resolved}}); } catch(error){ if(typeof error==='object'&&error&&'code'in error&&['MATCHING_DRY_RUN_REQUIRED','BATCH_ALREADY_EXECUTED'].includes(String(error.code))) return res.status(409).json({code:error.code,message:error instanceof Error?error.message:String(error)}); throw error; }
   res.status(validation.errors.length?422:200).json({...batch,fileSha256:sha256,templateVersion:XLSX_POLICY.templateVersion,rowCounts:validation.rowCounts,projectedWrites:writes,errors:validation.errors});
  } finally { await fs.rm(temp,{force:true}).catch(()=>undefined); }
 }));

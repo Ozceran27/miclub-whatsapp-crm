@@ -17,7 +17,17 @@ export const normalizePhone = (value: unknown): string => {
   if (digits.startsWith("54")) return `549${digits.slice(2).replace(/^0?15/, "")}`;
   return `549${digits.replace(/^0/, "").replace(/^15/, "")}`;
 };
-export const normalizeComparableText = (value: unknown): string => normalizeSheetText(value).toLowerCase().replace(/\s+/g, " ");
+export const normalizeComparableText = (value: unknown): string =>
+  String(value ?? "")
+    // NFD makes canonically equivalent NFC/NFD input comparable. Removing all
+    // Unicode marks (not only the basic combining block) also covers scripts
+    // whose diacritics live outside U+0300–U+036F.
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .normalize("NFC")
+    .trim()
+    .replace(/\s+/gu, " ")
+    .toLocaleLowerCase("und");
 
 export const normalizeMovementOperationalStatus = (value: unknown): EconomyOperationalStatus => {
   const normalized = normalizeComparableText(value);

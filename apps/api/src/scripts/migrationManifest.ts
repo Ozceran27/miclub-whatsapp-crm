@@ -68,6 +68,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608130002_activity_settlements.sql", sha256: "684a7d82d658db5305ebd696a0b3b761b105c2eee975b1af8abef9e691f32d37", dependsOn: ["202608130001_version_activity_terms.sql", "202608060003_movement_mutation_model.sql"], checkpointPurpose: "Modela liquidaciones y asignaciones explícitas por actividad sin inferir pagos históricos." },
   { path: "202608130003_global_category_catalog.sql", sha256: "1292c2c65f2a57029854b6ce60f4dfe72ca9c9ce16ff2a178bc589d94bda722f", dependsOn: ["202608060003_movement_mutation_model.sql"], provides: ["miclub.table.category_catalog"], checkpointPurpose: "Crea el catálogo económico global clasificado y conserva movement_categories como referencia tenant compatible." },
   { path: "202608130004_secure_xlsx_import.sql", sha256: "2a9f8ff8547fb63ec6d10d51ac19374ef1dd6209529b6f63b25509bb30167837", dependsOn: ["202607250002_evolve_app_users_auth.sql", "202607250003_create_user_club_authorization.sql"], checkpointPurpose: "Añade trazabilidad, idempotencia y errores estructurados al importador XLSX seguro." },
+  { path: "202608130005_xlsx_batch_identity.sql", sha256: "10ea1c80c9543c6791a0894e8283d92dacee92afaf547b7794e57715e589eeb4", dependsOn: ["202608130004_secure_xlsx_import.sql"], checkpointPurpose: "Impide reejecutar un lote XLSX real exacto salvo retry/reversal explícito." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";
