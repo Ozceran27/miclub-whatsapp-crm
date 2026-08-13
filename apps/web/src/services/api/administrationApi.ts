@@ -14,6 +14,11 @@ export const getAdministrationSummary = (signal?: AbortSignal) =>
 export const getAdministrationSectors = (signal?: AbortSignal) =>
   apiJson<AdministrationSectorsResponse>('/api/sectores?page=1&limit=100', { cache: 'no-store', signal });
 
+export type SectorTemplate = { id: string; code: string; display_name: string; icon_key: string; display_order: number };
+export const getSectorTemplates = (signal?: AbortSignal) => apiJson<{items: SectorTemplate[]}>('/api/administration/sector-templates', { signal });
+export const createAdministrationSector = (input: {templateId:string;color:string;status:'active'|'inactive'|'under_repair'}) =>
+  apiJson<Record<string,unknown>>('/api/administration/sectors', { method: 'POST', body: JSON.stringify(input) });
+
 export const getAdministrationActivities = (signal?: AbortSignal) =>
   apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100', { cache: 'no-store', signal });
 

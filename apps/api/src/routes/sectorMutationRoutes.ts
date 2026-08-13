@@ -46,7 +46,7 @@ router.patch("/sectors/:id", requirePermission(PERMISSIONS.SECTORS_EDIT), requir
     if (body[field] !== undefined && body[field] !== null && typeof body[field] !== "string") return fail(res, 400, "VALIDATION_ERROR", `${field} debe ser texto.`);
   }
   if (body.managerPersonId !== undefined && body.managerPersonId !== null && (typeof body.managerPersonId !== "string" || !UUID.test(body.managerPersonId))) return fail(res, 400, "VALIDATION_ERROR", "managerPersonId inválido.");
-  if (body.capacityMode !== undefined && !["none", "fixed", "unlimited"].includes(String(body.capacityMode))) return fail(res, 400, "VALIDATION_ERROR", "capacityMode inválido.");
+  if (body.capacityMode !== undefined && (typeof body.capacityMode !== "string" || !["none", "fixed", "unlimited"].includes(body.capacityMode))) return fail(res, 400, "VALIDATION_ERROR", "capacityMode inválido.");
   if (body.configuredCapacity !== undefined && body.configuredCapacity !== null && (!Number.isInteger(body.configuredCapacity) || Number(body.configuredCapacity) < 0)) return fail(res, 400, "VALIDATION_ERROR", "configuredCapacity debe ser un entero no negativo.");
   const input = { ...body, name: body.name.trim() } as SectorUpdate;
   delete (input as Record<string, unknown>).updatedAt;
@@ -69,8 +69,8 @@ router.patch("/sectors/:id/status", requirePermission(PERMISSIONS.SECTORS_EDIT),
   if (Object.keys(body).some((key) => !["updatedAt", "status"].includes(key))) return fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no permitidos.");
   const version = expectedVersion(body, res);
   if (!version) return;
-  if (body.status !== "active" && body.status !== "inactive") return fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive.");
-  return respond(res, await setSectorStatus(actor(req), id, version, body.status));
+  if (!["active", "inactive", "under_repair"].includes(String(body.status))) return fail(res, 400, "VALIDATION_ERROR", "status debe ser active, inactive o under_repair.");
+  return respond(res, await setSectorStatus(actor(req), id, version, body.status as "active" | "inactive" | "under_repair"));
 }));
 
 export default router;

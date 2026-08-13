@@ -1,6 +1,6 @@
 import type { AdministrationSectorDto, AdministrationSectorsResponse } from '@miclub/shared';
-import { useCallback, useEffect, useState } from 'react';
-import { getAdministrationSectors } from '../../services/api/administrationApi';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { createAdministrationSector, getAdministrationSectors, getSectorTemplates, type SectorTemplate } from '../../services/api/administrationApi';
 import { SectorDetailModal } from './SectorDetailModal';
 
 const integer = new Intl.NumberFormat('es-AR');
@@ -29,6 +29,9 @@ export function SectorList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [templates, setTemplates] = useState<SectorTemplate[]>([]);
+  const [newColor, setNewColor] = useState('#2563EB');
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -49,6 +52,16 @@ export function SectorList() {
     return () => controller.abort();
   }, [load]);
 
+  useEffect(() => { if (creating && templates.length === 0) void getSectorTemplates().then(({items}) => setTemplates(items)).catch((e: unknown) => setError(e instanceof Error ? e.message : 'No se pudo cargar el catálogo.')); }, [creating, templates.length]);
+
+  const create = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); const data = new FormData(event.currentTarget); setLoading(true); setError(null);
+    const templateId = data.get('templateId'); const color = data.get('color'); const status = data.get('status');
+    if (typeof templateId !== 'string' || typeof color !== 'string' || typeof status !== 'string') { setError('Datos de sector inválidos.'); setLoading(false); return; }
+    try { await createAdministrationSector({ templateId, color, status: status as 'active'|'inactive'|'under_repair' }); setCreating(false); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo crear el sector.'); setLoading(false); }
+  };
+
   const sectors = response?.items ?? [];
   const selectedSector = sectors.find(({ id }) => id === selectedSectorId);
 
@@ -60,9 +73,7 @@ export function SectorList() {
           <h3 id="sector-list-title">Sectores del club</h3>
           <p>{response ? `${response.total} sectores configurados` : 'Configuración, capacidad y operación actual.'}</p>
         </div>
-        <button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>
-          {loading ? 'Actualizando…' : 'Actualizar sectores'}
-        </button>
+        <div className="sector-list__actions"><button className="icon-btn" type="button" onClick={() => setCreating(true)}>+ Nuevo sector</button><button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar sectores'}</button></div>
       </div>
 
       {error && <div className="sector-list__state sector-list__state--error" role="alert"><span>{error}</span><button type="button" onClick={() => void load()}>Reintentar</button></div>}
@@ -98,6 +109,7 @@ export function SectorList() {
         </div>
       )}
       {selectedSector && <SectorDetailModal sector={selectedSector} onClose={() => setSelectedSectorId(null)} />}
+      {creating && <div className="sector-modal__backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setCreating(false); }}><form className="sector-modal sector-create" onSubmit={(e) => void create(e)}><header className="sector-modal__header"><div><p className="eyebrow">Catálogo global</p><h2>Nuevo sector</h2><p>Elegí una plantilla, color y estado inicial.</p></div><button className="sector-modal__close" type="button" onClick={() => setCreating(false)}>×</button></header><label>Plantilla<select name="templateId" required defaultValue=""><option value="" disabled>Seleccionar…</option>{templates.map(t => <option key={t.id} value={t.id}>{t.display_name}</option>)}</select></label><label>Color<input name="color" type="color" value={newColor} onChange={e => setNewColor(e.target.value.toUpperCase())} /></label><fieldset><legend>Paleta rápida</legend>{['#2563EB','#16A34A','#DC2626','#9333EA','#EA580C','#0891B2'].map(color => <button key={color} type="button" className="sector-create__swatch" data-selected={newColor === color} style={{backgroundColor:color}} onClick={() => setNewColor(color)} aria-label={`Usar color ${color}`} />)}</fieldset><label>Estado<select name="status" defaultValue="active"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="under_repair">En reparación</option></select></label><div className="sector-list__actions"><button type="button" className="ghost-btn" onClick={() => setCreating(false)}>Cancelar</button><button type="submit" className="icon-btn" disabled={loading}>Crear sector</button></div></form></div>}
     </section>
   );
 }
