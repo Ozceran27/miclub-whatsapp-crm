@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import inventory from './api-route-inventory.json' with { type: 'json' };
 import { tenantFixture } from '../testFixtures/multitenant.js';
 
-type Route = (typeof inventory.routes)[number];
 const routeFiles = [...new Set(inventory.routes.map(route => route.source))];
+const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const staticDeclaration = /router\.(get|post|patch|put|delete)\s*\(\s*["'`]([^"'`$]+)["'`]/g;
 const ignoredSpa = new Set(['GET /*']);
 
@@ -21,7 +23,7 @@ test('every statically declared API route has exactly one complete policy and te
     assert.deepEqual(new Set(route.testCategories), new Set(route.authentication === 'public' || route.authentication === 'optional' ? ['validation','success'] : ['authentication','authorization','tenant-isolation','validation','success']), route.id);
   }
   for (const source of routeFiles) {
-    const text = readFileSync(source, 'utf8');
+    const text = readFileSync(path.resolve(apiRoot, '../..', source), 'utf8');
     for (const match of text.matchAll(staticDeclaration)) {
       const signature = `${match[1].toUpperCase()} ${match[2]}`;
       if (ignoredSpa.has(signature)) continue;

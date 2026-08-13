@@ -206,6 +206,8 @@ export interface AdministrationWorkerDto {
   role?: string | null;
   sector?: string | null;
   salary?: number | null;
+  paymentMode?: "FIXED" | "VARIABLE" | null;
+  monthlyFixedAmount?: number | null;
   status: string;
   systemAccess: boolean;
   employmentStartDate?: string | null;
@@ -220,6 +222,21 @@ export interface AdministrationWorkerDto {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdministrationWorkerMutationDto {
+  firstName: string;
+  lastName: string;
+  dni: string;
+  phone?: string | null;
+  email?: string | null;
+  password?: string;
+  role: "TRABAJADOR" | "INSTRUCTOR" | "DIRECTOR";
+  sectorId?: string | null;
+  paymentMode: "FIXED" | "VARIABLE";
+  monthlyFixedAmount?: number | null;
+  employmentStartDate?: string | null;
+  notes?: string | null;
 }
 
 export type AdministrationWorkersDataSource = "employees" | "legacy";

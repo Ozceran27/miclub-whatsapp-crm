@@ -2172,6 +2172,66 @@
         "validation",
         "success"
       ]
+    },
+    {
+      "id": "POST /api/administration/workers",
+      "method": "POST",
+      "path": "/api/administration/workers",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.manage",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "mutability": "create",
+      "idempotency": "unsafe"
+    },
+    {
+      "id": "PUT /api/administration/workers/:id",
+      "method": "PUT",
+      "path": "/api/administration/workers/:id",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.manage",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "mutability": "write",
+      "idempotency": "unsafe"
+    },
+    {
+      "id": "DELETE /api/administration/workers/:id",
+      "method": "DELETE",
+      "path": "/api/administration/workers/:id",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.manage",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "mutability": "archive",
+      "idempotency": "idempotent"
     }
   ]
 }

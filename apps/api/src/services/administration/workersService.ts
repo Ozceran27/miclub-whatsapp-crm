@@ -22,6 +22,8 @@ export const getAdministrationWorkers = async (clubId: string, limit: number, of
       role: worker.role,
       sector: worker.sector,
       salary: worker.salary == null ? null : Number(worker.salary),
+      paymentMode: worker.payment_mode,
+      monthlyFixedAmount: worker.monthly_fixed_amount == null ? null : Number(worker.monthly_fixed_amount),
       status: worker.status,
       systemAccess: worker.system_access,
       employmentStartDate: worker.employment_start_date,
@@ -29,10 +31,10 @@ export const getAdministrationWorkers = async (clubId: string, limit: number, of
       isActive: worker.status === "active",
       notes: worker.notes,
       roleGuard: {
-        isDirector: (worker.role ?? "").toLocaleLowerCase() === "director",
+        isDirector: worker.role === "DIRECTOR",
         activeDirectorCount: Number(worker.active_director_count),
-        canRemoveDirectorRole: (worker.role ?? "").toLocaleLowerCase() !== "director" || Number(worker.active_director_count) > 1,
-        ...((worker.role ?? "").toLocaleLowerCase() === "director" && Number(worker.active_director_count) <= 1
+        canRemoveDirectorRole: worker.role !== "DIRECTOR" || Number(worker.active_director_count) > 1,
+        ...(worker.role === "DIRECTOR" && Number(worker.active_director_count) <= 1
           ? { reason: "El club debe conservar al menos un Director activo." }
           : {})
       },
