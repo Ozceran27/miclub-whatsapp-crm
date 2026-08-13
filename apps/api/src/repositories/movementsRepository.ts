@@ -36,7 +36,7 @@ export type MovementInput = {
 export type MovementMutationResult = { kind: "created"; movement: MovementRow } | { kind: "replayed"; movement: MovementRow } | { kind: "updated"; movement: MovementRow }
   | { kind: "missing" } | { kind: "invalid_reference" } | { kind: "conflict" } | { kind: "protected"; reasons: string[] };
 
-const movementColumns = `id, club_id, external_id, movement_date, movement_type, category_id, sector_id, activity_id, concept,
+const movementColumns = `id, club_id, sequence_number, external_id, movement_date, movement_type, category_id, sector_id, activity_id, concept,
   person_id, counterparty_text, amount, taxes, payment_method_id, financial_status, operational_status,
   source, source_payload, reconciled_at, voided_at, voided_by, void_reason, created_at, updated_at`;
 const audit = (actor: MovementActor, action: string, before: MovementRow | null, after: MovementRow, db: Parameters<typeof auditService.movement>[1]) =>
@@ -50,8 +50,8 @@ export const createMovement = async (actor: MovementActor, input: MovementInput,
     const replay = await db.query<MovementRow>(`select ${movementColumns} from miclub.movements where club_id=$1 and idempotency_key=$2`,[actor.clubId,idempotencyKey]);
     if(replay.rows[0]) return {kind:"replayed",movement:replay.rows[0]};
     const result = await db.query<MovementRow>(`insert into miclub.movements
-      (club_id,external_id,idempotency_key,movement_date,movement_type,category_id,sector_id,activity_id,concept,person_id,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source)
-      select $1,'manual:'||gen_random_uuid(),$2,$3,$4,c.id,s.id,a.id,$8,$9,$10,$11,$12,p.id,coalesce($14,'otro'),coalesce($15,'COMPLETADO'),'manual'
+      (club_id,sequence_number,external_id,idempotency_key,movement_date,movement_type,category_id,sector_id,activity_id,concept,person_id,counterparty_text,amount,taxes,payment_method_id,financial_status,operational_status,source)
+      select $1,miclub.next_tenant_sequence($1,'movement'),'manual:'||gen_random_uuid(),$2,$3,$4,c.id,s.id,a.id,$8,$9,$10,$11,$12,p.id,coalesce($14,'otro'),coalesce($15,'COMPLETADO'),'manual'
       from miclub.movement_categories c join miclub.sectors s on s.club_id=$1 join miclub.payment_methods p on p.club_id=$1
       left join miclub.activities a on a.club_id=$1 and a.id=$7 and a.sector_id=s.id
       where c.club_id=$1 and c.id=$5 and c.is_active and c.direction::text=$4 and s.id=$6 and p.id=$13 and p.is_active and ($7::uuid is null or a.id is not null)
