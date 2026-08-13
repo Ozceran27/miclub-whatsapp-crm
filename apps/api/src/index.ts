@@ -55,6 +55,7 @@ import administrationRoutes from "./routes/administrationRoutes.js";
 import onboardingRoutes from "./routes/onboardingRoutes.js";
 import readOnlyRoutes from "./routes/readOnlyRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
+import migrationUploadRoutes from "./routes/migrationUploadRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { createCrmRoutes } from "./routes/crmRoutes.js";
 import { createLegacyCompatRoutes, getMembersSource, isDebtorMember } from "./routes/legacyCompatRoutes.js";
@@ -123,6 +124,7 @@ if (process.env.IMPORT_ENDPOINTS_ENABLED === "true") {
     importRoutes(req, res, next);
   });
 }
+app.use("/api/migration", importMutationRateLimit, migrationUploadRoutes);
 app.use("/api/db", dbRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api", readOnlyRoutes);
