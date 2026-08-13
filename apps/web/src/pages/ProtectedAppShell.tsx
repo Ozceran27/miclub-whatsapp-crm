@@ -20,7 +20,7 @@ const isCoreModule = (value: string): value is CoreModuleId => value in CORE_LAB
 export default function ProtectedAppShell() {
   const { path, navigate } = useRouter();
   const { username, clubId, permissions, logout } = useSession();
-  const [navigation, setNavigation] = useState<BackendNavigation>({ modules: ['home'], sectors: [] });
+  const [navigation, setNavigation] = useState<BackendNavigation>({ modules: ['home'], sectors: [], capabilities: [] });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const { theme, toggleTheme } = useTheme();
@@ -29,7 +29,7 @@ export default function ProtectedAppShell() {
   const modules = useMemo(() => visibleModules([
     ...navigation.modules.map((id) => ({ id, label: CORE_LABELS[id] })),
     ...navigation.sectors.map((sector) => ({ id: `sector:${sector.id}` as const, label: sector.name.toLocaleUpperCase('es-AR') })),
-  ] satisfies ModuleDefinition[], permissions), [navigation, permissions]);
+  ] satisfies ModuleDefinition[], permissions, navigation.capabilities), [navigation, permissions]);
   const segment = decodeURIComponent(path.split('/')[2] ?? 'home');
   const requested: ModuleId = segment === 'migration' ? 'dataMigration' : isCoreModule(segment) ? segment : segment.startsWith('sector:') ? segment as `sector:${string}` : 'home';
   const currentModule = modules.some(({ id }) => id === requested) ? requested : 'home';

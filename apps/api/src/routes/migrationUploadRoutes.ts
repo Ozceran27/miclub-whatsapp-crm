@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Router } from "express";
-import { requireImportOperator, requireMembership } from "../middleware/authorization.js";
+import { requireClubCapability, requireImportOperator, requireMembership } from "../middleware/authorization.js";
+import { CLUB_CAPABILITIES } from "@miclub/shared";
 import asyncHandler from "./asyncHandler.js";
 import { XLSX_POLICY, TEMPLATE_FILENAME } from "../services/xlsxMigration/policy.js";
 import { validateWorkbook } from "../services/xlsxMigration/validator.js";
@@ -12,7 +13,7 @@ import { projectWrites } from "../services/xlsxMigration/projector.js";
 import { saveBatch } from "../services/xlsxMigration/persistence.js";
 import { loadReferenceCatalog, resolveReferenceRows } from "../services/xlsxMigration/referenceResolver.js";
 
-const router=Router(); router.use(requireMembership,requireImportOperator);
+const router=Router(); router.use(requireMembership,requireImportOperator,requireClubCapability(CLUB_CAPABILITIES.DATA_MIGRATION));
 const templatePath=path.resolve(process.cwd(),"apps/api/data/db",TEMPLATE_FILENAME);
 router.get("/template",asyncHandler(async(_req,res)=>{ res.type(XLSX_POLICY.mime); res.set("Content-Disposition",`attachment; filename="${TEMPLATE_FILENAME}"`); res.set("X-Content-Type-Options","nosniff"); res.sendFile(templatePath); }));
 function parsePart(raw:Buffer,boundary:string,name:string){ const marker=Buffer.from(`--${boundary}`); for(let at=raw.indexOf(marker);at>=0;at=raw.indexOf(marker,at+marker.length)){ const headersEnd=raw.indexOf(Buffer.from("\r\n\r\n"),at); if(headersEnd<0) break; const headers=raw.subarray(at,headersEnd).toString(); if(headers.includes(`name="${name}"`)){ const start=headersEnd+4,end=raw.indexOf(Buffer.from(`\r\n--${boundary}`),start); if(end<0) break; const filename=headers.match(/filename="([^"]*)"/)?.[1]; const mime=headers.match(/Content-Type:\s*([^\r\n]+)/i)?.[1]; return {data:raw.subarray(start,end),filename,mime}; } } return null; }
