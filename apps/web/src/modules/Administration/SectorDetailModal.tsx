@@ -68,7 +68,7 @@ export function SectorDetailModal({ sector, onClose }: Props) {
           <button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${sector.name}`}>×</button>
         </header>
 
-        {sector.isSystem && <div className="sector-modal__restriction" role="note"><strong>Sector de sistema</strong><span>No se puede editar, archivar ni eliminar porque sostiene funciones internas del club.</span></div>}
+        {sector.isSystem && <div className="sector-modal__restriction" role="note"><strong>Sector de sistema</strong><span>Su identidad y archivado están bloqueados; el color y estado operativo sí pueden mantenerse.</span></div>}
 
         <section aria-labelledby={`${titleId}-general`}><h3 id={`${titleId}-general`}>Datos generales</h3><dl className="sector-modal__facts">
           <div><dt>Código</dt><dd>{sector.code}</dd></div><div><dt>Estado</dt><dd>{displayStatus(sector.operationalStatus)}</dd></div>

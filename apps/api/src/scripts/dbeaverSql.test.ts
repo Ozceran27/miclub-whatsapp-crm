@@ -87,3 +87,20 @@ test("saldos iniciales usan cuentas, moneda ISO y reemplazo idempotente auditabl
   assert.match(script, /Snapshot\/cache reconciliable/);
   assert.doesNotMatch(script, /DELETE\s+FROM\s+miclub\.movements/i);
 });
+
+test("catálogo de sectores reutiliza códigos sistémicos existentes sin violar el índice funcional", () => {
+  const script = sql("16_sector_templates_and_sector_lifecycle_manual.sql");
+
+  assert.match(script, /^\/[\s\S]*?ROLLBACK;/);
+  assert.match(script, /pg_advisory_xact_lock/);
+  assert.match(script, /WHERE s\.club_id=c\.id AND lower\(btrim\(s\.code\)\)=r\.code/);
+  assert.doesNotMatch(
+    script,
+    /WHERE NOT EXISTS \([\s\S]*?s\.archived_at IS NULL[\s\S]*?\);/,
+    "la unicidad sectors_club_code_key también comprende filas archivadas",
+  );
+  assert.match(script, /UPDATE miclub\.sectors s[\s\S]*?SET is_system=true/);
+  assert.match(script, /MANUAL_REVIEW:[\s\S]*?archivado/);
+  assert.match(script, /CHECK\(status IS NULL OR status IN \('active','inactive','under_repair','archived'\)\) NOT VALID/);
+  assert.doesNotMatch(script, /pg_get_constraintdef\(c\.oid\) ILIKE '%status%'/);
+});

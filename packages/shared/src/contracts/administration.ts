@@ -5,7 +5,9 @@ export type AdministrationApiErrorResponse = ApiErrorResponse;
 export type AdministrationPagination = PagePagination;
 export type AdministrationPaginatedResponse<T> = HttpPaginatedResponse<T>;
 
-export type AdministrationRecordStatus = "active" | "inactive" | "archived" | LegacyUnknownCode<"administration-record-status">;
+export type AdministrationRecordStatus = "active" | "inactive" | "under_repair" | "archived" | LegacyUnknownCode<"administration-record-status">;
+
+export interface SectorTemplateDto { id: string; code: string; displayName: string; iconKey: string; displayOrder: number }
 export type AdministrationMovementType = "INGRESOS" | "EGRESOS" | LegacyUnknownCode<"administration-movement-type">;
 export type AdministrationFinancialStatus = "sin_movimientos" | "pendiente" | "pagado" | "parcial" | "a_liquidar" | "liquidado" | "deuda" | "vencido" | "cancelado" | "otro" | LegacyUnknownCode<"administration-financial-status">;
 export type AdministrationOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | "ANULADO" | "REVISAR" | LegacyUnknownCode<"administration-operational-status">;

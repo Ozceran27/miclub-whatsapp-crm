@@ -3088,6 +3088,13 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .worker-modal__chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
 .worker-modal__chips li { background: var(--color-card-muted); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; padding: 6px 9px; }
 .sector-list__header { align-items: center; }
+.sector-list__actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
+.sector-create { display: grid; gap: 16px; max-width: 520px; }
+.sector-create > label { display: grid; gap: 6px; font-weight: 700; }
+.sector-create select, .sector-create input[type='color'] { background: var(--color-card-muted); border: 1px solid var(--color-border); border-radius: 9px; color: var(--color-text); min-height: 42px; padding: 8px; }
+.sector-create fieldset { align-items: center; border: 0; display: flex; gap: 10px; margin: 0; padding: 0; }
+.sector-create__swatch { border: 2px solid white; border-radius: 50%; box-shadow: 0 0 0 1px var(--color-border); cursor: pointer; height: 30px; width: 30px; }
+.sector-create__swatch[data-selected='true'] { box-shadow: 0 0 0 3px var(--color-accent); }
 .sector-list__grid { display: grid; gap: 10px; }
 .sector-list__row {
   align-items: center; background: var(--color-card); border: 1px solid var(--color-border);

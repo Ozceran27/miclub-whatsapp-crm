@@ -2132,6 +2132,46 @@
       "permission": "onboarding.write",
       "mutability": "write",
       "idempotency": "idempotent"
+    },
+    {
+      "id": "GET /api/administration/sector-templates",
+      "method": "GET",
+      "path": "/api/administration/sector-templates",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "POST /api/administration/sectors",
+      "method": "POST",
+      "path": "/api/administration/sectors",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "sectors.edit",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "create",
+      "idempotency": "unsafe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
     }
   ]
 }
