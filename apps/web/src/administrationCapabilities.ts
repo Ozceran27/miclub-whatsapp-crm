@@ -1,4 +1,4 @@
-import { hasAuthorizationCapability, PERMISSIONS, type AuthorizationCapability, type PermissionCode } from '@miclub/shared';
+import { CLUB_CAPABILITIES, hasAuthorizationCapability, hasClubCapability, PERMISSIONS, type AuthorizationCapability, type ClubCapability, type PermissionCode } from '@miclub/shared';
 import type { ModuleId } from './modules/ModuleNav';
 
 export const ADMINISTRATION_CAPABILITIES = {
@@ -27,5 +27,6 @@ export const getAdministrationCapabilities = (permissions: readonly string[]) =>
       .map((capability) => [capability, canEnter && hasAdministrationCapability(permissions, capability)]),
   ) as Record<AdministrationCapability, boolean>;
 };
-export const visibleModules = <T extends { id: ModuleId }>(modules: readonly T[], permissions: readonly string[]) =>
-  modules.filter(({ id }) => id !== 'administration' || hasAdministrationCapability(permissions, 'enter'));
+export const visibleModules = <T extends { id: ModuleId }>(modules: readonly T[], permissions: readonly string[], capabilities: readonly ClubCapability[] = []) =>
+  modules.filter(({ id }) => (id !== 'administration' || hasAdministrationCapability(permissions, 'enter'))
+    && (id !== 'dataMigration' || (permissions.includes(PERMISSIONS.IMPORTS_RUN) && hasClubCapability(capabilities, CLUB_CAPABILITIES.DATA_MIGRATION))));

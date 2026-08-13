@@ -4,19 +4,24 @@ import asyncHandler from "./asyncHandler.js";
 import { getEconomyClubSectorBalances, getEconomyClubSummary, listEconomyClubMovements } from "../services/economyClubService.js";
 import { requirePermission } from "../middleware/authorization.js";
 import { getPostgresPool } from "../db/postgres.js";
+import { resolveClubCapabilities } from "../services/clubCapabilityService.js";
 
 // productivo: módulos bajo /api/modules; no renombrar sin migración frontend.
 const router = Router();
 
 router.get("/navigation", requirePermission(PERMISSIONS.DASHBOARD_READ), asyncHandler(async (req, res) => {
-  const sectors = await (await getPostgresPool()).query<{ id: string; name: string; code: string | null }>(
+  const pool = await getPostgresPool();
+  const [sectors, capabilities] = await Promise.all([pool.query<{ id: string; name: string; code: string | null }>(
     `select id, name, code from miclub.sectors
      where club_id=$1 and archived_at is null and coalesce(operational_status, 'active') <> 'inactive'
      order by name`, [req.auth!.clubId],
-  );
+  ), resolveClubCapabilities(req.auth!.clubId, pool)]);
+  res.set("Cache-Control", "private, max-age=60");
+  res.vary("Cookie");
   res.json({
     modules: ["home", "economy", "crm", "administration", "dataMigration"],
     sectors: sectors.rows,
+    capabilities,
   });
 }));
 

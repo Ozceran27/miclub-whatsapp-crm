@@ -1,7 +1,7 @@
-import { hasAuthorizationCapability, PERMISSIONS, type AuthorizationCapability } from "@miclub/shared";
+import { hasAuthorizationCapability, PERMISSIONS, type AuthorizationCapability, type ClubCapabilityCode, type PermissionCode } from "@miclub/shared";
 import type { Request, RequestHandler } from "express";
-import type { PermissionCode } from "@miclub/shared";
 import type { AuthenticatedContext } from "../auth/types.js";
+import { clubHasCapability } from "../services/clubCapabilityService.js";
 
 const reject = (status: 401 | 403, message: string, code = status === 401 ? "AUTHENTICATION_REQUIRED" : "FORBIDDEN"): RequestHandler =>
   (_req, res) => res.status(status).json({ code, message });
@@ -24,6 +24,18 @@ export const requirePermission = (...permissions: PermissionCode[]): RequestHand
     return reject(403, "Permiso insuficiente")(req, res, next);
   }
   next();
+};
+
+export const requireClubCapability = (capability: ClubCapabilityCode): RequestHandler => async (req, res, next) => {
+  if (!req.auth?.clubId) return reject(req.auth ? 403 : 401, "Membresía de club requerida")(req, res, next);
+  try {
+    if (!await clubHasCapability(req.auth.clubId, capability)) {
+      return reject(403, "Funcionalidad no habilitada para este club", "CAPABILITY_REQUIRED")(req, res, next);
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
