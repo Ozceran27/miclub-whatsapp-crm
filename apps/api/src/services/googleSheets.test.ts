@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { adminMovementFallbackIndexes, calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, normalizeSuspiciousArsFee, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from './googleSheets.js';
+import { adminMovementFallbackIndexes, calculateFutureReceivableFeesUntilMonthEnd, calculateProjectedBalance, calculateReceivableFee, calculateReceivableFeesFromDebtors, normalizeSuspiciousArsFee, getReceivableCommissionRate, isCompleted, isExpense, isIncome, isPending, movementValue, normalizeMoney, normalizeOperationalStatus, normalizeSheetText, parseAulaCommissionMap, parseCommissionRate, resolveMemberColumnIndexes, resolveMovementColumnIndexes, sectorMovementFallbackIndexes } from '../legacy/googleSheets/googleSheets.js';
 
 test('normalizeOperationalStatus normaliza estados operativos conocidos', () => {
   assert.equal(normalizeOperationalStatus('Al Día'), 'al_dia');

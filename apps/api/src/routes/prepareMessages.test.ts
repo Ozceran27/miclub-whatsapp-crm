@@ -6,7 +6,7 @@ import type { Member } from '@miclub/shared';
 // This is an explicit compatibility test for the legacy SQLite migration path.
 // Ordinary runtime defaults to PostgreSQL even when CRM_SOURCE is absent.
 process.env.CRM_SOURCE = 'sqlite';
-const { default: db } = await import('../lib/sqlite.js');
+const { default: db } = await import('../legacy/sqlite/sqlite.js');
 const { createCrmRoutes } = await import('./crmRoutes.js');
 
 const memberId = '1';

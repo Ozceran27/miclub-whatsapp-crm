@@ -29,14 +29,7 @@ Fuente: `apps/api/src/routes/authRoutes.ts`.
 | GET | `/health` | Pública |
 | GET | `/api/db/health` | Sesión + tenant |
 | GET | `/api/db/enrollment-fee-audit` | Sesión + tenant + `finance:write` |
-| GET | `/api/db/crm/audit` | Sesión + tenant + `crm:write` |
-| POST | `/api/db/crm/migrate` | Sesión + tenant + `crm:write` |
-| GET | `/api/import/google-sheets/admin-movements` | Sesión + tenant + operador + `imports:run` + flag |
-| POST | `/api/import/google-sheets` | Sesión + tenant + operador + `imports:run` + flag |
-| POST | `/api/import/google-sheets/enrollments/delete-missing` | Sesión + tenant + operador + `imports:run` + flag |
-| GET | `/api/import/google-sheets/movements/audit` | Sesión + tenant + operador + `imports:run` |
-| GET | `/api/import/batches` | Sesión + tenant + operador + `imports:run` |
-| GET | `/api/import/batches/:id/errors` | Sesión + tenant + operador + `imports:run` |
+| POST | `/api/migration` | Sesión + tenant + `imports:run`; XLSX |
 
 Fuentes: `apps/api/src/routes/dbRoutes.ts`, `apps/api/src/routes/importRoutes.ts` y `apps/api/src/routes/legacyCompatRoutes.ts`. El “flag” es `IMPORT_ENDPOINTS_ENABLED=true`; solo protege operaciones que leen o mutan Sheets, tal como define el router actual.
 
@@ -53,7 +46,7 @@ Todas requieren sesión + tenant.
 | GET | `/api/people` | `peopleRoutes.ts` |
 | GET | `/api/movements`, `/api/receivables`, `/api/payments` | `financeRoutes.ts` |
 | GET | `/api/operational-balances`, `/api/sector-settlements` | `financeRoutes.ts` |
-| GET | `/api/dashboard/basic`, `/api/sector-finance-summary`, `/api/dashboard-reconciliation` | `dashboardRoutes.ts` |
+| GET | `/api/dashboard/basic`, `/api/sector-finance-summary` | `dashboardRoutes.ts` |
 
 Los archivos fuente están bajo `apps/api/src/routes/`.
 
@@ -63,7 +56,7 @@ Todas requieren sesión + tenant.
 
 | Montaje | Paths GET | Fuente |
 | --- | --- | --- |
-| `/api/modules` | `/api/modules/economy/summary`, `/api/modules/economy/sector-balances`, `/api/modules/economy/movements` | `moduleRoutes.ts` |
+| `/api/modules` | `/api/modules/navigation`, `/api/modules/economy/summary`, `/api/modules/economy/sector-balances`, `/api/modules/economy/movements` | `moduleRoutes.ts` |
 | `/api/economy` | `/api/economy/summary`, `/api/economy/monthly-evolution`, `/api/economy/by-sector`, `/api/economy/sector-rankings` | `economyRoutes.ts` |
 | `/api/economy` | `/api/economy/by-category`, `/api/economy/payment-methods`, `/api/economy/recent-movements`, `/api/economy/pending` | `economyRoutes.ts` |
 | `/api/economy` | `/api/economy/annual-summary`, `/api/economy/yearly-breakdown`, `/api/economy/comparison`, `/api/economy/insights` | `economyRoutes.ts` |

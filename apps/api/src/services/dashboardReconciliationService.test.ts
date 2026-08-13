@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDashboardReconciliation } from "./dashboardReconciliationService.js";
+import { buildDashboardReconciliation } from "../legacy/googleSheets/dashboardReconciliationService.js";
 import type { ClubOperationsSummary, SectorOperationalSummary } from "@miclub/shared";
 
 // Fixture derivada de apps/api/data/db/Dashboard CLUB Actualizado.xlsx.

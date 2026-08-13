@@ -1,9 +1,9 @@
 import type { ClubOperationsSummary, Member, SourceSheet } from "@miclub/shared";
-import { getDashboardBasic, getSectorFinanceSummary } from "./dashboardService.js";
-import type { RequestAuthContext } from "../auth/types.js";
+import { getDashboardBasic, getSectorFinanceSummary } from "../../services/dashboardService.js";
+import type { RequestAuthContext } from "../../auth/types.js";
 import { getClubOperationsSummaryFromGoogleSheets, getGoogleSheetsConfig, getMembersFromGoogleSheets, normalizeOperationalStatus } from "./googleSheets.js";
-import { getPostgresClubFinanceSummary, getPostgresMembers, getPostgresSummary } from "./postgresDashboardService.js";
-import { normalizeRow, type JsonRecord } from "./rowNormalizer.js";
+import { getPostgresClubFinanceSummary, getPostgresMembers, getPostgresSummary } from "../../services/postgresDashboardService.js";
+import { normalizeRow, type JsonRecord } from "../../services/rowNormalizer.js";
 
 const SECTORS: SourceSheet[] = ["FITNESS", "SALON", "AULA", "LOCAL_1", "CANTINA", "ADMINISTRACION"];
 

@@ -18,7 +18,7 @@ import {
   parseCurrentMonthUtility,
   type MovementColumnIndexes,
   type MovementFallbackMode,
-} from "../../services/googleSheets.js";
+} from "../../legacy/googleSheets/googleSheets.js";
 import {
   upsertActivity,
   upsertInstructor,

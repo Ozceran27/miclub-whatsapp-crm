@@ -116,14 +116,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-// Google Sheets belongs to an operational migration window. Keeping the import
-// dynamic prevents googleapis and the backfill graph from entering normal boot.
-if (process.env.IMPORT_ENDPOINTS_ENABLED === "true") {
-  app.use("/api/import", importMutationRateLimit, async (req, res, next) => {
-    const { default: importRoutes } = await import("./routes/importRoutes.js");
-    importRoutes(req, res, next);
-  });
-}
 app.use("/api/migration", importMutationRateLimit, migrationUploadRoutes);
 app.use("/api/db", dbRoutes);
 app.use("/api/modules", moduleRoutes);

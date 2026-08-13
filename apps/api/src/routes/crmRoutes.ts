@@ -3,7 +3,6 @@ import { PERMISSIONS } from "@miclub/shared";
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import type { Member, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
-import { templates } from "../data/mockData.js";
 import { buildWaLink, interpolateTemplate, normalizeArPhone } from "../services/messages.js";
 import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, insertCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
 import { requireMembership, requirePermission } from "../middleware/authorization.js";
@@ -20,6 +19,10 @@ const jsonError = (res: Response, status: number, message: string) =>
   res.status(status).json({ error: true, message });
 
 const ALLOWED_TEMPLATE_VARIABLES = new Set(["{nombre}", "{apellido}", "{actividad}", "{cuota}", "{modalidad}", "{instructor}"]);
+const templates = [
+  { id: "friendly", name: "Recordatorio amable", body: "Hola {nombre}, te recordamos que registrás una cuota pendiente de {actividad}.", isDefault: true, createdAt: "", updatedAt: "" },
+  { id: "direct", name: "Recordatorio directo", body: "Hola {nombre}. Figura pendiente el pago de tu cuota de {actividad}.", isDefault: true, createdAt: "", updatedAt: "" },
+];
 
 const validateTemplateInput = (name: unknown, body: unknown): string | null => {
   if (typeof name !== "string" || name.trim().length === 0) return "name no puede estar vacío.";
