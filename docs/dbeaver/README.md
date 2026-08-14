@@ -139,3 +139,14 @@ a `miclub.activities(id)` sólo si falta y crea el índice
 equivalente legacy sin `club_id`— para consultas por actividad y fecha. El script
 no hace backfill por texto y conserva los movimientos históricos con
 `activity_id NULL`.
+# Regla de copia y ejecución
+
+Los bloques entregados para ejecución manual deben contener **solamente SQL
+ejecutable**. Una ruta como `apps/api/db/migrations/archivo.sql` identifica un
+archivo y nunca debe pegarse como primera línea del editor: PostgreSQL intentará
+interpretar `apps` como una sentencia y responderá con SQLSTATE `42601`.
+
+En DBeaver, abra el archivo `.sql` o copie exclusivamente su contenido, seleccione
+**Execute SQL Script** y no incluya cercos Markdown (` ```sql `), rutas, comandos
+de shell ni texto explicativo. Los scripts de este directorio deben ser
+autocontenidos, declarar su transacción y terminar con una verificación legible.
