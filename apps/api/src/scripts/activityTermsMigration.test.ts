@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const migrationUrl = new URL('../../db/migrations/202608130001_version_activity_terms.sql', import.meta.url);
+const contiguousMigrationUrl = new URL('../../db/migrations/202608140005_activity_terms_contiguous.sql', import.meta.url);
 const migration = () => readFile(migrationUrl, 'utf8');
 
 test('los términos VARIABLE admiten los límites 0% y 100%, y rechazan fee fijo o porcentajes fuera de rango', async () => {
@@ -17,6 +18,13 @@ test('los cambios de términos no pueden superponerse y conservan las versiones 
   assert.match(sql, /EXCLUDE USING gist[\s\S]*activity_id WITH =[\s\S]*daterange[\s\S]*WITH &&/);
   assert.doesNotMatch(sql, /DELETE FROM miclub\.activity_terms/i);
   assert.match(sql, /activity_terms_no_overlap/);
+});
+
+test('la base también rechaza gaps mediante una constraint diferida', async () => {
+  const sql = await readFile(contiguousMigrationUrl, 'utf8');
+  assert.match(sql, /CREATE CONSTRAINT TRIGGER activity_terms_contiguous/);
+  assert.match(sql, /DEFERRABLE INITIALLY DEFERRED/);
+  assert.match(sql, /effective_from <> previous_effective_to \+ 1/);
 });
 
 test('tenant, archivo e historia quedan protegidos también en base de datos', async () => {
