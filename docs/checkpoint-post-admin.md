@@ -15,7 +15,6 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
-
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -32,12 +31,12 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608130005_xlsx_batch_identity.sql` | Impide reejecutar un lote XLSX real exacto salvo retry/reversal explícito. | `10ea1c80c9543c6791a0894e8283d92dacee92afaf547b7794e57715e589eeb4` | Después de `202608130004_secure_xlsx_import.sql`. |
 | `202608130006_tenant_entity_sequences.sql` | Asigna números correlativos transaccionales e independientes por club a movimientos e inscripciones. | `8192e26dc9ba52e9b553eeac38c43b3a900150e7ec8f5f9660b0f9e3a9134485` | Después de `202607250001_backfill_and_scope_unique_constraints.sql`. |
 | `202608130007_club_capabilities.sql` | Crea grants tenant de capabilities con fuente, actor y vigencia auditables, separados de RBAC y billing. | `226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f` | Después de `202607240001_create_clubs.sql`. |
-| `202608140001_version_xlsx_import_rows.sql` | Versiona las claves de filas XLSX aplicadas por club y lote sin conservar PII de la planilla. | `0a4f14469ad1cd78c523f61e1903f27657fa96f25d2541959b5014f3ffe7b3e1` | Después de `202608130005_xlsx_batch_identity.sql` y `202608130007_club_capabilities.sql`. |
+| `202608140001_version_xlsx_import_rows.sql` | Versiona las claves de filas XLSX aplicadas por club y lote sin conservar PII de la planilla. | `d3cd5be5131f40fdee6f1f16c47b42bb764ac48562a17d5b0455132ba6e4da6b` | Después de `202608130005_xlsx_batch_identity.sql` y `202608130007_club_capabilities.sql`. |
 | `202608140002_onboarding_milestones.sql` | Distingue hitos completados de pasos omitidos y permite validar la finalización del onboarding. | `5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f` | Después de `202608130007_club_capabilities.sql`. |
 | `202608140003_enforce_club_role_codes.sql` | Garantiza un único código de rol exacto por club para el aprovisionamiento y las altas de trabajadores. | `b52a94ecfc5827768698ba5db11f1a475f09cf78ae7a0c1083f5772e16325ae5` | Después de `202607250001_backfill_and_scope_unique_constraints.sql`. |
 | `202608140004_correct_category_catalog.sql` | Completa y corrige el catálogo económico, sus aliases y la referencia canónica obligatoria para nuevas categorías. | `00811df6648acd37dd5307c508d3986842d9fb637a66eda20f1aff24c13386a8` | Después de `202608130003_global_category_catalog.sql`. |
 | `202608140005_activity_terms_contiguous.sql` | Rechaza gaps entre versiones de términos mediante una constraint diferida, además de la exclusión de superposiciones. | `3aef03dfe3f219010280edb1548b6e6e05997ee57c639cc01d88f836bb5db30e` | Después de `202608130001_version_activity_terms.sql`. |
-
+| `202608140006_worker_invitations.sql` | Incorpora invitaciones tenant-scoped, expirables y de un solo uso antes de conceder membresía y permisos a identidades existentes. | `b62667d273ce49c31f7232cfb9e69817f9aeb5dbcdd462c8c4ac88eebc758654` | Después de `202608140003_enforce_club_role_codes.sql`. |
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:

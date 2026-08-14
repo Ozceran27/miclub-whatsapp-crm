@@ -7,6 +7,7 @@ import asyncHandler from "./asyncHandler.js";
 import { registerClub, RegistrationError } from "../auth/registrationService.js";
 import { auditService } from "../services/auditService.js";
 import { toPermissionCode, toRoleCode, type PublicAuthUser } from "@miclub/shared";
+import { resolveWorkerInvitation, WorkerMutationError } from "../services/administration/workerMutationService.js";
 
 const publicUser = (context: { userId: string; email: string; clubId: string; membershipId: string; role: string; permissions: readonly string[] }): PublicAuthUser => ({
   userId: context.userId,
@@ -89,6 +90,21 @@ router.post("/clubs/select", asyncHandler(async (req, res) => {
   const context = { ...session, clubId: membership.club_id, membershipId: membership.membership_id, role: membership.role, permissions: membership.permissions, sectorIds: membership.sector_ids };
   setSessionCookie(req, res, context);
   res.json({ authenticated: true, user: publicUser(context) });
+}));
+
+router.post("/worker-invitations/:decision", asyncHandler(async (req, res) => {
+  const session = getSession(req);
+  const decision = req.params.decision;
+  if (!session?.userId) return res.status(401).json({ error: true, code: "AUTHENTICATION_REQUIRED", message: "Sesión requerida" });
+  if (decision !== "accept" && decision !== "reject") return res.status(404).json({ error: true, code: "NOT_FOUND", message: "Recurso inexistente" });
+  const token = typeof req.body?.token === "string" ? req.body.token : "";
+  try {
+    const result = await resolveWorkerInvitation(session.userId, token, decision, { requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent") });
+    return res.json(result);
+  } catch (error) {
+    if (!(error instanceof WorkerMutationError)) throw error;
+    return res.status(409).json({ error: true, code: "INVITATION_INVALID", message: "La invitación no es válida." });
+  }
 }));
 
 router.get("/me", asyncHandler(async (req, res) => {

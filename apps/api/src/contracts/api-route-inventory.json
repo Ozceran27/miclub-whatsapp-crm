@@ -1703,6 +1703,26 @@
       ]
     },
     {
+      "id": "POST /auth/worker-invitations/:decision",
+      "method": "POST",
+      "path": "/auth/worker-invitations/:decision",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "session",
+      "membership": "none",
+      "permission": "none",
+      "role": "account-owner",
+      "sectorScope": "tenant-invitation",
+      "mutability": "write",
+      "idempotency": "single-use",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
       "id": "POST /auth/login",
       "method": "POST",
       "path": "/auth/login",
