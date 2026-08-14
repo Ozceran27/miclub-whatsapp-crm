@@ -8,7 +8,7 @@ Las rutas raíz `/members`, `/debtors`, `/summary`, `/sync-status`, `/club-finan
 
 ## Herramientas operativas y Backfill
 
-Google Sheets se carga mediante `import()` únicamente al montar `/api/import` con `IMPORT_ENDPOINTS_ENABLED=true`. Ese flag sólo debe activarse durante una ventana controlada y junto con `GOOGLE_SHEETS_IMPORT_ENABLED=true`. Los importadores se mantienen para Backfill y para `npm run import:sheets`, pero no pertenecen al arranque ni a requests normales.
+Google Sheets no se monta en ninguna ruta o servicio productivo. Los módulos bajo `importers/googleSheets` y `legacy/googleSheets` se conservan temporalmente, aislados, para el backfill mediante `npm run import:sheets`; `npm run check:no-google-sheets-runtime` impide que vuelvan a entrar al grafo productivo. Los scripts, variables y dependencias se retirarán únicamente después de certificar el E2E XLSX real.
 
 SQLite se conserva exclusivamente como origen de auditoría/migración CRM. `crmService` importa el adaptador dinámicamente cuando una operación selecciona explícitamente `CRM_SOURCE=sqlite`; producción rechaza esa configuración. No existe seed automático: restaurar plantillas predeterminadas es una acción autenticada, explícita e idempotente por club mediante `POST /templates/reset-defaults`.
 
