@@ -1,5 +1,7 @@
+import { MICLUB_XLSX_IMPORT_VERSION } from "@miclub/shared";
+
 export const XLSX_POLICY = {
-  templateVersion: "1.0",
+  templateVersion: MICLUB_XLSX_IMPORT_VERSION,
   maxCompressedBytes: 8 * 1024 * 1024,
   maxExpandedBytes: 40 * 1024 * 1024,
   maxCompressionRatio: 40,
