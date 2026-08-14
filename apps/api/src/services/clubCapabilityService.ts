@@ -11,7 +11,7 @@ type CapabilityRow = {
 
 const iso = (value: Date | string): string => value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
-/** Single source of truth for effective tenant product capabilities. */
+/** Returns effective manual overrides for diagnostics and navigation metadata. */
 export async function resolveClubCapabilities(
   clubId: string,
   executor?: QueryExecutor,
@@ -20,9 +20,15 @@ export async function resolveClubCapabilities(
   const db = executor ?? await getPostgresPool();
   const result = await db.query<CapabilityRow>(
     `select capability, source, effective_from, effective_until, actor
-       from miclub.club_capabilities
-      where club_id=$1 and effective_from <= $2
-        and (effective_until is null or effective_until > $2)
+       from (
+         select distinct on (capability) capability, source, effective_from,
+                effective_until, actor, enabled
+           from miclub.club_capabilities
+          where club_id=$1 and effective_from <= $2
+            and (effective_until is null or effective_until > $2)
+          order by capability, effective_from desc, created_at desc
+       ) current_overrides
+      where enabled
       order by capability`,
     [clubId, now],
   );
@@ -35,10 +41,43 @@ export async function resolveClubCapabilities(
   }));
 }
 
-export async function clubHasCapability(clubId: string, capability: ClubCapabilityCode): Promise<boolean> {
-  const capabilities = await resolveClubCapabilities(clubId);
-  return capabilities.some(({ code }) => code === capability);
+/**
+ * Single source of truth for plan features. The newest currently-effective
+ * override wins; otherwise a current subscription must carry the entitlement.
+ */
+export async function hasFeature(
+  clubId: string,
+  featureCode: ClubCapabilityCode,
+  executor?: QueryExecutor,
+  now = new Date(),
+): Promise<boolean> {
+  const db = executor ?? await getPostgresPool();
+  const result = await db.query<{ enabled: boolean }>(
+    `with current_override as (
+       select enabled
+         from miclub.club_capabilities
+        where club_id=$1 and capability=$2 and effective_from <= $3
+          and (effective_until is null or effective_until > $3)
+        order by effective_from desc, created_at desc
+        limit 1
+     ), entitled as (
+       select true as enabled
+         from miclub.club_subscriptions subscription
+         join miclub.plan_entitlements entitlement on entitlement.plan_code=subscription.plan_code
+        where subscription.club_id=$1 and entitlement.feature_code=$2
+          and subscription.effective_from <= $3
+          and (subscription.effective_until is null or subscription.effective_until > $3)
+        limit 1
+     )
+     select coalesce((select enabled from current_override),
+                     (select enabled from entitled), false) as enabled`,
+    [clubId, featureCode, now],
+  );
+  return result.rows[0]?.enabled === true;
 }
+
+/** Compatibility name for callers while product language migrates to features. */
+export const clubHasCapability = hasFeature;
 
 export const DATA_MIGRATION_CAPABILITY = CLUB_CAPABILITIES.DATA_MIGRATION;
 
