@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CLUB_CAPABILITIES, PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, type ClubCapability } from "@miclub/shared";
 import type { QueryExecutor } from "../db/postgres.js";
-import { canRunDataMigration, resolveClubCapabilities } from "./clubCapabilityService.js";
+import { canRunDataMigration, hasFeature, resolveClubCapabilities } from "./clubCapabilityService.js";
 
 const grant: ClubCapability = {
   code: CLUB_CAPABILITIES.DATA_MIGRATION,
@@ -28,4 +28,41 @@ test("Director con permiso y capability es autorizado", () => assert.equal(canRu
 test("trabajador e instructor son denegados aun con capability", () => {
   assert.equal(canRunDataMigration(ROLE_DEFAULT_PERMISSIONS.TRABAJADOR, [grant]), false);
   assert.equal(canRunDataMigration(ROLE_DEFAULT_PERMISSIONS.INSTRUCTOR, [grant]), false);
+});
+
+const featureExecutor = (enabled: boolean): QueryExecutor => ({
+  query: <T>() => Promise.resolve({ rows: [{ enabled }] as T[] }),
+});
+
+test("rol permitido y feature ausente permanece denegado", async () => {
+  assert.equal(ROLE_DEFAULT_PERMISSIONS.DIRECTOR.includes(PERMISSIONS.IMPORTS_RUN), true);
+  assert.equal(await hasFeature("club-1", CLUB_CAPABILITIES.DATA_MIGRATION, featureExecutor(false)), false);
+});
+
+test("feature presente y rol denegado no mezcla feature con RBAC", async () => {
+  assert.equal(await hasFeature("club-1", CLUB_CAPABILITIES.DATA_MIGRATION, featureExecutor(true)), true);
+  assert.equal(canRunDataMigration(ROLE_DEFAULT_PERMISSIONS.TRABAJADOR, [grant]), false);
+});
+
+test("la consulta aplica expiración a suscripción y override", async () => {
+  let sql = "";
+  let params: unknown[] = [];
+  const executor: QueryExecutor = { query: <T>(query: string, values?: unknown[]) => {
+    sql = query; params = values ?? [];
+    return Promise.resolve({ rows: [{ enabled: false }] as T[] });
+  } };
+  const now = new Date("2026-08-14T12:00:00Z");
+  assert.equal(await hasFeature("club-1", CLUB_CAPABILITIES.DATA_MIGRATION, executor, now), false);
+  assert.equal(params[2], now);
+  assert.equal((sql.match(/effective_until is null or/g) ?? []).length, 2);
+});
+
+test("el override vigente prevalece sobre el entitlement", async () => {
+  let sql = "";
+  const executor: QueryExecutor = { query: <T>(query: string) => {
+    sql = query;
+    return Promise.resolve({ rows: [{ enabled: false }] as T[] });
+  } };
+  assert.equal(await hasFeature("club-1", CLUB_CAPABILITIES.DATA_MIGRATION, executor), false);
+  assert.match(sql, /coalesce\(\(select enabled from current_override\),/);
 });
