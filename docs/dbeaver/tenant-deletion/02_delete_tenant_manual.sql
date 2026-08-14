@@ -75,7 +75,8 @@ INSERT INTO _expected_manifest(name,checksum) VALUES
     ('202608130004_secure_xlsx_import.sql', '2a9f8ff8547fb63ec6d10d51ac19374ef1dd6209529b6f63b25509bb30167837'),
     ('202608130005_xlsx_batch_identity.sql', '10ea1c80c9543c6791a0894e8283d92dacee92afaf547b7794e57715e589eeb4'),
     ('202608130006_tenant_entity_sequences.sql', '8192e26dc9ba52e9b553eeac38c43b3a900150e7ec8f5f9660b0f9e3a9134485'),
-    ('202608130007_club_capabilities.sql', '226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f');
+    ('202608130007_club_capabilities.sql', '226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f'),
+    ('202608140001_version_xlsx_import_rows.sql', '0a4f14469ad1cd78c523f61e1903f27657fa96f25d2541959b5014f3ffe7b3e1');
 DO $$ DECLARE v_mismatches bigint; BEGIN
  IF to_regclass('public.miclub_schema_migrations') IS NULL THEN
    RAISE EXCEPTION 'PRECONDICION: public.miclub_schema_migrations no existe. No ejecutar la baja; verificar destino y despliegue con DBA';

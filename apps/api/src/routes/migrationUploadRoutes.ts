@@ -10,7 +10,7 @@ import asyncHandler from "./asyncHandler.js";
 import { XLSX_POLICY, TEMPLATE_FILENAME } from "../services/xlsxMigration/policy.js";
 import { validateWorkbook } from "../services/xlsxMigration/validator.js";
 import { projectWrites } from "../services/xlsxMigration/projector.js";
-import { saveBatch } from "../services/xlsxMigration/persistence.js";
+import { applyWorkbook, dryRunWorkbook } from "../services/xlsxMigration/persistence.js";
 import { loadReferenceCatalog, resolveReferenceRows } from "../services/xlsxMigration/referenceResolver.js";
 
 const router=Router(); router.use(requireMembership,requireImportOperator,requireClubCapability(CLUB_CAPABILITIES.DATA_MIGRATION));
@@ -30,8 +30,9 @@ router.post("/uploads",asyncHandler(async(req,res)=>{
   const operation=(req.get("x-import-operation")??(dry?"apply":"dry_run")).toLowerCase(); if(!["dry_run","apply","retry","reversal"].includes(operation)) return res.status(400).json({code:"INVALID_IMPORT_OPERATION",message:"Operación de importación inválida."});
   if(operation==="apply"&&!dry) return res.status(409).json({code:"MATCHING_DRY_RUN_REQUIRED",message:"La aplicación real requiere el identificador de un dry-run equivalente."});
   const references=resolveReferenceRows(validation.referenceRows,await loadReferenceCatalog(req.auth!.clubId)); validation.errors.push(...references.errors);
-  const batchIdentity=createHash("sha256").update([sha256,XLSX_POLICY.templateVersion,req.auth!.clubId,operation].join(":"),"utf8").digest("hex");
-  let batch; try { batch=await saveBatch({clubId:req.auth!.clubId,userId:req.auth!.userId,sha256,batchIdentity,operation,templateVersion:XLSX_POLICY.templateVersion,sourceFile:file.filename,idempotencyKey:idempotency,referenceConfigHash,dryRunOfBatchId:dry,rows:writes.total,projectedWrites:writes.total,errors:validation.errors,metadata:{sheets:validation.sheets,rowCounts:validation.rowCounts,writes,rows:references.resolved}}); } catch(error){ if(typeof error==='object'&&error&&'code'in error&&['MATCHING_DRY_RUN_REQUIRED','BATCH_ALREADY_EXECUTED'].includes(String(error.code))) return res.status(409).json({code:error.code,message:error instanceof Error?error.message:String(error)}); throw error; }
+  const batchIdentity=createHash("sha256").update([sha256,XLSX_POLICY.templateVersion,req.auth!.clubId,referenceConfigHash,JSON.stringify(references.resolved.map(({sheet,rowNumber,rowFingerprint})=>({sheet,rowNumber,rowFingerprint})))].join(":"),"utf8").digest("hex");
+  const input={actor:{clubId:req.auth!.clubId,userId:req.auth!.userId,membershipId:req.auth!.membershipId,requestId:req.requestId,ip:req.ip,userAgent:req.get("user-agent")},sha256,batchIdentity,templateVersion:XLSX_POLICY.templateVersion,sourceFile:file.filename,idempotencyKey:idempotency,referenceConfigHash,dryRunOfBatchId:dry,rows:validation.rows,resolvedRows:references.resolved,projectedWrites:writes.total,errors:validation.errors,metadata:{sheets:validation.sheets,rowCounts:validation.rowCounts,writes}};
+  let batch; try { batch=operation==="dry_run"?await dryRunWorkbook(input):await applyWorkbook(input); } catch(error){ if(typeof error==='object'&&error&&'code'in error&&['MATCHING_DRY_RUN_REQUIRED','BATCH_ALREADY_EXECUTED','WORKBOOK_HAS_ERRORS'].includes(String(error.code))) return res.status(409).json({code:error.code,message:error instanceof Error?error.message:String(error)}); throw error; }
   res.status(validation.errors.length?422:200).json({...batch,fileSha256:sha256,templateVersion:XLSX_POLICY.templateVersion,rowCounts:validation.rowCounts,projectedWrites:writes,errors:validation.errors});
  } finally { await fs.rm(temp,{force:true}).catch(()=>undefined); }
 }));
