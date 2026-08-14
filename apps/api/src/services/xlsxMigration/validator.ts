@@ -2,14 +2,16 @@ import { XLSX_POLICY } from "./policy.js";
 import { inspectZip, readEntry } from "./zipInspector.js";
 import { normalizeComparableText } from "../../importers/normalizers.js";
 import type { ReferenceRow } from "./referenceResolver.js";
+import { XLSX_IMPORT_V1_SCHEMA, type XlsxImportColumn } from "@miclub/shared";
 export type MigrationIssue = { error_code: string; message: string; severity: "error"|"warning"; sheet?: string; row_number?: number; entity_type?: string; field?: string; value_normalized?: string };
+export type ParsedWorkbookRow = { sheet:string; rowNumber:number; values:Record<string,string|number|null>; sourceValues:unknown[] };
 const issue = (error_code: string, message: string, extra: Partial<MigrationIssue> = {}): MigrationIssue => ({ error_code, message, severity: "error", ...extra });
 export function validateWorkbook(buffer: Buffer, filename: string, mime: string) {
   const errors: MigrationIssue[] = [];
   if (!/\.xlsx$/i.test(filename)) errors.push(issue("INVALID_EXTENSION", "La extensión debe ser .xlsx."));
   if (mime !== XLSX_POLICY.mime && mime !== "application/octet-stream") errors.push(issue("INVALID_MIME", "El MIME no corresponde a XLSX."));
   if (buffer.length > XLSX_POLICY.maxCompressedBytes) errors.push(issue("COMPRESSED_SIZE_LIMIT", "El archivo excede 8 MiB."));
-  if (errors.length) return { errors, sheets: [], rowCounts: {} as Record<string,number>, referenceRows: [] as ReferenceRow[] };
+  if (errors.length) return { errors, sheets: [], rowCounts: {} as Record<string,number>, referenceRows: [] as ReferenceRow[], rows:[] as ParsedWorkbookRow[] };
   const entries = inspectZip(buffer);
   const names = entries.map((entry) => entry.name.toLowerCase());
   if (names.some((name) => name.endsWith("vbaproject.bin") || name.endsWith(".xlsm"))) errors.push(issue("MACROS_NOT_ALLOWED", "No se permiten macros."));
@@ -26,6 +28,7 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
   for (const header of requiredHeaders) if (!sharedStrings.includes(`<t>${header}</t>`)) errors.push(issue("INVALID_HEADERS", `Falta el encabezado requerido: ${header}.`, { field: header }));
   const rowCounts: Record<string,number> = {};
   const referenceRows:ReferenceRow[]=[];
+  const rows:ParsedWorkbookRow[]=[];
   entries.filter((entry) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entry.name)).forEach((entry, index) => {
     const xml = readEntry(buffer, entry); const sheet = sheets[index] ?? entry.name;
     if (/<f(?:\s|>)/i.test(xml)) errors.push(issue("FORMULAS_NOT_ALLOWED", "No se permiten fórmulas; use valores almacenados.", { sheet }));
@@ -37,15 +40,26 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
     }));
     const headerValues=values(rowMatches.find((row)=>Number(row[1])===1)?.[2]??"");
     const columns=new Map([...headerValues].map(([column,value])=>[normalizeComparableText(value),column]));
-    for(const match of rowMatches.filter((row)=>Number(row[1])>2)) {
+    const schema=Object.values(XLSX_IMPORT_V1_SCHEMA.sheets).find((candidate)=>candidate.name===sheet);
+    for(const match of rowMatches.filter((row)=>Number(row[1])>=2)) {
       const cells=values(match[2]); if(![...cells.values()].some(Boolean)) continue;
       const get=(...headers:string[])=>{for(const header of headers){const column=columns.get(normalizeComparableText(header));if(column)return cells.get(column);}return undefined;};
-      referenceRows.push({sheet,rowNumber:Number(match[1]),sector:get("Sector"),activity:get("Actividad"),modality:get("Modalidad"),instructor:get("Instructor","Responsable"),externalReference:get("External Reference","Referencia externa"),values:[...cells.values()]});
+      const parsed:Record<string,string|number|null>={};
+      if(schema) for(const column of schema.columns as readonly XlsxImportColumn[]){
+        const raw=get(column.header); const normalized=String(raw??"").trim(); let value:string|number|null=normalized||null;
+        if(normalized&&column.type==="decimal") { const canonical=normalized.replace(/\s/g,"").replace(/\.(?=\d{3}(?:\D|$))/g,"").replace(",","."); const number=Number(canonical); if(Number.isFinite(number)) value=number; else errors.push(issue("INVALID_DECIMAL",`${column.header} debe ser decimal.`,{sheet,row_number:Number(match[1]),field:column.key,value_normalized:normalized})); }
+        if(normalized&&column.type==="date") { const numeric=Number(normalized); const date=Number.isFinite(numeric)&&numeric>0?new Date(Date.UTC(1899,11,30)+numeric*86400000):new Date(normalized); if(!Number.isNaN(date.valueOf())) value=date.toISOString().slice(0,10); else errors.push(issue("INVALID_DATE",`${column.header} debe ser una fecha válida.`,{sheet,row_number:Number(match[1]),field:column.key,value_normalized:normalized})); }
+        if(column.required&&(value===null||value==="")) errors.push(issue("REQUIRED_VALUE",`Falta ${column.header}.`,{sheet,row_number:Number(match[1]),field:column.key}));
+        parsed[column.key]=value;
+      }
+      const sourceValues=schema?(schema.columns as readonly XlsxImportColumn[]).map((column)=>get(column.header)??null):[...cells.values()];
+      rows.push({sheet,rowNumber:Number(match[1]),values:parsed,sourceValues});
+      referenceRows.push({sheet,rowNumber:Number(match[1]),sector:get("Sector"),activity:get("Actividad"),modality:get("Modalidad"),instructor:get("Instructor","Responsable"),category:get("Categoría"),paymentMethod:get("M.P."),document:get("D.N.I."),externalReference:get("External Reference","Referencia externa"),values:sourceValues});
     }
-    const populatedRows = rowMatches.filter((match) => Number(match[1]) > 2 && /<(?:v|t)>[^<]+<\/(?:v|t)>/.test(match[2]));
+    const populatedRows = rowMatches.filter((match) => Number(match[1]) >= 2 && /<(?:v|t)>[^<]+<\/(?:v|t)>/.test(match[2]));
     rowCounts[sheet] = populatedRows.length;
     const lastPopulatedRow = Number(populatedRows.at(-1)?.[1] ?? 0);
     if (lastPopulatedRow > XLSX_POLICY.maxRowsPerSheet + 2 || populatedRows.length > XLSX_POLICY.maxRowsPerSheet) errors.push(issue("ROW_LIMIT", "La hoja excede el máximo de filas.", { sheet, row_number: lastPopulatedRow }));
   });
-  return { errors, sheets, rowCounts, referenceRows };
+  return { errors, sheets, rowCounts, referenceRows, rows };
 }

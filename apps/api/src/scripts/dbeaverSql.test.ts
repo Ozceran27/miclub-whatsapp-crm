@@ -21,6 +21,17 @@ test("SQL DBeaver usa las columnas reales y recupera transacciones abortadas", (
   assert.match(validation, /movement_type::text/);
 });
 
+test("SQL manual XLSX es autocontenido y no contiene rutas para pegar como sentencias", () => {
+  const script = sql("17_xlsx_import_rows_manual.sql");
+  assert.match(script, /^\/\*/);
+  assert.match(script, /BEGIN;[\s\S]*COMMIT;/);
+  assert.match(script, /CREATE TABLE IF NOT EXISTS miclub\.xlsx_import_rows/);
+  assert.match(script, /FOREIGN KEY \(batch_id,club_id\)/);
+  assert.match(script, /FORCE ROW LEVEL SECURITY/);
+  assert.doesNotMatch(script, /^apps\//m);
+  assert.doesNotMatch(script, /^docs\//m);
+});
+
 test("estabilización DBeaver mantiene auditoría y validación estrictamente read-only", () => {
   for (const name of ["01_audit.sql", "05_validation.sql"]) {
     const script = stabilizationSql(name);
