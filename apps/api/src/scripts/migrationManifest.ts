@@ -75,6 +75,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608140002_onboarding_milestones.sql", sha256: "5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f", dependsOn: ["202608130007_club_capabilities.sql"], checkpointPurpose: "Distingue hitos completados de pasos omitidos y permite validar la finalización del onboarding." },
   { path: "202608140003_enforce_club_role_codes.sql", sha256: "b52a94ecfc5827768698ba5db11f1a475f09cf78ae7a0c1083f5772e16325ae5", dependsOn: ["multitenant/202607250001_backfill_and_scope_unique_constraints.sql"], checkpointPurpose: "Garantiza un único código de rol exacto por club para el aprovisionamiento y las altas de trabajadores." },
   { path: "202608140004_correct_category_catalog.sql", sha256: "00811df6648acd37dd5307c508d3986842d9fb637a66eda20f1aff24c13386a8", dependsOn: ["202608130003_global_category_catalog.sql"], requires: ["miclub.table.category_catalog"], provides: ["miclub.table.category_import_aliases"], checkpointPurpose: "Completa y corrige el catálogo económico, sus aliases y la referencia canónica obligatoria para nuevas categorías." },
+  { path: "202608140005_activity_terms_contiguous.sql", sha256: "3aef03dfe3f219010280edb1548b6e6e05997ee57c639cc01d88f836bb5db30e", dependsOn: ["202608130001_version_activity_terms.sql"], checkpointPurpose: "Rechaza gaps entre versiones de términos mediante una constraint diferida, además de la exclusión de superposiciones." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

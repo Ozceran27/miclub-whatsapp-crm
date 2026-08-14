@@ -36,6 +36,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608140002_onboarding_milestones.sql` | Distingue hitos completados de pasos omitidos y permite validar la finalización del onboarding. | `5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f` | Después de `202608130007_club_capabilities.sql`. |
 | `202608140003_enforce_club_role_codes.sql` | Garantiza un único código de rol exacto por club para el aprovisionamiento y las altas de trabajadores. | `b52a94ecfc5827768698ba5db11f1a475f09cf78ae7a0c1083f5772e16325ae5` | Después de `202607250001_backfill_and_scope_unique_constraints.sql`. |
 | `202608140004_correct_category_catalog.sql` | Completa y corrige el catálogo económico, sus aliases y la referencia canónica obligatoria para nuevas categorías. | `00811df6648acd37dd5307c508d3986842d9fb637a66eda20f1aff24c13386a8` | Después de `202608130003_global_category_catalog.sql`. |
+| `202608140005_activity_terms_contiguous.sql` | Rechaza gaps entre versiones de términos mediante una constraint diferida, además de la exclusión de superposiciones. | `3aef03dfe3f219010280edb1548b6e6e05997ee57c639cc01d88f836bb5db30e` | Después de `202608130001_version_activity_terms.sql`. |
 
 <!-- POST_ADMIN_MIGRATIONS:END -->
 

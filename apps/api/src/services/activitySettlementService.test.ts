@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { aggregateActivitySettlementsBySector, calculateActivitySettlements, type ActivityTerm } from "./activitySettlementService.js";
+import { aggregateActivitySettlementsBySector, calculateActivitySettlements, validateActivityTerms, type ActivityTerm } from "./activitySettlementService.js";
 
 const term = (overrides: Partial<ActivityTerm> = {}): ActivityTerm => ({ id: "t1", activityId: "a1", sectorId: "s1", mode: "VARIABLE", responsibleSharePercentage: 60, effectiveFrom: "2026-01-01", ...overrides });
 const calculate = (terms: ActivityTerm[], income: number, paid: number, extras: Record<string, unknown> = {}) => calculateActivitySettlements({
@@ -26,4 +26,49 @@ test("soporta cero, sobrepago, vigencias y agregación dinámica por sector", ()
 test("aplica el día calendario de Buenos Aires", () => {
   const row = calculateActivitySettlements({ period: { from: "2026-07-31", to: "2026-07-31" }, terms: [term({ effectiveFrom: "2026-07-01" })], incomes: [{ activityId: "a1", occurredAt: "2026-08-01T01:30:00Z", amount: 100, status: "COMPLETED" }], allocations: [] })[0];
   assert.equal(row.completedIncome, 100);
+});
+
+test("asigna ingresos al término local y suma subtotales cuando cambia el porcentaje", () => {
+  const rows = calculateActivitySettlements({
+    period: { from: "2026-08-01", to: "2026-08-31" },
+    terms: [
+      term({ id: "40-percent", responsibleSharePercentage: 40, effectiveTo: "2026-08-15" }),
+      term({ id: "60-percent", responsibleSharePercentage: 60, effectiveFrom: "2026-08-16" }),
+    ],
+    incomes: [
+      { activityId: "a1", occurredAt: "2026-08-15T12:00:00Z", amount: 100_000, status: "COMPLETADO" },
+      { activityId: "a1", occurredAt: "2026-08-16T02:00:00Z", amount: 100_000, status: "COMPLETADO" }, // todavía 15/8 en Buenos Aires
+      { activityId: "a1", occurredAt: "2026-08-16T03:00:00Z", amount: 100_000, status: "COMPLETADO" },
+    ],
+    allocations: [],
+  });
+  assert.deepEqual(rows.map(({ termId, completedIncome, responsibleGross }) => ({ termId, completedIncome, responsibleGross })), [
+    { termId: "40-percent", completedIncome: 200_000, responsibleGross: 80_000 },
+    { termId: "60-percent", completedIncome: 100_000, responsibleGross: 60_000 },
+  ]);
+  assert.deepEqual(aggregateActivitySettlementsBySector(rows), [{ sectorId: "s1", responsibleBalance: 140_000 }]);
+});
+
+test("FIXED multiplica la cuota únicamente para meses calendario completos", () => {
+  const fixed = term({ mode: "FIXED", responsibleSharePercentage: null, monthlyFixedFee: 150_000 });
+  const rows = calculateActivitySettlements({
+    period: { from: "2026-07-01", to: "2026-08-31" }, terms: [fixed],
+    incomes: [{ activityId: "a1", occurredAt: "2026-08-10", amount: 650_000, status: "COMPLETADO" }], allocations: [],
+  });
+  assert.equal(rows[0].responsibleBalance, 350_000);
+  assert.throws(() => calculateActivitySettlements({ period: { from: "2026-07-15", to: "2026-08-31" }, terms: [fixed], incomes: [], allocations: [] }), /complete calendar months/);
+});
+
+test("rechaza gaps y superposiciones antes de liquidar", () => {
+  assert.throws(() => validateActivityTerms([term({ effectiveTo: "2026-08-10" }), term({ id: "t2", effectiveFrom: "2026-08-12" })]), /Gap/);
+  assert.throws(() => validateActivityTerms([term({ effectiveTo: "2026-08-10" }), term({ id: "t2", effectiveFrom: "2026-08-10" })]), /Overlapping/);
+});
+
+test("cancelados no generan ingresos ni pagos implícitos", () => {
+  const row = calculateActivitySettlements({
+    period: { from: "2026-08-01", to: "2026-08-31" }, terms: [term()],
+    incomes: [{ activityId: "a1", occurredAt: "2026-08-10", amount: 100_000, status: "CANCELADO" }],
+    allocations: [{ activityId: "a1", occurredAt: "2026-08-10", amount: 20_000, status: "CANCELADO", kind: "PAYMENT" }],
+  })[0];
+  assert.equal(row.responsibleBalance, 0);
 });
