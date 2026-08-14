@@ -30,7 +30,7 @@ test("emite not-found y mismatches de sector y responsable",()=>{
   const missing=resolveReferenceRows([row({sector:"inexistente",activity:"otra",instructor:"nadie"})],catalog);
   assert.deepEqual(missing.errors.map((e)=>e.error_code),["SECTOR_NOT_FOUND","ACTIVITY_NOT_FOUND","INSTRUCTOR_NOT_FOUND"]);
   const crossed=resolveReferenceRows([row({sector:"Tenis",instructor:"Juan Pérez"})],catalog);
-  assert.deepEqual(crossed.errors.map((e)=>e.error_code),["ACTIVITY_SECTOR_MISMATCH","ACTIVITY_RESPONSIBLE_MISMATCH"]);
+  assert.deepEqual(crossed.errors.map((e)=>e.error_code),["ACTIVITY_SECTOR_MISMATCH","ACTIVITY_INSTRUCTOR_MISMATCH"]);
 });
 
 test("un catálogo del tenant no permite resolver referencias de otro club",()=>{

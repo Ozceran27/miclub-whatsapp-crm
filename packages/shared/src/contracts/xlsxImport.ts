@@ -7,6 +7,7 @@ export type XlsxImportColumn = Readonly<{
   headerCell: string;
   dataCell: string;
   type: "date" | "string" | "decimal" | "enum";
+  enumValues?: readonly string[];
   required: boolean;
   derived?: "activity.sector" | "counterparty.document";
 }>;
@@ -22,14 +23,14 @@ export const XLSX_IMPORT_V1_SCHEMA = {
       firstDataRow: 2,
       columns: [
         { key: "date", header: "Fecha", headerCell: "A1", dataCell: "A2", type: "date", required: true },
-        { key: "type", header: "Tipo", headerCell: "C1", dataCell: "C2", type: "enum", required: true },
+        { key: "type", header: "Tipo", headerCell: "C1", dataCell: "C2", type: "enum", enumValues: ["INGRESOS", "EGRESOS", "CAPITAL"], required: true },
         { key: "category", header: "Categoría", headerCell: "F1", dataCell: "F2", type: "string", required: true },
         { key: "concept", header: "Concepto", headerCell: "I1", dataCell: "I2", type: "string", required: true },
         { key: "counterparty", header: "Contra-parte", headerCell: "N1", dataCell: "N2", type: "string", required: false, derived: "counterparty.document" },
         { key: "sector", header: "Sector", headerCell: "Q1", dataCell: "Q2", type: "string", required: false, derived: "activity.sector" },
         { key: "amount", header: "Monto", headerCell: "S1", dataCell: "S2", type: "decimal", required: true },
         { key: "taxes", header: "Impuestos", headerCell: "V1", dataCell: "V2", type: "decimal", required: false },
-        { key: "status", header: "Estado", headerCell: "X1", dataCell: "X2", type: "enum", required: true },
+        { key: "status", header: "Estado", headerCell: "X1", dataCell: "X2", type: "enum", enumValues: ["COMPLETADO", "PENDIENTE", "CANCELADO", "ANULADO"], required: true },
         { key: "paymentMethod", header: "M.P.", headerCell: "Z1", dataCell: "Z2", type: "string", required: false },
       ] satisfies readonly XlsxImportColumn[],
     },
@@ -46,7 +47,7 @@ export const XLSX_IMPORT_V1_SCHEMA = {
         { key: "activity", header: "Actividad", headerCell: "M1", dataCell: "M2", type: "string", required: true },
         { key: "modality", header: "Modalidad", headerCell: "O1", dataCell: "O2", type: "string", required: false },
         { key: "fee", header: "Cuota", headerCell: "Q1", dataCell: "Q2", type: "decimal", required: true },
-        { key: "status", header: "Estado", headerCell: "S1", dataCell: "S2", type: "enum", required: true },
+        { key: "status", header: "Estado", headerCell: "S1", dataCell: "S2", type: "enum", enumValues: ["ACTIVA", "INACTIVA", "PENDIENTE", "CANCELADA"], required: true },
         { key: "instructor", header: "Instructor", headerCell: "V1", dataCell: "V2", type: "string", required: false },
         { key: "expiresOn", header: "Vence", headerCell: "X1", dataCell: "X2", type: "date", required: false },
       ] satisfies readonly XlsxImportColumn[],
