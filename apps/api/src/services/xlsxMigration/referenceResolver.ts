@@ -48,7 +48,7 @@ export async function loadReferenceCatalog(clubId:string):Promise<ReferenceCatal
       db.query<ImportReference>(`select id,name,code from miclub.sectors where club_id=$1`,[clubId]),
       db.query<{id:string;name:string;code:string|null;sector_id:string;instructor_id:string|null;modality:string|null}>(`select id,name,code,sector_id,instructor_id,modality from miclub.activities where club_id=$1 and archived_at is null`,[clubId]),
       db.query<ImportReference>(`select id,display_name as name,code from miclub.instructors where club_id=$1 and is_active=true`,[clubId]),
-      db.query<ImportReference>(`select id,name,code from miclub.movement_categories where club_id=$1 and is_active=true`,[clubId]),
+      db.query<ImportReference>(`select mc.id,mc.name,cc.code from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id where mc.club_id=$1 and mc.is_active=true`,[clubId]),
       db.query<ImportReference>(`select id,name,null::text as code from miclub.payment_methods where club_id=$1 and is_active=true`,[clubId]),
       db.query<ImportReference>(`select id,dni as name,dni as code from miclub.people where club_id=$1 and dni is not null`,[clubId]),
     ]);

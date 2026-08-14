@@ -13,7 +13,6 @@ import { getPostgresPool } from "../../db/postgres.js";
 import { getArgentinaMonthWindow } from "../../domain/argentinaTime.js";
 import { calculateDynamicSettlementBalance, calculateOperationalBalances } from "../operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "../../importers/normalizers.js";
-import { OPERATING_CATEGORIES } from "../economyDomain.js";
 import { getClubFinanceSummary } from "../../repositories/economyRepository.js";
 
 const SHEETS: SourceSheet[] = [
@@ -677,17 +676,17 @@ export const getPostgresSectorOperationalSummary =
             upper(regexp_replace(translate(trim(coalesce(s.code, s.name, 'SIN_SECTOR')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', '_', 'g')) as sector_key,
             m.movement_type,
             coalesce(m.amount, 0) as amount,
-            m.movement_date,
-            upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) as normalized_category
+            m.movement_date
           from miclub.movements m
           left join miclub.sectors s on s.id = m.sector_id and s.club_id = m.club_id
           left join miclub.movement_categories c on c.id = m.category_id and c.club_id = m.club_id
+          left join miclub.category_catalog cc on cc.id = c.catalog_id
           where m.club_id = $1
             and upper(regexp_replace(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) in ('COMPLETADO', 'COMPLETED')
             and m.movement_type in ('INGRESOS', 'EGRESOS')
-            and upper(regexp_replace(regexp_replace(translate(trim(coalesce(c.name, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) = any($2::text[])
+            and cc.classification = 'OPERATIONAL'
         ), current_month as (
-          select $3::timestamptz as start_at, $4::timestamptz as end_at
+          select $2::timestamptz as start_at, $3::timestamptz as end_at
         )
         select
           sector_key,
@@ -696,7 +695,7 @@ export const getPostgresSectorOperationalSummary =
         from normalized_movements
         cross join current_month
         group by sector_key`,
-        [clubId, OPERATING_CATEGORIES, monthWindow.from, monthWindow.to],
+        [clubId, monthWindow.from, monthWindow.to],
       ),
       pool.query<Record<string, unknown>>(
         `with relevant as (
