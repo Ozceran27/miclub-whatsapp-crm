@@ -17,16 +17,19 @@ test("validateRegistration exige identidad, contacto, club y contraseña robusta
 });
 
 const input = { firstName: "Ana", lastName: "Pérez", dni: "12345678", phone: "1155555555", email: "ana@example.com", club: { name: "Club Norte" } };
-const ids = ["club-id", "role-id", "user-id", "person-id", "membership-id"];
-
 function fakeClient(failAt = -1) {
   const calls: { sql: string; values?: readonly unknown[] }[] = [];
-  let resultIndex = 0;
   const client: TransactionClient = { query: async (sql, values) => {
     const index = calls.length; calls.push({ sql, values });
     if (index === failAt) throw new Error(`falló ${index}`);
-    const id = ids[resultIndex++];
-    return { rows: id ? [{ id }] : [] } as never;
+    if (sql.includes("miclub.clubs")) return { rows: [{ id: "club-id" }] } as never;
+    if (sql.includes("miclub.roles")) return { rows: [
+      { id: "director-role-id", code: "DIRECTOR" }, { id: "worker-role-id", code: "TRABAJADOR" }, { id: "instructor-role-id", code: "INSTRUCTOR" },
+    ] } as never;
+    if (sql.includes("miclub.users")) return { rows: [{ id: "user-id" }] } as never;
+    if (sql.includes("miclub.people")) return { rows: [{ id: "person-id" }] } as never;
+    if (sql.includes("user_club_memberships")) return { rows: [{ id: "membership-id" }] } as never;
+    return { rows: [] } as never;
   } };
   return { client, calls };
 }
@@ -36,18 +39,22 @@ test("bootstrap crea integralmente Director, persona, usuario, membresía, emple
   const result = await provisionClub(client, input, "hash");
   assert.deepEqual(result, { clubId: "club-id", userId: "user-id", personId: "person-id", membershipId: "membership-id" });
   const sql = calls.map(({ sql }) => sql).join("\n");
-  assert.match(sql, /miclub\.roles[\s\S]*'DIRECTOR'/);
+  assert.match(sql, /miclub\.roles[\s\S]*jsonb_to_recordset/);
   assert.equal(sql.match(/insert into miclub\.roles/g)?.length, 1, "debe existir un único Director");
+  const roleDefinitions = JSON.parse(String(calls.find(({ sql: statement }) => statement.includes("miclub.roles"))?.values?.[1]));
+  assert.deepEqual(roleDefinitions.map(({ code }: { code: string }) => code), ["DIRECTOR", "TRABAJADOR", "INSTRUCTOR"]);
   assert.match(sql, /miclub\.people/); assert.match(sql, /miclub\.users/);
   assert.match(sql, /miclub\.user_club_memberships/); assert.doesNotMatch(sql, /miclub\.club_memberships/);
   assert.match(sql, /miclub\.employees/);
   assert.match(sql, /Administración/); assert.match(sql, /Tesorería/); assert.match(sql, /Áreas Comunes/); assert.match(sql, /is_system/);
-  assert.match(sql, /NOT_STARTED/);
+  assert.match(sql, /miclub\.club_onboarding[\s\S]*NOT_STARTED/);
+  assert.doesNotMatch(sql, /"onboarding"/);
+  assert.equal(calls.find(({ sql: statement }) => statement.includes("user_club_memberships"))?.values?.[2], "director-role-id");
   assert.deepEqual(calls.find(({ sql }) => sql.includes("user_club_memberships"))?.values?.[3], [...ROLE_DEFAULT_PERMISSIONS.DIRECTOR]);
 });
 
 test("cada fallo de bootstrap se propaga para que registrationService haga rollback", async () => {
-  for (let operation = 0; operation < 8; operation += 1) {
+  for (let operation = 0; operation < 9; operation += 1) {
     const { client, calls } = fakeClient(operation);
     await assert.rejects(provisionClub(client, input, "hash"), new RegExp(`falló ${operation}`));
     assert.equal(calls.length, operation + 1, `no debe ejecutar suboperaciones después del fallo ${operation}`);

@@ -59,6 +59,17 @@ export const PERMISSIONS = {
 
 export type PermissionCode = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 
+/** Roles installed for every club, including their persisted label and grants. */
+export const CLUB_ROLE_DEFINITIONS = {
+  DIRECTOR: { name: "Director", description: "Control total del club", permissions: Object.values(PERMISSIONS) },
+  TRABAJADOR: { name: "Trabajador", description: "Operación general del club", permissions: [PERMISSIONS.DASHBOARD_READ, PERMISSIONS.TASKS_VIEW] },
+  INSTRUCTOR: { name: "Instructor", description: "Gestión de actividades e inscripciones", permissions: [PERMISSIONS.DASHBOARD_READ, PERMISSIONS.SECTORS_VIEW, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.TASKS_VIEW, PERMISSIONS.ENROLLMENTS_VIEW] },
+} as const satisfies Record<"DIRECTOR" | "TRABAJADOR" | "INSTRUCTOR", Readonly<{
+  name: string;
+  description: string;
+  permissions: readonly PermissionCode[];
+}>>;
+
 /**
  * Definitive operation-to-permission matrix. Legacy alternatives are temporary
  * input compatibility only; they must never be used when provisioning a new
@@ -97,10 +108,10 @@ export const toPermissionCode = (value: string): StoredPermissionCode =>
 /** Canonical defaults used only when the application creates a membership. */
 export const ROLE_DEFAULT_PERMISSIONS = {
   owner: KNOWN_PERMISSIONS,
-  DIRECTOR: KNOWN_PERMISSIONS,
+  DIRECTOR: CLUB_ROLE_DEFINITIONS.DIRECTOR.permissions,
   admin: KNOWN_PERMISSIONS,
-  TRABAJADOR: [PERMISSIONS.DASHBOARD_READ, PERMISSIONS.TASKS_VIEW] as const,
-  INSTRUCTOR: [PERMISSIONS.DASHBOARD_READ, PERMISSIONS.SECTORS_VIEW, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.TASKS_VIEW, PERMISSIONS.ENROLLMENTS_VIEW] as const,
+  TRABAJADOR: CLUB_ROLE_DEFINITIONS.TRABAJADOR.permissions,
+  INSTRUCTOR: CLUB_ROLE_DEFINITIONS.INSTRUCTOR.permissions,
 } as const satisfies Record<KnownRole, readonly KnownPermission[]>;
 
 /** Machine-readable role matrix shared by tests and manual SQL generators. */

@@ -73,6 +73,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608130007_club_capabilities.sql", sha256: "226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f", dependsOn: ["multitenant/202607240001_create_clubs.sql"], provides: ["miclub.table.club_capabilities"], checkpointPurpose: "Crea grants tenant de capabilities con fuente, actor y vigencia auditables, separados de RBAC y billing." },
   { path: "202608140001_version_xlsx_import_rows.sql", sha256: "0a4f14469ad1cd78c523f61e1903f27657fa96f25d2541959b5014f3ffe7b3e1", dependsOn: ["202608130005_xlsx_batch_identity.sql", "202608130007_club_capabilities.sql"], provides: ["miclub.table.xlsx_import_rows"], checkpointPurpose: "Versiona las claves de filas XLSX aplicadas por club y lote sin conservar PII de la planilla." },
   { path: "202608140002_onboarding_milestones.sql", sha256: "5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f", dependsOn: ["202608130007_club_capabilities.sql"], checkpointPurpose: "Distingue hitos completados de pasos omitidos y permite validar la finalización del onboarding." },
+  { path: "202608140003_enforce_club_role_codes.sql", sha256: "b52a94ecfc5827768698ba5db11f1a475f09cf78ae7a0c1083f5772e16325ae5", dependsOn: ["multitenant/202607250001_backfill_and_scope_unique_constraints.sql"], checkpointPurpose: "Garantiza un único código de rol exacto por club para el aprovisionamiento y las altas de trabajadores." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";
