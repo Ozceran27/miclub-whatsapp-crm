@@ -33,6 +33,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608130006_tenant_entity_sequences.sql` | Asigna números correlativos transaccionales e independientes por club a movimientos e inscripciones. | `8192e26dc9ba52e9b553eeac38c43b3a900150e7ec8f5f9660b0f9e3a9134485` | Después de `202607250001_backfill_and_scope_unique_constraints.sql`. |
 | `202608130007_club_capabilities.sql` | Crea grants tenant de capabilities con fuente, actor y vigencia auditables, separados de RBAC y billing. | `226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f` | Después de `202607240001_create_clubs.sql`. |
 | `202608140001_version_xlsx_import_rows.sql` | Versiona las claves de filas XLSX aplicadas por club y lote sin conservar PII de la planilla. | `0a4f14469ad1cd78c523f61e1903f27657fa96f25d2541959b5014f3ffe7b3e1` | Después de `202608130005_xlsx_batch_identity.sql` y `202608130007_club_capabilities.sql`. |
+| `202608140002_onboarding_milestones.sql` | Distingue hitos completados de pasos omitidos y permite validar la finalización del onboarding. | `5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f` | Después de `202608130007_club_capabilities.sql`. |
 
 <!-- POST_ADMIN_MIGRATIONS:END -->
 

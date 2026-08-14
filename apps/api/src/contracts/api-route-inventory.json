@@ -1859,6 +1859,20 @@
       "membership": "active",
       "role": "any-with-permission",
       "sectorScope": "tenant",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"],
+      "id": "POST /api/onboarding/opening-balances",
+      "method": "POST",
+      "path": "/api/onboarding/opening-balances",
+      "permission": "onboarding.write",
+      "mutability": "write",
+      "idempotency": "idempotency-key"
+    },
+    {
+      "source": "apps/api/src/routes/onboardingRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
       "testCategories": [
         "authentication",
         "authorization",
