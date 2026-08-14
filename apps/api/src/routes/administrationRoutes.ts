@@ -28,8 +28,12 @@ const workerMutation = (operation: (actor: WorkerActor, id: string, body: unknow
   catch (error) { if (!(error instanceof WorkerMutationError)) throw error; const status = error.code === "not_found" ? 404 : error.code === "invalid_input" ? 400 : 409; res.status(status).json({ error: true, code: error.code.toUpperCase(), message: error.message }); }
 });
 router.post("/workers", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHandler(async (req, res) => {
-  try { res.status(201).json(await createWorker(workerActor(req), req.body)); }
-  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; res.status(error.code === "invalid_input" ? 400 : 409).json({ error: true, code: error.code.toUpperCase(), message: error.message }); }
+  try {
+    const result = await createWorker(workerActor(req), req.body);
+    if (result.invitationPending === true) return res.status(409).json({ error: true, code: "CONFLICT", message: "No se pudo completar el alta." });
+    return res.status(201).json(result);
+  }
+  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; res.status(error.code === "invalid_input" ? 400 : 409).json({ error: true, code: error.code === "invalid_input" ? "INVALID_INPUT" : "CONFLICT", message: error.code === "invalid_input" ? error.message : "No se pudo completar el alta." }); }
 }));
 router.put("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id, body) => updateWorker(actor, id, body)));
 router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id) => archiveWorker(actor, id)));
