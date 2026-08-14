@@ -1,0 +1,8 @@
+import { useState, type FormEvent } from 'react';
+import { saveOpeningBalances } from '../../services/api/onboardingApi';
+
+export function OpeningBalancesStep() {
+  const [saving,setSaving]=useState(false); const [message,setMessage]=useState('');
+  const submit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);setSaving(true);setMessage('');try{await saveOpeningBalances({cash:Number(data.get('cash')),bank:Number(data.get('bank')),usdCash:Number(data.get('usdCash')),idempotencyKey:crypto.randomUUID()});setMessage('Saldos de apertura registrados como capital. Ya podés continuar.');}catch(error){setMessage(error instanceof Error?error.message:'No se pudieron registrar los saldos.');}finally{setSaving(false);}};
+  return <form className="setup-form" onSubmit={event=>void submit(event)}><p>Registrá el capital anterior a miClub. Se asentará en las cuentas canónicas Caja, Banco y Caja USD; no se crea un saldo paralelo.</p><label>Caja (ARS)<input name="cash" type="number" min="0" step="0.01" defaultValue="0" required /></label><label>Banco (ARS)<input name="bank" type="number" min="0" step="0.01" defaultValue="0" required /></label><label>Caja (USD)<input name="usdCash" type="number" min="0" step="0.01" defaultValue="0" required /></label><button type="submit" disabled={saving}>{saving?'Registrando…':'Registrar saldos de apertura'}</button>{message&&<p role="status">{message}</p>}</form>;
+}
