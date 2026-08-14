@@ -1,20 +1,8 @@
 begin;
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-    where conrelid='miclub.import_batches'::regclass
-      and conname='import_batches_id_club_unique'
-  ) then
-    alter table miclub.import_batches
-      add constraint import_batches_id_club_unique unique (id,club_id);
-  end if;
-end $$;
-
 create table if not exists miclub.xlsx_import_rows (
   club_id uuid not null references miclub.clubs(id) on delete cascade,
-  batch_id uuid not null,
+  batch_id uuid not null references miclub.import_batches(id) on delete cascade,
   sheet text not null check (sheet in ('ADMINISTRACIÓN','INSCRIPCIONES')),
   row_fingerprint text not null check (row_fingerprint ~ '^[0-9a-f]{64}$'),
   external_reference text,
@@ -22,9 +10,7 @@ create table if not exists miclub.xlsx_import_rows (
   entity_id uuid not null,
   imported_at timestamptz not null default now(),
   primary key (club_id,batch_id,sheet,row_fingerprint),
-  unique (club_id,batch_id,sheet,source_row_number),
-  foreign key (batch_id,club_id)
-    references miclub.import_batches(id,club_id) on delete cascade
+  unique (club_id,batch_id,sheet,source_row_number)
 );
 
 create index if not exists xlsx_import_rows_external_reference_idx
