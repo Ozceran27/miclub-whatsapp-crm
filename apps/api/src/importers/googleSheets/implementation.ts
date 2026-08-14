@@ -470,16 +470,24 @@ const upsertCategory = async (
   name: string,
 ): Promise<string | null> => {
   const clean = normalizeSheetText(name) || "Sin categoría";
-  const found = await pool.query<{ id: string }>(
-    "select id from miclub.movement_categories where club_id=$1 and lower(name)=lower($2) limit 1",
+  const found = await pool.query<{ id: string; catalog_id: string | null }>(
+    "select id,catalog_id from miclub.movement_categories where club_id=$1 and lower(name)=lower($2) limit 1",
     [clubId, clean],
   );
   if (found.rows[0]) return found.rows[0].id;
+  const canonical = await pool.query<{ id: string }>(
+    `select coalesce(cia.catalog_id,cc.id) id
+     from (select upper(trim($1)) normalized_name) n
+     left join miclub.category_import_aliases cia on cia.normalized_alias=n.normalized_name
+     left join miclub.category_catalog cc on cc.code=replace(n.normalized_name,' ','_')
+     where coalesce(cia.catalog_id,cc.id) is not null`, [clean],
+  );
+  if (!canonical.rows[0]) throw new Error(`Categoría de importación desconocida: ${clean}`);
   return (
     (
       await pool.query<{ id: string }>(
-        "insert into miclub.movement_categories (club_id, name) values ($1, $2) returning id",
-        [clubId, clean],
+        "insert into miclub.movement_categories (club_id, name, catalog_id) values ($1, $2, $3) returning id",
+        [clubId, clean, canonical.rows[0].id],
       )
     ).rows[0]?.id ?? null
   );
