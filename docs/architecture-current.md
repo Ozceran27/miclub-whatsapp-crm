@@ -15,7 +15,7 @@ El arranque productivo exige `AUTH_ENABLED=true`, `DATA_SOURCE=postgres`, `CRM_S
 
 Google Sheets es exclusivamente un origen temporal de importación hacia PostgreSQL. No participa como read path ordinario. La importación requiere habilitación explícita, operador autorizado, tenant determinado y posterior auditoría; al terminar se deshabilitan sus flags.
 
-SQLite y `mockData` permanecen como artefactos de compatibilidad, migración o prueba. No son fuentes, respaldos automáticos ni fallbacks de producción. Su contexto anterior está en [`history/`](history/README.md) y no debe copiarse a despliegues nuevos.
+SQLite permanece como artefacto de prueba de compatibilidad y no es fuente, respaldo automático ni fallback de producción. El `mockData` sin consumidores fue eliminado. El grafo y la puerta de retiro están en [`legacy-runtime-inventory.md`](legacy-runtime-inventory.md); el contexto anterior está en [`history/`](history/README.md).
 
 ## Superficies HTTP
 
