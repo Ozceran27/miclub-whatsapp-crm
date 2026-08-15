@@ -111,6 +111,97 @@ el archivo desde una sesión administrativa equivalente.
 > expuesta. Rótela con `\password miclub_app` y actualice `DATABASE_URL` antes de
 > continuar.
 
+### Windows + DBeaver + PostgreSQL 18
+
+La vista **DBA** de DBeaver muestra al propietario de la base, no necesariamente
+al superusuario del cluster. Que `miclub_app` sea dueño de `miclub_gestion` no le
+concede `SUPERUSER`, `CREATEROLE` ni permiso para asignar `BYPASSRLS`. En una
+instalación local creada con el instalador oficial suele existir el login
+`postgres`; su contraseña es la elegida durante la instalación y PostgreSQL no
+permite leerla en texto claro.
+
+#### Si conoce la contraseña de `postgres`
+
+1. En DBeaver, clic derecho sobre `miclub-gestion` → **Duplicar conexión**.
+2. Nombre sugerido: `miclub-gestion-dba-local`.
+3. Mantener host `localhost`, puerto `5432` y base `miclub_gestion`.
+4. Cambiar **Nombre de usuario** a `postgres`, dejar **Session role** vacío e
+   introducir la contraseña administrativa.
+5. Pulsar **Probar conexión** y, una vez conectada, ejecutar:
+
+```sql
+select current_user, session_user,
+       r.rolsuper, r.rolcreaterole, r.rolbypassrls
+from pg_roles r
+where r.rolname=current_user;
+```
+
+No continuar salvo que `current_user=postgres` y `rolsuper=true`.
+
+#### Si no recuerda la contraseña de `postgres`
+
+No intente extraerla de DBeaver ni de `pg_authid`: los secretos guardados y los
+verificadores SCRAM no son recuperables como contraseña original. Si es
+administrador de Windows y ésta es realmente una instancia local, restablézcala:
+
+1. Abra **Servicios** (`services.msc`) y localice el servicio PostgreSQL 18
+   (habitualmente `postgresql-x64-18`). En sus propiedades identifique `-D`, que
+   apunta al directorio de datos.
+2. Haga una copia de seguridad de `<data>\pg_hba.conf`.
+3. Edite como administrador **sólo** las reglas loopback de `127.0.0.1/32` y
+   `::1/128`, cambiando temporalmente su método (`scram-sha-256`) por `trust`. No
+   cambie reglas de red remotas y no deje `trust` habilitado.
+4. Reinicie desde una consola **como Administrador** (ajuste el nombre real):
+
+```bat
+net stop postgresql-x64-18
+net start postgresql-x64-18
+```
+
+5. Abra `psql` desde `C:\Program Files\PostgreSQL\18\bin`:
+
+```bat
+"C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5432 -U postgres -d miclub_gestion
+```
+
+6. Dentro de `psql`, asigne un secreto nuevo sin escribirlo en la línea de
+   comandos:
+
+```text
+\password postgres
+```
+
+7. Salga con `\q`, restaure inmediatamente el `pg_hba.conf` original y reinicie
+   otra vez el servicio. Verifique que la conexión sin contraseña ya no funciona
+   y que DBeaver conecta con la nueva.
+
+Durante la breve ventana `trust`, cualquier proceso local podría autenticarse
+sin contraseña; cierre aplicaciones no necesarias y restaure el archivo antes de
+seguir. Si PostgreSQL pertenece a Docker, WSL, una empresa o un proveedor cloud,
+**no use este procedimiento**: use el mecanismo de reset del propietario/DBA.
+
+#### Crear el login de migraciones desde Windows
+
+Conectado como `postgres` en DBeaver, ejecute una vez:
+
+```sql
+CREATE ROLE miclub_migrator
+  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+GRANT miclub_app TO miclub_migrator;
+```
+
+Si ya existe, omita `CREATE ROLE` y compruebe sus atributos. Asigne la contraseña
+sin dejarla en un script guardado, desde `psql`:
+
+```text
+\password miclub_migrator
+```
+
+Después, aún en la conexión `postgres`, ejecute
+`docs/dbeaver/00_provision_database_roles.sql` con
+`runtime_login=miclub_app` y `admin_login=miclub_migrator`. Cierre o marque como
+administrativa la conexión `postgres`; no la use para consultas ordinarias.
+
 Consultas adicionales de comprobación:
 
 ```sql
