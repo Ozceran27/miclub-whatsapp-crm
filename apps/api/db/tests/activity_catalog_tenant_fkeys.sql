@@ -65,21 +65,21 @@ BEGIN
   rejected := false;
   BEGIN
     DELETE FROM miclub.sectors WHERE id = sector_a;
-  EXCEPTION WHEN foreign_key_violation THEN rejected := true;
+  EXCEPTION WHEN restrict_violation OR foreign_key_violation THEN rejected := true;
   END;
   IF NOT rejected THEN RAISE EXCEPTION 'referenced sector deletion was accepted'; END IF;
 
   rejected := false;
   BEGIN
     DELETE FROM miclub.instructors WHERE id = instructor_a;
-  EXCEPTION WHEN foreign_key_violation THEN rejected := true;
+  EXCEPTION WHEN restrict_violation OR foreign_key_violation THEN rejected := true;
   END;
   IF NOT rejected THEN RAISE EXCEPTION 'referenced instructor deletion was accepted'; END IF;
 
   rejected := false;
   BEGIN
     DELETE FROM miclub.people WHERE id = person_a;
-  EXCEPTION WHEN foreign_key_violation THEN rejected := true;
+  EXCEPTION WHEN restrict_violation OR foreign_key_violation THEN rejected := true;
   END;
   IF NOT rejected THEN RAISE EXCEPTION 'referenced manager deletion was accepted'; END IF;
 END $test$;

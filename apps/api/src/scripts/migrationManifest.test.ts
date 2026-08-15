@@ -130,3 +130,21 @@ test("las referencias de actividades se resuelven declarativamente dentro del te
   assert.match(sql, /DROP TRIGGER IF EXISTS activities_validate_tenant/);
   assert.doesNotMatch(sql, /CREATE TRIGGER activities_validate_tenant/);
 });
+
+test("el guard de actividades no convierte etiquetas inglesas al enum entity_status", async () => {
+  const migrationPath = "202608150003_fix_activity_status_enum_guard.sql";
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+
+  assert.match(sql, /NEW\.status::text IN \('active', 'activa'\)/);
+  assert.match(sql, /NEW\.status::text NOT IN \('archived', 'cancelada'\)/);
+  assert.doesNotMatch(sql, /NEW\.status IN \('active', 'activa'\)/);
+});
+
+test("la regresión SQL reconoce el SQLSTATE específico de ON DELETE RESTRICT", async () => {
+  const sql = await readFile(path.resolve(migrationsDir, "../tests/activity_catalog_tenant_fkeys.sql"), "utf8");
+
+  assert.equal(
+    sql.match(/EXCEPTION WHEN restrict_violation OR foreign_key_violation THEN/g)?.length,
+    3,
+  );
+});
