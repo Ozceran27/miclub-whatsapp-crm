@@ -143,9 +143,14 @@ test("el guard de actividades no convierte etiquetas inglesas al enum entity_sta
 test("el runtime prioritario queda sin BYPASSRLS y falla cerrado sin tenant", async () => {
   const migration = await readFile(path.resolve(migrationsDir, "202608150004_runtime_roles_and_priority_rls.sql"), "utf8");
   const negative = await readFile(path.resolve(migrationsDir, "../tests/runtime_rls_negative.sql"), "utf8");
+  const provisioning = await readFile(path.resolve(repositoryRoot, "docs/dbeaver/00_provision_database_roles.sql"), "utf8");
 
-  assert.match(migration, /miclub_runtime[\s\S]*NOBYPASSRLS/);
-  assert.match(migration, /miclub_admin[\s\S]*BYPASSRLS/);
+  assert.doesNotMatch(migration, /CREATE ROLE/);
+  assert.match(migration, /rolbypassrls/);
+  assert.match(migration, /ERRCODE = 'object_not_in_prerequisite_state'/);
+  assert.match(provisioning, /miclub_runtime[\s\S]*NOBYPASSRLS/);
+  assert.match(provisioning, /miclub_admin[\s\S]*BYPASSRLS/);
+  assert.match(provisioning, /GRANT miclub_runtime TO \$\{runtime_login\}/);
   assert.match(migration, /FORCE ROW LEVEL SECURITY/);
   assert.match(migration, /current_setting\('app\.club_id', true\)/);
   for (const table of ["people", "club_memberships", "movements", "enrollments", "activities", "crm_message_templates", "import_batches", "xlsx_import_rows"]) {

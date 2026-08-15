@@ -25,13 +25,14 @@ type PgModule = {
 let pool: PgPool | undefined;
 let adminPool: PgPool | undefined;
 
-const buildPoolConfig = (env: PostgresEnv): Record<string, unknown> => {
+const buildPoolConfig = (env: PostgresEnv, role?: string): Record<string, unknown> => {
   const warnings = validatePostgresEnv(env);
   for (const warning of warnings) console.warn(warning);
 
   if (env.databaseUrl) {
     return {
       connectionString: env.databaseUrl,
+      options: role ? `-c role=${role}` : undefined,
       ssl: env.ssl ? { rejectUnauthorized: false } : undefined
     };
   }
@@ -42,6 +43,7 @@ const buildPoolConfig = (env: PostgresEnv): Record<string, unknown> => {
     database: env.database,
     user: env.user,
     password: env.password,
+    options: role ? `-c role=${role}` : undefined,
     ssl: env.ssl ? { rejectUnauthorized: false } : undefined
   };
 };
@@ -56,7 +58,9 @@ export const getPostgresPool = async (): Promise<PgPool> => {
     throw new Error("No se pudo cargar pg.Pool");
   }
 
-  pool = new Pool(buildPoolConfig(getPostgresEnv()));
+  // NOINHERIT makes the boundary explicit: every API connection assumes only
+  // the RLS-protected group role provisioned by the DBA.
+  pool = new Pool(buildPoolConfig(getPostgresEnv(), "miclub_runtime"));
   return pool;
 };
 

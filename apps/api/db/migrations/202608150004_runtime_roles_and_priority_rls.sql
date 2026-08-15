@@ -1,21 +1,24 @@
 BEGIN;
 
--- These group roles deliberately cannot log in. Deployment-owned login roles are
--- granted exactly one of them, keeping API connections away from administrative
--- migrations and controlled jobs.
+-- Cluster roles are provisioned once by a DBA with
+-- docs/dbeaver/00_provision_database_roles.sql. A schema migration must not need
+-- CREATEROLE: fail with an actionable precondition instead.
 DO $roles$
+DECLARE runtime_bypass boolean; admin_bypass boolean;
 BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'miclub_runtime') THEN
-    CREATE ROLE miclub_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+  SELECT rolbypassrls INTO runtime_bypass FROM pg_roles WHERE rolname = 'miclub_runtime';
+  SELECT rolbypassrls INTO admin_bypass FROM pg_roles WHERE rolname = 'miclub_admin';
+  IF runtime_bypass IS NULL OR admin_bypass IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = 'object_not_in_prerequisite_state',
+      MESSAGE = 'Faltan los roles miclub_runtime/miclub_admin',
+      HINT = 'Un DBA con CREATEROLE debe ejecutar docs/dbeaver/00_provision_database_roles.sql antes de esta migración';
   END IF;
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'miclub_admin') THEN
-    CREATE ROLE miclub_admin NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT BYPASSRLS;
+  IF runtime_bypass OR NOT admin_bypass THEN
+    RAISE EXCEPTION 'Atributos inseguros: miclub_runtime debe ser NOBYPASSRLS y miclub_admin debe ser BYPASSRLS';
   END IF;
 END
 $roles$;
-
-ALTER ROLE miclub_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-ALTER ROLE miclub_admin NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT BYPASSRLS;
 
 GRANT USAGE ON SCHEMA miclub TO miclub_runtime, miclub_admin;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA miclub TO miclub_admin;
