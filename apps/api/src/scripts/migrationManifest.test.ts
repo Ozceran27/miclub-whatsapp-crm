@@ -170,3 +170,16 @@ test("la regresión SQL reconoce el SQLSTATE específico de ON DELETE RESTRICT",
     3,
   );
 });
+
+test("los movimientos PAYMENT y ADVANCE son indivisibles aun con escritores concurrentes", async () => {
+  const migration = await readFile(path.resolve(migrationsDir, "202608150005_prevent_split_settlement_movements.sql"), "utf8");
+  const concurrency = await readFile(path.resolve(migrationsDir, "../tests/activity_settlement_allocation_concurrency.sql"), "utf8");
+
+  assert.match(migration, /UNIQUE INDEX activity_settlement_allocations_active_movement_type_unique/);
+  assert.match(migration, /\(club_id, movement_id, allocation_type\)/);
+  assert.match(migration, /status <> 'CANCELADO'[\s\S]*voided_at IS NULL/);
+  assert.match(concurrency, /dblink_send_query/);
+  assert.match(concurrency, /ARRAY\['PAYMENT', 'ADVANCE'\]/);
+  assert.match(concurrency, /first_settlement_id[\s\S]*second_settlement_id/);
+  assert.match(concurrency, /EXCEPTION WHEN unique_violation/);
+});
