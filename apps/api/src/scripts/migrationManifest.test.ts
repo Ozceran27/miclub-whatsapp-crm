@@ -113,3 +113,20 @@ test("la migración XLSX referencia la tabla canónica de usuarios", async () =>
   assert.match(sql, /to_regclass\('miclub\.users'\)/i);
   assert.match(sql, /begin;[\s\S]*commit;/i);
 });
+
+test("las referencias de actividades se resuelven declarativamente dentro del tenant", async () => {
+  const migrationPath = "202608150002_scope_activity_catalog_fks.sql";
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+
+  for (const parent of ["sectors", "instructors", "people"]) {
+    assert.match(sql, new RegExp(`ALTER TABLE miclub\\.${parent}[\\s\\S]*UNIQUE \\(id, club_id\\)`));
+  }
+  assert.match(sql, /FOREIGN KEY \(sector_id, club_id\)[\s\S]*REFERENCES miclub\.sectors \(id, club_id\) ON DELETE RESTRICT/);
+  assert.match(sql, /FOREIGN KEY \(instructor_id, club_id\)[\s\S]*REFERENCES miclub\.instructors \(id, club_id\) ON DELETE RESTRICT/);
+  assert.match(sql, /FOREIGN KEY \(manager_person_id, club_id\)[\s\S]*REFERENCES miclub\.people \(id, club_id\) ON DELETE RESTRICT/);
+  assert.match(sql, /ON miclub\.activities \(sector_id, club_id\)/);
+  assert.match(sql, /ON miclub\.activities \(instructor_id, club_id\)/);
+  assert.match(sql, /ON miclub\.activities \(manager_person_id, club_id\)/);
+  assert.match(sql, /DROP TRIGGER IF EXISTS activities_validate_tenant/);
+  assert.doesNotMatch(sql, /CREATE TRIGGER activities_validate_tenant/);
+});
