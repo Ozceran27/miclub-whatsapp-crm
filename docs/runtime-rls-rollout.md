@@ -34,6 +34,7 @@ PGADMINDATABASE=miclub_gestion
 PGADMINUSER=miclub_migrator
 PGADMINPASSWORD=<secreto-del-vault-o-proveedor>
 PGADMINSSL=true
+PGADMINROLE=miclub_app
 ```
 
 Si la contraseña de una URL contiene `@`, `:`, `/`, `?`, `#` o `%`, codificarla
@@ -45,8 +46,9 @@ Nunca versionar el `.env` real.
 
 La creación de roles es una operación del **cluster**, no una migración de
 esquema. Por eso el error `42501` es correcto cuando el usuario no tiene
-`CREATEROLE`. No se debe conceder `CREATEROLE` permanentemente al migration
-runner para sortearlo.
+`CREATEROLE`. Además, PostgreSQL reserva la concesión de `BYPASSRLS` a un
+**superusuario**: disponer sólo de `CREATEROLE` tampoco completa este paso. No se
+debe elevar permanentemente al login de la API ni al migration runner.
 
 1. Definir los nombres reales de login, por ejemplo `miclub_api` y
    `miclub_migrator`. Si todavía no existen, el DBA los crea con `LOGIN` y
@@ -62,6 +64,52 @@ runner para sortearlo.
 5. El DBA confirma que el login administrativo puede modificar las tablas del
    esquema (normalmente haciéndolo dueño de la base/esquema). `BYPASSRLS` no
    concede por sí mismo permisos DDL.
+
+### Procedimiento exacto para PostgreSQL local
+
+Si la conexión actual usa `miclub_app@localhost`, ese login es el runtime y no
+debe crear roles. En Linux, abra una terminal del servidor PostgreSQL y compruebe
+el acceso del administrador local:
+
+```bash
+sudo -u postgres psql -d miclub_gestion -c \
+  "select current_user, rolsuper from pg_roles where rolname=current_user"
+```
+
+Debe devolver `postgres | t`. Cree después un login administrativo separado;
+`createuser --pwprompt` solicita el secreto sin incluirlo en el historial:
+
+```bash
+sudo -u postgres createuser --login --pwprompt \
+  --no-superuser --no-createdb --no-createrole miclub_migrator
+```
+
+Si el rol ya existe, no lo recree: use `sudo -u postgres psql` y el comando
+interactivo `\password miclub_migrator`. Como las tablas existentes normalmente
+pertenecen a `miclub_app`, permita que el migrator asuma ese propietario sólo
+durante DDL:
+
+```bash
+sudo -u postgres psql -d miclub_gestion -v ON_ERROR_STOP=1 -c \
+  'GRANT miclub_app TO miclub_migrator'
+```
+
+Luego cree en DBeaver una **segunda conexión temporal** como `postgres`, abra
+`docs/dbeaver/00_provision_database_roles.sql`, indique:
+
+```text
+runtime_login = miclub_app
+admin_login   = miclub_migrator
+```
+
+y ejecute todo el archivo. No lo ejecute como `miclub_app`: el preflight ahora
+lo rechazará antes de `CREATE ROLE` con una explicación concreta. Si `postgres`
+usa autenticación local *peer* y DBeaver no puede conectarse, el DBA debe aplicar
+el archivo desde una sesión administrativa equivalente.
+
+> Si una contraseña real fue compartida en un chat, ticket o log, considérela
+> expuesta. Rótela con `\password miclub_app` y actualice `DATABASE_URL` antes de
+> continuar.
 
 Consultas adicionales de comprobación:
 
@@ -90,6 +138,26 @@ select pg_has_role('miclub_api','miclub_runtime','MEMBER'),
 
 No ejecutar el archivo versionado a mano fuera del manifest salvo un
 procedimiento de recuperación aprobado: el comando canónico es el runner.
+
+Para la instalación local descrita, la configuración final queda así (use
+secretos nuevos y no copie los placeholders literalmente):
+
+```dotenv
+DATABASE_URL=postgres://miclub_app:<runtime-secret>@localhost:5432/miclub_gestion
+ADMIN_DATABASE_URL=postgres://miclub_migrator:<admin-secret>@localhost:5432/miclub_gestion
+PGADMINSSL=false
+PGADMINROLE=miclub_app
+```
+
+`PGADMINROLE=miclub_app` hace que la conexión separada `miclub_migrator` asuma
+el propietario de los objetos para DDL, sin convertir al migrator en
+superusuario. Compruebe el cambio de identidad antes de migrar:
+
+```bash
+psql "$ADMIN_DATABASE_URL" -c 'set role miclub_app; select session_user,current_user'
+```
+
+Debe mostrar `session_user=miclub_migrator` y `current_user=miclub_app`.
 
 ## 4. Validación de aislamiento
 

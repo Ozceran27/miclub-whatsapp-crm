@@ -1,6 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateRuntimeConfig } from "./env.js";
+import { getPostgresAdminEnv, validateRuntimeConfig } from "./env.js";
+
+test("admin admite una URL separada y un rol propietario explícito", () => {
+  const original = { ...process.env };
+  try {
+    Object.assign(process.env, {
+      ADMIN_DATABASE_URL: "postgres://migrator:secret@localhost/miclub_gestion",
+      PGADMINROLE: "miclub_app",
+      PGADMINSSL: "false",
+    });
+    assert.deepEqual(getPostgresAdminEnv(), {
+      databaseUrl: "postgres://migrator:secret@localhost/miclub_gestion",
+      host: undefined,
+      port: undefined,
+      database: undefined,
+      user: undefined,
+      password: undefined,
+      ssl: false,
+      role: "miclub_app",
+    });
+  } finally {
+    process.env = original;
+  }
+});
 
 test("producción rechaza AUTH_ENABLED=false", () => {
   const original = { ...process.env };

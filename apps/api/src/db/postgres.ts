@@ -26,6 +26,9 @@ let pool: PgPool | undefined;
 let adminPool: PgPool | undefined;
 
 const buildPoolConfig = (env: PostgresEnv, role?: string): Record<string, unknown> => {
+  if (role && !/^[a-z_][a-z0-9_]*$/i.test(role)) {
+    throw new Error("El rol PostgreSQL configurado contiene caracteres inválidos");
+  }
   const warnings = validatePostgresEnv(env);
   for (const warning of warnings) console.warn(warning);
 
@@ -73,7 +76,9 @@ export const getPostgresAdminPool = async (): Promise<PgPool> => {
   const pgModule = (await import("pg")) as PgModule;
   const Pool = pgModule.Pool ?? pgModule.default?.Pool;
   if (typeof Pool !== "function") throw new Error("No se pudo cargar pg.Pool");
-  adminPool = new Pool(buildPoolConfig(env));
+  // A separate login may SET ROLE to the existing schema owner for DDL. This is
+  // useful in local installations without making the migrator a superuser.
+  adminPool = new Pool(buildPoolConfig(env, env.role));
   return adminPool;
 };
 

@@ -1,6 +1,18 @@
-/* PRE-MIGRACIÓN, una sola vez. Requiere un DBA/superusuario o un login con
-   CREATEROLE. Sustituir los dos parámetros DBeaver por nombres de LOGIN reales.
+/* PRE-MIGRACIÓN, una sola vez. Requiere un superusuario PostgreSQL: BYPASSRLS
+   es un atributo reservado, por lo que CREATEROLE por sí solo no es suficiente.
+   Sustituir los dos parámetros DBeaver por nombres de LOGIN reales.
    Este archivo crea roles de cluster; no pertenece al migration runner. */
+DO $preflight$
+BEGIN
+  IF NOT (SELECT rolsuper FROM pg_roles WHERE rolname=current_user) THEN
+    RAISE EXCEPTION USING
+      ERRCODE='insufficient_privilege',
+      MESSAGE=format('La conexión actual (%s) no es superusuario PostgreSQL',current_user),
+      HINT='En una instalación local ejecute el aprovisionamiento como el usuario postgres; consulte docs/runtime-rls-rollout.md';
+  END IF;
+END
+$preflight$;
+
 DO $roles$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='miclub_runtime') THEN

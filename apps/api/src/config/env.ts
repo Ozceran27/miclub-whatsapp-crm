@@ -6,6 +6,7 @@ export type PostgresEnv = {
   user?: string;
   password?: string;
   ssl?: boolean;
+  role?: string;
 };
 
 /** Dedicated credentials for migrations and explicitly controlled jobs. */
@@ -17,6 +18,7 @@ export const getPostgresAdminEnv = (): PostgresEnv => ({
   user: readOptional("PGADMINUSER"),
   password: readOptional("PGADMINPASSWORD"),
   ssl: parseBoolean("PGADMINSSL", parseBoolean("PGSSL", false)),
+  role: readOptional("PGADMINROLE"),
 });
 
 const readOptional = (key: string): string | undefined => {
