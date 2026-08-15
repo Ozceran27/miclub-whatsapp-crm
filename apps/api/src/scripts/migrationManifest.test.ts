@@ -113,3 +113,38 @@ test("la migración XLSX referencia la tabla canónica de usuarios", async () =>
   assert.match(sql, /to_regclass\('miclub\.users'\)/i);
   assert.match(sql, /begin;[\s\S]*commit;/i);
 });
+
+test("las referencias de actividades se resuelven declarativamente dentro del tenant", async () => {
+  const migrationPath = "202608150002_scope_activity_catalog_fks.sql";
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+
+  for (const parent of ["sectors", "instructors", "people"]) {
+    assert.match(sql, new RegExp(`ALTER TABLE miclub\\.${parent}[\\s\\S]*UNIQUE \\(id, club_id\\)`));
+  }
+  assert.match(sql, /FOREIGN KEY \(sector_id, club_id\)[\s\S]*REFERENCES miclub\.sectors \(id, club_id\) ON DELETE RESTRICT/);
+  assert.match(sql, /FOREIGN KEY \(instructor_id, club_id\)[\s\S]*REFERENCES miclub\.instructors \(id, club_id\) ON DELETE RESTRICT/);
+  assert.match(sql, /FOREIGN KEY \(manager_person_id, club_id\)[\s\S]*REFERENCES miclub\.people \(id, club_id\) ON DELETE RESTRICT/);
+  assert.match(sql, /ON miclub\.activities \(sector_id, club_id\)/);
+  assert.match(sql, /ON miclub\.activities \(instructor_id, club_id\)/);
+  assert.match(sql, /ON miclub\.activities \(manager_person_id, club_id\)/);
+  assert.match(sql, /DROP TRIGGER IF EXISTS activities_validate_tenant/);
+  assert.doesNotMatch(sql, /CREATE TRIGGER activities_validate_tenant/);
+});
+
+test("el guard de actividades no convierte etiquetas inglesas al enum entity_status", async () => {
+  const migrationPath = "202608150003_fix_activity_status_enum_guard.sql";
+  const sql = await readFile(path.join(migrationsDir, migrationPath), "utf8");
+
+  assert.match(sql, /NEW\.status::text IN \('active', 'activa'\)/);
+  assert.match(sql, /NEW\.status::text NOT IN \('archived', 'cancelada'\)/);
+  assert.doesNotMatch(sql, /NEW\.status IN \('active', 'activa'\)/);
+});
+
+test("la regresión SQL reconoce el SQLSTATE específico de ON DELETE RESTRICT", async () => {
+  const sql = await readFile(path.resolve(migrationsDir, "../tests/activity_catalog_tenant_fkeys.sql"), "utf8");
+
+  assert.equal(
+    sql.match(/EXCEPTION WHEN restrict_violation OR foreign_key_violation THEN/g)?.length,
+    3,
+  );
+});
