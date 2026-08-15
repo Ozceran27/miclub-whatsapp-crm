@@ -140,6 +140,23 @@ test("el guard de actividades no convierte etiquetas inglesas al enum entity_sta
   assert.doesNotMatch(sql, /NEW\.status IN \('active', 'activa'\)/);
 });
 
+test("el runtime prioritario queda sin BYPASSRLS y falla cerrado sin tenant", async () => {
+  const migration = await readFile(path.resolve(migrationsDir, "202608150004_runtime_roles_and_priority_rls.sql"), "utf8");
+  const negative = await readFile(path.resolve(migrationsDir, "../tests/runtime_rls_negative.sql"), "utf8");
+
+  assert.match(migration, /miclub_runtime[\s\S]*NOBYPASSRLS/);
+  assert.match(migration, /miclub_admin[\s\S]*BYPASSRLS/);
+  assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+  assert.match(migration, /current_setting\('app\.club_id', true\)/);
+  for (const table of ["people", "club_memberships", "movements", "enrollments", "activities", "crm_message_templates", "import_batches", "xlsx_import_rows"]) {
+    assert.match(migration, new RegExp(`'${table}'`));
+  }
+  assert.match(negative, /SET LOCAL ROLE miclub_runtime/);
+  assert.match(negative, /SELECT count\(\*\) FROM miclub\.%I/);
+  assert.doesNotMatch(negative, /WHERE club_id/);
+  assert.match(negative, /ROLLBACK/);
+});
+
 test("la regresión SQL reconoce el SQLSTATE específico de ON DELETE RESTRICT", async () => {
   const sql = await readFile(path.resolve(migrationsDir, "../tests/activity_catalog_tenant_fkeys.sql"), "utf8");
 

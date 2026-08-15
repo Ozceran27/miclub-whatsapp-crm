@@ -1,4 +1,4 @@
-import { getPostgresEnv, validatePostgresEnv } from "../config/env.js";
+import { getPostgresAdminEnv, getPostgresEnv, validatePostgresEnv, type PostgresEnv } from "../config/env.js";
 
 export type QueryExecutor = {
   query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
@@ -23,9 +23,9 @@ type PgModule = {
 };
 
 let pool: PgPool | undefined;
+let adminPool: PgPool | undefined;
 
-const buildPoolConfig = (): Record<string, unknown> => {
-  const env = getPostgresEnv();
+const buildPoolConfig = (env: PostgresEnv): Record<string, unknown> => {
   const warnings = validatePostgresEnv(env);
   for (const warning of warnings) console.warn(warning);
 
@@ -56,8 +56,21 @@ export const getPostgresPool = async (): Promise<PgPool> => {
     throw new Error("No se pudo cargar pg.Pool");
   }
 
-  pool = new Pool(buildPoolConfig());
+  pool = new Pool(buildPoolConfig(getPostgresEnv()));
   return pool;
+};
+
+/** Administrative pool for migrations/jobs; never use it from request handlers. */
+export const getPostgresAdminPool = async (): Promise<PgPool> => {
+  if (adminPool) return adminPool;
+  const env = getPostgresAdminEnv();
+  const warnings = validatePostgresEnv(env);
+  if (warnings.length > 0) throw new Error(`Credenciales PostgreSQL administrativas incompletas: ${warnings.join(" ")}`);
+  const pgModule = (await import("pg")) as PgModule;
+  const Pool = pgModule.Pool ?? pgModule.default?.Pool;
+  if (typeof Pool !== "function") throw new Error("No se pudo cargar pg.Pool");
+  adminPool = new Pool(buildPoolConfig(env));
+  return adminPool;
 };
 
 export const closePostgresPool = async (): Promise<void> => {
@@ -65,6 +78,12 @@ export const closePostgresPool = async (): Promise<void> => {
 
   await pool.end();
   pool = undefined;
+};
+
+export const closePostgresAdminPool = async (): Promise<void> => {
+  if (!adminPool) return;
+  await adminPool.end();
+  adminPool = undefined;
 };
 
 /** Test seam for repository-level tenant isolation tests. */
