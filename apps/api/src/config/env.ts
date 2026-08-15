@@ -1,4 +1,4 @@
-type PostgresEnv = {
+export type PostgresEnv = {
   databaseUrl?: string;
   host?: string;
   port?: number;
@@ -6,7 +6,20 @@ type PostgresEnv = {
   user?: string;
   password?: string;
   ssl?: boolean;
+  role?: string;
 };
+
+/** Dedicated credentials for migrations and explicitly controlled jobs. */
+export const getPostgresAdminEnv = (): PostgresEnv => ({
+  databaseUrl: readOptional("ADMIN_DATABASE_URL"),
+  host: readOptional("PGADMINHOST"),
+  port: parsePort("PGADMINPORT"),
+  database: readOptional("PGADMINDATABASE"),
+  user: readOptional("PGADMINUSER"),
+  password: readOptional("PGADMINPASSWORD"),
+  ssl: parseBoolean("PGADMINSSL", parseBoolean("PGSSL", false)),
+  role: readOptional("PGADMINROLE"),
+});
 
 const readOptional = (key: string): string | undefined => {
   const value = process.env[key]?.trim();

@@ -1,4 +1,4 @@
-import { getPostgresEnv, validatePostgresEnv } from "../config/env.js";
+import { getPostgresAdminEnv, getPostgresEnv, validatePostgresEnv, type PostgresEnv } from "../config/env.js";
 
 export type QueryExecutor = {
   query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
@@ -23,15 +23,19 @@ type PgModule = {
 };
 
 let pool: PgPool | undefined;
+let adminPool: PgPool | undefined;
 
-const buildPoolConfig = (): Record<string, unknown> => {
-  const env = getPostgresEnv();
+const buildPoolConfig = (env: PostgresEnv, role?: string): Record<string, unknown> => {
+  if (role && !/^[a-z_][a-z0-9_]*$/i.test(role)) {
+    throw new Error("El rol PostgreSQL configurado contiene caracteres inválidos");
+  }
   const warnings = validatePostgresEnv(env);
   for (const warning of warnings) console.warn(warning);
 
   if (env.databaseUrl) {
     return {
       connectionString: env.databaseUrl,
+      options: role ? `-c role=${role}` : undefined,
       ssl: env.ssl ? { rejectUnauthorized: false } : undefined
     };
   }
@@ -42,6 +46,7 @@ const buildPoolConfig = (): Record<string, unknown> => {
     database: env.database,
     user: env.user,
     password: env.password,
+    options: role ? `-c role=${role}` : undefined,
     ssl: env.ssl ? { rejectUnauthorized: false } : undefined
   };
 };
@@ -56,8 +61,25 @@ export const getPostgresPool = async (): Promise<PgPool> => {
     throw new Error("No se pudo cargar pg.Pool");
   }
 
-  pool = new Pool(buildPoolConfig());
+  // NOINHERIT makes the boundary explicit: every API connection assumes only
+  // the RLS-protected group role provisioned by the DBA.
+  pool = new Pool(buildPoolConfig(getPostgresEnv(), "miclub_runtime"));
   return pool;
+};
+
+/** Administrative pool for migrations/jobs; never use it from request handlers. */
+export const getPostgresAdminPool = async (): Promise<PgPool> => {
+  if (adminPool) return adminPool;
+  const env = getPostgresAdminEnv();
+  const warnings = validatePostgresEnv(env);
+  if (warnings.length > 0) throw new Error(`Credenciales PostgreSQL administrativas incompletas: ${warnings.join(" ")}`);
+  const pgModule = (await import("pg")) as PgModule;
+  const Pool = pgModule.Pool ?? pgModule.default?.Pool;
+  if (typeof Pool !== "function") throw new Error("No se pudo cargar pg.Pool");
+  // A separate login may SET ROLE to the existing schema owner for DDL. This is
+  // useful in local installations without making the migrator a superuser.
+  adminPool = new Pool(buildPoolConfig(env, env.role));
+  return adminPool;
 };
 
 export const closePostgresPool = async (): Promise<void> => {
@@ -65,6 +87,12 @@ export const closePostgresPool = async (): Promise<void> => {
 
   await pool.end();
   pool = undefined;
+};
+
+export const closePostgresAdminPool = async (): Promise<void> => {
+  if (!adminPool) return;
+  await adminPool.end();
+  adminPool = undefined;
 };
 
 /** Test seam for repository-level tenant isolation tests. */

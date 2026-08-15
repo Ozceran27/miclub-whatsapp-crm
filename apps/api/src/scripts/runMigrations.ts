@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPostgresPool, closePostgresPool } from "../db/postgres.js";
+import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
 import { hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
@@ -36,7 +36,7 @@ const migrations = await Promise.all(migrationManifest.map(async (migration) => 
   return { ...migration, name: path.basename(migration.path), sql, checksum };
 }));
 
-const pool = await getPostgresPool();
+const pool = await getPostgresAdminPool();
 await pool.query(`create table if not exists public.miclub_schema_migrations (name text primary key, checksum text not null, applied_at timestamptz not null default now())`);
 for (const migration of migrations) {
   const existing = await pool.query<{ checksum: string }>("select checksum from public.miclub_schema_migrations where name=$1", [migration.name]);
@@ -48,4 +48,4 @@ for (const migration of migrations) {
   await pool.query("insert into public.miclub_schema_migrations(name, checksum) values ($1,$2)", [migration.name, migration.checksum]);
   console.log(`Aplicada ${migration.path}`);
 }
-await closePostgresPool();
+await closePostgresAdminPool();
