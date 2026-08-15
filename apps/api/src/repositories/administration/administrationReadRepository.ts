@@ -61,11 +61,13 @@ export const getAdministrationReadModel = async (clubId: string): Promise<Admini
   const pool = await getPostgresPool();
   const [balanceResult, pendingResult, recentMovementsResult] = await Promise.all([
     pool.query<AdministrationBalanceRow>(`
-      select cutoff_date, liquidity, cash, bank, dollars
-      from miclub.operational_balances
+      select current_date::text as cutoff_date,
+        coalesce(sum(balance) filter (where code in ('CASH','BANK')), 0) as liquidity,
+        coalesce(sum(balance) filter (where code='CASH'), 0) as cash,
+        coalesce(sum(balance) filter (where code='BANK'), 0) as bank,
+        coalesce(sum(balance) filter (where code='USD_CASH'), 0) as dollars
+      from miclub.v_financial_account_liquidity
       where club_id = $1
-      order by cutoff_date desc, created_at desc
-      limit 1
     `, [clubId]),
     pool.query<AdministrationPendingRow>(`
       select

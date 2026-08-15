@@ -22,13 +22,13 @@ const main = async () => {
         order by (lower(email)=lower($1)) desc, created_at limit 1
       ), updated as (
         update miclub.clubs set code='miclub-posadas', name='miClub', legal_name='miClub', email=$1,
-          phone=$2, address=$3, timezone='America/Argentina/Buenos_Aires',
-          settings=coalesce(settings, '{}'::jsonb) || '{"country":"Argentina","province":"Misiones","city":"Posadas","currency":"ARS"}'::jsonb,
+          phone=$2, address=$3, timezone='America/Argentina/Buenos_Aires', base_currency_code='ARS',
+          settings=(coalesce(settings, '{}'::jsonb) - 'currency') || '{"country":"Argentina","province":"Misiones","city":"Posadas"}'::jsonb,
           is_active=true, updated_at=now() where id=(select id from candidate) returning id
       ), inserted as (
-        insert into miclub.clubs (code,name,legal_name,email,phone,address,timezone,settings,is_active)
-        select 'miclub-posadas','miClub','miClub',$1,$2,$3,'America/Argentina/Buenos_Aires',
-          '{"country":"Argentina","province":"Misiones","city":"Posadas","currency":"ARS"}'::jsonb,true
+        insert into miclub.clubs (code,name,legal_name,email,phone,address,timezone,base_currency_code,settings,is_active)
+        select 'miclub-posadas','miClub','miClub',$1,$2,$3,'America/Argentina/Buenos_Aires','ARS',
+          '{"country":"Argentina","province":"Misiones","city":"Posadas"}'::jsonb,true
         where not exists(select 1 from updated) returning id
       ) select id from updated union all select id from inserted`, [EMAIL, "+5493765240007", "Tambor de Tacuarí 7812"]);
     const clubId = club.rows[0].id;

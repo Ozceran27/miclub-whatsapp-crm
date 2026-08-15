@@ -57,14 +57,14 @@ test("agregados y enrollments quedan aislados entre Club A y Club B", async () =
   });
 });
 
-test("Inicio y Economía consumen el corte PostgreSQL autoritativo de liquidez", async () => {
+test("Inicio y Economía consumen movimientos por cuenta como autoridad de liquidez", async () => {
   await withTenantFixture(async (calls) => {
     await getClubFinanceSummary(CLUB_A);
     const query = calls[0];
     assert.deepEqual(query.params, [CLUB_A]);
-    assert.match(query.sql, /from miclub\.operational_balances/);
-    assert.match(query.sql, /order by cutoff_date desc, created_at desc/);
-    assert.match(query.sql, /coalesce\(b\.liquidity, d\.liquidity, 0\)/);
+    assert.match(query.sql, /from miclub\.v_financial_account_liquidity/);
+    assert.doesNotMatch(query.sql, /operational_balances/);
+    assert.match(query.sql, /coalesce\(b\.liquidity, 0\)/);
     assert.match(query.sql, /coalesce\(d\.cuotas_a_cobrar, 0\)/);
     assert.match(query.sql, /coalesce\(d\.pending_net_balance, 0\)/);
   });
