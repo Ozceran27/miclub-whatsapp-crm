@@ -8,3 +8,8 @@ La referencia vigente es [`../checkpoint-pre-admin.md`](../checkpoint-pre-admin.
 
 - [`checkpoint-stable-2026-06-29.md`](checkpoint-stable-2026-06-29.md): fotografía operativa declarada el 2026-06-29, reemplazada por el checkpoint pre-admin.
 - [`sheets-sqlite-fallback-context-2026-07-28.md`](sheets-sqlite-fallback-context-2026-07-28.md): descripción legacy del fallback Sheets/mock y SQLite, archivada el 2026-07-28.
+
+## Sección forense
+
+Las auditorías y reconstrucciones fechadas están catalogadas separadamente en
+[`forensics/`](forensics/README.md). No deben usarse como runbooks vigentes.
