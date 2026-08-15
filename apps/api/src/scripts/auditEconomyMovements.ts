@@ -1,4 +1,4 @@
-import { getPostgresPool, closePostgresPool } from "../db/postgres.js";
+import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
 
 type AuditRow = Record<string, unknown>;
 
@@ -22,7 +22,7 @@ where m.club_id=$1 and m.source='google_sheets'
 order by m.movement_date, m.external_id`;
 
 export const auditEconomyMovements = async (clubId: string): Promise<AuditRow[]> => {
-  const pool = await getPostgresPool();
+  const pool = await getPostgresAdminPool();
   return (await pool.query<AuditRow>(sql, [clubId])).rows;
 };
 
@@ -31,5 +31,5 @@ if (process.argv[1]?.endsWith("auditEconomyMovements.ts")) {
   if (!clubId) throw new Error("Uso: auditEconomyMovements.ts <club_id>");
   auditEconomyMovements(clubId)
     .then((rows) => process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`))
-    .finally(closePostgresPool);
+    .finally(closePostgresAdminPool);
 }

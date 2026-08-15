@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { hashPassword } from "../auth/passwordHasher.js";
-import { closePostgresPool, getPostgresPool } from "../db/postgres.js";
+import { closePostgresAdminPool, getPostgresAdminPool } from "../db/postgres.js";
 import { auditService } from "../services/auditService.js";
 import { ROLE_DEFAULT_PERMISSIONS } from "@miclub/shared";
 
@@ -12,7 +12,7 @@ const main = async () => {
   const password = process.env.BOOTSTRAP_DIRECTOR_PASSWORD;
   if (!password || password.length < 12) throw new Error("BOOTSTRAP_DIRECTOR_PASSWORD debe contener al menos 12 caracteres.");
   const passwordHash = await hashPassword(password);
-  const pool = await getPostgresPool();
+  const pool = await getPostgresAdminPool();
   const db = await pool.connect();
   try {
     await db.query("begin");
@@ -70,4 +70,4 @@ const main = async () => {
 };
 
 main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; })
-  .finally(closePostgresPool);
+  .finally(closePostgresAdminPool);

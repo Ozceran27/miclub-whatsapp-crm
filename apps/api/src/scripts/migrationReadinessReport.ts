@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { basename, relative, resolve } from "node:path";
-import { getPostgresPool, closePostgresPool } from "../db/postgres.js";
+import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
 import { migrationManifest } from "./migrationManifest.js";
 
 type LedgerRow = { name: string; checksum: string; applied_at: Date | string };
@@ -34,7 +34,7 @@ function safeDate(value: Date | string): string {
   return Number.isNaN(date.getTime()) ? "INVALID_DATE" : date.toISOString();
 }
 
-const pool = await getPostgresPool();
+const pool = await getPostgresAdminPool();
 try {
   const result = await pool.query<LedgerRow>(
     "select name, checksum, applied_at from public.miclub_schema_migrations order by applied_at, name",
@@ -77,5 +77,5 @@ try {
   else process.stdout.write(report);
   if (anomalies.length) process.exitCode = 1;
 } finally {
-  await closePostgresPool();
+  await closePostgresAdminPool();
 }
