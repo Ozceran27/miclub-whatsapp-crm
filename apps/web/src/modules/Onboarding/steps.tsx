@@ -1,4 +1,5 @@
 import React from 'react';
+import { isOptionalOnboardingStep } from '@miclub/shared';
 import { ActivitySetupForm, SectorSetupForm, WorkerSetupForm } from '../Administration/SetupForms';
 import { MigrationStep } from './MigrationStep';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
@@ -14,4 +15,4 @@ export const getOnboardingSteps = (migrationAvailable: boolean) => [
 ] as const;
 
 export const ONBOARDING_STEPS = getOnboardingSteps(true);
-export const isSkippableStep = (step: number) => step >= 2 && step <= 6;
+export const isSkippableStep = isOptionalOnboardingStep;
