@@ -15,7 +15,11 @@ test("the legacy root routes retained by the API match current frontend consumer
   ]);
   assert.deepEqual(consumed, expected);
 
-  const apiRoutes = source("legacyCompatRoutes.ts") + source("crmRoutes.ts");
+  const legacyApiRoutes = source("legacyCompatRoutes.ts");
+  const retainedRootRoutes = new Set([...legacyApiRoutes.matchAll(/router\.get\("([^"]+)"/g)].map(match => match[1]));
+  assert.deepEqual(retainedRootRoutes, new Set(["/health", "/summary", "/members", "/debtors", "/sync-status", "/club-finance-summary", "/sector-operational-summary"]));
+
+  const apiRoutes = legacyApiRoutes + source("crmRoutes.ts");
   for (const route of expected) {
     const staticPrefix = route.split("${")[0];
     assert.ok(apiRoutes.includes(`\"${staticPrefix}`), `missing API contract for ${route}`);

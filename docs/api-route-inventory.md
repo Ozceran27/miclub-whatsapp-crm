@@ -1,13 +1,13 @@
 # Inventario de rutas API
 
-**Generado y reconciliado:** 2026-08-06 a partir de los `Router` montados en `apps/api/src/index.ts`. Se inventarían rutas HTTP de API, no el fallback SPA de `frontendRoutes.ts`.
+**Generado y reconciliado:** 2026-08-16 a partir de los `Router` montados en `apps/api/src/index.ts`. Se inventarían rutas HTTP de API, no el fallback SPA de `frontendRoutes.ts`.
 
 ## Convenciones de acceso
 
 - **Pública:** no requiere sesión (`/health`, login y registro condicionado por flag).
 - **Sesión:** requiere autenticación; **tenant** añade membresía activa y toma `clubId` exclusivamente del contexto servidor.
 - **Permiso/flag:** suma el control indicado. En producción la autenticación es obligatoria y no existe bypass.
-- Los paths `legacy-compat` conservan contratos del frontend, pero sus datos provienen solo de PostgreSQL.
+- Los paths `legacy-compat` conservan contratos del frontend, pero sus datos provienen solo de PostgreSQL. Su retiro está previsto para el **2026-11-06**, después de migrar los consumidores enumerados en [`legacy-compat-audit.md`](legacy-compat-audit.md).
 
 ## Autenticación — montaje `/auth`
 
@@ -97,11 +97,6 @@ Todas, salvo `/health` ya inventariada, requieren sesión + tenant.
 | GET | `/club-finance-summary` | — | `legacyCompatRoutes.ts` |
 | GET | `/sector-operational-summary` | — | `legacyCompatRoutes.ts` |
 | GET | `/sync-status` | — | `legacyCompatRoutes.ts` |
-| GET | `/club-finance-debug` | `DEBUG_ENDPOINTS_ENABLED=true` | `legacyCompatRoutes.ts` |
-| GET | `/receivable-fees-effective-status-debug` | `DEBUG_ENDPOINTS_ENABLED=true` | `legacyCompatRoutes.ts` |
-| GET | `/comparison-debug` | `DEBUG_ENDPOINTS_ENABLED=true` | `legacyCompatRoutes.ts` |
-| GET | `/comparison-debug/summary` | `DEBUG_ENDPOINTS_ENABLED=true` | `legacyCompatRoutes.ts` |
-| GET | `/comparison-debug/members` | `DEBUG_ENDPOINTS_ENABLED=true` | `legacyCompatRoutes.ts` |
 | GET | `/templates` | — | `crmRoutes.ts` |
 | POST | `/templates` | `crm:write` | `crmRoutes.ts` |
 | PATCH | `/templates/:id` | `crm:write` | `crmRoutes.ts` |
@@ -115,7 +110,7 @@ Todas, salvo `/health` ya inventariada, requieren sesión + tenant.
 
 ## Reconciliación respecto del inventario anterior
 
-Se incorporaron las rutas reales de registro/clubes, auditoría de cuotas, borrado controlado de inscripciones y el router completo `/api/economy`. Se retiraron del inventario `status-debug`, `payments-debug` y `sector-operational-debug`, porque no existen en los routers montados. Se corrigió además el path de auditoría de movimientos y se documentaron flags y permisos efectivos.
+En la limpieza post-reset del 2026-08-16 se eliminaron `/club-finance-debug` y `/receivable-fees-effective-status-debug`, sin consumidores en el frontend ni en imports de runtime. Se incorporaron las rutas reales de registro/clubes, auditoría de cuotas, borrado controlado de inscripciones y el router completo `/api/economy`. Se retiraron del inventario `status-debug`, `payments-debug` y `sector-operational-debug`, porque no existen en los routers montados. Se corrigió además el path de auditoría de movimientos y se documentaron flags y permisos efectivos.
 
 ## Cómo regenerar
 

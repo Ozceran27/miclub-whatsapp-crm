@@ -4,7 +4,7 @@ import type { Member } from "@miclub/shared";
 import { validatePostgresEnv } from "../config/env.js";
 import { getPostgresHealth } from "../db/health.js";
 import { normalizeOperationalStatus } from "../importers/normalizers.js";
-import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresReceivableEffectiveStatusDebug, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
+import { getPostgresClubFinanceSummary, getPostgresDebtors, getPostgresMembers, getPostgresSectorOperationalSummary, getPostgresSummary } from "../services/postgresDashboardService.js";
 import { requirePermission } from "../middleware/authorization.js";
 
 type PostgresError = Error & { code?: string };
@@ -36,8 +36,9 @@ export const getMembersSource = async (clubId?: string): Promise<{ members: Memb
 
 export const isDebtorMember = (member: Member): boolean => normalizeOperationalStatus(member.estado) === "adeudando";
 
-// legacy-compat: paths raíz consumidos por el frontend actual; PostgreSQL es su única fuente.
-export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
+// legacy-compat: paths raíz consumidos por el frontend actual; retiro previsto: 2026-11-06.
+// PostgreSQL es su única fuente. No agregar rutas sin un consumidor frontend verificado.
+export const createLegacyCompatRoutes = () => {
   const router = Router();
 
   router.get("/health", (_req, res) => res.json({ ok: true, service: "miclub-api" }));
@@ -75,17 +76,6 @@ export const createLegacyCompatRoutes = (debugEndpointsEnabled: boolean) => {
       res.json({ source: "postgres", enabled: true, ok: true, sheets: [], lastSyncAt: new Date().toISOString() });
     } catch (error) { postgresFailure(res, "estado de sincronización", error, _req.requestId); }
   });
-
-  if (debugEndpointsEnabled) {
-    router.get("/club-finance-debug", requirePermission(PERMISSIONS.ADMINISTRATION_CONFIGURE), async (req, res) => {
-      try { res.json(await getPostgresClubFinanceSummary(req.auth!.clubId)); }
-      catch (error) { postgresFailure(res, "debug financiero", error, req.requestId); }
-    });
-    router.get("/receivable-fees-effective-status-debug", requirePermission(PERMISSIONS.ADMINISTRATION_CONFIGURE), async (req, res) => {
-      try { res.json(await getPostgresReceivableEffectiveStatusDebug(req.auth!.clubId)); }
-      catch (error) { postgresFailure(res, "debug de cuotas", error, req.requestId); }
-    });
-  }
 
   return router;
 };
