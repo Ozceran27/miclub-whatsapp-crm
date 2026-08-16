@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-08-05  
 **Alcance:** plan de producto, datos y operación para evolucionar el módulo **ADMINISTRACIÓN** sin cambiar el runtime de backend ni frontend en esta PR.  
-**Fuentes canónicas:** [`architecture-current.md`](architecture-current.md), [`checkpoint-pre-admin.md`](checkpoint-pre-admin.md), [`api-route-inventory.md`](api-route-inventory.md), [`business-rules/operational-balances.md`](business-rules/operational-balances.md) y diagnósticos SQL bajo [`dbeaver/`](dbeaver/).
+**Fuentes canónicas:** [`architecture-current.md`](architecture-current.md), [`pre-reset-readiness.md`](pre-reset-readiness.md), [`api-route-inventory.md`](api-route-inventory.md), [`business-rules/operational-balances.md`](business-rules/operational-balances.md) y diagnósticos SQL bajo [`dbeaver/`](dbeaver/).
 
 ## Arquitectura actual
 
@@ -73,7 +73,7 @@ Este documento no modifica runtime. Cualquier cambio posterior debe implementars
 
 **Objetivo:** congelar estado actual y validar datos antes de diseñar escrituras.
 
-- Reconfirmar invariantes de `checkpoint-pre-admin.md`.
+- Reconfirmar invariantes de `pre-reset-readiness.md`.
 - Ejecutar diagnósticos de schema y reconciliación sólo lectura en entorno no productivo.
 - Inventariar categorías, medios de pago, estados operativos y sectores presentes en movimientos administrativos.
 - Documentar diferencias entre saldos importados, vistas enriquecidas y balance mostrado.

@@ -9,8 +9,8 @@ import { hasOpenTransaction, migrationManifest, renderPostAdminMigrationTable, v
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
-test("el checkpoint post-admin se genera desde las entradas correspondientes del manifiesto", async () => {
-  const checkpoint = await readFile(path.join(repositoryRoot, "docs/checkpoint-post-admin.md"), "utf8");
+test("el checkpoint post-admin archivado se genera desde las entradas correspondientes del manifiesto", async () => {
+  const checkpoint = await readFile(path.join(repositoryRoot, "docs/history/checkpoint-post-admin.md"), "utf8");
   const startMarker = "<!-- POST_ADMIN_MIGRATIONS:START -->";
   const endMarker = "<!-- POST_ADMIN_MIGRATIONS:END -->";
   const start = checkpoint.indexOf(startMarker);

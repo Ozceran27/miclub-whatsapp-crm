@@ -10,7 +10,7 @@ Punto de entrada operativo para miClub Gestión: API Express/TypeScript, web Rea
 - Google Sheets no es una fuente de lectura productiva: se admite únicamente como entrada de importaciones explícitas, auditadas y acotadas.
 - No existe fallback productivo a mocks, fixtures, Google Sheets ni SQLite. Los artefactos legacy solo sirven para pruebas, migración o consulta histórica.
 
-El estado y los controles previos al siguiente módulo administrativo están en el [checkpoint canónico](docs/checkpoint-pre-admin.md). La [arquitectura actual](docs/architecture-current.md) y el [inventario de rutas](docs/api-route-inventory.md) complementan esa referencia.
+El estado y los controles previos al siguiente módulo administrativo están en el [readiness canónico previo al reset](docs/pre-reset-readiness.md). La [arquitectura actual](docs/architecture-current.md) y el [inventario de rutas](docs/api-route-inventory.md) complementan esa referencia.
 
 ## Inicio local
 
@@ -41,7 +41,7 @@ La vía soportada es el importador XLSX autenticado. Ejecute siempre dry-run y c
 
 ## Documentación operativa
 
-- [Checkpoint canónico pre-admin](docs/checkpoint-pre-admin.md)
+- [Readiness canónico previo al reset](docs/pre-reset-readiness.md)
 - [Arquitectura canónica](docs/architecture.md)
 - [Inventario de endpoints](docs/api-route-inventory.md)
 - [Tenant canónico](docs/tenant.md)

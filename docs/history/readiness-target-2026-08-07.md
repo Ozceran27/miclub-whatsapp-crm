@@ -1,5 +1,8 @@
 # Readiness de migraciones (sanitizado)
 
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+
+
 - Commit inspeccionado: `cd5cb486fedd87be07fae7daeff8da987d7a9287`
 - Entorno: `destino (no accesible desde este checkout)`
 - Fecha de auditoría (UTC): `2026-08-07`

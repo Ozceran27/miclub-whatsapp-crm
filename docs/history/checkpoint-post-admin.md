@@ -1,5 +1,8 @@
 # Checkpoint canónico post-admin
 
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+
+
 **Fecha de corte:** 2026-08-06  
 **Estado:** implementación cerrada en código; despliegue sujeto al gate operativo de este documento.  
 **Reemplaza para trabajo nuevo:** [`checkpoint-pre-admin.md`](checkpoint-pre-admin.md), que se conserva como evidencia del baseline.
@@ -8,7 +11,7 @@
 
 El panel **Administración** ya ofrece resumen ejecutivo, capacidad, tendencias, rankings y consultas de sectores, actividades, trabajadores, movimientos e inscripciones. Los detalles de sector, actividad y trabajador son de sólo lectura. También están operativos la creación manual de movimientos e inscripciones y el alta, cambio de estado y archivo de tareas. Las solicitudes permiten consulta y decisión manual para tipos con handler seguro.
 
-Las tarjetas de acciones aún no implementadas muestran una indicación de próxima fase; no deben interpretarse como operaciones disponibles. El manual de uso actualizado está en [`manual/Manual Oficial - miClub Gestión.md`](manual/Manual%20Oficial%20-%20miClub%20Gestión.md).
+Las tarjetas de acciones aún no implementadas muestran una indicación de próxima fase; no deben interpretarse como operaciones disponibles. El manual de uso actualizado está en [`manual/Manual Oficial - miClub Gestión.md`](../manual/Manual%20Oficial%20-%20miClub%20Gestión.md).
 
 ## SQL incorporado y estado de aplicación
 
@@ -48,7 +51,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608160001_commercial_plan_taxonomy.sql` | Confirma un catálogo de un plan gratuito y tres pagos, con clase comercial explícita y DEVELOPMENT reservado exclusivamente a testing, sin implementar cobros. | `5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c` | Después de `202608140007_plan_entitlements.sql`. |
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
-Además existen SQL manuales de Administración en [`dbeaver/administration/`](dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
+Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
 
 ```sql
 select name, checksum, applied_at
@@ -106,7 +109,7 @@ Todos los paths son tenant-scoped. Los GET paginados aceptan `page`/`limit` y s�
 | POST | `/api/movements/:id/void` | `movements.cancel`; requiere `updatedAt` y motivo |
 | POST | `/api/inscripciones` | `enrollments.create`; alta validada y auditada |
 
-El inventario completo reconciliado está en [`api-route-inventory.md`](api-route-inventory.md).
+El inventario completo reconciliado está en [`api-route-inventory.md`](../api-route-inventory.md).
 
 ## Rollback
 
@@ -121,7 +124,7 @@ El inventario completo reconciliado está en [`api-route-inventory.md`](api-rout
 
 - Una operación funcional se revierte con una nueva operación compensatoria auditada; no se editan ni borran filas a mano.
 - Restaurar backup es el mecanismo para corrupción general y requiere ventana aprobada, prueba de restauración y reconciliación posterior.
-- [`dbeaver/administration/99_admin_rollback_manual.sql`](dbeaver/administration/99_admin_rollback_manual.sql) corresponde **sólo** a objetos creados por los scripts manuales. Aborta si detecta datos y deja columnas destructivas comentadas. No revierte el ledger de migraciones versionadas ni debe ejecutarse contra un schema migrado sin revisión DBA.
+- [`dbeaver/administration/99_admin_rollback_manual.sql`](../dbeaver/administration/99_admin_rollback_manual.sql) corresponde **sólo** a objetos creados por los scripts manuales. Aborta si detecta datos y deja columnas destructivas comentadas. No revierte el ledger de migraciones versionadas ni debe ejecutarse contra un schema migrado sin revisión DBA.
 - No editar `public.miclub_schema_migrations` para fingir un rollback. Una reversión de schema requiere una nueva migración correctiva versionada.
 
 ## Criterios de aceptación cumplidos

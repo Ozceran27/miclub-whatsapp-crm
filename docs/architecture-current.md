@@ -23,4 +23,4 @@ Las rutas se montan en `apps/api/src/index.ts`; el inventario reconciliado está
 
 ## Referencia operativa
 
-El documento canónico para el estado previo al módulo admin es [`checkpoint-pre-admin.md`](checkpoint-pre-admin.md). Los procedimientos detallados se mantienen en runbooks enlazados desde allí para evitar versiones duplicadas.
+La fuente vigente para cualquier decisión de readiness previa al reset es [`pre-reset-readiness.md`](pre-reset-readiness.md). Esta página sólo define la arquitectura; los procedimientos y la evidencia exigida se consultan en las fuentes enlazadas por ese índice, sin inferir que hayan sido ejecutados.

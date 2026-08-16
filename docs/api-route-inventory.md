@@ -83,7 +83,7 @@ Todas requieren sesión, membresía activa, tenant derivado por el servidor y re
 | POST | `/api/movements/:id/void` | `movements.cancel` (`finance:write` sólo por compatibilidad temporal) |
 | POST | `/api/inscripciones` | `enrollments.create` (`club:manage` sólo por compatibilidad temporal) |
 
-Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La compatibilidad legacy está centralizada, vence el 2026-11-06 y su criterio de retiro queda registrado en [`checkpoint-post-admin.md`](checkpoint-post-admin.md); no forma parte del permiso canónico de las rutas.
+Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La compatibilidad legacy está centralizada, vence el 2026-11-06 y su criterio de retiro queda registrado en [`legacy-compat-audit.md`](legacy-compat-audit.md); no forma parte del permiso canónico de las rutas.
 
 ## Compatibilidad PostgreSQL y CRM
 

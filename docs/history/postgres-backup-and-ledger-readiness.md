@@ -1,5 +1,8 @@
 # Backup PostgreSQL y readiness del ledger
 
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+
+
 ## Hallazgo forense del dump histórico
 
 El dump versionado `dump-miclub_gestion-202608061915.txt` crea el schema `miclub`,
