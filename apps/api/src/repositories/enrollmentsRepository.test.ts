@@ -25,7 +25,7 @@ const installPool = (fixture: ActivityFixture) => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const enrollments: Array<Record<string, unknown>> = [];
   const client: PgClient = {
-    query: (sql: string, params?: unknown[]) => {
+    query: <T>(sql: string, params?: unknown[]) => {
       queries.push({ sql, params });
       if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return Promise.resolve({ rows: [] });
       if (sql.includes("from miclub.people p")) {
@@ -34,15 +34,15 @@ const installPool = (fixture: ActivityFixture) => {
           && fixture.status === "activa"
           && !fixture.archived
           && fixture.generatesEnrollments;
-        return Promise.resolve({ rows: eligible ? [{ person_id: PERSON_ID, activity_id: ACTIVITY_ID }] : [] });
+        return Promise.resolve({ rows: (eligible ? [{ person_id: PERSON_ID, activity_id: ACTIVITY_ID }] : []) as T[] });
       }
       if (sql.includes("from miclub.enrollments")) return Promise.resolve({ rows: [] });
       if (sql.includes("insert into miclub.enrollments")) {
         const enrollment = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", club_id: CLUB_A, person_id: params?.[1], activity_id: params?.[2] };
         enrollments.push(enrollment);
-        return Promise.resolve({ rows: [enrollment] });
+        return Promise.resolve({ rows: [enrollment] as T[] });
       }
-      if (sql.includes("INSERT INTO miclub.audit_log")) return Promise.resolve({ rows: [{ id: "audit-1" }] });
+      if (sql.includes("INSERT INTO miclub.audit_log")) return Promise.resolve({ rows: [{ id: "audit-1" }] as T[] });
       return Promise.reject(new Error(`SQL inesperado: ${sql}`));
     },
     release: () => undefined,

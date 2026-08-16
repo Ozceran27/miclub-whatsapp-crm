@@ -23,7 +23,7 @@ function fakeClient(failAt = -1) {
     const index = calls.length; calls.push({ sql, values });
     if (index === failAt) throw new Error(`falló ${index}`);
     if (sql.includes("miclub.clubs")) return { rows: [{ id: "club-id" }] } as never;
-    if (sql.includes("miclub.club_subscriptions")) return { rows: [{ plan_code: "DEVELOPMENT" }] } as never;
+    if (sql.includes("miclub.club_subscriptions")) return { rows: [{ plan_code: "FREE" }] } as never;
     if (sql.includes("miclub.roles")) return { rows: [
       { id: "director-role-id", code: "DIRECTOR" }, { id: "worker-role-id", code: "TRABAJADOR" }, { id: "instructor-role-id", code: "INSTRUCTOR" },
     ] } as never;
@@ -49,7 +49,8 @@ test("bootstrap crea integralmente Director, persona, usuario, membresía, emple
   assert.match(sql, /miclub\.employees/);
   assert.match(sql, /Administración/); assert.match(sql, /Tesorería/); assert.match(sql, /Áreas Comunes/); assert.match(sql, /is_system/);
   assert.match(sql, /miclub\.club_onboarding[\s\S]*NOT_STARTED/);
-  assert.match(sql, /miclub\.club_subscriptions[\s\S]*is_development[\s\S]*DEVELOPMENT/);
+  assert.match(sql, /miclub\.club_subscriptions[\s\S]*code = 'FREE'[\s\S]*commercial_class = 'free'/);
+  assert.doesNotMatch(sql, /code = 'DEVELOPMENT'/);
   assert.doesNotMatch(sql, /"onboarding"/);
   assert.equal(calls.find(({ sql: statement }) => statement.includes("user_club_memberships"))?.values?.[2], "director-role-id");
   assert.deepEqual(calls.find(({ sql }) => sql.includes("user_club_memberships"))?.values?.[3], [...ROLE_DEFAULT_PERMISSIONS.DIRECTOR]);
