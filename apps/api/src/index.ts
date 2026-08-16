@@ -70,7 +70,6 @@ import { diagnosePermissions } from "./auth/permissionDiagnostics.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
-const debugEndpointsEnabled = process.env.DEBUG_ENDPOINTS_ENABLED === "true";
 app.set("trust proxy", true);
 const allowedOrigins = getAllowedOrigins();
 app.use(requestId);
@@ -134,7 +133,7 @@ app.use("/api/administration", administrationRoutes);
 app.use("/api", onboardingRoutes);
 app.use("/api", dashboardRoutes);
 
-app.use(createLegacyCompatRoutes(debugEndpointsEnabled));
+app.use(createLegacyCompatRoutes());
 app.use(createCrmRoutes({ getMembersSource, isDebtorMember }));
 
 if (isProduction) {
