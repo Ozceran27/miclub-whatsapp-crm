@@ -1,5 +1,8 @@
 # Checkpoint canónico pre-admin
 
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+
+
 **Vigente desde:** 2026-07-28  
 **Estado:** referencia única antes de iniciar o desplegar el módulo administrativo.
 
@@ -11,7 +14,7 @@
 - Google Sheets se usa solo como importación temporal hacia PostgreSQL, nunca como fuente de consultas productivas.
 - Mocks, fixtures y SQLite no tienen fallback productivo. Sus usos permitidos son pruebas, migración o auditoría histórica explícita.
 - Los endpoints debug e import permanecen deshabilitados salvo una ventana operativa aprobada.
-- Los contratos HTTP vigentes son los del [inventario reconciliado](api-route-inventory.md).
+- Los contratos HTTP vigentes son los del [inventario reconciliado](../api-route-inventory.md).
 
 ## Gate antes de trabajar en admin
 
@@ -38,14 +41,14 @@ Los comandos que dependen de PostgreSQL o Google Sheets deben ejecutarse solo co
 
 Este checkpoint fija invariantes y gates; los pasos detallados viven únicamente aquí:
 
-- [Identidad, autorización y tenant](auth-tenant-remediation-runbook.md).
-- [Corte, validación y retiro de legacy en PostgreSQL](postgres-cutover-runbook.md).
+- [Identidad, autorización y tenant](../auth-tenant-remediation-runbook.md).
+- [Corte, validación y retiro de legacy en PostgreSQL](../postgres-cutover-runbook.md).
 - [Importación controlada Google Sheets → PostgreSQL](google-sheets-postgres-migration.md).
-- [Configuración y recuperación del arranque](bootstrap-config-current.md).
-- [Diagnósticos SQL asistidos con DBeaver](dbeaver/README.md).
+- [Configuración y recuperación del arranque](../bootstrap-config-current.md).
+- [Diagnósticos SQL asistidos con DBeaver](../dbeaver/README.md).
 
 ## Evidencia de cierre
 
 La PR que habilite admin debe registrar: commit desplegado, entorno, resultado de cada comando del gate, migraciones aplicadas, prueba de aislamiento tenant, estado final de flags y enlace al backup/rollback en el sistema operativo correspondiente (sin secretos en Git).
 
-Los checkpoints previos y explicaciones de fallbacks están archivados en [`history/`](history/README.md); están fechados y expresamente prohibidos como guía para despliegues nuevos.
+Los checkpoints previos y explicaciones de fallbacks están archivados en [`history/`](README.md); están fechados y expresamente prohibidos como guía para despliegues nuevos.

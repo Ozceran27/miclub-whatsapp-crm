@@ -34,7 +34,7 @@ no reemplazar ese orden con ejecuciones parciales.
 
 ## Scripts administrativos post-admin
 
-Los archivos de `administration/` son diagnósticos y remediaciones **manuales para instalaciones legacy**. Su presencia en Git no demuestra que hayan sido ejecutados y no reemplazan `npm run db:migrate`. El estado, orden de migraciones versionadas y evidencia exigida se documentan en [`../checkpoint-post-admin.md`](../checkpoint-post-admin.md).
+Los archivos de `administration/` son diagnósticos y remediaciones **manuales para instalaciones legacy**. Su presencia en Git no demuestra que hayan sido ejecutados y no reemplazan `npm run db:migrate`. El estado, orden de migraciones versionadas y evidencia exigida se documentan en [`../pre-reset-readiness.md`](../pre-reset-readiness.md) y en la [`política del manifiesto`](../migration-manifest-policy.md).
 
 Antes de ejecutar uno, registrar backup, entorno, operador y checksum. Ejecutar primero `administration/01_admin_schema_diagnostic_readonly.sql`; no aplicar DDL manual si el objeto equivalente ya existe por migración. `administration/99_admin_rollback_manual.sql` sólo revierte objetos manuales vacíos, no el ledger de migraciones ni datos productivos.
 

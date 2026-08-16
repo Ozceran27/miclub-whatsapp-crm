@@ -242,4 +242,4 @@ Gestionar categorías, trabajadores, cuotas y socios desde las tarjetas rápidas
 
 ### Buenas prácticas y soporte
 
-Actualizar el panel antes de decidir, no compartir sesiones, no modificar el tenant desde herramientas del navegador y conservar el `requestId` de cualquier error. Ante una falla de escritura, no repetir compulsivamente: verificar primero si la operación quedó registrada. El estado técnico, permisos efectivos, SQL, rollback, aceptación y pendientes viven en `docs/checkpoint-post-admin.md`.
+Actualizar el panel antes de decidir, no compartir sesiones, no modificar el tenant desde herramientas del navegador y conservar el `requestId` de cualquier error. Ante una falla de escritura, no repetir compulsivamente: verificar primero si la operación quedó registrada. El índice vigente para localizar las fuentes técnicas, procedimientos de rollback y evidencia exigida es `docs/pre-reset-readiness.md`; el manual no afirma el estado aplicado de un entorno.
