@@ -3,18 +3,19 @@ import test from "node:test";
 import { setPostgresPoolForTests, type PgPool } from "../db/postgres.js";
 import { getReadOnlyPage } from "./readOnlyRepository.js";
 
-test.afterEach(() => setPostgresPoolForTests(undefined));
+void test.afterEach(() => setPostgresPoolForTests(undefined));
 
-test("las listas aplican paginación, filtros y tenant en datos y total", async () => {
+void test("las listas aplican paginación, filtros y tenant en datos y total", async () => {
   const calls: Array<{ sql: string; params: unknown[] }> = [];
-  setPostgresPoolForTests({
-    query: async <T>(sql: string, params: unknown[] = []) => {
+  const pool: PgPool = {
+    query: <T>(sql: string, params: unknown[] = []) => {
       calls.push({ sql, params });
-      return { rows: (sql.includes("count(*) as total_count") ? [{ total_count: "37" }] : [{ id: "movement-1" }]) as T[] };
+      return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "37" }] : [{ id: "movement-1" }]) as T[] });
     },
-    connect: async () => { throw new Error("connect no esperado"); },
-    end: async () => undefined,
-  } as PgPool);
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
+  };
+  setPostgresPoolForTests(pool);
 
   const page = await getReadOnlyPage("movimientos", {
     clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -32,4 +33,23 @@ test("las listas aplican paginación, filtros y tenant en datos y total", async 
     assert.match(call.sql, /m\.operational_status = \$4::miclub\.movement_status/);
   }
   assert.match(calls[0].sql, /limit \$5\s+offset \$6/);
+});
+
+void test("el contador de sectores incluye sólo actividades canónicamente activas y no archivadas", async () => {
+  const calls: string[] = [];
+  const pool: PgPool = {
+    query: <T>(sql: string) => {
+      calls.push(sql);
+      return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "0" }] : []) as T[] });
+    },
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
+  };
+  setPostgresPoolForTests(pool);
+
+  await getReadOnlyPage("sectores", { clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", limit: 20, offset: 0, filters: {} });
+
+  assert.match(calls[0] ?? "", /a\.status = 'activa'::miclub\.entity_status/);
+  assert.match(calls[0] ?? "", /a\.archived_at is null/);
+  assert.doesNotMatch(calls[0] ?? "", /a\.status = 'active'/);
 });

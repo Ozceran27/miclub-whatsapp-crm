@@ -1,5 +1,8 @@
 # Informe de preparación para migración real - 2026-06-28
 
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+
+
 ## Alcance revisado
 
 - Dump PostgreSQL fuente: `apps/api/data/db/dump-miclub_gestion-202606281204.txt`.

@@ -16,7 +16,9 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
       select p.id person_id, a.id activity_id
       from miclub.people p
       join miclub.activities a on a.club_id = p.club_id
-      where p.club_id=$1 and p.id=$2 and a.id=$3 and a.status='active' and a.generates_enrollments
+      where p.club_id=$1 and p.id=$2 and a.id=$3
+        and a.status='activa'::miclub.entity_status and a.archived_at is null
+        and a.generates_enrollments
       for update of p, a
     `, [actor.clubId, input.personId, input.activityId]);
     if (!references.rows[0]) return { kind: "invalid_reference" };

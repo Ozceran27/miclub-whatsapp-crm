@@ -1,6 +1,6 @@
 # Arquitectura actual
 
-**Vigencia:** 2026-07-28. Esta página describe el contrato de runtime, no los mecanismos históricos de transición.
+**Vigencia:** 2026-08-16. Esta página describe el contrato de runtime, no los mecanismos históricos de transición.
 
 ## Flujo productivo
 
@@ -13,7 +13,7 @@ El arranque productivo exige `AUTH_ENABLED=true`, `DATA_SOURCE=postgres`, `CRM_S
 
 ## Importaciones
 
-Google Sheets es exclusivamente un origen temporal de importación hacia PostgreSQL. No participa como read path ordinario. La importación requiere habilitación explícita, operador autorizado, tenant determinado y posterior auditoría; al terminar se deshabilitan sus flags.
+La importación soportada es exclusivamente XLSX mediante `/api/migration`, con autenticación, tenant, validación de lote y auditoría. Tras certificar el E2E XLSX y comprobar el grafo de imports, Google Sheets fue retirado definitivamente: no existen adaptadores, script operativo, comandos npm, variables de entorno ni dependencia `googleapis` en el build/runtime de la API. Sus documentos históricos no son herramientas ejecutables.
 
 SQLite permanece como artefacto de prueba de compatibilidad y no es fuente, respaldo automático ni fallback de producción. El `mockData` sin consumidores fue eliminado. El grafo y la puerta de retiro están en [`legacy-runtime-inventory.md`](legacy-runtime-inventory.md); el contexto anterior está en [`history/`](history/README.md).
 
@@ -23,4 +23,4 @@ Las rutas se montan en `apps/api/src/index.ts`; el inventario reconciliado está
 
 ## Referencia operativa
 
-El documento canónico para el estado previo al módulo admin es [`checkpoint-pre-admin.md`](checkpoint-pre-admin.md). Los procedimientos detallados se mantienen en runbooks enlazados desde allí para evitar versiones duplicadas.
+La fuente vigente para cualquier decisión de readiness previa al reset es [`pre-reset-readiness.md`](pre-reset-readiness.md). Esta página sólo define la arquitectura; los procedimientos y la evidencia exigida se consultan en las fuentes enlazadas por ese índice, sin inferir que hayan sido ejecutados.

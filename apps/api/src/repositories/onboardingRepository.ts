@@ -1,4 +1,4 @@
-import type { OnboardingState, OnboardingStatus, OnboardingStep, OnboardingStepOutcome, OpeningBalancesRequest } from "@miclub/shared";
+import { REQUIRED_ONBOARDING_STEPS, isOptionalOnboardingStep, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
 import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
@@ -11,18 +11,55 @@ const map=(r:Row):OnboardingState=>({status:r.status,currentStep:r.current_step 
 const select=`select o.*,
  (select count(*) from miclub.movements m where m.club_id=o.club_id) movement_count,
  (select count(*) from miclub.enrollments e where e.club_id=o.club_id) enrollment_count,
- exists(select 1 from miclub.club_capabilities c where c.club_id=o.club_id and c.capability='DATA_MIGRATION' and c.enabled and c.effective_from<=now() and (c.effective_until is null or c.effective_until>now())) migration_available
+ coalesce(
+   (select c.enabled from miclub.club_capabilities c
+     where c.club_id=o.club_id and c.capability='DATA_MIGRATION'
+       and c.effective_from<=now() and (c.effective_until is null or c.effective_until>now())
+     order by c.effective_from desc,c.created_at desc limit 1),
+   exists(select 1 from miclub.club_subscriptions s
+     join miclub.plan_entitlements e on e.plan_code=s.plan_code
+     where s.club_id=o.club_id and e.feature_code='DATA_MIGRATION'
+       and s.effective_from<=now() and (s.effective_until is null or s.effective_until>now())),
+   false) migration_available
  from miclub.club_onboarding o where o.club_id=$1`;
 const ensure=async(db:QueryExecutor,clubId:string)=>{await db.query("insert into miclub.club_onboarding (club_id) values ($1) on conflict (club_id) do nothing",[clubId]);return map((await db.query<Row>(select,[clubId])).rows[0]);};
 export const readOnboarding=async(clubId:string)=>withTenantTransaction(clubId,db=>ensure(db,clubId),await getPostgresPool());
 const audit=(actor:OnboardingActor,action:string,before:OnboardingState,after:OnboardingState,db:QueryExecutor)=>auditService.sensitiveChange({action,result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,entityType:"club_onboarding",entityId:actor.clubId,requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,oldData:before as unknown as Record<string,unknown>,newData:after as unknown as Record<string,unknown>},db);
+
+const milestoneSql:Partial<Record<OnboardingStep,string>>={
+  2:`exists(select 1 from miclub.opening_balance_batches b where b.club_id=$1 and b.status='APPLIED' and b.reconciliation_status='RECONCILED')`,
+  3:`not exists(
+    select required.code from (values ('administracion'),('tesoreria'),('areas-comunes')) required(code)
+    where not exists(select 1 from miclub.sectors s where s.club_id=$1 and s.code=required.code and s.status::text in ('active','activa') and s.archived_at is null)
+  )`,
+  4:`exists(
+    select 1 from miclub.employees e join miclub.people p on p.id=e.person_id and p.club_id=e.club_id
+    where e.club_id=$1 and e.status='active' and e.archived_at is null and p.status::text in ('active','activa')
+    union all
+    select 1 from miclub.instructors i join miclub.people p on p.id=i.person_id and p.club_id=i.club_id
+    where i.club_id=$1 and p.status::text in ('active','activa')
+  )`,
+  5:`exists(
+    select 1 from miclub.activities a
+    join miclub.sectors s on s.id=a.sector_id and s.club_id=a.club_id and s.status::text in ('active','activa') and s.archived_at is null
+    left join miclub.instructors i on i.id=a.instructor_id and i.club_id=a.club_id
+    where a.club_id=$1 and a.status::text in ('active','activa') and a.archived_at is null
+      and (a.instructor_id is null or i.id is not null)
+  )`,
+};
+const verifyMilestone=async(db:QueryExecutor,clubId:string,step:OnboardingStep)=>{
+ const sql=milestoneSql[step]; if(!sql)return;
+ const result=await db.query<{valid:boolean}>(`select ${sql} as valid`,[clubId]);
+ if(!result.rows[0]?.valid)throw Object.assign(new Error("El paso todavía no cumple sus datos obligatorios."),{code:"ONBOARDING_MILESTONE_NOT_MET"});
+};
 
 export const advanceOnboarding=async(actor:OnboardingActor,target:OnboardingStep,outcome:OnboardingStepOutcome)=>withTenantTransaction(actor.clubId,async db=>{
  const before=await ensure(db,actor.clubId); if(before.status==="COMPLETED") return before;
  const departed=(target-1) as OnboardingStep;
  if(target===before.currentStep&&((outcome==="COMPLETED"&&before.completedSteps.includes(departed))||(outcome==="SKIPPED"&&before.skippedSteps.includes(departed)))) return before;
  if(target!==before.currentStep+1) throw Object.assign(new Error("Sólo se puede avanzar al paso siguiente."),{code:"ONBOARDING_INVALID_TRANSITION"});
- if(outcome==="SKIPPED"&&(departed===1||departed===7)) throw Object.assign(new Error("Este paso no se puede omitir."),{code:"ONBOARDING_SKIP_NOT_ALLOWED"});
+ if(outcome==="SKIPPED"&&!isOptionalOnboardingStep(departed)) throw Object.assign(new Error("Este paso es obligatorio y no se puede omitir."),{code:"ONBOARDING_SKIP_NOT_ALLOWED"});
+ if(outcome==="COMPLETED") await verifyMilestone(db,actor.clubId,departed);
  await db.query(`update miclub.club_onboarding set status='IN_PROGRESS',current_step=$2,
   completed_steps=case when $3='COMPLETED' then array(select distinct unnest(completed_steps||$4::smallint)) else completed_steps end,
   skipped_steps=case when $3='SKIPPED' then array(select distinct unnest(skipped_steps||$4::smallint)) else skipped_steps end,
@@ -32,8 +69,9 @@ export const advanceOnboarding=async(actor:OnboardingActor,target:OnboardingStep
 
 export const completeOnboarding=async(actor:OnboardingActor)=>withTenantTransaction(actor.clubId,async db=>{
  const before=await ensure(db,actor.clubId); if(before.status==="COMPLETED") return before;
- const resolved=new Set([...before.completedSteps,...before.skippedSteps]);
- if(before.currentStep!==7||![1,2,3,4,5,6].every(step=>resolved.has(step as OnboardingStep))) throw Object.assign(new Error("Hay pasos de configuración pendientes."),{code:"ONBOARDING_PRECONDITION_FAILED"});
+ const requiredBeforeFinish=REQUIRED_ONBOARDING_STEPS.filter(step=>step!==7);
+ if(before.currentStep!==7||!requiredBeforeFinish.every(step=>before.completedSteps.includes(step))||(!before.completedSteps.includes(6)&&!before.skippedSteps.includes(6))) throw Object.assign(new Error("Hay pasos de configuración pendientes."),{code:"ONBOARDING_PRECONDITION_FAILED"});
+ for(const step of requiredBeforeFinish)await verifyMilestone(db,actor.clubId,step);
  await db.query(`update miclub.club_onboarding set status='COMPLETED',completed_at=coalesce(completed_at,now()),started_at=coalesce(started_at,now()),updated_at=now() where club_id=$1`,[actor.clubId]);
  const after=map((await db.query<Row>(select,[actor.clubId])).rows[0]); await audit(actor,"onboarding.complete",before,after,db); return after;
 },await getPostgresPool());

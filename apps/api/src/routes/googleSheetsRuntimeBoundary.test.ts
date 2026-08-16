@@ -1,41 +1,57 @@
 import assert from "node:assert/strict";
-import { promises as fs } from "node:fs";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-const productionSourceRoots = ["routes", "services"] as const;
-const forbiddenModules = ["importers/googleSheets", "legacy/googleSheets"] as const;
+const retiredPaths = [
+  "importers/googleSheets",
+  "importers/googleSheetsImporter.ts",
+  "legacy/googleSheets",
+  "scripts/importGoogleSheetsToPostgres.ts",
+] as const;
 
-const walkProductionTypescript = async (directory: string): Promise<string[]> => {
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  const files = await Promise.all(entries.map(async (entry) => {
-    const absolutePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return walkProductionTypescript(absolutePath);
-    if (!entry.isFile() || !/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) return [];
-    return [absolutePath];
-  }));
-  return files.flat();
+const walk = async (directory: string): Promise<string[]> => {
+  const entries = await readdir(directory, { withFileTypes: true });
+  return (await Promise.all(entries.map(async (entry) => {
+    const target = path.join(directory, entry.name);
+    return entry.isDirectory() ? walk(target) : [target];
+  }))).flat();
 };
 
-test("production routes and services cannot import Google Sheets modules", async () => {
+test("Google Sheets was definitively retired from API source and production entry points", async () => {
   const sourceRoot = path.resolve(import.meta.dirname, "..");
-  const files = (await Promise.all(
-    productionSourceRoots.map((root) => walkProductionTypescript(path.join(sourceRoot, root))),
-  )).flat();
+  const repositoryRoot = path.resolve(sourceRoot, "../../..");
 
-  const violations: string[] = [];
-  for (const file of files) {
-    const source = await fs.readFile(file, "utf8");
-    for (const forbiddenModule of forbiddenModules) {
-      if (source.includes(forbiddenModule)) {
-        violations.push(`${path.relative(sourceRoot, file)} -> ${forbiddenModule}`);
+  const pathsStillPresent: string[] = [];
+  for (const retiredPath of retiredPaths) {
+    try {
+      await access(path.join(sourceRoot, retiredPath));
+      pathsStillPresent.push(retiredPath);
+    } catch {
+      // Absence is the retirement invariant asserted by this test.
+    }
+  }
+  assert.deepEqual(pathsStillPresent, [], `Retired Google Sheets paths returned:\n${pathsStillPresent.join("\n")}`);
+
+  const importViolations: string[] = [];
+  for (const file of await walk(sourceRoot)) {
+    if (!/\.tsx?$/.test(file) || file === import.meta.filename) continue;
+    const source = await readFile(file, "utf8");
+    for (const match of source.matchAll(/(?:from\s*|import\s*\()\s*["']([^"']+)["']/g)) {
+      if (/googleSheets|googleapis/i.test(match[1])) {
+        importViolations.push(`${path.relative(sourceRoot, file)} -> ${match[1]}`);
       }
     }
   }
+  assert.deepEqual(importViolations, [], `Google Sheets remains reachable from API source:\n${importViolations.join("\n")}`);
 
-  assert.deepEqual(
-    violations,
-    [],
-    `Google Sheets debe permanecer aislado del runtime productivo:\n${violations.join("\n")}`,
-  );
+  const rootPackage = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8")) as {
+    scripts?: Record<string, string>;
+  };
+  const apiPackage = JSON.parse(await readFile(path.join(repositoryRoot, "apps/api/package.json"), "utf8")) as {
+    dependencies?: Record<string, string>;
+  };
+  assert.equal(rootPackage.scripts?.["import:sheets"], undefined);
+  assert.equal(rootPackage.scripts?.["import:sheets:dry"], undefined);
+  assert.equal(apiPackage.dependencies?.googleapis, undefined);
 });

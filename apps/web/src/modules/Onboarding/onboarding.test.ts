@@ -6,8 +6,9 @@ import { isSkippableStep, ONBOARDING_STEPS } from './steps';
 
 test('define siete pasos y solo permite omitir los pasos opcionales', () => {
   assert.equal(ONBOARDING_STEPS.length, 7);
-  assert.equal(isSkippableStep(1), false); assert.equal(isSkippableStep(2), true);
-  assert.equal(isSkippableStep(3), true); assert.equal(isSkippableStep(6), true); assert.equal(isSkippableStep(7), false);
+  assert.equal(isSkippableStep(1), false); assert.equal(isSkippableStep(2), false);
+  assert.equal(isSkippableStep(3), false); assert.equal(isSkippableStep(4), false);
+  assert.equal(isSkippableStep(5), false); assert.equal(isSkippableStep(6), true); assert.equal(isSkippableStep(7), false);
 });
 
 test('navegación conserva el límite del séptimo paso para reanudación segura', () => {
@@ -27,6 +28,15 @@ test('gate recupera currentStep del servidor y persiste cada avance', () => {
   const source = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   assert.match(source, /getOnboarding\(signal\)/); assert.match(source, /state\.currentStep/);
   assert.match(source, /advanceOnboarding\(step,outcome\)/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
+});
+
+test('F5 vuelve a renderizar el paso persistido y Omitir depende de la política compartida', () => {
+  const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
+  const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
+  assert.match(gate, /step=\{state\.currentStep\}/);
+  assert.match(dialog, /isSkippableStep\(step\).*Omitir/s);
+  assert.equal(isSkippableStep(5), false);
+  assert.equal(isSkippableStep(6), true);
 });
 
 test('los pasos representan exactamente el flujo solicitado y saldos usa la operación canónica', () => {

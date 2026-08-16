@@ -66,3 +66,16 @@ test("el override vigente prevalece sobre el entitlement", async () => {
   assert.equal(await hasFeature("club-1", CLUB_CAPABILITIES.DATA_MIGRATION, executor), false);
   assert.match(sql, /coalesce\(\(select enabled from current_override\),/);
 });
+
+test("la resolución de features usa suscripción y entitlement, nunca roles o permisos", async () => {
+  let sql = "";
+  const executor: QueryExecutor = { query: <T>(query: string) => {
+    sql = query;
+    return Promise.resolve({ rows: [{ enabled: true }] as T[] });
+  } };
+
+  assert.equal(await hasFeature("club-1", CLUB_CAPABILITIES.DATA_MIGRATION, executor), true);
+  assert.match(sql, /club_subscriptions subscription/);
+  assert.match(sql, /plan_entitlements entitlement/);
+  assert.doesNotMatch(sql, /\broles\b|\bpermissions\b|user_club_memberships/);
+});

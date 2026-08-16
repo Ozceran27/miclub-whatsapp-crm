@@ -1066,26 +1066,6 @@
       ]
     },
     {
-      "id": "GET /club-finance-debug",
-      "method": "GET",
-      "path": "/club-finance-debug",
-      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "administration.configure",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
       "id": "GET /club-finance-summary",
       "method": "GET",
       "path": "/club-finance-summary",
@@ -1190,26 +1170,6 @@
       "authentication": "session",
       "membership": "active",
       "permission": "people.read",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "read",
-      "idempotency": "safe",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
-      "id": "GET /receivable-fees-effective-status-debug",
-      "method": "GET",
-      "path": "/receivable-fees-effective-status-debug",
-      "source": "apps/api/src/routes/legacyCompatRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "administration.configure",
       "role": "any-with-permission",
       "sectorScope": "tenant",
       "mutability": "read",

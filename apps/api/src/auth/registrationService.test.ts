@@ -23,6 +23,7 @@ function fakeClient(failAt = -1) {
     const index = calls.length; calls.push({ sql, values });
     if (index === failAt) throw new Error(`falló ${index}`);
     if (sql.includes("miclub.clubs")) return { rows: [{ id: "club-id" }] } as never;
+    if (sql.includes("miclub.club_subscriptions")) return { rows: [{ plan_code: "FREE" }] } as never;
     if (sql.includes("miclub.roles")) return { rows: [
       { id: "director-role-id", code: "DIRECTOR" }, { id: "worker-role-id", code: "TRABAJADOR" }, { id: "instructor-role-id", code: "INSTRUCTOR" },
     ] } as never;
@@ -48,13 +49,15 @@ test("bootstrap crea integralmente Director, persona, usuario, membresía, emple
   assert.match(sql, /miclub\.employees/);
   assert.match(sql, /Administración/); assert.match(sql, /Tesorería/); assert.match(sql, /Áreas Comunes/); assert.match(sql, /is_system/);
   assert.match(sql, /miclub\.club_onboarding[\s\S]*NOT_STARTED/);
+  assert.match(sql, /miclub\.club_subscriptions[\s\S]*code = 'FREE'[\s\S]*commercial_class = 'free'/);
+  assert.doesNotMatch(sql, /code = 'DEVELOPMENT'/);
   assert.doesNotMatch(sql, /"onboarding"/);
   assert.equal(calls.find(({ sql: statement }) => statement.includes("user_club_memberships"))?.values?.[2], "director-role-id");
   assert.deepEqual(calls.find(({ sql }) => sql.includes("user_club_memberships"))?.values?.[3], [...ROLE_DEFAULT_PERMISSIONS.DIRECTOR]);
 });
 
 test("cada fallo de bootstrap se propaga para que registrationService haga rollback", async () => {
-  for (let operation = 0; operation < 9; operation += 1) {
+  for (let operation = 0; operation < 10; operation += 1) {
     const { client, calls } = fakeClient(operation);
     await assert.rejects(provisionClub(client, input, "hash"), new RegExp(`falló ${operation}`));
     assert.equal(calls.length, operation + 1, `no debe ejecutar suboperaciones después del fallo ${operation}`);
