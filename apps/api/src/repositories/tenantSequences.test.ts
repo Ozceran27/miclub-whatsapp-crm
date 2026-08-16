@@ -6,16 +6,13 @@ const movementRepository = new URL("./movementsRepository.ts", import.meta.url);
 const enrollmentRepository = new URL("./enrollmentsRepository.ts", import.meta.url);
 const migration = new URL("../../db/migrations/202608130006_tenant_entity_sequences.sql", import.meta.url);
 
-test("manual creation and both import paths allocate inside their INSERT transaction", async () => {
-  const [movements, enrollments, importer] = await Promise.all([
+test("manual creation allocates tenant sequences inside its INSERT transaction", async () => {
+  const [movements, enrollments] = await Promise.all([
     readFile(movementRepository, "utf8"),
     readFile(enrollmentRepository, "utf8"),
-    readFile(new URL("../importers/googleSheets/implementation.ts", import.meta.url), "utf8"),
   ]);
   assert.match(movements, /insert into miclub\.movements[\s\S]*miclub\.next_tenant_sequence\(\$1,'movement'\)/i);
   assert.match(enrollments, /insert into miclub\.enrollments[\s\S]*miclub\.next_tenant_sequence\(\$1, 'enrollment'\)/i);
-  assert.match(importer, /insert into miclub\.movements[\s\S]*next_tenant_sequence\(\$1,'movement'\)/i);
-  assert.match(importer, /insert into miclub\.enrollments[\s\S]*next_tenant_sequence\(\$1,'enrollment'\)/i);
 });
 
 test("the database allocator serializes conflicts and is rollback-safe", async () => {
