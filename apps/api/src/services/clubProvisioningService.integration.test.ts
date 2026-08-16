@@ -16,8 +16,8 @@ const harness = (failAt = -1) => {
     if (calls++ === failAt) throw new Error("forced provisioning failure");
     if (sql.includes("miclub.clubs")) { state.clubs.push("club-id"); return { rows: [{ id: "club-id" }] }; }
     if (sql.includes("insert into miclub.club_subscriptions")) {
-      state.subscriptions.set(String(values?.[0]), "DEVELOPMENT");
-      return { rows: [{ plan_code: "DEVELOPMENT" }] };
+      state.subscriptions.set(String(values?.[0]), "FREE");
+      return { rows: [{ plan_code: "FREE" }] };
     }
     if (sql.includes("miclub.club_onboarding")) { state.onboarding.push(String(values?.[0])); return { rows: [] }; }
     if (sql.includes("miclub.roles")) {
@@ -33,7 +33,7 @@ const harness = (failAt = -1) => {
   };
   const client: TransactionClient = { query: query as TransactionClient["query"] };
   const resolvesFeature = async (clubId: string) => hasFeature(clubId, CLUB_CAPABILITIES.DATA_MIGRATION, {
-    query: <T>() => Promise.resolve({ rows: [{ enabled: state.subscriptions.get(clubId) === "DEVELOPMENT" }] as T[] }),
+    query: <T>() => Promise.resolve({ rows: [{ enabled: false }] as T[] }),
   });
   return {
     run: async () => { const before = state; state = emptyState(); try { return await provisionClub(client, input, "hash"); } catch (error) { state = before; throw error; } },
@@ -41,7 +41,7 @@ const harness = (failAt = -1) => {
       const roleId = state.roles.get(role); if (!roleId) throw new Error(`missing ${role}`);
       state.memberships.push(roleId); return { roleId, permissions: [...CLUB_ROLE_DEFINITIONS[role].permissions] };
     },
-    requestTemplate: async () => resolvesFeature("club-id") && CLUB_ROLE_DEFINITIONS.DIRECTOR.permissions.includes(PERMISSIONS.IMPORTS_RUN)
+    requestTemplate: async () => await resolvesFeature("club-id") && CLUB_ROLE_DEFINITIONS.DIRECTOR.permissions.includes(PERMISSIONS.IMPORTS_RUN)
       ? { status: 200, contentDisposition: "attachment; filename=\"plantilla-migracion.xlsx\"" }
       : { status: 403, contentDisposition: null },
     readOnboarding: async () => ({ migrationAvailable: await resolvesFeature("club-id") }),
@@ -63,14 +63,14 @@ test("el provisioning permite crear después trabajadores e instructores con sus
   assert.equal(integration.state().employees[0], "membership-id", "el empleado propietario conserva esa membresía");
 });
 
-test("el club registrado obtiene DATA_MIGRATION desde DEVELOPMENT y accede a la plantilla", async () => {
+test("el club registrado obtiene FREE y no recibe features de DEVELOPMENT", async () => {
   const integration = harness(); await integration.run();
-  assert.equal(integration.state().subscriptions.get("club-id"), "DEVELOPMENT");
-  assert.equal(await integration.resolvesFeature("club-id"), true);
+  assert.equal(integration.state().subscriptions.get("club-id"), "FREE");
+  assert.equal(await integration.resolvesFeature("club-id"), false);
   const response = await integration.requestTemplate();
-  assert.equal(response.status, 200);
-  assert.match(response.contentDisposition ?? "", /plantilla-migracion\.xlsx/);
-  assert.equal((await integration.readOnboarding()).migrationAvailable, true);
+  assert.equal(response.status, 403);
+  assert.equal(response.contentDisposition, null);
+  assert.equal((await integration.readOnboarding()).migrationAvailable, false);
 });
 
 test("cualquier fallo revierte integralmente el provisioning", async () => {

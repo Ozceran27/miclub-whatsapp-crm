@@ -31,12 +31,11 @@ export async function provisionClub(
   const subscription = await client.query<{ plan_code: string }>(`
     insert into miclub.club_subscriptions (club_id, plan_code, effective_from)
     select $1, code, now()
-      from miclub.plans
-     where is_development
-     order by (code = 'DEVELOPMENT') desc, code
+     from miclub.plans
+     where code = 'FREE' and catalog_status = 'catalog' and commercial_class = 'free'
      limit 1
     returning plan_code`, [clubId]);
-  if (!subscription.rows[0]) throw new Error("No se encontró un plan de testing para el club.");
+  if (!subscription.rows[0]) throw new Error("No se encontró el plan gratuito para el club.");
 
   await client.query(`
     insert into miclub.club_onboarding (club_id, status, current_step, completed_steps, skipped_steps)
