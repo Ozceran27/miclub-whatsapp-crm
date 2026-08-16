@@ -39,8 +39,8 @@ const respond = (res: Response, result: ActivityMutationResult) => {
   if (result.kind === "updated") return res.json(result.activity);
   const errors: Record<string, [number, string, string]> = {
     missing: [404, "ACTIVITY_NOT_FOUND", "Actividad no encontrada."], conflict: [409, "OPTIMISTIC_CONCURRENCY_CONFLICT", "La actividad fue modificada por otra operación; recargue los datos."],
-    model_not_applied: [503, "ACTIVITY_MODEL_NOT_APPLIED", "El modelo de mutaciones de actividades todavía no fue aplicado."], invalid_manager: [400, "INVALID_MANAGER", "Una actividad activa requiere un responsable principal válido del club."],
-    invalid_sector: [400, "INVALID_SECTOR", "El sector no pertenece al club o está archivado."], invalid_instructor: [400, "INVALID_INSTRUCTOR", "El instructor no pertenece al club."],
+    model_not_applied: [503, "ACTIVITY_MODEL_NOT_APPLIED", "El modelo de mutaciones de actividades todavía no fue aplicado."], invalid_manager: [404, "INVALID_MANAGER", "El responsable no fue encontrado."],
+    invalid_sector: [404, "INVALID_SECTOR", "El sector no fue encontrado."], invalid_instructor: [404, "INVALID_INSTRUCTOR", "El instructor no fue encontrado."],
     dependencies: [409, "ACTIVITY_HAS_DEPENDENCIES", "La actividad tiene dependencias y no existe una regla segura para archivarla."],
   };
   const [status, code, message] = errors[result.kind]; return fail(res, status, code, message, "dependencies" in result ? result.dependencies : undefined);

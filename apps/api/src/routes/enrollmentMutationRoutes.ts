@@ -15,7 +15,7 @@ router.post("/inscripciones", requireAuthorizationCapability("ENROLLMENTS_CREATE
   const fee=Number(body.feeAmount); const status=String(body.status); const date=String(body.enrollmentDate);
   if(!Number.isFinite(fee)||fee<0||!["al_dia","nuevo_inscripto","adeudando"].includes(status)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||(body.dueDate!=null&&!/^\d{4}-\d{2}-\d{2}$/.test(String(body.dueDate))))return fail(res,400,"VALIDATION_ERROR","Cuota, estado y fechas no son válidos.");
   const result=await createEnrollment(actor(req),{personId:String(body.personId),activityId:String(body.activityId),feeAmount:fee,status,dueDate:body.dueDate?String(body.dueDate):null,enrollmentDate:date} as EnrollmentInput);
-  if(result.kind==="invalid_reference")return fail(res,422,"VALIDATION_ERROR","La persona o actividad no pertenece al club, o la actividad no admite inscripciones.");
+  if(result.kind==="invalid_reference")return fail(res,404,"REFERENCE_NOT_FOUND","No se encontraron la persona o la actividad.");
   if(result.kind==="duplicate")return fail(res,409,"ENROLLMENT_ALREADY_EXISTS","La persona ya tiene una inscripción activa en esta actividad.",result.enrollment);
   return res.status(201).json(result.enrollment);
 }));
