@@ -46,7 +46,8 @@ const listDefinitions = {
       s.uses_enrollments, s.uses_activities, s.notes, s.created_at, s.updated_at,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name,
       (select count(*)::integer from miclub.activities a
-        where a.club_id = s.club_id and a.sector_id = s.id and a.status = 'active') as activities_count,
+        where a.club_id = s.club_id and a.sector_id = s.id
+          and a.status = 'activa'::miclub.entity_status and a.archived_at is null) as activities_count,
       (select count(*)::integer from miclub.enrollments e
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
         where e.club_id = s.club_id and a.sector_id = s.id
