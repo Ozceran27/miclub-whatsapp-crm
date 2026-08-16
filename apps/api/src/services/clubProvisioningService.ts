@@ -28,6 +28,16 @@ export async function provisionClub(
     returning id`, [clubCode(input.club.name), input.club.name]);
   const clubId = club.rows[0].id;
 
+  const subscription = await client.query<{ plan_code: string }>(`
+    insert into miclub.club_subscriptions (club_id, plan_code, effective_from)
+    select $1, code, now()
+      from miclub.plans
+     where is_development
+     order by (code = 'DEVELOPMENT') desc, code
+     limit 1
+    returning plan_code`, [clubId]);
+  if (!subscription.rows[0]) throw new Error("No se encontró un plan de testing para el club.");
+
   await client.query(`
     insert into miclub.club_onboarding (club_id, status, current_step, completed_steps, skipped_steps)
     values ($1, 'NOT_STARTED', 1, '{}'::smallint[], '{}'::smallint[])`, [clubId]);

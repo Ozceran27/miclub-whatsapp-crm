@@ -11,7 +11,16 @@ const map=(r:Row):OnboardingState=>({status:r.status,currentStep:r.current_step 
 const select=`select o.*,
  (select count(*) from miclub.movements m where m.club_id=o.club_id) movement_count,
  (select count(*) from miclub.enrollments e where e.club_id=o.club_id) enrollment_count,
- exists(select 1 from miclub.club_capabilities c where c.club_id=o.club_id and c.capability='DATA_MIGRATION' and c.enabled and c.effective_from<=now() and (c.effective_until is null or c.effective_until>now())) migration_available
+ coalesce(
+   (select c.enabled from miclub.club_capabilities c
+     where c.club_id=o.club_id and c.capability='DATA_MIGRATION'
+       and c.effective_from<=now() and (c.effective_until is null or c.effective_until>now())
+     order by c.effective_from desc,c.created_at desc limit 1),
+   exists(select 1 from miclub.club_subscriptions s
+     join miclub.plan_entitlements e on e.plan_code=s.plan_code
+     where s.club_id=o.club_id and e.feature_code='DATA_MIGRATION'
+       and s.effective_from<=now() and (s.effective_until is null or s.effective_until>now())),
+   false) migration_available
  from miclub.club_onboarding o where o.club_id=$1`;
 const ensure=async(db:QueryExecutor,clubId:string)=>{await db.query("insert into miclub.club_onboarding (club_id) values ($1) on conflict (club_id) do nothing",[clubId]);return map((await db.query<Row>(select,[clubId])).rows[0]);};
 export const readOnboarding=async(clubId:string)=>withTenantTransaction(clubId,db=>ensure(db,clubId),await getPostgresPool());
