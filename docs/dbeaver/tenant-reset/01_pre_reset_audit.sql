@@ -25,7 +25,10 @@ SELECT *, CASE
   WHEN has_club_id THEN 'TENANT_DATA'
   WHEN table_name IN ('clubs','users') OR has_user_id THEN 'MIXED'
   WHEN table_name ~ '(catalog|currenc|discount_rate|system_month|plan|entitlement)'
-    OR table_name IN ('payment_methods') THEN 'GLOBAL_STRUCTURAL'
+    OR table_name IN (
+      'payment_methods', 'category_import_aliases', 'features',
+      'import_amount_normalization_rules', 'sector_templates'
+    ) THEN 'GLOBAL_STRUCTURAL'
   ELSE 'UNKNOWN' END AS classification
 FROM traits;
 
@@ -83,16 +86,45 @@ END $audit$;
 SELECT * FROM pg_temp.reset_global_fingerprints ORDER BY 1,2;
 
 /* PASS exige forma soportada, como máximo el único fixture y ningún UNKNOWN poblado. */
-SELECT CASE WHEN
-  to_regclass('miclub.users') IS NOT NULL
-  AND to_regclass('miclub.clubs') IS NOT NULL
-  AND to_regclass('miclub.user_club_memberships') IS NOT NULL
-  AND (SELECT count(*) FROM miclub.users) <= 1
-  AND NOT EXISTS (SELECT 1 FROM miclub.users WHERE id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid)
-  AND (SELECT count(*) FROM miclub.clubs) <= 1
-  AND NOT EXISTS (SELECT 1 FROM miclub.user_club_memberships WHERE user_id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid)
-  AND NOT EXISTS (
-    SELECT 1 FROM reset_inventory i WHERE classification='UNKNOWN'
-    AND (xpath('/row/c/text()',query_to_xml(format('select count(*) c from %I.%I',i.table_schema,i.table_name),false,true,'')))[1]::text::bigint > 0)
-  THEN 'RESET PRECHECK: PASS' ELSE 'RESET PRECHECK: FAIL' END AS reset_precheck;
+DROP TABLE IF EXISTS pg_temp.reset_precheck_checks;
+CREATE TEMP TABLE reset_precheck_checks
+ (check_name text PRIMARY KEY, passed boolean NOT NULL, detail text NOT NULL);
 
+INSERT INTO reset_precheck_checks VALUES
+ ('required table miclub.users',to_regclass('miclub.users') IS NOT NULL,COALESCE(to_regclass('miclub.users')::text,'MISSING')),
+ ('required table miclub.clubs',to_regclass('miclub.clubs') IS NOT NULL,COALESCE(to_regclass('miclub.clubs')::text,'MISSING')),
+ ('required table miclub.user_club_memberships',to_regclass('miclub.user_club_memberships') IS NOT NULL,COALESCE(to_regclass('miclub.user_club_memberships')::text,'MISSING'));
+
+DO $checks$
+DECLARE n bigint; unexpected bigint; unknown_populated text;
+BEGIN
+ /* SQL dinámico permite informar tablas requeridas ausentes sin referenciarlas. */
+ IF to_regclass('miclub.users') IS NOT NULL THEN
+  EXECUTE 'SELECT count(*) FROM miclub.users' INTO n;
+  INSERT INTO reset_precheck_checks VALUES ('users count supported',n<=1,n::text);
+  EXECUTE $$SELECT count(*) FROM miclub.users WHERE id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid$$ INTO unexpected;
+  INSERT INTO reset_precheck_checks VALUES ('only diagnostic user',unexpected=0,unexpected::text||' unexpected');
+ END IF;
+ IF to_regclass('miclub.clubs') IS NOT NULL THEN
+  EXECUTE 'SELECT count(*) FROM miclub.clubs' INTO n;
+  INSERT INTO reset_precheck_checks VALUES ('clubs count supported',n<=1,n::text);
+ END IF;
+ IF to_regclass('miclub.user_club_memberships') IS NOT NULL THEN
+  EXECUTE $$SELECT count(*) FROM miclub.user_club_memberships WHERE user_id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid$$ INTO unexpected;
+  INSERT INTO reset_precheck_checks VALUES ('only diagnostic memberships',unexpected=0,unexpected::text||' unexpected');
+ END IF;
+
+ SELECT string_agg(format('%I.%I=%s',table_schema,table_name,row_count),', ' ORDER BY table_schema,table_name)
+ INTO unknown_populated FROM (
+  SELECT i.table_schema,i.table_name,
+   (xpath('/row/c/text()',query_to_xml(format('select count(*) c from %I.%I',i.table_schema,i.table_name),false,true,'')))[1]::text::bigint row_count
+  FROM reset_inventory i WHERE classification='UNKNOWN'
+ ) unknowns WHERE row_count>0;
+ INSERT INTO reset_precheck_checks VALUES
+  ('no populated UNKNOWN tables',unknown_populated IS NULL,COALESCE(unknown_populated,'none'));
+END $checks$;
+
+TABLE reset_precheck_checks;
+SELECT CASE WHEN bool_and(passed) THEN 'RESET PRECHECK: PASS'
+            ELSE 'RESET PRECHECK: FAIL' END AS reset_precheck
+FROM reset_precheck_checks;

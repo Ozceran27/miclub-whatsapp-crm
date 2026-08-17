@@ -117,10 +117,29 @@ test("catálogo de sectores reutiliza códigos sistémicos existentes sin violar
 });
 
 const tenantDeletionSql = (name: string) => sql(`tenant-deletion/${name}`);
+const tenantResetSql = (name: string) => sql(`tenant-reset/${name}`);
 
 function withoutSqlComments(source: string): string {
   return source.replace(/--.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
+
+test("precheck de reset reconoce catálogos globales reales y explica cada bloqueo", () => {
+  const precheck = tenantResetSql("01_pre_reset_audit.sql");
+
+  for (const globalTable of [
+    "category_import_aliases",
+    "features",
+    "import_amount_normalization_rules",
+    "sector_templates",
+  ]) {
+    assert.match(precheck, new RegExp(`'${globalTable}'`));
+  }
+  assert.match(precheck, /CREATE TEMP TABLE reset_precheck_checks/);
+  assert.match(precheck, /no populated UNKNOWN tables/);
+  assert.match(precheck, /TABLE reset_precheck_checks;/);
+  assert.match(precheck, /bool_and\(passed\)/);
+  assert.doesNotMatch(withoutSqlComments(precheck), /\b(?:UPDATE|MERGE|ALTER|TRUNCATE|CALL)\b/i);
+});
 
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {
   const diagnostic = tenantDeletionSql("01_tenant_inventory_readonly.sql");
