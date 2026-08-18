@@ -100,6 +100,14 @@ vuelva a ejecutar `01` completo y exporte evidencia nueva. Después ejecute el
 `02` corregido completo, conservando el `ROLLBACK` final, y trate el resultado
 como un ensayo nuevo.
 
+El mensaje de ciclo que deja únicamente `miclub.import_batches` pendiente no es
+un ciclo entre tablas: `dry_run_of_batch_id` es una FK autorreferencial `NO
+ACTION`. La versión corregida de `02` permite ese caso porque todas las filas del
+tenant se eliminan en una sola sentencia y PostgreSQL comprueba `NO ACTION` al
+final de la sentencia. Una FK autorreferencial `RESTRICT` continúa bloqueando el
+reset, al igual que cualquier ciclo real entre dos o más tablas. No elimine ni
+deshabilite la FK para sortear el gate.
+
 ## Cómo entregar la evidencia del precheck
 
 Mantenga abierta la conexión que ejecutó el precheck: cerrar/reconectar elimina
