@@ -90,6 +90,15 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";
 
+/** Canonical SQL rows embedded in the DBeaver tenant-deletion ledger gates. */
+export function renderTenantDeletionManifestValues(
+  entries: readonly MigrationManifestEntry[] = migrationManifest,
+): string {
+  return entries
+    .map((entry) => `    ('${pathBasename(entry.path)}', '${entry.sha256}')`)
+    .join(",\n");
+}
+
 /** Canonical Markdown used by the release checkpoint and its static consistency check. */
 export function renderPostAdminMigrationTable(entries: readonly MigrationManifestEntry[] = migrationManifest): string {
   const postAdmin = entries.filter((entry) => pathBasename(entry.path) >= POST_ADMIN_MIGRATIONS_START);

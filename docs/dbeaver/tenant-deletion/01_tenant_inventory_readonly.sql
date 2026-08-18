@@ -87,6 +87,7 @@ SELECT to_regclass('public.miclub_schema_migrations') AS ledger_relation,
             THEN 'DETENER: verificar conexión e historial de despliegue con DBA; no ejecutar 02_delete_tenant_manual.sql'
             ELSE 'Revisar comparación: continuar sólo con gate_status=PASS' END AS next_action;
 WITH expected(name,checksum) AS (VALUES
+-- MIGRATION_MANIFEST_VALUES:START
     ('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
     ('202606270001_align_existing_miclub_for_sheets_import.sql', '06a39926e25c5c743658a57fb33550129ed679d0659e55702bb4e77c2eefa155'),
     ('202606280001_add_operational_aggregation_views.sql', '710958884d6d31716c632c32d8683f9862f389b5be4cc9d426160a3adaa2023e'),
@@ -140,7 +141,23 @@ WITH expected(name,checksum) AS (VALUES
     ('202608130004_secure_xlsx_import.sql', '2a9f8ff8547fb63ec6d10d51ac19374ef1dd6209529b6f63b25509bb30167837'),
     ('202608130005_xlsx_batch_identity.sql', '10ea1c80c9543c6791a0894e8283d92dacee92afaf547b7794e57715e589eeb4'),
     ('202608130006_tenant_entity_sequences.sql', '8192e26dc9ba52e9b553eeac38c43b3a900150e7ec8f5f9660b0f9e3a9134485'),
-    ('202608130007_club_capabilities.sql', '226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f')
+    ('202608130007_club_capabilities.sql', '226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f'),
+    ('202608140001_version_xlsx_import_rows.sql', 'd3cd5be5131f40fdee6f1f16c47b42bb764ac48562a17d5b0455132ba6e4da6b'),
+    ('202608140002_onboarding_milestones.sql', '5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f'),
+    ('202608140003_enforce_club_role_codes.sql', 'b52a94ecfc5827768698ba5db11f1a475f09cf78ae7a0c1083f5772e16325ae5'),
+    ('202608140004_correct_category_catalog.sql', '00811df6648acd37dd5307c508d3986842d9fb637a66eda20f1aff24c13386a8'),
+    ('202608140005_activity_terms_contiguous.sql', '3aef03dfe3f219010280edb1548b6e6e05997ee57c639cc01d88f836bb5db30e'),
+    ('202608140006_worker_invitations.sql', 'b62667d273ce49c31f7232cfb9e69817f9aeb5dbcdd462c8c4ac88eebc758654'),
+    ('202608140007_plan_entitlements.sql', '8e95a0d71cef4a45170e36bbcbe725524f12127a07a58d8fe6a1c94e6a6415ae'),
+    ('202608140008_canonical_onboarding_and_opening_balances.sql', '56c5b8b75daea283c67d31a50d853b899fcb5dbb8beb5a603113c4171689a154'),
+    ('202608150001_scope_settlement_allocations_movements.sql', 'e9f246695e9d020ee1132ee91acb598edf47cb073ae85ab5c934b6f47a9fe523'),
+    ('202608150002_scope_activity_catalog_fks.sql', '270f25c059de18b4732367d21651c6e8f50081668858d2de776a1790c0c94fd2'),
+    ('202608150003_fix_activity_status_enum_guard.sql', 'ce0e2b02f3f7863453263ed81ba27555e7b87998496b8da9f06e6048914f4ac3'),
+    ('202608150004_runtime_roles_and_priority_rls.sql', '96cbec8d8c198beb34bfeef979f8f98b9bd58a99f96af924d065b8c8dc637ce4'),
+    ('202608150005_prevent_split_settlement_movements.sql', 'ce170d44b2fab940e69ee0761350ea11f5c4c1c0911c7a8dcd98d6fa59948d28'),
+    ('202608150006_remove_empty_bootstrap_legacy_club.sql', 'bb561df6444fa1a4680859f0ec1f262db6e0d51b5be95a72c82fda30d78c9488'),
+    ('202608160001_commercial_plan_taxonomy.sql', '5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c')
+-- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
              THEN xmlparse(document '<table/>')
@@ -159,6 +176,7 @@ ORDER BY migration;
 
 -- Resumen obligatorio: debe devolver exactamente mismatches=0 y ledger_rows=manifest_rows.
 WITH expected(name,checksum) AS (VALUES
+-- MIGRATION_MANIFEST_VALUES:START
     ('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
     ('202606270001_align_existing_miclub_for_sheets_import.sql', '06a39926e25c5c743658a57fb33550129ed679d0659e55702bb4e77c2eefa155'),
     ('202606280001_add_operational_aggregation_views.sql', '710958884d6d31716c632c32d8683f9862f389b5be4cc9d426160a3adaa2023e'),
@@ -212,7 +230,23 @@ WITH expected(name,checksum) AS (VALUES
     ('202608130004_secure_xlsx_import.sql', '2a9f8ff8547fb63ec6d10d51ac19374ef1dd6209529b6f63b25509bb30167837'),
     ('202608130005_xlsx_batch_identity.sql', '10ea1c80c9543c6791a0894e8283d92dacee92afaf547b7794e57715e589eeb4'),
     ('202608130006_tenant_entity_sequences.sql', '8192e26dc9ba52e9b553eeac38c43b3a900150e7ec8f5f9660b0f9e3a9134485'),
-    ('202608130007_club_capabilities.sql', '226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f')
+    ('202608130007_club_capabilities.sql', '226999ff0d535768ed1bf730fe2ba31acfdca84dde34217bcfebd6441987a75f'),
+    ('202608140001_version_xlsx_import_rows.sql', 'd3cd5be5131f40fdee6f1f16c47b42bb764ac48562a17d5b0455132ba6e4da6b'),
+    ('202608140002_onboarding_milestones.sql', '5e11171c42736199b8775946ab66dbb07f78a62fedbaea33c17c13d1d3b7d21f'),
+    ('202608140003_enforce_club_role_codes.sql', 'b52a94ecfc5827768698ba5db11f1a475f09cf78ae7a0c1083f5772e16325ae5'),
+    ('202608140004_correct_category_catalog.sql', '00811df6648acd37dd5307c508d3986842d9fb637a66eda20f1aff24c13386a8'),
+    ('202608140005_activity_terms_contiguous.sql', '3aef03dfe3f219010280edb1548b6e6e05997ee57c639cc01d88f836bb5db30e'),
+    ('202608140006_worker_invitations.sql', 'b62667d273ce49c31f7232cfb9e69817f9aeb5dbcdd462c8c4ac88eebc758654'),
+    ('202608140007_plan_entitlements.sql', '8e95a0d71cef4a45170e36bbcbe725524f12127a07a58d8fe6a1c94e6a6415ae'),
+    ('202608140008_canonical_onboarding_and_opening_balances.sql', '56c5b8b75daea283c67d31a50d853b899fcb5dbb8beb5a603113c4171689a154'),
+    ('202608150001_scope_settlement_allocations_movements.sql', 'e9f246695e9d020ee1132ee91acb598edf47cb073ae85ab5c934b6f47a9fe523'),
+    ('202608150002_scope_activity_catalog_fks.sql', '270f25c059de18b4732367d21651c6e8f50081668858d2de776a1790c0c94fd2'),
+    ('202608150003_fix_activity_status_enum_guard.sql', 'ce0e2b02f3f7863453263ed81ba27555e7b87998496b8da9f06e6048914f4ac3'),
+    ('202608150004_runtime_roles_and_priority_rls.sql', '96cbec8d8c198beb34bfeef979f8f98b9bd58a99f96af924d065b8c8dc637ce4'),
+    ('202608150005_prevent_split_settlement_movements.sql', 'ce170d44b2fab940e69ee0761350ea11f5c4c1c0911c7a8dcd98d6fa59948d28'),
+    ('202608150006_remove_empty_bootstrap_legacy_club.sql', 'bb561df6444fa1a4680859f0ec1f262db6e0d51b5be95a72c82fda30d78c9488'),
+    ('202608160001_commercial_plan_taxonomy.sql', '5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c')
+-- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
              THEN xmlparse(document '<table/>')
@@ -232,7 +266,8 @@ SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL THEN 'BL
             ELSE count(*) FILTER (WHERE expected_name IS NULL OR actual_name IS NULL OR expected_checksum<>actual_checksum) END AS mismatches,
        (SELECT count(*) FROM actual) AS ledger_rows,(SELECT count(*) FROM expected) AS manifest_rows,
        CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
-            THEN 'NOT_COMPARABLE: ledger ausente; 54 filas esperadas no equivalen a 54 mismatches'
+            THEN format('NOT_COMPARABLE: ledger ausente; %s filas esperadas no equivalen a %s mismatches',
+                        (SELECT count(*) FROM expected),(SELECT count(*) FROM expected))
             WHEN count(*) FILTER (WHERE expected_name IS NULL OR actual_name IS NULL OR expected_checksum<>actual_checksum)=0
             THEN 'COMPARABLE_AND_EQUAL' ELSE 'COMPARABLE_BUT_DIFFERENT' END AS comparison_status
 FROM comparison;

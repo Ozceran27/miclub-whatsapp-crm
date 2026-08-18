@@ -192,7 +192,7 @@ test("diagnóstico de baja tenant descubre el destino y permanece read-only", ()
 
 test("baja tenant manual exige identidad, backup, manifest, orden FK y rollback seguro", async () => {
   const script = tenantDeletionSql("02_delete_tenant_manual.sql");
-  const { migrationManifest } = await import("./migrationManifest.js");
+  const { renderTenantDeletionManifestValues } = await import("./migrationManifest.js");
 
   assert.match(script, /\$\{club_id\}/);
   assert.match(script, /\$\{expected_club_name\}/);
@@ -210,10 +210,30 @@ test("baja tenant manual exige identidad, backup, manifest, orden FK y rollback 
   assert.match(script, /public\.miclub_schema_migrations no existe/);
   assert.match(script, /EXECUTE 'SELECT count\(\*\) FROM _expected_manifest/);
 
-  for (const entry of migrationManifest) {
-    const basename = entry.path.split("/").at(-1)!;
-    assert.match(script, new RegExp(`\\('${basename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}', '${entry.sha256}'\\)`));
+  const startMarker = "-- MIGRATION_MANIFEST_VALUES:START";
+  const endMarker = "-- MIGRATION_MANIFEST_VALUES:END";
+  const expectedValues = renderTenantDeletionManifestValues().trim();
+  const extractValues = (source: string): string[] => {
+    const blocks: string[] = [];
+    let offset = 0;
+    while (true) {
+      const start = source.indexOf(startMarker, offset);
+      if (start === -1) break;
+      const contentStart = start + startMarker.length;
+      const end = source.indexOf(endMarker, contentStart);
+      assert.notEqual(end, -1, `falta ${endMarker}`);
+      blocks.push(source.slice(contentStart, end).trim());
+      offset = end + endMarker.length;
+    }
+    return blocks;
+  };
+
+  for (const [name, expectedBlocks] of [
+    ["01_tenant_inventory_readonly.sql", 2],
+    ["02_delete_tenant_manual.sql", 1],
+  ] as const) {
+    const blocks = extractValues(tenantDeletionSql(name));
+    assert.equal(blocks.length, expectedBlocks, `${name}: cantidad de bloques expected`);
+    for (const block of blocks) assert.equal(block, expectedValues, `${name}: bloque divergente del manifest`);
   }
-  const manifestRows = [...script.matchAll(/^\s*\('[^']+\.sql', '[0-9a-f]{64}'\)[,;]$/gm)];
-  assert.equal(manifestRows.length, migrationManifest.length);
 });
