@@ -13,7 +13,10 @@ una única conexión de DBeaver, con **Auto-commit desactivado** y `ON_ERROR_STO
 2. Ejecutar `01_pre_reset_audit.sql` completo. Exportar todos sus result sets,
    especialmente la matriz, `reset_global_fingerprints` y
    `reset_precheck_checks`. No continuar salvo
-   que el último resultado sea `RESET PRECHECK: PASS`.
+   que el último resultado sea `RESET PRECHECK: PASS`. El archivo abre y
+   confirma su propia transacción: ese `COMMIT` sólo conserva las tablas
+   temporales de la sesión y es necesario aunque DBeaver tenga Auto-commit
+   desactivado.
 3. Revisar que las clasificaciones `UNKNOWN` estén justificadas. El reset se
    niega a borrar una tabla desconocida: reclasificar el caso en el script sólo
    después de revisar su semántica y guardar esa revisión.
@@ -21,7 +24,9 @@ una única conexión de DBeaver, con **Auto-commit desactivado** y `ON_ERROR_STO
    `ROLLBACK` final. El script exige las tablas temporales y el PASS de `01`; no
    copie resultados entre sesiones. Revisar
    los avisos y conteos. Cuando el ensayo sea correcto, cambiar **solamente** ese
-   `ROLLBACK` por `COMMIT` y ejecutar de nuevo desde el principio.
+   `ROLLBACK` por `COMMIT` y ejecutar de nuevo desde el principio. El rollback
+   del ensayo no elimina el precheck porque `01` ya confirmó la transacción que
+   creó sus tablas temporales.
 5. Sin cerrar la conexión (la huella pre-reset es temporal), ejecutar
    `03_post_reset_validation.sql`; conservar todos los resultados. Un `FAIL`
    obliga a investigar o restaurar, nunca a insertar filas a mano.
