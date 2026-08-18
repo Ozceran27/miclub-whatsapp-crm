@@ -10,7 +10,10 @@ export type OnboardingStepOutcome = "COMPLETED" | "SKIPPED";
  */
 export const ONBOARDING_STEP_POLICY = {
   1: { required: true },
-  2: { required: true },
+  // A club that imports its complete movement history must be able to derive
+  // its balances from that ledger instead of creating an artificial opening
+  // balance batch (including a misleading all-zero batch).
+  2: { required: false },
   3: { required: true },
   4: { required: true },
   5: { required: true },
