@@ -17,7 +17,9 @@ una única conexión de DBeaver, con **Auto-commit desactivado** y `ON_ERROR_STO
 3. Revisar que las clasificaciones `UNKNOWN` estén justificadas. El reset se
    niega a borrar una tabla desconocida: reclasificar el caso en el script sólo
    después de revisar su semántica y guardar esa revisión.
-4. Ejecutar `02_tenant_reset.sql` inicialmente con el `ROLLBACK` final. Revisar
+4. En la **misma conexión**, ejecutar `02_tenant_reset.sql` inicialmente con el
+   `ROLLBACK` final. El script exige las tablas temporales y el PASS de `01`; no
+   copie resultados entre sesiones. Revisar
    los avisos y conteos. Cuando el ensayo sea correcto, cambiar **solamente** ese
    `ROLLBACK` por `COMMIT` y ejecutar de nuevo desde el principio.
 5. Sin cerrar la conexión (la huella pre-reset es temporal), ejecutar

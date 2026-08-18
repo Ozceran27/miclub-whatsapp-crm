@@ -141,6 +141,18 @@ test("precheck de reset reconoce catálogos globales reales y explica cada bloqu
   assert.doesNotMatch(withoutSqlComments(precheck), /\b(?:UPDATE|MERGE|ALTER|TRUNCATE|CALL)\b/i);
 });
 
+test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irresolubles", () => {
+  const reset = tenantResetSql("02_tenant_reset.sql");
+
+  assert.match(reset, /to_regclass\('pg_temp\.reset_precheck_checks'\)/);
+  assert.match(reset, /SELECT bool_and\(passed\) FROM pg_temp\.reset_precheck_checks/);
+  assert.match(reset, /classification='UNKNOWN'/);
+  assert.match(reset, /grafo FK tenant sin orden seguro/);
+  assert.match(reset, /tablas pendientes=%/);
+  assert.match(reset, /ROLLBACK;\s*$/);
+  assert.doesNotMatch(withoutSqlComments(reset), /^\s*(?:TRUNCATE|COMMIT)\b/im);
+});
+
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {
   const diagnostic = tenantDeletionSql("01_tenant_inventory_readonly.sql");
   assert.match(diagnostic, /BEGIN TRANSACTION READ ONLY;/i);
