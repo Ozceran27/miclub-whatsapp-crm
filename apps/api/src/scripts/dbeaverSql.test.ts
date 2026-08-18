@@ -127,14 +127,26 @@ test("precheck de reset reconoce catálogos globales reales y explica cada bloqu
   const precheck = tenantResetSql("01_pre_reset_audit.sql");
 
   for (const globalTable of [
+    "category_catalog",
     "category_import_aliases",
+    "currencies",
+    "activity_icon_catalog",
     "features",
+    "plans",
+    "plan_entitlements",
     "import_amount_normalization_rules",
     "sector_templates",
   ]) {
     assert.match(precheck, new RegExp(`'${globalTable}'`));
   }
   assert.match(precheck, /CREATE TEMP TABLE reset_precheck_checks/);
+  assert.match(precheck, /CREATE TEMP TABLE reset_catalog_registry/);
+  assert.match(precheck, /'movement_categories','MIXED','club_id IS NULL'/);
+  assert.match(precheck, /'roles','MIXED','club_id IS NULL'/);
+  assert.match(precheck, /permissions\[\] y grants/);
+  assert.match(precheck, /global catalogs are not tenant-scoped/);
+  assert.match(precheck, /mixed catalogs have demonstrable ownership/);
+  assert.match(precheck, /subset_name text, subset_predicate text/);
   assert.match(precheck, /CREATE TEMP TABLE reset_scope_rows/);
   assert.match(precheck, /TENANT_TRANSITIVE/);
   assert.match(precheck, /to_jsonb\(x\)->%L = p\.row_data->%L/);
@@ -185,6 +197,10 @@ test("validación post-reset exige que los guards financieros queden habilitados
   assert.match(validation, /UNKNOWN: clasificar y agregar una comprobación explícita/);
   assert.match(validation, /captured tenant rows removed/);
   assert.match(validation, /reset_scope_tables/);
+  assert.match(validation, /s\.row_data=to_jsonb\(x\)/);
+  assert.match(validation, /capturadas_restantes/);
+  assert.match(validation, /before\.subset_predicate/);
+  assert.match(validation, /subconjunto=%s antes=%s\/%s después=%s\/%s/);
 });
 
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {

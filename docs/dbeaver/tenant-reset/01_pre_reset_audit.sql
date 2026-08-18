@@ -88,6 +88,60 @@ SELECT *, CASE
 FROM traits;
 
 /*
+ * Registro auditable de catálogos/configuración según el DDL aplicado. No se
+ * deduce que una tabla sea descartable por contener "catalog" en su nombre.
+ * GLOBAL exige no tener ownership tenant; MIXED conserva club_id IS NULL y
+ * sólo permite retirar filas con club_id capturado; TENANT_CONFIG documenta
+ * configuración/grants cuya pertenencia está expresada por club_id.
+ */
+DROP TABLE IF EXISTS pg_temp.reset_catalog_registry;
+CREATE TEMP TABLE reset_catalog_registry
+ (table_schema text NOT NULL,table_name text NOT NULL,scope_kind text NOT NULL,
+  global_predicate text,tenant_evidence text,ddl_reason text NOT NULL,
+  PRIMARY KEY(table_schema,table_name),
+  CHECK(scope_kind IN ('GLOBAL','MIXED','TENANT_CONFIG')));
+INSERT INTO reset_catalog_registry VALUES
+ ('miclub','category_catalog','GLOBAL','true',NULL,'catálogo canónico global'),
+ ('miclub','category_import_aliases','GLOBAL','true',NULL,'aliases del catálogo global'),
+ ('miclub','sector_templates','GLOBAL','true',NULL,'plantillas globales de sectores'),
+ ('miclub','currencies','GLOBAL','true',NULL,'monedas globales'),
+ ('miclub','activity_icon_catalog','GLOBAL','true',NULL,'iconos globales de actividades'),
+ ('miclub','features','GLOBAL','true',NULL,'catálogo global de capacidades'),
+ ('miclub','plans','GLOBAL','true',NULL,'catálogo comercial global'),
+ ('miclub','plan_entitlements','GLOBAL','true',NULL,'grants globales plan-capacidad'),
+ ('miclub','import_amount_normalization_rules','GLOBAL','true',NULL,'reglas globales del importador'),
+ ('miclub','movement_categories','MIXED','club_id IS NULL','club_id IN (SELECT id FROM reset_target_clubs)','compatibilidad tenant enlazada a category_catalog'),
+ ('miclub','roles','MIXED','club_id IS NULL','club_id IN (SELECT id FROM reset_target_clubs)','roles y códigos definidos por club en el DDL real'),
+ ('miclub','payment_methods','MIXED','club_id IS NULL','club_id IN (SELECT id FROM reset_target_clubs)','medios globales legacy o configuración del club'),
+ ('miclub','discount_rates','MIXED','club_id IS NULL','club_id IN (SELECT id FROM reset_target_clubs)','tasas globales legacy o configuración del club'),
+ ('miclub','salon_hour_prices','MIXED','club_id IS NULL','club_id IN (SELECT id FROM reset_target_clubs)','precios globales legacy o configuración del club'),
+ ('miclub','user_club_memberships','TENANT_CONFIG',NULL,'club_id IN (SELECT id FROM reset_target_clubs)','role_id, permissions[] y grants pertenecen a la membresía'),
+ ('miclub','club_capabilities','TENANT_CONFIG',NULL,'club_id IN (SELECT id FROM reset_target_clubs)','overrides de capacidades por club'),
+ ('miclub','club_subscriptions','TENANT_CONFIG',NULL,'club_id IN (SELECT id FROM reset_target_clubs)','selección de plan por club');
+
+/* Cobertura futura/equivalente basada en el catálogo PostgreSQL efectivo. Los
+ * objetos conocidos de arriba conservan la explicación contractual específica. */
+INSERT INTO reset_catalog_registry
+SELECT i.table_schema,i.table_name,'GLOBAL','true',NULL,
+       'configuración global equivalente descubierta por estructura/nombre'
+FROM reset_inventory i
+WHERE i.classification='GLOBAL_STRUCTURAL'
+ON CONFLICT (table_schema,table_name) DO NOTHING;
+INSERT INTO reset_catalog_registry
+SELECT i.table_schema,i.table_name,'MIXED','club_id IS NULL',
+       'club_id IN (SELECT id FROM reset_target_clubs)',
+       'catálogo/configuración mixta equivalente descubierta por DDL efectivo'
+FROM reset_inventory i
+WHERE i.has_club_id AND i.table_name ~ '(catalog|currenc|discount_rate|system_month|plan|entitlement|role|permission|grant|payment_method|price)'
+ON CONFLICT (table_schema,table_name) DO NOTHING;
+
+/* Objetos opcionales se muestran como MISSING; así el inventario sigue siendo
+ * comparable entre instalaciones sin convertir una migración pendiente en una
+ * autorización implícita para borrar. */
+SELECT r.*,to_regclass(format('%I.%I',r.table_schema,r.table_name)) AS relation_oid
+FROM reset_catalog_registry r ORDER BY r.scope_kind,r.table_schema,r.table_name;
+
+/*
  * Alcance transitivo del reset.  La pertenencia no se infiere por nombres: una
  * fila sin club_id sólo entra si una FK real apunta a una fila ya capturada.
  * row_data es además el respaldo temporal e inmutable usado por 02 y 03.
@@ -214,18 +268,21 @@ SELECT DISTINCT c.* FROM miclub.clubs c
 /* Huellas de catálogos, válidas sólo durante esta conexión. */
 DROP TABLE IF EXISTS pg_temp.reset_global_fingerprints;
 CREATE TEMP TABLE reset_global_fingerprints
- (table_schema text, table_name text, row_count bigint, content_md5 text,
-  PRIMARY KEY(table_schema,table_name));
+ (table_schema text, table_name text, subset_name text, subset_predicate text,
+  row_count bigint, content_md5 text,
+  PRIMARY KEY(table_schema,table_name,subset_name));
 DO $audit$
 DECLARE r record; n bigint; h text;
 BEGIN
- FOR r IN SELECT * FROM reset_inventory i WHERE classification='GLOBAL_STRUCTURAL' AND NOT EXISTS (SELECT FROM reset_scope_tables t WHERE t.table_oid=i.oid) LOOP
-   EXECUTE format('select count(*), md5(coalesce(string_agg(md5(to_jsonb(x)::text),'''' order by md5(to_jsonb(x)::text)),'''')) from %I.%I x',r.table_schema,r.table_name)
+ FOR r IN SELECT cr.* FROM reset_catalog_registry cr
+   WHERE cr.scope_kind IN ('GLOBAL','MIXED') AND cr.global_predicate IS NOT NULL
+     AND to_regclass(format('%I.%I',cr.table_schema,cr.table_name)) IS NOT NULL LOOP
+   EXECUTE format('select count(*), md5(coalesce(string_agg(md5(to_jsonb(x)::text),'''' order by md5(to_jsonb(x)::text)),'''')) from %I.%I x where %s',r.table_schema,r.table_name,r.global_predicate)
      INTO n,h;
-   INSERT INTO pg_temp.reset_global_fingerprints VALUES(r.table_schema,r.table_name,n,h);
+   INSERT INTO pg_temp.reset_global_fingerprints VALUES(r.table_schema,r.table_name,'GLOBAL_ROWS',r.global_predicate,n,h);
  END LOOP;
 END $audit$;
-SELECT * FROM pg_temp.reset_global_fingerprints ORDER BY 1,2;
+SELECT * FROM pg_temp.reset_global_fingerprints ORDER BY 1,2,3;
 
 /* PASS exige forma soportada, como máximo el único fixture y ningún UNKNOWN poblado. */
 DROP TABLE IF EXISTS pg_temp.reset_precheck_checks;
@@ -240,9 +297,29 @@ INSERT INTO reset_precheck_checks VALUES
 DO $checks$
 DECLARE
  n bigint; unexpected bigint; unknown_populated text;
+ catalog_problem text;
  users_n bigint:=0; clubs_n bigint:=0; memberships_n bigint:=0;
  people_n bigint:=0; club_memberships_n bigint:=0; approved boolean:=false;
 BEGIN
+ /* Un catálogo declarado GLOBAL que adquirió club_id contradice su contrato.
+  * Se bloquea con explicación; jamás se reclasifica ni se limpia solo. */
+ SELECT string_agg(format('%I.%I tiene club_id: el DDL efectivo lo volvió tenant-scoped; migrar/corregir el catálogo, no borrarlo',r.table_schema,r.table_name),'; ' ORDER BY r.table_schema,r.table_name)
+ INTO catalog_problem
+ FROM reset_catalog_registry r
+ JOIN pg_class c ON c.oid=to_regclass(format('%I.%I',r.table_schema,r.table_name))
+ JOIN pg_attribute a ON a.attrelid=c.oid AND a.attname='club_id' AND NOT a.attisdropped
+ WHERE r.scope_kind='GLOBAL';
+ INSERT INTO reset_precheck_checks VALUES
+  ('global catalogs are not tenant-scoped',catalog_problem IS NULL,COALESCE(catalog_problem,'DDL global compatible'));
+
+ /* MIXED sólo es seguro si existe club_id: éste es tanto el límite del DELETE
+  * como la demostración positiva de pertenencia. */
+ SELECT string_agg(format('%I.%I no tiene club_id para separar filas globales de tenant',r.table_schema,r.table_name),'; ' ORDER BY r.table_schema,r.table_name)
+ INTO catalog_problem FROM reset_catalog_registry r
+ WHERE r.scope_kind='MIXED' AND to_regclass(format('%I.%I',r.table_schema,r.table_name)) IS NOT NULL
+   AND NOT EXISTS (SELECT FROM information_schema.columns c WHERE c.table_schema=r.table_schema AND c.table_name=r.table_name AND c.column_name='club_id');
+ INSERT INTO reset_precheck_checks VALUES
+  ('mixed catalogs have demonstrable ownership',catalog_problem IS NULL,COALESCE(catalog_problem,'club_id disponible'));
  /* SQL dinámico permite informar tablas requeridas ausentes sin referenciarlas. */
  IF to_regclass('miclub.users') IS NOT NULL THEN
   EXECUTE 'SELECT count(*) FROM miclub.users' INTO n;

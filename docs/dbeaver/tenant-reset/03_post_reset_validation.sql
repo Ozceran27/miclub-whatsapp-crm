@@ -6,7 +6,8 @@ DO $fingerprint_guard$
 BEGIN
  IF to_regclass('pg_temp.reset_global_fingerprints') IS NULL THEN
    CREATE TEMP TABLE reset_global_fingerprints
-    (table_schema text, table_name text, row_count bigint, content_md5 text);
+    (table_schema text, table_name text, subset_name text, subset_predicate text,
+     row_count bigint, content_md5 text);
    INSERT INTO reset_validation VALUES
     ('precheck fingerprints available',false,'Ejecute 01 en esta conexión');
  END IF;
@@ -84,10 +85,14 @@ BEGIN
   RETURN;
  END IF;
  FOR r IN SELECT * FROM pg_temp.reset_scope_tables LOOP
-  EXECUTE format('select count(*) from %I.%I',r.table_schema,r.table_name) INTO n;
+  /* No exige tabla completa vacía: en catálogos MIXED deben sobrevivir las
+   * filas globales. Cuenta sólo filas idénticas a las capturadas por el grafo. */
+  EXECUTE format(
+   'select count(*) from %I.%I x where exists (select 1 from pg_temp.reset_scope_rows s where s.table_oid=%s and s.row_data=to_jsonb(x))',
+   r.table_schema,r.table_name,r.table_oid) INTO n;
   INSERT INTO reset_validation VALUES(
    format('captured tenant rows removed %I.%I',r.table_schema,r.table_name),n=0,
-   format('antes=%s después=%s clasificación=%s',r.captured_rows,n,r.classification));
+   format('capturadas_antes=%s capturadas_restantes=%s clasificación=%s',r.captured_rows,n,r.classification));
  END LOOP;
 END $transitive_validation$;
 
@@ -107,8 +112,8 @@ DECLARE r record; n bigint; h text; before record; total numeric; orphan_n bigin
 BEGIN
  IF EXISTS (SELECT 1 FROM pg_temp.reset_global_fingerprints) THEN
   FOR before IN SELECT * FROM pg_temp.reset_global_fingerprints LOOP
-   EXECUTE format('select count(*),md5(coalesce(string_agg(md5(to_jsonb(x)::text),'''' order by md5(to_jsonb(x)::text)),'''')) from %I.%I x',before.table_schema,before.table_name) INTO n,h;
-   INSERT INTO reset_validation VALUES(format('global fingerprint %I.%I',before.table_schema,before.table_name),n=before.row_count AND h=before.content_md5,format('antes=%s/%s después=%s/%s',before.row_count,before.content_md5,n,h));
+   EXECUTE format('select count(*),md5(coalesce(string_agg(md5(to_jsonb(x)::text),'''' order by md5(to_jsonb(x)::text)),'''')) from %I.%I x where %s',before.table_schema,before.table_name,before.subset_predicate) INTO n,h;
+   INSERT INTO reset_validation VALUES(format('global fingerprint %I.%I [%s]',before.table_schema,before.table_name,before.subset_name),n=before.row_count AND h=before.content_md5,format('subconjunto=%s antes=%s/%s después=%s/%s',before.subset_predicate,before.row_count,before.content_md5,n,h));
   END LOOP;
  END IF;
 
@@ -118,8 +123,8 @@ BEGIN
   WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname !~ '^pg_toast'
  LOOP
   IF EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=r.oid AND attname='club_id' AND NOT attisdropped) THEN
-   EXECUTE format('select count(*) from %I.%I',r.schema_name,r.table_name) INTO n;
-   INSERT INTO reset_validation VALUES(format('tenant zero %I.%I',r.schema_name,r.table_name),n=0,n::text);
+   EXECUTE format('select count(*) from %I.%I where club_id in (select id from pg_temp.reset_target_clubs)',r.schema_name,r.table_name) INTO n;
+   INSERT INTO reset_validation VALUES(format('target tenant zero %I.%I',r.schema_name,r.table_name),n=0,n::text);
   END IF;
   IF r.table_name ~* '(session|token)' THEN
    EXECUTE format('select count(*) from %I.%I',r.schema_name,r.table_name) INTO n;
@@ -129,7 +134,7 @@ BEGIN
    JOIN pg_type ty ON ty.oid=a.atttypid WHERE a.attrelid=r.oid AND a.attnum>0 AND NOT a.attisdropped
     AND ty.typcategory='N' AND a.attname ~* '(amount|balance|total|price|fee)';
   IF h IS NOT NULL AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=r.oid AND attname='club_id' AND NOT attisdropped) THEN
-   EXECUTE format('select coalesce(sum(%s),0) from %I.%I',h,r.schema_name,r.table_name) INTO total;
+   EXECUTE format('select coalesce(sum(%s),0) from %I.%I where club_id in (select id from pg_temp.reset_target_clubs)',h,r.schema_name,r.table_name) INTO total;
    INSERT INTO reset_validation VALUES(format('financial sum zero %I.%I',r.schema_name,r.table_name),total=0,total::text);
   END IF;
  END LOOP;
