@@ -6,7 +6,7 @@ import { isSkippableStep, ONBOARDING_STEPS } from './steps';
 
 test('define siete pasos y solo permite omitir los pasos opcionales', () => {
   assert.equal(ONBOARDING_STEPS.length, 7);
-  assert.equal(isSkippableStep(1), false); assert.equal(isSkippableStep(2), false);
+  assert.equal(isSkippableStep(1), false); assert.equal(isSkippableStep(2), true);
   assert.equal(isSkippableStep(3), false); assert.equal(isSkippableStep(4), false);
   assert.equal(isSkippableStep(5), false); assert.equal(isSkippableStep(6), true); assert.equal(isSkippableStep(7), false);
 });
@@ -43,4 +43,10 @@ test('los pasos representan exactamente el flujo solicitado y saldos usa la oper
   const source = readFileSync(new URL('./steps.tsx', import.meta.url), 'utf8');
   assert.deepEqual(ONBOARDING_STEPS.map(step=>step.title),['Bienvenida','Saldos','Sectores','Trabajadores','Actividades','Migración','Finalización']);
   assert.match(source, /OpeningBalancesStep/); assert.match(source,/MigrationStep/);
+});
+
+test('la migración del onboarding permite aplicar un dry-run válido', () => {
+  const source = readFileSync(new URL('./MigrationStep.tsx', import.meta.url), 'utf8');
+  assert.match(source, /summary\?\.dryRun&&state\.summary\.errors\.length===0/);
+  assert.match(source, /state\.run\(state\.summary\?\.batchId\)/);
 });
