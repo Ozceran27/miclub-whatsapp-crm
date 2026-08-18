@@ -117,10 +117,55 @@ test("catálogo de sectores reutiliza códigos sistémicos existentes sin violar
 });
 
 const tenantDeletionSql = (name: string) => sql(`tenant-deletion/${name}`);
+const tenantResetSql = (name: string) => sql(`tenant-reset/${name}`);
 
 function withoutSqlComments(source: string): string {
   return source.replace(/--.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
+
+test("precheck de reset reconoce catálogos globales reales y explica cada bloqueo", () => {
+  const precheck = tenantResetSql("01_pre_reset_audit.sql");
+
+  for (const globalTable of [
+    "category_import_aliases",
+    "features",
+    "import_amount_normalization_rules",
+    "sector_templates",
+  ]) {
+    assert.match(precheck, new RegExp(`'${globalTable}'`));
+  }
+  assert.match(precheck, /CREATE TEMP TABLE reset_precheck_checks/);
+  assert.match(precheck, /no populated UNKNOWN tables/);
+  assert.match(precheck, /TABLE reset_precheck_checks;/);
+  assert.match(precheck, /bool_and\(passed\)/);
+  assert.doesNotMatch(withoutSqlComments(precheck), /\b(?:UPDATE|MERGE|ALTER|TRUNCATE|CALL)\b/i);
+});
+
+test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irresolubles", () => {
+  const reset = tenantResetSql("02_tenant_reset.sql");
+
+  assert.match(reset, /to_regclass\('pg_temp\.reset_precheck_checks'\)/);
+  assert.match(reset, /SELECT bool_and\(passed\) FROM pg_temp\.reset_precheck_checks/);
+  assert.match(reset, /classification='UNKNOWN'/);
+  assert.match(reset, /grafo FK tenant sin orden seguro/);
+  assert.match(reset, /tablas pendientes=%/);
+  assert.match(reset, /p\.oid='miclub\.reject_financial_fact_delete\(\)'::regprocedure/);
+  assert.match(reset, /ALTER TABLE miclub\.movements DISABLE TRIGGER movements_reject_physical_delete/);
+  assert.match(reset, /ALTER TABLE miclub\.payments DISABLE TRIGGER payments_reject_physical_delete/);
+  assert.match(reset, /ALTER TABLE miclub\.movements ENABLE TRIGGER movements_reject_physical_delete/);
+  assert.match(reset, /ALTER TABLE miclub\.payments ENABLE TRIGGER payments_reject_physical_delete/);
+  assert.match(reset, /ROLLBACK;\s*$/);
+  assert.doesNotMatch(withoutSqlComments(reset), /^\s*(?:TRUNCATE|COMMIT)\b/im);
+});
+
+test("validación post-reset exige que los guards financieros queden habilitados", () => {
+  const validation = tenantResetSql("03_post_reset_validation.sql");
+
+  assert.match(validation, /financial delete guards enabled/);
+  assert.match(validation, /count\(\*\)=2/);
+  assert.match(validation, /t\.tgenabled='O'/);
+  assert.match(validation, /reject_financial_fact_delete\(\)/);
+});
 
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {
   const diagnostic = tenantDeletionSql("01_tenant_inventory_readonly.sql");

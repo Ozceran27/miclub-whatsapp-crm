@@ -18,6 +18,17 @@ INSERT INTO reset_validation VALUES
  ('memberships zero',(SELECT count(*)=0 FROM miclub.user_club_memberships),(SELECT count(*)::text FROM miclub.user_club_memberships)),
  ('people zero',(SELECT count(*)=0 FROM miclub.people),(SELECT count(*)::text FROM miclub.people));
 
+INSERT INTO reset_validation
+SELECT 'financial delete guards enabled',count(*)=2,
+       count(*)::text||'/2 enabled and canonical'
+FROM pg_catalog.pg_trigger t
+JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+WHERE NOT t.tgisinternal AND t.tgenabled='O'
+  AND (t.tgrelid,t.tgname) IN (
+   (to_regclass('miclub.movements'),'movements_reject_physical_delete'),
+   (to_regclass('miclub.payments'),'payments_reject_physical_delete'))
+  AND p.oid='miclub.reject_financial_fact_delete()'::regprocedure;
+
 DO $validate$
 DECLARE r record; n bigint; h text; before record; total numeric; orphan_n bigint; nullable_pred text;
 BEGIN
