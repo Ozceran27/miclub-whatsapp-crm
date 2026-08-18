@@ -28,6 +28,11 @@ export async function provisionClub(
     returning id`, [clubCode(input.club.name), input.club.name]);
   const clubId = club.rows[0].id;
 
+  // Public registration starts without a tenant context because the tenant does
+  // not exist yet. As soon as it does, bind the rest of this transaction to it
+  // so every RLS-protected bootstrap insert is both visible and admissible.
+  await client.query("select set_config('app.club_id', $1, true)", [clubId]);
+
   const subscription = await client.query<{ plan_code: string }>(`
     insert into miclub.club_subscriptions (club_id, plan_code, effective_from)
     select $1, code, now()

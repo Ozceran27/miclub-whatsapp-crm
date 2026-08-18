@@ -162,6 +162,15 @@ test("el runtime prioritario queda sin BYPASSRLS y falla cerrado sin tenant", as
   assert.match(negative, /ROLLBACK/);
 });
 
+test("el runtime recupera acceso operativo sin eliminar el aislamiento RLS", async () => {
+  const migration = await readFile(path.resolve(migrationsDir, "202608180002_restore_runtime_application_grants.sql"), "utf8");
+
+  assert.match(migration, /GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA miclub TO miclub_runtime/);
+  assert.match(migration, /has_table_privilege\('miclub_runtime', 'miclub\.clubs', 'INSERT'\)/);
+  assert.match(migration, /has_table_privilege\('miclub_runtime', 'miclub\.xlsx_import_rows', 'INSERT'\)/);
+  assert.doesNotMatch(migration, /DISABLE ROW LEVEL SECURITY|BYPASSRLS/);
+});
+
 test("la regresión SQL reconoce el SQLSTATE específico de ON DELETE RESTRICT", async () => {
   const sql = await readFile(path.resolve(migrationsDir, "../tests/activity_catalog_tenant_fkeys.sql"), "utf8");
 
