@@ -135,6 +135,10 @@ test("precheck de reset reconoce catálogos globales reales y explica cada bloqu
     assert.match(precheck, new RegExp(`'${globalTable}'`));
   }
   assert.match(precheck, /CREATE TEMP TABLE reset_precheck_checks/);
+  assert.match(precheck, /CREATE TEMP TABLE reset_scope_rows/);
+  assert.match(precheck, /TENANT_TRANSITIVE/);
+  assert.match(precheck, /to_jsonb\(x\)->%L = p\.row_data->%L/);
+  assert.match(precheck, /temporary_backup/);
   assert.match(precheck, /no populated UNKNOWN tables/);
   assert.match(precheck, /TABLE reset_precheck_checks;/);
   assert.match(precheck, /bool_and\(passed\)/);
@@ -148,7 +152,11 @@ test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irres
   assert.match(reset, /SELECT bool_and\(passed\) FROM pg_temp\.reset_precheck_checks/);
   assert.match(reset, /classification='UNKNOWN'/);
   assert.match(reset, /grafo FK tenant sin orden seguro/);
-  assert.match(reset, /tablas pendientes=%/);
+  assert.match(reset, /grafo FK tenant sin orden seguro: ciclo/);
+  assert.match(reset, /intervención DBA requerida/);
+  assert.match(reset, /reset_delete_order/);
+  assert.match(reset, /reset_scope_rows p/);
+  assert.match(reset, /no tiene condición tenant derivada de FK/);
   assert.match(reset, /CREATE TEMP TABLE _candidate_users/);
   assert.match(reset, /con\.confrelid='miclub\.users'::regclass/);
   assert.match(reset, /AUTH_TABLE_UNKNOWN/);
@@ -175,6 +183,8 @@ test("validación post-reset exige que los guards financieros queden habilitados
   }
   assert.match(validation, /UNKNOWN auth table/);
   assert.match(validation, /UNKNOWN: clasificar y agregar una comprobación explícita/);
+  assert.match(validation, /captured tenant rows removed/);
+  assert.match(validation, /reset_scope_tables/);
 });
 
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {
