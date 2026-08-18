@@ -6,6 +6,15 @@ SELECT pg_advisory_xact_lock(hashtextextended(current_database() || ':tenant-res
 DO $preconditions$
 DECLARE users_n bigint; clubs_n bigint; memberships_n bigint; bad_n bigint;
 BEGIN
+ IF to_regclass('pg_temp.reset_precheck_checks') IS NULL
+    OR to_regclass('pg_temp.reset_inventory') IS NULL
+    OR to_regclass('pg_temp.reset_global_fingerprints') IS NULL THEN
+   RAISE EXCEPTION 'Reset abortado: ejecute 01_pre_reset_audit.sql completo en esta misma conexión';
+ END IF;
+ IF (SELECT bool_and(passed) FROM pg_temp.reset_precheck_checks) IS DISTINCT FROM true THEN
+   RAISE EXCEPTION 'Reset abortado: reset_precheck_checks contiene uno o más FAIL';
+ END IF;
+
  SELECT count(*) INTO users_n FROM miclub.users;
  SELECT count(*) INTO clubs_n FROM miclub.clubs;
  SELECT count(*) INTO memberships_n FROM miclub.user_club_memberships;
@@ -26,6 +35,17 @@ BEGIN
      AND m.club_id=(SELECT id FROM miclub.clubs LIMIT 1)) THEN
    RAISE EXCEPTION 'Reset abortado: el club no pertenece al usuario diagnóstico';
  END IF;
+
+ /* Revalida UNKNOWN poblados para cerrar la ventana entre auditoría y ensayo. */
+ FOR bad_n IN
+  SELECT (xpath('/row/c/text()',query_to_xml(
+    format('select count(*) c from %I.%I',i.table_schema,i.table_name),false,true,'')))[1]::text::bigint
+  FROM pg_temp.reset_inventory i WHERE i.classification='UNKNOWN'
+ LOOP
+  IF bad_n>0 THEN
+   RAISE EXCEPTION 'Reset abortado: una tabla UNKNOWN se pobló después del precheck';
+  END IF;
+ END LOOP;
 END $preconditions$;
 
 /* Descubre el grafo FK y borra tablas tenant en orden hijos→padres. */
@@ -55,7 +75,13 @@ BEGIN
   END LOOP;
   EXIT WHEN NOT progressed OR pass>100;
  END LOOP;
- /* Ciclos o referencias indirectas se resuelven mediante cascadas declaradas al borrar roots. */
+ IF EXISTS (SELECT 1 FROM reset_targets WHERE has_club_id) THEN
+   RAISE EXCEPTION 'Reset abortado: grafo FK tenant sin orden seguro; tablas pendientes=%',
+    (SELECT string_agg(format('%I.%I',schema_name,table_name),', ' ORDER BY schema_name,table_name)
+     FROM reset_targets WHERE has_club_id);
+ END IF;
+
+ /* Las referencias indirectas soportadas se resuelven por sus cascadas declaradas. */
  DELETE FROM miclub.user_club_memberships
   WHERE user_id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
  DELETE FROM miclub.clubs;
@@ -64,4 +90,3 @@ END $delete$;
 
 /* ENSAYO SEGURO. Tras revisarlo, cambiar únicamente ROLLBACK por COMMIT. */
 ROLLBACK;
-

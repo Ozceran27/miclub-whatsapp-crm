@@ -11,12 +11,15 @@ una única conexión de DBeaver, con **Auto-commit desactivado** y `ON_ERROR_STO
 1. Crear y verificar un backup restaurándolo en una base descartable. Conservar
    URI/fecha/checksum y evidencia de la restauración en el ticket.
 2. Ejecutar `01_pre_reset_audit.sql` completo. Exportar todos sus result sets,
-   especialmente la matriz y `reset_global_fingerprints`. No continuar salvo
+   especialmente la matriz, `reset_global_fingerprints` y
+   `reset_precheck_checks`. No continuar salvo
    que el último resultado sea `RESET PRECHECK: PASS`.
 3. Revisar que las clasificaciones `UNKNOWN` estén justificadas. El reset se
    niega a borrar una tabla desconocida: reclasificar el caso en el script sólo
    después de revisar su semántica y guardar esa revisión.
-4. Ejecutar `02_tenant_reset.sql` inicialmente con el `ROLLBACK` final. Revisar
+4. En la **misma conexión**, ejecutar `02_tenant_reset.sql` inicialmente con el
+   `ROLLBACK` final. El script exige las tablas temporales y el PASS de `01`; no
+   copie resultados entre sesiones. Revisar
    los avisos y conteos. Cuando el ensayo sea correcto, cambiar **solamente** ese
    `ROLLBACK` por `COMMIT` y ejecutar de nuevo desde el principio.
 5. Sin cerrar la conexión (la huella pre-reset es temporal), ejecutar
@@ -81,8 +84,8 @@ Los result sets mínimos que deben compartirse son: matriz completa de tablas,
 las tres consultas del usuario diagnóstico, huellas globales y el resultado
 final `RESET PRECHECK`. Comprímalos en ZIP si son grandes, conservando nombres
 claros como `01_table_matrix.csv`, `02_diagnostic_user.csv`,
-`03_memberships.csv`, `04_clubs.csv`, `05_global_fingerprints.csv`,
-`06_precheck_status.csv` y `07_output_log.txt`.
+   `03_memberships.csv`, `04_clubs.csv`, `05_global_fingerprints.csv`,
+   `06_precheck_checks.csv`, `07_precheck_status.csv` y `08_output_log.txt`.
 
 Si las pestañas anteriores ya se cerraron pero la conexión sigue viva, puede
 recuperar el inventario y las huellas con:
