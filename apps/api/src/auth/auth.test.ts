@@ -44,12 +44,13 @@ test("login registra éxito y aplica bloqueo después de cinco fallos", async ()
   const failedUpdates: Array<{ attempts: number; lockedUntil: Date | null }> = [];
   const successfulLogins: Date[] = [];
   const repository: UserRepository = {
-    async findByEmail(email) {
+    findByEmail(email) {
       assert.equal(email, "admin@miclub.test");
-      return user;
+      return Promise.resolve(user);
     },
-    async recordFailedLogin(_id, attempts, lockedUntil) { failedUpdates.push({ attempts, lockedUntil }); },
-    async recordSuccessfulLogin(_id, at) { successfulLogins.push(at); }
+    resolveTenant() { return Promise.resolve(user.tenant); },
+    recordFailedLogin(_id, attempts, lockedUntil) { failedUpdates.push({ attempts, lockedUntil }); return Promise.resolve(); },
+    recordSuccessfulLogin(_id, at) { successfulLogins.push(at); return Promise.resolve(); }
   };
   const now = new Date("2026-07-25T12:00:00Z");
 

@@ -26,6 +26,7 @@
     "db:backup": "bash scripts/backup-postgres.sh",
     "bootstrap:director": "tsx apps/api/src/scripts/bootstrapDirector.ts",
     "auth:set-password": "npm run auth:set-password -w @miclub/api --",
+    "club:set-plan": "npm run club:set-plan -w @miclub/api --",
     "lint": "eslint .",
     "deadcode": "knip"
   },

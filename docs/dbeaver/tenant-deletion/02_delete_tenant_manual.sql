@@ -93,7 +93,8 @@ INSERT INTO _expected_manifest(name,checksum) VALUES
     ('202608150006_remove_empty_bootstrap_legacy_club.sql', 'bb561df6444fa1a4680859f0ec1f262db6e0d51b5be95a72c82fda30d78c9488'),
     ('202608160001_commercial_plan_taxonomy.sql', '5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c'),
     ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119'),
-    ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea')
+    ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea'),
+    ('202608180003_fix_rls_login_membership_resolution.sql', '52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335')
 -- MIGRATION_MANIFEST_VALUES:END
 ;
 DO $$ DECLARE v_mismatches bigint; BEGIN
