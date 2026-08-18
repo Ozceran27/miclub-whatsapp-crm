@@ -72,6 +72,25 @@ BEGIN
  END LOOP;
 END $auth_validation$;
 
+/* El manifiesto/back-up de 01 incluye también hijos sin club_id. Se conserva
+ * tras el COMMIT para poder exigir cero y mostrar antes/después por tabla. */
+DO $transitive_validation$
+DECLARE r record; n bigint;
+BEGIN
+ IF to_regclass('pg_temp.reset_scope_tables') IS NULL
+    OR to_regclass('pg_temp.reset_scope_rows') IS NULL THEN
+  INSERT INTO reset_validation VALUES
+   ('transitive reset backup available',false,'Ejecute 01 y el COMMIT de 02 en esta misma conexión');
+  RETURN;
+ END IF;
+ FOR r IN SELECT * FROM pg_temp.reset_scope_tables LOOP
+  EXECUTE format('select count(*) from %I.%I',r.table_schema,r.table_name) INTO n;
+  INSERT INTO reset_validation VALUES(
+   format('captured tenant rows removed %I.%I',r.table_schema,r.table_name),n=0,
+   format('antes=%s después=%s clasificación=%s',r.captured_rows,n,r.classification));
+ END LOOP;
+END $transitive_validation$;
+
 INSERT INTO reset_validation
 SELECT 'financial delete guards enabled',count(*)=2,
        count(*)::text||'/2 enabled and canonical'

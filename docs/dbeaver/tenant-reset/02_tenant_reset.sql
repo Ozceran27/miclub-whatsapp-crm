@@ -21,6 +21,10 @@ BEGIN
    INSERT INTO reset_execution_counts VALUES ('miclub.club_memberships',true,n);
  END IF;
 END $capture_optional_count$;
+INSERT INTO reset_execution_counts
+SELECT format('%I.%I',table_schema,table_name),true,captured_rows
+FROM pg_temp.reset_scope_tables
+ON CONFLICT (relation_name) DO UPDATE SET row_count=excluded.row_count;
 TABLE reset_execution_counts;
 
 /*
@@ -190,6 +194,7 @@ BEGIN
   SELECT (xpath('/row/c/text()',query_to_xml(
     format('select count(*) c from %I.%I',i.table_schema,i.table_name),false,true,'')))[1]::text::bigint
   FROM pg_temp.reset_inventory i WHERE i.classification='UNKNOWN'
+    AND NOT EXISTS (SELECT FROM pg_temp.reset_scope_tables t WHERE t.table_oid=i.oid)
  LOOP
   IF bad_n>0 THEN
    RAISE EXCEPTION 'Reset abortado: una tabla UNKNOWN se pobló después del precheck';
@@ -206,53 +211,90 @@ END $preconditions$;
 ALTER TABLE miclub.movements DISABLE TRIGGER movements_reject_physical_delete;
 ALTER TABLE miclub.payments DISABLE TRIGGER payments_reject_physical_delete;
 
-/* Descubre el grafo FK y borra tablas tenant en orden hijos→padres. */
+/* Borra exactamente el alcance respaldado por 01, en el orden topológico
+ * producido por las FKs. No existe fallback DELETE genérico: cada condición es
+ * club_id contra IDs capturados o una FK real contra el respaldo de su padre. */
 DO $delete$
-DECLARE r record; affected bigint; pass integer:=0; progressed boolean;
+DECLARE r record; e record; affected bigint; predicate text; where_sql text;
+        progressed boolean; remaining integer;
 BEGIN
- CREATE TEMP TABLE reset_targets ON COMMIT DROP AS
- SELECT c.oid, n.nspname schema_name,c.relname table_name,
-        EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attname='club_id' AND NOT a.attisdropped) has_club_id
- FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema')
-   AND n.nspname !~ '^pg_toast'
-   AND NOT (n.nspname='public' AND c.relname='miclub_schema_migrations');
-
- /* Sólo tablas club-scoped; NOT EXISTS implementa el orden topológico FK. */
- LOOP
-  pass:=pass+1; progressed:=false;
-  FOR r IN
-   SELECT t.* FROM reset_targets t WHERE t.has_club_id
-   AND NOT EXISTS (SELECT 1 FROM pg_constraint fk JOIN reset_targets child ON child.oid=fk.conrelid
-                   WHERE fk.contype='f' AND fk.confrelid=t.oid AND child.has_club_id AND child.oid<>t.oid)
-  LOOP
-   EXECUTE format('delete from %I.%I where club_id in (select id from miclub.clubs)',r.schema_name,r.table_name);
-   GET DIAGNOSTICS affected=ROW_COUNT;
-   RAISE NOTICE 'DELETE %.%: % filas',r.schema_name,r.table_name,affected;
-   DELETE FROM reset_targets WHERE oid=r.oid; progressed:=true;
-  END LOOP;
-  EXIT WHEN NOT progressed OR pass>100;
- END LOOP;
- IF EXISTS (SELECT 1 FROM reset_targets WHERE has_club_id) THEN
-   RAISE EXCEPTION 'Reset abortado: grafo FK tenant sin orden seguro; tablas pendientes=%',
-    (SELECT string_agg(format('%I.%I',schema_name,table_name),', ' ORDER BY schema_name,table_name)
-     FROM reset_targets WHERE has_club_id);
+ IF to_regclass('pg_temp.reset_scope_rows') IS NULL
+    OR to_regclass('pg_temp.reset_scope_tables') IS NULL
+    OR to_regclass('pg_temp.reset_fk_edges') IS NULL
+    OR to_regclass('pg_temp.reset_target_clubs') IS NULL THEN
+  RAISE EXCEPTION 'Reset abortado: faltan alcance/IDs/backups transitivos de 01';
  END IF;
 
- /* Primero se retiran sesiones/tokens/intentos y cualquier otro hijo directo
-  * que no tenga ON DELETE CASCADE. El guard anterior ya probó que cada una de
-  * esas referencias corresponde exclusivamente a los tenants objetivo. */
+ CREATE TEMP TABLE reset_delete_order
+  (position integer GENERATED ALWAYS AS IDENTITY,table_oid oid PRIMARY KEY,
+   table_schema text,table_name text) ON COMMIT DROP;
+ CREATE TEMP TABLE reset_pending ON COMMIT DROP AS
+  SELECT * FROM reset_scope_tables WHERE table_oid<>'miclub.clubs'::regclass;
+
+ /* Un nodo sólo sale cuando ya salieron todos sus hijos alcanzados. Si una
+  * iteración no progresa, el remanente es un ciclo y requiere decisión DBA. */
+ LOOP
+  progressed:=false;
+  FOR r IN SELECT p.* FROM reset_pending p
+   WHERE NOT EXISTS (
+    SELECT 1 FROM reset_fk_edges fk JOIN reset_pending child ON child.table_oid=fk.child_oid
+    WHERE fk.parent_oid=p.table_oid AND child.table_oid<>p.table_oid)
+   AND NOT EXISTS (
+    SELECT 1 FROM reset_fk_edges fk
+    WHERE fk.parent_oid=p.table_oid AND fk.child_oid=p.table_oid)
+   ORDER BY p.min_depth DESC,p.table_schema,p.table_name
+  LOOP
+   INSERT INTO reset_delete_order(table_oid,table_schema,table_name)
+    VALUES(r.table_oid,r.table_schema,r.table_name);
+   DELETE FROM reset_pending WHERE table_oid=r.table_oid; progressed:=true;
+  END LOOP;
+  SELECT count(*) INTO remaining FROM reset_pending;
+  EXIT WHEN remaining=0;
+  IF NOT progressed THEN
+   RAISE EXCEPTION 'Reset abortado: grafo FK tenant sin orden seguro: ciclo; intervención DBA requerida; tablas pendientes=%',
+    (SELECT string_agg(format('%I.%I',table_schema,table_name),', ' ORDER BY table_schema,table_name) FROM reset_pending);
+  END IF;
+ END LOOP;
+
+ FOR r IN SELECT * FROM reset_delete_order ORDER BY position LOOP
+  where_sql:=NULL;
+  IF r.table_oid IN (SELECT table_oid FROM reset_scope_tables WHERE has_club_id) THEN
+   where_sql:='x.club_id in (select id from reset_target_clubs)';
+  END IF;
+  FOR e IN SELECT fk.* FROM reset_fk_edges fk
+   WHERE fk.child_oid=r.table_oid
+     AND EXISTS (SELECT FROM reset_scope_rows p WHERE p.table_oid=fk.parent_oid)
+  LOOP
+   SELECT string_agg(format('to_jsonb(x)->%L = p.row_data->%L',ca.attname,pa.attname),' AND ' ORDER BY k.ord)
+    INTO predicate
+   FROM unnest(e.child_keys,e.parent_keys) WITH ORDINALITY k(child_att,parent_att,ord)
+   JOIN pg_attribute ca ON ca.attrelid=e.child_oid AND ca.attnum=k.child_att
+   JOIN pg_attribute pa ON pa.attrelid=e.parent_oid AND pa.attnum=k.parent_att;
+   IF predicate IS NULL THEN
+    RAISE EXCEPTION 'Reset abortado [UNKNOWN]: FK % no demuestra pertenencia; intervención DBA requerida',e.conname;
+   END IF;
+   where_sql:=concat_ws(' OR ',where_sql,format('exists (select 1 from reset_scope_rows p where p.table_oid=%s and %s)',e.parent_oid,predicate));
+  END LOOP;
+  IF where_sql IS NULL THEN
+   RAISE EXCEPTION 'Reset abortado [UNKNOWN]: %.% no tiene condición tenant derivada de FK',r.table_schema,r.table_name;
+  END IF;
+  EXECUTE format('delete from %I.%I x where %s',r.table_schema,r.table_name,where_sql);
+  GET DIAGNOSTICS affected=ROW_COUNT;
+  IF affected<>(SELECT captured_rows FROM reset_scope_tables WHERE table_oid=r.table_oid) THEN
+   RAISE EXCEPTION 'Reset abortado: conteo cambió para %.% (capturado %, eliminado %)',r.table_schema,r.table_name,
+    (SELECT captured_rows FROM reset_scope_tables WHERE table_oid=r.table_oid),affected;
+  END IF;
+  RAISE NOTICE 'DELETE %.%: % filas (orden %)',r.table_schema,r.table_name,affected,r.position;
+ END LOOP;
+
+ /* Identidad global: conserva sus guards específicos y el inventario dinámico. */
  FOR r IN SELECT ur.* FROM _user_references ur WHERE ur.confdeltype<>'c'
  LOOP
   EXECUTE format('delete from %I.%I x using _candidate_users c where x.%I=c.user_id',
                  r.table_schema,r.table_name,r.user_column);
  END LOOP;
-
- DELETE FROM miclub.user_club_memberships m USING _candidate_users c
-  WHERE m.user_id=c.user_id;
- DELETE FROM miclub.clubs;
- /* El antijoin final hace que una FK aparecida durante el borrado provoque una
-  * violación/revisión, nunca un borrado más amplio. */
+ DELETE FROM miclub.user_club_memberships m USING _candidate_users c WHERE m.user_id=c.user_id;
+ DELETE FROM miclub.clubs c WHERE EXISTS (SELECT FROM reset_target_clubs t WHERE t.id=c.id);
  DELETE FROM miclub.users u USING _candidate_users c WHERE u.id=c.user_id
   AND NOT EXISTS (SELECT 1 FROM pg_constraint con
                   WHERE con.contype='f' AND con.confrelid='miclub.users'::regclass
