@@ -33,3 +33,20 @@ membership/employee, payment methods and the three system sectors.
 MIGRATION_GATE_DATABASE_URL=postgres://postgres:postgres@localhost/postgres \
   npm run db:public-registration:integration
 ```
+
+## Empty-database first-club journey
+
+`emptyDatabaseJourney.test.ts` only accepts `MICLUB_TEST_DATABASE_URL` when its
+database name explicitly contains `test`. It creates a randomly named database,
+runs the real migration runner from zero, verifies the migration ledger and
+global catalogs, and drops that database in teardown. The API is pointed only at
+that disposable database while it exercises health, first-club registration,
+login, `/auth/me`, empty dashboards, onboarding, catalogs and logout.
+
+When the variable is absent, Node reports the test as skipped with the explicit
+reason that no shared or production database will be used:
+
+```bash
+MICLUB_TEST_DATABASE_URL=postgres://postgres:postgres@localhost/miclub_test \
+  npm run test:integration:empty-db -w @miclub/api
+```
