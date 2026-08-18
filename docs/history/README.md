@@ -11,6 +11,8 @@ La referencia vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md
 - [`readiness-target-2026-08-07.md`](readiness-target-2026-08-07.md): auditoría sanitizada y bloqueada del entorno destino.
 - [`migration-readiness-2026-06-28.md`](migration-readiness-2026-06-28.md): evaluación de la migración anterior.
 - [`postgres-backup-and-ledger-readiness.md`](postgres-backup-and-ledger-readiness.md): hallazgos anteriores sobre backup y ledger.
+- [`sheet-structure.md`](sheet-structure.md): rangos de la antigua integración con Google Sheets; no describe el importador XLSX vigente.
+- [`google-sheets-enrollment-archive.sql`](google-sheets-enrollment-archive.sql): parche manual sustituido por migraciones versionadas; no ejecutar en instalaciones nuevas.
 
 - [`checkpoint-stable-2026-06-29.md`](checkpoint-stable-2026-06-29.md): fotografía operativa declarada el 2026-06-29, reemplazada por el checkpoint pre-admin.
 - [`sheets-sqlite-fallback-context-2026-07-28.md`](sheets-sqlite-fallback-context-2026-07-28.md): descripción legacy del fallback Sheets/mock y SQLite, archivada el 2026-07-28.

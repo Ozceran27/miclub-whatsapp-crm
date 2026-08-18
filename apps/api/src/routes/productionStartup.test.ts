@@ -2,6 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
+
+test("startup commands never invoke the director repair script", () => {
+  const repoRoot = path.resolve(import.meta.dirname, "../../../..");
+  const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { scripts?: Record<string, string> };
+  const apiPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/api/package.json"), "utf8")) as { scripts?: Record<string, string> };
+  const startupCommands = [rootPackage.scripts?.start, rootPackage.scripts?.["start:prod"], apiPackage.scripts?.start, apiPackage.scripts?.dev].filter(Boolean).join("\n");
+
+  assert.doesNotMatch(startupCommands, /bootstrap(?::director|Director)/i);
+});
 
 test("production startup does not load SQLite or Google Sheets", async () => {
   const repoRoot = path.resolve(import.meta.dirname, "../../../..");
@@ -27,6 +37,7 @@ test("production startup does not load SQLite or Google Sheets", async () => {
       CORS_ORIGINS: "https://miclub.example",
       IMPORT_ENDPOINTS_ENABLED: "false",
       DEBUG_ENDPOINTS_ENABLED: "false",
+      BOOTSTRAP_DIRECTOR_ENABLED: "false",
       GOOGLE_SHEETS_ENABLED: "false",
       SQLITE_DB_PATH: "/dev/null/must-not-be-opened.sqlite",
     },

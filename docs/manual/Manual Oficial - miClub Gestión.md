@@ -50,7 +50,7 @@ CAPÍTULO 1 — INICIO
 
 
 
-Alcance auditado. La pantalla Inicio está implementada por HomeModule, useHomeDashboard, HomeMetricCards, RecentMovements y SectorDistribution. Consume endpoints raíz legacy compatibles: /summary, /members, /debtors, /sync-status, /club-finance-summary y /sector-operational-summary. En el estado productivo declarado, PostgreSQL es la fuente oficial; Google Sheets queda como origen histórico de migración y compatibilidad no productiva.
+Alcance auditado. La pantalla Inicio está implementada por HomeModule, useHomeDashboard, HomeMetricCards, RecentMovements y SectorDistribution. Consume endpoints raíz legacy compatibles: /summary, /members, /debtors, /sync-status, /club-finance-summary y /sector-operational-summary. En el estado productivo declarado, PostgreSQL es la fuente oficial; Google Sheets fue retirado y sólo se conserva como antecedente histórico no ejecutable.
 
 
 
@@ -64,7 +64,7 @@ Estado: el frontend muestra “Con advertencias” si /sync-status devuelve erro
 
 Botón Sincronizar: vuelve a ejecutar loadHome y recarga en paralelo todos los endpoints del Inicio. No importa datos ni escribe en PostgreSQL; solo refresca la vista.
 
-Origen de datos: DATA_SOURCE=postgres activa PostgreSQL mediante shouldUsePostgresDataSource. Google Sheets no es backend oficial; aparece solo en rutas heredadas y procesos de migración.
+Origen de datos: DATA_SOURCE=postgres activa PostgreSQL mediante shouldUsePostgresDataSource. Google Sheets no es backend ni proceso de migración disponible: su API, credenciales y dependencia `googleapis` fueron retiradas.
 
 Tablas/servicios: /sync-status usa getPostgresHealth y validatePostgresEnv. Los datos funcionales se construyen desde people, enrollments, activities, sectors, movements, operational_balances y sheet_metric_snapshots.
 
@@ -209,6 +209,12 @@ El clasificador único de gastos aplica prioridad DEBT, SERVICES, TAXES, OPERATI
 
 Convención de signos del gráfico “Gastos por Tipo”: para Gastos Operativos y Gastos No Operativos se suman únicamente EGRESOS; para Deudas/Pasivos, Servicios e Impuestos se calcula EGRESOS - INGRESOS y se preserva el signo sin `ABS()`. Un valor negativo representa ingreso/reintegro neto superior al egreso del mes. Los movimientos no clasificados se reportan en metadata y en el script `npm run audit:economy-yearly-breakdown -- --asOf=AAAA-MM-DD` sin reclasificarlos como OTROS.
 
+
+CAPÍTULO 9 — MIGRACIÓN XLSX (VIGENTE)
+
+La importación soportada recibe un archivo `.xlsx` mediante `POST /api/migration`. Es independiente de Google Sheets: no consulta Google Sheets API, no requiere credenciales `GOOGLE_*` y no utiliza la dependencia `googleapis`. Se debe ejecutar primero el dry-run, revisar errores y conservar el hash y reporte del lote antes de persistir. La guía operativa vigente es `docs/import-xlsx.md`.
+
+Los antiguos procedimientos que leían rangos de una planilla Google o archivaban inscripciones de ese importador están en `docs/history/` y no deben ejecutarse en instalaciones nuevas. XLSX continúa soportado aunque Google Sheets haya sido retirado.
 
 CAPÍTULO 10 — ADMINISTRACIÓN (ACTUALIZACIÓN POST-ADMIN)
 
