@@ -22,3 +22,25 @@
 La CLI no imprime contraseña ni hash. Actualiza la cuenta deliberadamente sólo
 cuando el operador proporciona una contraseña temporal; revoca sesiones previas
 y registra `bootstrap.director` en `miclub.audit_log`.
+## Corrección posterior a un alta y asignación de plan
+
+El alta pública siempre aprovisiona `FREE`. Una excepción controlada (por
+ejemplo, el club de prueba inicial) se promueve después del alta, identificando
+explícitamente al usuario o al club; nunca se infiere por fecha ni por ser el
+último registro creado.
+
+Después de aplicar las migraciones, asigne el plan comercial más alto al club
+de prueba con credenciales administrativas:
+
+```bash
+npm run db:migrate
+npm run club:set-plan -- --email=USUARIO_DE_PRUEBA --plan=ENTERPRISE
+# Alternativa equivalente si se conoce el UUID:
+npm run club:set-plan -- --club-id=UUID_DEL_CLUB --plan=ENTERPRISE
+```
+
+El comando bloquea el club, exige una cadena activa completa
+`user -> person -> membership -> club`, cierra la suscripción vigente e inserta
+la nueva dentro de una única transacción. Su salida JSON incluye todos los IDs
+resueltos para conservar evidencia. Ante ambigüedad o datos incompletos no
+modifica nada.

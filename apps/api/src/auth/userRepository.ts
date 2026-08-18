@@ -19,6 +19,7 @@ type UserRow = {
 
 export interface UserRepository {
   findByEmail(email: string): Promise<AuthUser | null>;
+  resolveTenant(userId: string): Promise<AuthUser["tenant"]>;
   recordFailedLogin(userId: string, failedAttempts: number, lockedUntil: Date | null): Promise<void>;
   recordSuccessfulLogin(userId: string, loggedInAt: Date): Promise<void>;
 }
@@ -81,25 +82,31 @@ export const postgresUserRepository: UserRepository = {
     const pool = await getPostgresPool();
     const result = await pool.query<UserRow>(
       `SELECT u.id, u.email, u.password_hash, u.status, u.failed_login_attempts,
-              u.locked_until, u.last_login_at, membership.id AS membership_id,
-              membership.club_id, membership.role_code, membership.permissions,
-              membership.sector_ids, membership.person_id
+              u.locked_until, u.last_login_at,
+              NULL::uuid AS membership_id, NULL::uuid AS club_id,
+              NULL::text AS role_code, NULL::text[] AS permissions,
+              NULL::uuid[] AS sector_ids, NULL::uuid AS person_id
        FROM miclub.users u
-       LEFT JOIN LATERAL (
-         SELECT ucm.id, ucm.club_id, r.code AS role_code, person.id AS person_id,
-                ucm.permissions, ucm.sector_ids
-         FROM miclub.user_club_memberships ucm
-         JOIN miclub.clubs c ON c.id = ucm.club_id AND c.is_active = true
-         JOIN miclub.roles r ON r.id = ucm.role_id AND r.club_id = ucm.club_id
-         JOIN miclub.people person ON person.user_id = u.id AND person.club_id = ucm.club_id
-         WHERE ucm.user_id = u.id AND ucm.status = 'active'
-         ORDER BY ucm.created_at ASC
-         LIMIT 1
-       ) membership ON true
        WHERE lower(u.email) = lower($1) LIMIT 1`,
       [email]
     );
     return result.rows[0] ? mapUser(result.rows[0]) : null;
+  },
+
+  async resolveTenant(userId) {
+    const pool = await getPostgresPool();
+    // The function is the deliberately narrow authentication bootstrap across
+    // FORCE RLS. It is called only after the application verified the password.
+    const result = await pool.query<Pick<UserRow, "membership_id" | "club_id" | "role_code" | "permissions" | "sector_ids" | "person_id">>(
+      `select membership_id, club_id, role_code, permissions, sector_ids, person_id
+         from miclub.resolve_login_membership($1)`,
+      [userId],
+    );
+    const row = result.rows[0];
+    return row?.membership_id && row.club_id && row.role_code && row.person_id ? {
+      personId: row.person_id, membershipId: row.membership_id, clubId: row.club_id,
+      role: row.role_code, permissions: row.permissions ?? [], sectorIds: row.sector_ids ?? [],
+    } : null;
   },
 
   async recordFailedLogin(userId, failedAttempts, lockedUntil) {

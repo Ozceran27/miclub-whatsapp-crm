@@ -33,13 +33,14 @@ export const login = async (
   // A password-valid identity is not an application principal until the
   // authoritative user -> person -> active membership -> club -> role chain
   // has been resolved. Never issue an identity-only or synthetic tenant cookie.
-  if (!user.tenant) return { ok: false, reason: "membership_required" };
+  const tenant = user.tenant ?? await repository.resolveTenant(user.id);
+  if (!tenant) return { ok: false, reason: "membership_required" };
 
   await repository.recordSuccessfulLogin(user.id, now);
   return { ok: true, context: {
     userId: user.id,
     email: user.email,
     legacy: false,
-    ...(user.tenant ?? {})
+    ...tenant
   } };
 };
