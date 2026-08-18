@@ -3,16 +3,35 @@ SET LOCAL statement_timeout = '15min';
 SET LOCAL lock_timeout = '10s';
 SELECT pg_advisory_xact_lock(hashtextextended(current_database() || ':tenant-reset',0));
 
+/* Evidencia inmutable de esta ejecución: se captura antes del primer DELETE. */
+CREATE TEMP TABLE reset_execution_counts
+ (relation_name text PRIMARY KEY, table_present boolean NOT NULL, row_count bigint);
+INSERT INTO reset_execution_counts VALUES
+ ('miclub.clubs',true,(SELECT count(*) FROM miclub.clubs)),
+ ('miclub.users',true,(SELECT count(*) FROM miclub.users)),
+ ('miclub.user_club_memberships',true,(SELECT count(*) FROM miclub.user_club_memberships)),
+ ('miclub.people',true,(SELECT count(*) FROM miclub.people));
+DO $capture_optional_count$
+DECLARE n bigint;
+BEGIN
+ IF to_regclass('miclub.club_memberships') IS NULL THEN
+   INSERT INTO reset_execution_counts VALUES ('miclub.club_memberships',false,NULL);
+ ELSE
+   EXECUTE 'SELECT count(*) FROM miclub.club_memberships' INTO n;
+   INSERT INTO reset_execution_counts VALUES ('miclub.club_memberships',true,n);
+ END IF;
+END $capture_optional_count$;
+TABLE reset_execution_counts;
+
 DO $preconditions$
-DECLARE users_n bigint; clubs_n bigint; memberships_n bigint; bad_n bigint;
+DECLARE
+ users_n bigint; clubs_n bigint; memberships_n bigint; people_n bigint;
+ club_memberships_n bigint; bad_n bigint; target_club uuid;
 BEGIN
  IF to_regclass('pg_temp.reset_precheck_checks') IS NULL
     OR to_regclass('pg_temp.reset_inventory') IS NULL
     OR to_regclass('pg_temp.reset_global_fingerprints') IS NULL THEN
    RAISE EXCEPTION 'Reset abortado: ejecute 01_pre_reset_audit.sql completo en esta misma conexión';
- END IF;
- IF (SELECT bool_and(passed) FROM pg_temp.reset_precheck_checks) IS DISTINCT FROM true THEN
-   RAISE EXCEPTION 'Reset abortado: reset_precheck_checks contiene uno o más FAIL';
  END IF;
  IF (SELECT count(*) FROM pg_catalog.pg_trigger t
      JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
@@ -24,25 +43,75 @@ BEGIN
    RAISE EXCEPTION 'Reset abortado: guards de borrado financiero ausentes, alterados o deshabilitados';
  END IF;
 
- SELECT count(*) INTO users_n FROM miclub.users;
- SELECT count(*) INTO clubs_n FROM miclub.clubs;
- SELECT count(*) INTO memberships_n FROM miclub.user_club_memberships;
- IF users_n NOT IN (0,1) OR clubs_n NOT IN (0,1) THEN
-   RAISE EXCEPTION 'Reset abortado: users=%, clubs=%; se esperaba 0 o 1',users_n,clubs_n;
+ SELECT row_count INTO users_n FROM reset_execution_counts WHERE relation_name='miclub.users';
+ SELECT row_count INTO clubs_n FROM reset_execution_counts WHERE relation_name='miclub.clubs';
+ SELECT row_count INTO memberships_n FROM reset_execution_counts WHERE relation_name='miclub.user_club_memberships';
+ SELECT row_count INTO people_n FROM reset_execution_counts WHERE relation_name='miclub.people';
+ SELECT COALESCE(row_count,0) INTO club_memberships_n FROM reset_execution_counts
+  WHERE relation_name='miclub.club_memberships';
+
+ IF clubs_n>1 THEN
+   RAISE EXCEPTION 'Reset abortado [MULTIPLES_CLUBES]: clubs=%; el escenario aprobado exige exactamente uno',clubs_n;
  END IF;
- SELECT count(*) INTO bad_n FROM miclub.users
-  WHERE id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
- IF bad_n>0 THEN RAISE EXCEPTION 'Reset abortado: usuario inesperado'; END IF;
- SELECT count(*) INTO bad_n FROM miclub.user_club_memberships
-  WHERE user_id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
- IF bad_n>0 OR memberships_n>1 THEN
-   RAISE EXCEPTION 'Reset abortado: memberships inesperadas (%)',memberships_n;
+
+ /* Estado permitido 1: base completamente reseteada, incluidas personas. */
+ IF clubs_n=0 AND users_n=0 AND memberships_n=0 AND people_n=0 AND club_memberships_n=0 THEN
+   NULL;
+ ELSIF clubs_n<>1 THEN
+   RAISE EXCEPTION 'Reset abortado [ESTADO_PARCIAL]: clubs=%, users=%, auth_memberships=%, club_memberships=%, people=%; no es base vacía ni fixture aprobado',
+    clubs_n,users_n,memberships_n,club_memberships_n,people_n;
+ ELSE
+   /* Estado permitido 2: un solo tenant de desarrollo y su identidad diagnóstica. */
+   SELECT id INTO target_club FROM miclub.clubs;
+
+   SELECT count(*) INTO bad_n FROM miclub.user_club_memberships
+    WHERE club_id IS DISTINCT FROM target_club;
+   IF bad_n>0 THEN
+     RAISE EXCEPTION 'Reset abortado [MEMBERSHIPS_OTROS_CLUBES]: % memberships apuntan fuera del único club',bad_n;
+   END IF;
+
+   SELECT count(*) INTO bad_n FROM miclub.users
+    WHERE id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
+   IF users_n<>1 OR bad_n>0 THEN
+     RAISE EXCEPTION 'Reset abortado [USUARIOS_NO_EXPLICADOS]: users=%, inesperados=%',users_n,bad_n;
+   END IF;
+
+   IF memberships_n<>1 OR NOT EXISTS (
+     SELECT 1 FROM miclub.user_club_memberships m
+     WHERE m.user_id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid
+       AND m.club_id=target_club AND m.status='active') THEN
+     RAISE EXCEPTION 'Reset abortado [MEMBERSHIP_ESPERADA_AUSENTE]: se exige una única membership activa del UUID diagnóstico hacia el único club (encontradas=%)',memberships_n;
+   END IF;
+
+   SELECT count(*) INTO bad_n FROM miclub.people
+    WHERE club_id IS DISTINCT FROM target_club;
+   IF bad_n>0 THEN
+     RAISE EXCEPTION 'Reset abortado [PERSONAS_NO_EXPLICADAS]: % personas no pertenecen al tenant objetivo',bad_n;
+   END IF;
+   SELECT count(*) INTO bad_n FROM miclub.people
+    WHERE user_id IS NOT NULL
+      AND user_id <> '821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
+   IF bad_n>0 THEN
+     RAISE EXCEPTION 'Reset abortado [IDENTIDAD_COMPARTIDA]: % personas enlazan identidades ajenas',bad_n;
+   END IF;
+   SELECT count(*) INTO bad_n FROM miclub.people
+    WHERE user_id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
+   IF bad_n>1 THEN
+     RAISE EXCEPTION 'Reset abortado [IDENTIDAD_COMPARTIDA]: el UUID diagnóstico aparece en % perfiles',bad_n;
+   END IF;
+
+   IF to_regclass('miclub.club_memberships') IS NOT NULL THEN
+     EXECUTE 'SELECT count(*) FROM miclub.club_memberships cm LEFT JOIN miclub.people p ON p.id=cm.person_id WHERE cm.club_id IS DISTINCT FROM $1 OR p.id IS NULL OR p.club_id IS DISTINCT FROM $1'
+       INTO bad_n USING target_club;
+     IF bad_n>0 THEN
+       RAISE EXCEPTION 'Reset abortado [CLUB_MEMBERSHIPS_NO_EXPLICADAS]: % filas no corresponden a personas del tenant objetivo',bad_n;
+     END IF;
+   END IF;
  END IF;
- IF clubs_n=1 AND NOT EXISTS (
-   SELECT 1 FROM miclub.user_club_memberships m
-   WHERE m.user_id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid
-     AND m.club_id=(SELECT id FROM miclub.clubs LIMIT 1)) THEN
-   RAISE EXCEPTION 'Reset abortado: el club no pertenece al usuario diagnóstico';
+
+ /* Se evalúa después de los diagnósticos específicos para no ocultar su causa. */
+ IF (SELECT bool_and(passed) FROM pg_temp.reset_precheck_checks) IS DISTINCT FROM true THEN
+   RAISE EXCEPTION 'Reset abortado [PRE_AUDIT_FAIL]: reset_precheck_checks contiene uno o más FAIL no cubiertos por las validaciones específicas';
  END IF;
 
  /* Revalida UNKNOWN poblados para cerrar la ventana entre auditoría y ensayo. */

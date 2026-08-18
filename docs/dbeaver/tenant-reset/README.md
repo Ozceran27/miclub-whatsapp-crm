@@ -28,9 +28,15 @@ una única conexión de DBeaver, con **Auto-commit desactivado** y `ON_ERROR_STO
 6. Seguir `04_reset_rollback_notes.sql` para rollback/recuperación.
 
 El UUID diagnóstico esperado es
-`821893b6-01a8-4e91-88f7-d869d8f3f8f4`. El reset acepta una base ya vacía o un
-único usuario de prueba y un único club relacionado mediante memberships. La
-existencia de cualquier otro usuario, club o membership aborta la transacción.
+`821893b6-01a8-4e91-88f7-d869d8f3f8f4`. El reset acepta sólo una base totalmente
+vacía o un único tenant de desarrollo: un club, ese único usuario y una única
+membership activa hacia el club. Personas y `club_memberships`, si la
+tabla aún existe, deben estar explicadas íntegramente por ese mismo tenant; se
+rechazan perfiles enlazados a identidades ajenas o una identidad enlazada a más
+de un perfil. El primer result set del pre-audit muestra las filas inesperadas y
+debe revisarse antes de continuar. `02_tenant_reset.sql` vuelve a contar las
+cinco tablas inmediatamente antes de validar y borrar, y muestra esos conteos
+como evidencia de la ejecución.
 
 ## Alcance y garantías
 
