@@ -1,0 +1,16 @@
+"table_schema","table_name","subset_name","subset_predicate","row_count","content_md5"
+miclub,activity_icon_catalog,GLOBAL_ROWS,true,20,"078ff119b7f2b089364baeb9ee251d78"
+miclub,category_catalog,GLOBAL_ROWS,true,33,f5cdbd1eb040f2a9926cb91e480f2468
+miclub,category_import_aliases,GLOBAL_ROWS,true,15,"21c702d72b95a60c5ff1787435cce97f"
+miclub,currencies,GLOBAL_ROWS,true,4,effc59a3eaba95b8b03adcf63b6367e8
+miclub,discount_rates,GLOBAL_ROWS,club_id IS NULL,0,d41d8cd98f00b204e9800998ecf8427e
+miclub,features,GLOBAL_ROWS,true,1,"04aad42e6c70135a874d670d65a4e47e"
+miclub,import_amount_normalization_rules,GLOBAL_ROWS,true,1,"47aa37515d07dad3ba81c19280771531"
+miclub,movement_categories,GLOBAL_ROWS,club_id IS NULL,0,d41d8cd98f00b204e9800998ecf8427e
+miclub,payment_methods,GLOBAL_ROWS,club_id IS NULL,0,d41d8cd98f00b204e9800998ecf8427e
+miclub,plan_entitlements,GLOBAL_ROWS,true,1,"124525b00d8de949d8654d0d64e5fa6f"
+miclub,plans,GLOBAL_ROWS,true,5,"4d014f5dfe8259bc121f2772f1ca9470"
+miclub,roles,GLOBAL_ROWS,club_id IS NULL,0,d41d8cd98f00b204e9800998ecf8427e
+miclub,salon_hour_prices,GLOBAL_ROWS,club_id IS NULL,0,d41d8cd98f00b204e9800998ecf8427e
+miclub,sector_templates,GLOBAL_ROWS,true,30,"20a72e3d33b4003ebb6c8ac95aa40a0f"
+miclub,system_months,GLOBAL_ROWS,true,12,"2195c0e56718f798e02b9cae2bb1152f"

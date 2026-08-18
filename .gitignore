@@ -9,5 +9,5 @@ build/
 *.sqlite
 *.sqlite3
 *.tsbuildinfo
-.local-evidence/
+#.local-evidence/
 !apps/api/data/.gitkeep

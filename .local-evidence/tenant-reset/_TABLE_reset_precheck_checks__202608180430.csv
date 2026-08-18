@@ -1,0 +1,14 @@
+"check_name","passed","detail"
+required table miclub.users,true,users
+required table miclub.clubs,true,clubs
+required table miclub.user_club_memberships,true,user_club_memberships
+global catalogs are not tenant-scoped,true,DDL global compatible
+mixed catalogs have demonstrable ownership,true,club_id disponible
+exactly one provisionable FREE plan,true,"1 provisionable FREE rows"
+required global catalogs are not empty,true,all required GLOBAL catalogs contain rows
+users count supported,true,"1"
+only diagnostic user,true,"0 unexpected"
+clubs count supported,true,"1"
+only diagnostic memberships,true,"0 unexpected"
+state is empty or approved development tenant,true,clubs=1 users=1 auth_memberships=1 club_memberships=289 people=305 unexpected_rows=0
+no populated UNKNOWN tables,true,none

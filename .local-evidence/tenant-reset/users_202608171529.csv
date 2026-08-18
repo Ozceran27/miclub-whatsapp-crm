@@ -1,2 +1,0 @@
-"id","role_id","email","password_hash","display_name","is_active","last_login_at","created_at","updated_at","status","failed_login_attempts","locked_until","session_revoked_before"
-"821893b6-01a8-4e91-88f7-d869d8f3f8f4",,miclub.posadas@gmail.com,scrypt$PkWxP_uQqpvY3rypLu6I9g$oPSQ11TBWWaP5yQgy6KA2EWqmFsCNBr1tqGPScC6TGijO4ZCfY-9p-DT3VpefpWYyHP8mpNd3hEUmwCWEumBwA,Fernando Ramos,true,2026-08-12 00:08:05.958 -0300,2026-07-25 15:35:43.641 -0300,2026-08-12 00:08:06.086 -0300,active,0,,2026-08-10 16:36:37.713 -0300

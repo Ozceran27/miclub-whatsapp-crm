@@ -1,0 +1,19 @@
+"table_schema","table_name","scope_kind","global_predicate","tenant_evidence","ddl_reason","relation_oid"
+miclub,activity_icon_catalog,GLOBAL,true,,iconos globales de actividades,activity_icon_catalog
+miclub,category_catalog,GLOBAL,true,,catálogo canónico global,category_catalog
+miclub,category_import_aliases,GLOBAL,true,,aliases del catálogo global,category_import_aliases
+miclub,currencies,GLOBAL,true,,monedas globales,currencies
+miclub,features,GLOBAL,true,,catálogo global de capacidades,features
+miclub,import_amount_normalization_rules,GLOBAL,true,,reglas globales del importador,import_amount_normalization_rules
+miclub,plan_entitlements,GLOBAL,true,,grants globales plan-capacidad,plan_entitlements
+miclub,plans,GLOBAL,true,,catálogo comercial global,plans
+miclub,sector_templates,GLOBAL,true,,plantillas globales de sectores,sector_templates
+miclub,system_months,GLOBAL,true,,configuración global equivalente descubierta por estructura/nombre,system_months
+miclub,discount_rates,MIXED,club_id IS NULL,club_id IN (SELECT id FROM reset_target_clubs),tasas globales legacy o configuración del club,discount_rates
+miclub,movement_categories,MIXED,club_id IS NULL,club_id IN (SELECT id FROM reset_target_clubs),compatibilidad tenant enlazada a category_catalog,movement_categories
+miclub,payment_methods,MIXED,club_id IS NULL,club_id IN (SELECT id FROM reset_target_clubs),medios globales legacy o configuración del club,payment_methods
+miclub,roles,MIXED,club_id IS NULL,club_id IN (SELECT id FROM reset_target_clubs),roles y códigos definidos por club en el DDL real,roles
+miclub,salon_hour_prices,MIXED,club_id IS NULL,club_id IN (SELECT id FROM reset_target_clubs),precios globales legacy o configuración del club,salon_hour_prices
+miclub,club_capabilities,TENANT_CONFIG,,club_id IN (SELECT id FROM reset_target_clubs),overrides de capacidades por club,club_capabilities
+miclub,club_subscriptions,TENANT_CONFIG,,club_id IN (SELECT id FROM reset_target_clubs),selección de plan por club,club_subscriptions
+miclub,user_club_memberships,TENANT_CONFIG,,club_id IN (SELECT id FROM reset_target_clubs),"role_id, permissions[] y grants pertenecen a la membresía",user_club_memberships
