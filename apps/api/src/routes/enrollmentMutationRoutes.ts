@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { requireAuthorizationCapability } from "../middleware/authorization.js";
-import { createEnrollment, type EnrollmentActor, type EnrollmentInput } from "../repositories/enrollmentsRepository.js";
+import { createEnrollment, setEnrollmentStatus, type EnrollmentActor, type EnrollmentInput } from "../repositories/enrollmentsRepository.js";
 import asyncHandler from "./asyncHandler.js";
 
 const router = Router();
@@ -18,5 +18,15 @@ router.post("/inscripciones", requireAuthorizationCapability("ENROLLMENTS_CREATE
   if(result.kind==="invalid_reference")return fail(res,404,"REFERENCE_NOT_FOUND","No se encontraron la persona o la actividad.");
   if(result.kind==="duplicate")return fail(res,409,"ENROLLMENT_ALREADY_EXISTS","La persona ya tiene una inscripción activa en esta actividad.",result.enrollment);
   return res.status(201).json(result.enrollment);
+}));
+
+router.patch("/inscripciones/:id/estado", requireAuthorizationCapability("ENROLLMENTS_EDIT"), asyncHandler(async(req,res)=>{
+  const body=req.body as Record<string,unknown>, id=String(req.params.id);
+  const status=String(body.status), expected=String(body.expectedUpdatedAt);
+  if(!UUID.test(id)||!['al_dia','nuevo_inscripto','adeudando','abandonado','cancelado'].includes(status)||typeof body.override!=="boolean"||Number.isNaN(new Date(expected).valueOf())) return fail(res,400,"VALIDATION_ERROR","Estado, override y versión esperada son obligatorios.");
+  const result=await setEnrollmentStatus(actor(req),id,status,body.override,expected);
+  if(result.kind==="missing")return fail(res,404,"ENROLLMENT_NOT_FOUND","No se encontró la inscripción.");
+  if(result.kind==="conflict")return fail(res,409,"OPTIMISTIC_LOCK_CONFLICT","La inscripción fue modificada por otro usuario.");
+  return res.json(result.enrollment);
 }));
 export default router;

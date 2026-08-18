@@ -187,7 +187,7 @@ export const buildEnrollmentReceivablesQuery = ({
       end
     end as receivable_fee
   from miclub.enrollments e
-  join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
+  join miclub.v_enrollment_lifecycle_v2 eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
   join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
   join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
   cross join lateral (

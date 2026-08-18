@@ -107,7 +107,7 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
       const sourceValues=(schema.columns as readonly XlsxImportColumn[]).map((column)=>rawFor(column)??null);
       const get=(key:string)=>parsed[key]??undefined;
       rows.push({sheet,rowNumber,values:parsed,sourceValues});
-      referenceRows.push({sheet,rowNumber,sector:get("sector"),activity:get("activity"),modality:get("modality"),instructor:get("instructor"),category:get("category"),paymentMethod:get("paymentMethod"),document:get("document"),externalReference:get("externalReference"),values:sourceValues});
+      referenceRows.push({sheet,rowNumber,sector:get("sector"),activity:get("activity"),modality:get("modality"),instructor:get("instructor"),category:get("category"),paymentMethod:get("paymentMethod"),document:get("document")??get("counterparty"),externalReference:get("externalReference"),values:sourceValues});
     }
     rowCounts[sheet]=populated.length;
     const last=Number(populated.at(-1)?.[1]??0);

@@ -5,7 +5,7 @@ import { applyWorkbook, type WorkbookInput } from "./workbook.js";
 
 const input=(clubId="club-a"):WorkbookInput=>({
   actor:{clubId,userId:"00000000-0000-0000-0000-000000000001",membershipId:"00000000-0000-0000-0000-000000000002"},
-  sha256:"file",batchIdentity:"identity",templateVersion:"v1",sourceFile:"import.xlsx",idempotencyKey:null,referenceConfigHash:"refs",dryRunOfBatchId:"dry",
+  sha256:"file",batchIdentity:"identity",templateVersion:"v2",sourceFile:"import.xlsx",idempotencyKey:null,referenceConfigHash:"refs",dryRunOfBatchId:"dry",
   rows:[{sheet:"ADMINISTRACIÓN",rowNumber:2,values:{date:"2026-08-01",type:"INGRESO",concept:"Cuota",amount:10,taxes:0,status:"COMPLETADO"},sourceValues:[]}],
   resolvedRows:[{sheet:"ADMINISTRACIÓN",rowNumber:2,sectorId:"sector",activityId:null,instructorId:null,categoryId:"category",paymentMethodId:null,personId:null,externalReference:null,rowFingerprint:"a".repeat(64)}],
   projectedWrites:1,errors:[],metadata:{rowCounts:{"ADMINISTRACIÓN":1}},

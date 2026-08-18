@@ -27,17 +27,21 @@ export function resolveReferenceRows(rows:ReferenceRow[], catalog:ReferenceCatal
   const errors:MigrationIssue[]=[];
   const resolved=rows.map((row)=>{
     const sector=resolve(catalog.sectors,row.sector,"SECTOR_NOT_FOUND","sector",row,errors);
-    const activityCandidates=row.modality === undefined ? catalog.activities : catalog.activities.filter((activity)=>normalizeComparableText(activity.modality)===normalizeComparableText(row.modality));
-    const activity=resolve(activityCandidates,row.activity,"ACTIVITY_NOT_FOUND","activity",row,errors);
-    const instructor=resolve(catalog.instructors,row.instructor,"INSTRUCTOR_NOT_FOUND","instructor",row,errors);
+    // Modalidad is enrollment free text, never part of activity identity.
+    const activity=resolve(catalog.activities,row.activity,"ACTIVITY_NOT_FOUND","activity",row,errors);
+    const instructor=row.instructor === undefined ? undefined : resolve(catalog.instructors,row.instructor,"INSTRUCTOR_NOT_FOUND","instructor",row,errors);
     const category=resolve(catalog.categories??[],row.category,"CATEGORY_NOT_FOUND","category",row,errors);
     const paymentMethod=resolve(catalog.paymentMethods??[],row.paymentMethod,"PAYMENT_METHOD_NOT_FOUND","paymentMethod",row,errors);
-    const person=resolve(catalog.people??[],row.document,"PERSON_NOT_FOUND","document",row,errors);
+    // People from INSCRIPCIONES are created/upserted by the import itself. For
+    // movements this is a best-effort link by DNI, never a catalog blocker.
+    const personKey=normalizeComparableText(row.document);
+    const person=(catalog.people??[]).find((candidate)=>keys(candidate).includes(personKey));
     if (sector&&activity&&activity.sectorId!==sector.id) errors.push({error_code:"ACTIVITY_SECTOR_MISMATCH",message:"La actividad no pertenece al sector de la fila.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"activity",value_normalized:normalizeComparableText(row.activity)});
+    if (activity&&!activity.instructorId) errors.push({error_code:"ACTIVITY_WITHOUT_INSTRUCTOR",message:"La actividad debe tener un instructor vigente antes de importar inscripciones.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"activity",value_normalized:normalizeComparableText(row.activity)});
     if (instructor&&activity&&activity.instructorId!==instructor.id) errors.push({error_code:"ACTIVITY_INSTRUCTOR_MISMATCH",message:"El instructor no es el instructor vigente de la actividad.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"instructor",value_normalized:normalizeComparableText(row.instructor)});
     const externalReference=(typeof row.externalReference==="string"||typeof row.externalReference==="number" ? String(row.externalReference).trim() : "")||null;
     const rowFingerprint=createHash("sha256").update(JSON.stringify(row.values.map((value)=>normalizeComparableText(value)))).digest("hex");
-    return {sheet:row.sheet,rowNumber:row.rowNumber,sectorId:sector?.id??null,activityId:activity?.id??null,instructorId:instructor?.id??null,categoryId:category?.id??null,paymentMethodId:paymentMethod?.id??null,personId:person?.id??null,externalReference,rowFingerprint};
+    return {sheet:row.sheet,rowNumber:row.rowNumber,sectorId:row.sector===undefined?activity?.sectorId??null:sector?.id??null,activityId:activity?.id??null,instructorId:instructor?.id??activity?.instructorId??null,categoryId:category?.id??null,paymentMethodId:paymentMethod?.id??null,personId:person?.id??null,externalReference,rowFingerprint};
   });
   return {errors,resolved};
 }
