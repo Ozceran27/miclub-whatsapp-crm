@@ -60,7 +60,7 @@ export const getAdministrationSummaryRows = async (
         count(*) filter (where eos.effective_status = 'adeudando'::miclub.enrollment_status)::integer as owing,
         count(*) filter (where eos.effective_status = 'abandonado'::miclub.enrollment_status)::integer as abandoned
       from miclub.enrollments e
-      join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
+      join miclub.v_enrollment_lifecycle_v2 eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
       where e.club_id = $1
         and coalesce(e.inactive, false) = false
         and e.superseded_at is null
@@ -73,7 +73,7 @@ export const getAdministrationSummaryRows = async (
       ), occupied as (
         select count(*) as occupied
         from miclub.enrollments e
-        join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
+        join miclub.v_enrollment_lifecycle_v2 eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
         where e.club_id = $1
           and coalesce(e.inactive, false) = false
           and e.superseded_at is null
@@ -92,7 +92,7 @@ export const getAdministrationSummaryRows = async (
       select a.id::text, a.name as label, count(e.id)::integer as enrollments
       from miclub.activities a
       left join miclub.enrollments e on e.activity_id = a.id and e.club_id = a.club_id
-      left join miclub.v_enrollment_operational_status eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
+      left join miclub.v_enrollment_lifecycle_v2 eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
       where a.club_id = $1
         and a.status = 'activa'::miclub.entity_status
         and a.archived_at is null

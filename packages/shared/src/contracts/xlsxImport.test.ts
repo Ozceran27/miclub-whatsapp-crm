@@ -9,7 +9,7 @@ const signature = Object.fromEntries(Object.values(XLSX_IMPORT_V1_SCHEMA.sheets)
 ]));
 
 void test("detects v1 from the established workbook signature", () => {
-  assert.equal(detectMiclubXlsxImportVersion(signature), "v1");
+  assert.equal(detectMiclubXlsxImportVersion(signature), "v2");
 });
 
 void test("rejects missing, moved and unknown headers", () => {
@@ -19,5 +19,7 @@ void test("rejects missing, moved and unknown headers", () => {
 
 void test("derives enrollment sector instead of requiring a redundant cell", () => {
   assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.derived.sector, "activity.sector");
+  assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.derived.instructor, "activity.instructor");
   assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.columns.some((column) => column.key === "sector"), false);
+  assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.columns.some((column) => column.key === "instructor" || column.key === "expiresOn"), false);
 });

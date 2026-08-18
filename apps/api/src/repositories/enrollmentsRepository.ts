@@ -5,6 +5,7 @@ import { auditService } from "../services/auditService.js";
 export type EnrollmentActor = { userId: string; membershipId: string; clubId: string; requestId?: string; ip?: string; userAgent?: string };
 export type EnrollmentInput = { personId: string; activityId: string; feeAmount: number; status: "al_dia" | "nuevo_inscripto" | "adeudando"; dueDate?: string | null; enrollmentDate: string };
 export type EnrollmentResult = { kind: "created"; enrollment: Record<string, unknown> } | { kind: "duplicate"; enrollment: Record<string, unknown> } | { kind: "invalid_reference" };
+export type EnrollmentStatusResult = { kind: "updated"; enrollment: Record<string, unknown> } | { kind: "missing" } | { kind: "conflict" };
 
 const columns = "id, club_id, sequence_number, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, created_at, updated_at";
 
@@ -43,4 +44,17 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
       requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent, oldData: null, newData: enrollment }, db);
     return { kind: "created", enrollment };
   }, pool);
+};
+
+/** Sets or clears the explicit override without disabling the automatic lifecycle globally. */
+export const setEnrollmentStatus = async (actor: EnrollmentActor, id: string, status: string, override: boolean, expectedUpdatedAt: string): Promise<EnrollmentStatusResult> => {
+  const pool = await getPostgresPool();
+  return withTransaction(async (db) => {
+    const before = await db.query<Record<string, unknown>>(`select ${columns} from miclub.enrollments where club_id=$1 and id=$2 for update`, [actor.clubId,id]);
+    if (!before.rows[0]) return {kind:"missing"};
+    if (new Date(String(before.rows[0].updated_at)).toISOString() !== new Date(expectedUpdatedAt).toISOString()) return {kind:"conflict"};
+    const result = await db.query<Record<string, unknown>>(`update miclub.enrollments set status=$3::miclub.enrollment_status,status_override=$4,updated_at=now() where club_id=$1 and id=$2 returning ${columns},status_override`,[actor.clubId,id,status,override]);
+    await auditService.enrollment({action:"enrollment.status",result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,entityType:"enrollment",entityId:id,requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,oldData:before.rows[0],newData:result.rows[0]},db);
+    return {kind:"updated",enrollment:result.rows[0]};
+  },pool);
 };
