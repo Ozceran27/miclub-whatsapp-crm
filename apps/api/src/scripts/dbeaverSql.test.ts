@@ -149,8 +149,22 @@ test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irres
   assert.match(reset, /classification='UNKNOWN'/);
   assert.match(reset, /grafo FK tenant sin orden seguro/);
   assert.match(reset, /tablas pendientes=%/);
+  assert.match(reset, /p\.oid='miclub\.reject_financial_fact_delete\(\)'::regprocedure/);
+  assert.match(reset, /ALTER TABLE miclub\.movements DISABLE TRIGGER movements_reject_physical_delete/);
+  assert.match(reset, /ALTER TABLE miclub\.payments DISABLE TRIGGER payments_reject_physical_delete/);
+  assert.match(reset, /ALTER TABLE miclub\.movements ENABLE TRIGGER movements_reject_physical_delete/);
+  assert.match(reset, /ALTER TABLE miclub\.payments ENABLE TRIGGER payments_reject_physical_delete/);
   assert.match(reset, /ROLLBACK;\s*$/);
   assert.doesNotMatch(withoutSqlComments(reset), /^\s*(?:TRUNCATE|COMMIT)\b/im);
+});
+
+test("validación post-reset exige que los guards financieros queden habilitados", () => {
+  const validation = tenantResetSql("03_post_reset_validation.sql");
+
+  assert.match(validation, /financial delete guards enabled/);
+  assert.match(validation, /count\(\*\)=2/);
+  assert.match(validation, /t\.tgenabled='O'/);
+  assert.match(validation, /reject_financial_fact_delete\(\)/);
 });
 
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {

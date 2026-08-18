@@ -37,6 +37,11 @@ existencia de cualquier otro usuario, club o membership aborta la transacción.
 - Los nombres reales se descubren en los catálogos; no se presupone que todas
   las tablas estén en `miclub`.
 - Nunca se usa `TRUNCATE CASCADE`.
+- El reset deshabilita transaccionalmente sólo los guards
+  `movements_reject_physical_delete` y `payments_reject_physical_delete`, porque
+  la retención ordinaria impide borrar hechos financieros. Verifica primero su
+  identidad/estado y los vuelve a habilitar antes de finalizar; nunca deshabilita
+  triggers internos ni claves foráneas.
 - `public.miclub_schema_migrations`, schemas de sistema y tablas clasificadas
   como `GLOBAL_STRUCTURAL`/`SYSTEM_INTERNAL` se conservan.
 - Las huellas globales son conteo y digest determinista del contenido textual

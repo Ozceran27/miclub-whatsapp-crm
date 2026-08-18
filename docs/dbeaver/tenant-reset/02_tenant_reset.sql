@@ -14,6 +14,15 @@ BEGIN
  IF (SELECT bool_and(passed) FROM pg_temp.reset_precheck_checks) IS DISTINCT FROM true THEN
    RAISE EXCEPTION 'Reset abortado: reset_precheck_checks contiene uno o más FAIL';
  END IF;
+ IF (SELECT count(*) FROM pg_catalog.pg_trigger t
+     JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+     WHERE NOT t.tgisinternal AND t.tgenabled='O'
+       AND (t.tgrelid,t.tgname) IN (
+        (to_regclass('miclub.movements'),'movements_reject_physical_delete'),
+        (to_regclass('miclub.payments'),'payments_reject_physical_delete'))
+       AND p.oid='miclub.reject_financial_fact_delete()'::regprocedure) <> 2 THEN
+   RAISE EXCEPTION 'Reset abortado: guards de borrado financiero ausentes, alterados o deshabilitados';
+ END IF;
 
  SELECT count(*) INTO users_n FROM miclub.users;
  SELECT count(*) INTO clubs_n FROM miclub.clubs;
@@ -47,6 +56,15 @@ BEGIN
   END IF;
  END LOOP;
 END $preconditions$;
+
+/*
+ * Excepción operativa acotada: el modelo ordinario prohíbe borrar hechos
+ * financieros, pero un reset total aprobado debe poder retirarlos. Se desactivan
+ * únicamente los dos triggers de retención, nunca triggers internos/FKs. ALTER
+ * TABLE es transaccional: un error seguido de ROLLBACK restaura su estado.
+ */
+ALTER TABLE miclub.movements DISABLE TRIGGER movements_reject_physical_delete;
+ALTER TABLE miclub.payments DISABLE TRIGGER payments_reject_physical_delete;
 
 /* Descubre el grafo FK y borra tablas tenant en orden hijos→padres. */
 DO $delete$
@@ -87,6 +105,10 @@ BEGIN
  DELETE FROM miclub.clubs;
  DELETE FROM miclub.users WHERE id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
 END $delete$;
+
+/* Deben quedar habilitados antes tanto del ROLLBACK de ensayo como del COMMIT real. */
+ALTER TABLE miclub.movements ENABLE TRIGGER movements_reject_physical_delete;
+ALTER TABLE miclub.payments ENABLE TRIGGER payments_reject_physical_delete;
 
 /* ENSAYO SEGURO. Tras revisarlo, cambiar únicamente ROLLBACK por COMMIT. */
 ROLLBACK;
