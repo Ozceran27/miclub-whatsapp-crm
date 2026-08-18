@@ -23,6 +23,77 @@ BEGIN
 END $capture_optional_count$;
 TABLE reset_execution_counts;
 
+/*
+ * La identidad es global, pero sus vínculos no se reducen a la membership de
+ * autorización. Se toma una foto de los tenants eliminados y se descubre cada
+ * FK simple real hacia users (people.user_id, employees.user_id, invitaciones,
+ * auditoría y futuras incorporaciones incluidas). Así ningún usuario queda
+ * fuera del análisis por depender de una lista de tablas mantenida a mano.
+ */
+CREATE TEMP TABLE _target_clubs(id uuid PRIMARY KEY) ON COMMIT DROP AS
+ SELECT id FROM miclub.clubs;
+CREATE TEMP TABLE _user_references ON COMMIT DROP AS
+SELECT con.oid constraint_oid,con.conrelid table_oid,n.nspname table_schema,
+       c.relname table_name,a.attname user_column,con.confdeltype,
+       EXISTS (SELECT 1 FROM pg_attribute ca WHERE ca.attrelid=c.oid
+               AND ca.attname='club_id' AND NOT ca.attisdropped) has_club_id
+FROM pg_constraint con
+JOIN pg_class c ON c.oid=con.conrelid
+JOIN pg_namespace n ON n.oid=c.relnamespace
+JOIN pg_attribute a ON a.attrelid=con.conrelid AND a.attnum=con.conkey[1]
+WHERE con.contype='f' AND con.confrelid='miclub.users'::regclass
+  AND array_length(con.conkey,1)=1 AND array_length(con.confkey,1)=1;
+
+CREATE TEMP TABLE _candidate_users(user_id uuid PRIMARY KEY) ON COMMIT DROP;
+DO $candidate_users$
+DECLARE r record;
+BEGIN
+ FOR r IN SELECT * FROM _user_references WHERE has_club_id LOOP
+  EXECUTE format(
+   'insert into _candidate_users select distinct %I from %I.%I where club_id in (select id from _target_clubs) and %I is not null on conflict do nothing',
+   r.user_column,r.table_schema,r.table_name,r.user_column);
+ END LOOP;
+END $candidate_users$;
+
+/* Tablas de autenticación conocidas. Toda otra tabla con nombre de auth queda
+ * UNKNOWN y bloquea el reset hasta que un DBA clasifique su semántica. */
+CREATE TEMP TABLE _auth_table_inventory ON COMMIT DROP AS
+SELECT c.oid,n.nspname table_schema,c.relname table_name,
+ CASE
+  WHEN c.relname='app_sessions' THEN 'SESSION'
+  WHEN c.relname ~* '(^|_)(refresh|password_reset|passwordreset|device)(_.*)?tokens?$' THEN 'TOKEN'
+  WHEN c.relname ~* '(^|_)login_attempts?$' THEN 'LOGIN_ATTEMPT'
+  ELSE 'UNKNOWN'
+ END classification
+FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema')
+ AND c.relname ~* '(auth|session|token|login|credential|password)';
+
+DO $identity_guard$
+DECLARE r record; bad_n bigint;
+BEGIN
+ IF EXISTS (SELECT 1 FROM _auth_table_inventory WHERE classification='UNKNOWN') THEN
+  RAISE EXCEPTION 'Reset abortado [AUTH_TABLE_UNKNOWN]: tablas=%',
+   (SELECT string_agg(format('%I.%I',table_schema,table_name),', ' ORDER BY table_schema,table_name)
+    FROM _auth_table_inventory WHERE classification='UNKNOWN');
+ END IF;
+ FOR r IN SELECT * FROM _user_references LOOP
+  IF r.has_club_id THEN
+   EXECUTE format('select count(*) from %I.%I x join _candidate_users c on c.user_id=x.%I where x.club_id not in (select id from _target_clubs)',
+                  r.table_schema,r.table_name,r.user_column) INTO bad_n;
+  ELSIF EXISTS (SELECT 1 FROM _auth_table_inventory a WHERE a.oid=r.table_oid AND a.classification<>'UNKNOWN') THEN
+   bad_n:=0; /* hijo global de autenticación: pertenece a la identidad */
+  ELSE
+   EXECUTE format('select count(*) from %I.%I x join _candidate_users c on c.user_id=x.%I',
+                  r.table_schema,r.table_name,r.user_column) INTO bad_n;
+  END IF;
+  IF bad_n>0 THEN
+   RAISE EXCEPTION 'Reset abortado [IDENTIDAD_COMPARTIDA]: %.% columna % conserva % referencias fuera de los tenants objetivo o sin tenant atribuible',
+    r.table_schema,r.table_name,r.user_column,bad_n;
+  END IF;
+ END LOOP;
+END $identity_guard$;
+
 DO $preconditions$
 DECLARE
  users_n bigint; clubs_n bigint; memberships_n bigint; people_n bigint;
@@ -168,11 +239,24 @@ BEGIN
      FROM reset_targets WHERE has_club_id);
  END IF;
 
- /* Las referencias indirectas soportadas se resuelven por sus cascadas declaradas. */
- DELETE FROM miclub.user_club_memberships
-  WHERE user_id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
+ /* Primero se retiran sesiones/tokens/intentos y cualquier otro hijo directo
+  * que no tenga ON DELETE CASCADE. El guard anterior ya probó que cada una de
+  * esas referencias corresponde exclusivamente a los tenants objetivo. */
+ FOR r IN SELECT ur.* FROM _user_references ur WHERE ur.confdeltype<>'c'
+ LOOP
+  EXECUTE format('delete from %I.%I x using _candidate_users c where x.%I=c.user_id',
+                 r.table_schema,r.table_name,r.user_column);
+ END LOOP;
+
+ DELETE FROM miclub.user_club_memberships m USING _candidate_users c
+  WHERE m.user_id=c.user_id;
  DELETE FROM miclub.clubs;
- DELETE FROM miclub.users WHERE id='821893b6-01a8-4e91-88f7-d869d8f3f8f4'::uuid;
+ /* El antijoin final hace que una FK aparecida durante el borrado provoque una
+  * violación/revisión, nunca un borrado más amplio. */
+ DELETE FROM miclub.users u USING _candidate_users c WHERE u.id=c.user_id
+  AND NOT EXISTS (SELECT 1 FROM pg_constraint con
+                  WHERE con.contype='f' AND con.confrelid='miclub.users'::regclass
+                    AND NOT EXISTS (SELECT 1 FROM _user_references ur WHERE ur.constraint_oid=con.oid));
 END $delete$;
 
 /* Deben quedar habilitados antes tanto del ROLLBACK de ensayo como del COMMIT real. */

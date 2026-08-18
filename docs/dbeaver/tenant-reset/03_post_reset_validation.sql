@@ -18,6 +18,60 @@ INSERT INTO reset_validation VALUES
  ('memberships zero',(SELECT count(*)=0 FROM miclub.user_club_memberships),(SELECT count(*)::text FROM miclub.user_club_memberships)),
  ('people zero',(SELECT count(*)=0 FROM miclub.people),(SELECT count(*)::text FROM miclub.people));
 
+/* Controles de autenticación explícitos: los ausentes se informan como cero/
+ * ausentes; una tabla con aspecto de auth que no encaje aquí es UNKNOWN/FAIL. */
+DO $auth_validation$
+DECLARE r record; n bigint;
+BEGIN
+ FOR r IN
+  SELECT v.check_name,v.relation_name,to_regclass(v.relation_name) relation_oid
+  FROM (VALUES
+   ('app_sessions zero','miclub.app_sessions'),
+   ('refresh tokens zero','miclub.refresh_tokens'),
+   ('password-reset tokens zero','miclub.password_reset_tokens'),
+   ('device tokens zero','miclub.device_tokens'),
+   ('login attempts zero','miclub.login_attempts')
+  ) v(check_name,relation_name)
+ LOOP
+  IF r.relation_oid IS NULL THEN
+   INSERT INTO reset_validation VALUES(r.check_name,true,'NOT PRESENT');
+  ELSE
+   EXECUTE format('select count(*) from %s',r.relation_oid) INTO n;
+   INSERT INTO reset_validation VALUES(r.check_name,n=0,n::text);
+  END IF;
+ END LOOP;
+
+ FOR r IN
+  SELECT c.oid,n.nspname schema_name,c.relname table_name
+  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema')
+    AND (c.relname='app_sessions'
+      OR c.relname ~* '(^|_)(refresh|password_reset|passwordreset|device)(_.*)?tokens?$'
+      OR c.relname ~* '(^|_)login_attempts?$')
+ LOOP
+  EXECUTE format('select count(*) from %I.%I',r.schema_name,r.table_name) INTO n;
+  INSERT INTO reset_validation VALUES(
+   format('classified auth zero %I.%I',r.schema_name,r.table_name),n=0,n::text);
+ END LOOP;
+
+ FOR r IN
+  WITH auth_tables AS (
+   SELECT c.oid,n.nspname schema_name,c.relname table_name,CASE
+    WHEN c.relname='app_sessions' THEN 'SESSION'
+    WHEN c.relname ~* '(^|_)(refresh|password_reset|passwordreset|device)(_.*)?tokens?$' THEN 'TOKEN'
+    WHEN c.relname ~* '(^|_)login_attempts?$' THEN 'LOGIN_ATTEMPT'
+    ELSE 'UNKNOWN' END classification
+   FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema')
+     AND c.relname ~* '(auth|session|token|login|credential|password)'
+  ) SELECT * FROM auth_tables WHERE classification='UNKNOWN'
+ LOOP
+  INSERT INTO reset_validation VALUES(
+   format('UNKNOWN auth table %I.%I',r.schema_name,r.table_name),false,
+   'UNKNOWN: clasificar y agregar una comprobación explícita antes de aprobar');
+ END LOOP;
+END $auth_validation$;
+
 INSERT INTO reset_validation
 SELECT 'financial delete guards enabled',count(*)=2,
        count(*)::text||'/2 enabled and canonical'

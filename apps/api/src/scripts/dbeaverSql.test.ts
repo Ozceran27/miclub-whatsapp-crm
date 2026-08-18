@@ -149,6 +149,11 @@ test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irres
   assert.match(reset, /classification='UNKNOWN'/);
   assert.match(reset, /grafo FK tenant sin orden seguro/);
   assert.match(reset, /tablas pendientes=%/);
+  assert.match(reset, /CREATE TEMP TABLE _candidate_users/);
+  assert.match(reset, /con\.confrelid='miclub\.users'::regclass/);
+  assert.match(reset, /AUTH_TABLE_UNKNOWN/);
+  assert.match(reset, /IDENTIDAD_COMPARTIDA/);
+  assert.match(reset, /ur\.confdeltype<>'c'/);
   assert.match(reset, /p\.oid='miclub\.reject_financial_fact_delete\(\)'::regprocedure/);
   assert.match(reset, /ALTER TABLE miclub\.movements DISABLE TRIGGER movements_reject_physical_delete/);
   assert.match(reset, /ALTER TABLE miclub\.payments DISABLE TRIGGER payments_reject_physical_delete/);
@@ -165,6 +170,11 @@ test("validación post-reset exige que los guards financieros queden habilitados
   assert.match(validation, /count\(\*\)=2/);
   assert.match(validation, /t\.tgenabled='O'/);
   assert.match(validation, /reject_financial_fact_delete\(\)/);
+  for (const check of ["app_sessions zero", "refresh tokens zero", "password-reset tokens zero", "device tokens zero", "login attempts zero"]) {
+    assert.match(validation, new RegExp(check));
+  }
+  assert.match(validation, /UNKNOWN auth table/);
+  assert.match(validation, /UNKNOWN: clasificar y agregar una comprobación explícita/);
 });
 
 test("diagnóstico de baja tenant descubre el destino y permanece read-only", () => {
