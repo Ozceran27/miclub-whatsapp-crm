@@ -34,7 +34,12 @@ TABLE reset_execution_counts;
  * auditoría y futuras incorporaciones incluidas). Así ningún usuario queda
  * fuera del análisis por depender de una lista de tablas mantenida a mano.
  */
-CREATE TEMP TABLE _target_clubs(id uuid PRIMARY KEY) ON COMMIT DROP AS
+/* CREATE TABLE AS sólo admite nombres de columna, no tipos/constraints, en su
+ * lista parentizada. Crear primero la tabla permite conservar la PK que protege
+ * el alcance y evita el error 42601 que PostgreSQL señala al llegar a AS. */
+CREATE TEMP TABLE _target_clubs
+ (id uuid PRIMARY KEY) ON COMMIT DROP;
+INSERT INTO _target_clubs(id)
  SELECT id FROM miclub.clubs;
 CREATE TEMP TABLE _user_references ON COMMIT DROP AS
 SELECT con.oid constraint_oid,con.conrelid table_oid,n.nspname table_schema,
@@ -231,8 +236,13 @@ BEGIN
  CREATE TEMP TABLE reset_pending ON COMMIT DROP AS
   SELECT * FROM reset_scope_tables WHERE table_oid<>'miclub.clubs'::regclass;
 
- /* Un nodo sólo sale cuando ya salieron todos sus hijos alcanzados. Si una
-  * iteración no progresa, el remanente es un ciclo y requiere decisión DBA. */
+ /* Un nodo sólo sale cuando ya salieron todos sus hijos alcanzados. Una FK
+  * autorreferencial NO ACTION/CASCADE/SET NULL no crea una dependencia entre
+  * tablas: PostgreSQL puede borrar en una única sentencia todas las filas del
+  * alcance y comprueba NO ACTION al final de esa sentencia. RESTRICT sí exige
+  * comprobación inmediata y se mantiene como bloqueo. Si una iteración no
+  * progresa, el remanente es un ciclo real entre tablas (o un self-RESTRICT) y
+  * requiere decisión DBA. */
  LOOP
   progressed:=false;
   FOR r IN SELECT p.* FROM reset_pending p
@@ -241,7 +251,9 @@ BEGIN
     WHERE fk.parent_oid=p.table_oid AND child.table_oid<>p.table_oid)
    AND NOT EXISTS (
     SELECT 1 FROM reset_fk_edges fk
-    WHERE fk.parent_oid=p.table_oid AND fk.child_oid=p.table_oid)
+    JOIN pg_constraint self_con ON self_con.oid=fk.constraint_oid
+    WHERE fk.parent_oid=p.table_oid AND fk.child_oid=p.table_oid
+      AND self_con.confdeltype='r')
    ORDER BY p.min_depth DESC,p.table_schema,p.table_name
   LOOP
    INSERT INTO reset_delete_order(table_oid,table_schema,table_name)
