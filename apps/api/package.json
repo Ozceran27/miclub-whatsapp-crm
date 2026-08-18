@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "NODE_ENV=test tsx --test src/**/*.test.ts",
+    "test:integration:empty-db": "NODE_ENV=test tsx --test integration/emptyDatabaseJourney.test.ts",
     "auth:set-password": "tsx src/scripts/setUserPassword.ts",
     "start": "node dist/apps/api/src/index.js",
     "lint": "eslint src"
