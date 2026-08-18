@@ -146,6 +146,8 @@ test("precheck de reset reconoce catálogos globales reales y explica cada bloqu
   assert.match(precheck, /permissions\[\] y grants/);
   assert.match(precheck, /global catalogs are not tenant-scoped/);
   assert.match(precheck, /mixed catalogs have demonstrable ownership/);
+  assert.match(precheck, /exactly one provisionable FREE plan/);
+  assert.match(precheck, /required global catalogs are not empty/);
   assert.match(precheck, /subset_name text, subset_predicate text/);
   assert.match(precheck, /CREATE TEMP TABLE reset_scope_rows/);
   assert.match(precheck, /TENANT_TRANSITIVE/);
@@ -185,6 +187,8 @@ test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irres
 
 test("validación post-reset exige que los guards financieros queden habilitados", () => {
   const validation = tenantResetSql("03_post_reset_validation.sql");
+  assert.match(validation, /exactly one provisionable FREE plan/);
+  assert.match(validation, /required global catalogs are not empty/);
 
   assert.match(validation, /financial delete guards enabled/);
   assert.match(validation, /count\(\*\)=2/);

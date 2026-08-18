@@ -20,3 +20,16 @@ Every negative HTTP response must be a safe 403, 404, or 409. Finally, an
 administrator connection compares complete JSON snapshots of all Club B rows;
 the test fails if any cross-tenant request changed a row.
 
+## Public registration provisioning
+
+`publicRegistration.ts` creates a separate database, migrates it from zero and
+confirms that it contains no clubs before exercising the real
+`POST /auth/register` route. It first forces provisioning to fail after its
+first insert and verifies a complete rollback. It then verifies the person,
+user, club, FREE subscription, onboarding, complete role catalog, Director
+membership/employee, payment methods and the three system sectors.
+
+```bash
+MIGRATION_GATE_DATABASE_URL=postgres://postgres:postgres@localhost/postgres \
+  npm run db:public-registration:integration
+```

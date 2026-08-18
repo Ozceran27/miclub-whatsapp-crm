@@ -320,6 +320,23 @@ BEGIN
    AND NOT EXISTS (SELECT FROM information_schema.columns c WHERE c.table_schema=r.table_schema AND c.table_name=r.table_name AND c.column_name='club_id');
  INSERT INTO reset_precheck_checks VALUES
   ('mixed catalogs have demonstrable ownership',catalog_problem IS NULL,COALESCE(catalog_problem,'club_id disponible'));
+
+ /* El registro público sólo es provisionable con una única fila FREE activa.
+  * Además, cada catálogo GLOBAL declarado requerido debe contener datos antes
+  * de permitir cualquier reset. */
+ SELECT count(*) INTO n FROM miclub.plans
+  WHERE code='FREE' AND catalog_status='catalog' AND commercial_class='free'
+    AND NOT is_development;
+ INSERT INTO reset_precheck_checks VALUES
+  ('exactly one provisionable FREE plan',n=1,n::text||' provisionable FREE rows');
+ SELECT string_agg(format('%I.%I',r.table_schema,r.table_name),', ' ORDER BY r.table_schema,r.table_name)
+ INTO catalog_problem
+ FROM reset_catalog_registry r
+ LEFT JOIN reset_global_fingerprints f USING(table_schema,table_name)
+ WHERE r.scope_kind='GLOBAL' AND COALESCE(f.row_count,0)=0;
+ INSERT INTO reset_precheck_checks VALUES
+  ('required global catalogs are not empty',catalog_problem IS NULL,
+   COALESCE(catalog_problem,'all required GLOBAL catalogs contain rows'));
  /* SQL dinámico permite informar tablas requeridas ausentes sin referenciarlas. */
  IF to_regclass('miclub.users') IS NOT NULL THEN
   EXECUTE 'SELECT count(*) FROM miclub.users' INTO n;
