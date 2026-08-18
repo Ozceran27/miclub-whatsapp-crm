@@ -34,7 +34,12 @@ TABLE reset_execution_counts;
  * auditoría y futuras incorporaciones incluidas). Así ningún usuario queda
  * fuera del análisis por depender de una lista de tablas mantenida a mano.
  */
-CREATE TEMP TABLE _target_clubs(id uuid PRIMARY KEY) ON COMMIT DROP AS
+/* CREATE TABLE AS sólo admite nombres de columna, no tipos/constraints, en su
+ * lista parentizada. Crear primero la tabla permite conservar la PK que protege
+ * el alcance y evita el error 42601 que PostgreSQL señala al llegar a AS. */
+CREATE TEMP TABLE _target_clubs
+ (id uuid PRIMARY KEY) ON COMMIT DROP;
+INSERT INTO _target_clubs(id)
  SELECT id FROM miclub.clubs;
 CREATE TEMP TABLE _user_references ON COMMIT DROP AS
 SELECT con.oid constraint_oid,con.conrelid table_oid,n.nspname table_schema,

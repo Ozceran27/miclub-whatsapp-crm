@@ -87,6 +87,19 @@ deben existir una restauración de backup probada, evidencia revisada, una venta
 de mantenimiento sin escritores y una aprobación humana explícita. Un `FAIL`,
 un error SQL o una tabla poblada clasificada como `UNKNOWN` detiene el proceso.
 
+### Recuperación de un ensayo abortado
+
+Si `02_tenant_reset.sql` falla, no continúe ejecutando sentencias sueltas ni
+cambie su `ROLLBACK` final por `COMMIT`. Ejecute `ROLLBACK;` explícitamente en la
+misma conexión para salir del estado de transacción abortada. El precheck de
+`01_pre_reset_audit.sql` debe seguir disponible porque `01` confirmó sus tablas
+temporales antes del ensayo: compruébelo con
+`to_regclass('pg_temp.reset_precheck_checks')` y
+`to_regclass('pg_temp.reset_global_fingerprints')`. Si alguna devuelve `NULL`,
+vuelva a ejecutar `01` completo y exporte evidencia nueva. Después ejecute el
+`02` corregido completo, conservando el `ROLLBACK` final, y trate el resultado
+como un ensayo nuevo.
+
 ## Cómo entregar la evidencia del precheck
 
 Mantenga abierta la conexión que ejecutó el precheck: cerrar/reconectar elimina
