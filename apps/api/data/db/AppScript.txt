@@ -1,0 +1,3901 @@
+/**
+ * BOTÓN "AGREGAR" → agrega un movimiento al bloque B13:AB2003
+ * Hoja: "ADMINISTRACIÓN"
+ * Formulario: AD2:AJ9 (valores en celdas específicas)
+ * Luego ordena automáticamente los movimientos por ID descendente.
+ */
+function agregarMovimiento() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("ADMINISTRACIÓN");
+  if (!sh) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+
+  // --- Config tabla movimientos ---
+  const START_ROW = 13;
+  const END_ROW = 2003;
+  const START_COL = 2; // B
+  const END_COL = 28;  // AB
+  const NUM_COLS = END_COL - START_COL + 1; // 27 columnas
+
+  // Columnas destino (según tu tabla)
+  const COL = {
+    id: 2,           // B
+    fecha: 3,        // C
+    tipo: 5,         // E
+    categoria: 8,    // H
+    concepto: 11,    // K
+    contraparte: 16, // P
+    sector: 19,      // S
+    monto: 21,       // U
+    impuestos: 24,   // X
+    estado: 26,      // Z
+    mp: 28           // AB
+  };
+
+  // --- Inputs (formulario) ---
+  const tipo = sh.getRange("AD4").getValue();
+  const categoria = sh.getRange("AF4").getValue();
+  const sector = sh.getRange("AI4").getValue();
+  const concepto = sh.getRange("AD6").getValue();
+  const montoRaw = sh.getRange("AH6").getValue();
+
+  // DNI: lo tomo como display (ya debería venir formateado por onEdit)
+  const contraparteDisplay = sh.getRange("AG7").getDisplayValue();
+  const contraparte = formatDNIText_(contraparteDisplay); // asegura formato final
+
+  const tasaImpRaw = sh.getRange("AF8").getValue();  // ej 0.05
+  const mp = sh.getRange("AI8").getValue();
+
+  // --- Validación mínima ---
+  const faltan = [];
+  if (!tipo) faltan.push("Tipo");
+  if (!categoria) faltan.push("Categoría");
+  if (!sector) faltan.push("Sector");
+  if (!concepto) faltan.push("Concepto");
+  if (montoRaw === "" || montoRaw === null) faltan.push("Monto");
+
+  if (faltan.length) {
+    SpreadsheetApp.getUi().alert(
+      "Faltan campos obligatorios:\n- " + faltan.join("\n- ")
+    );
+    return;
+  }
+
+  // Convertir monto a número (acepta coma o punto)
+  const monto = parseNumber_(montoRaw);
+  if (!isFinite(monto) || monto <= 0) {
+    SpreadsheetApp.getUi().alert("El Monto debe ser un número válido mayor a 0.");
+    return;
+  }
+
+  // Tasa de impuesto (si está vacía o inválida, 0)
+  const tasaImp = parseNumber_(tasaImpRaw);
+  const impuestos = isFinite(tasaImp) ? (monto * tasaImp) : 0;
+
+  // Fecha actual y estado default
+  const fecha = new Date();
+  const estado = "COMPLETADO";
+
+  // --- Leer IDs del bloque para:
+  // 1) encontrar próxima fila libre
+  // 2) calcular correlativo máximo global
+  const idRange = sh.getRange(START_ROW, COL.id, END_ROW - START_ROW + 1, 1).getValues();
+
+  // Próxima fila libre = primera fila vacía después del último registro con ID
+  let lastUsedIndex = -1;
+  for (let i = idRange.length - 1; i >= 0; i--) {
+    if (idRange[i][0] !== "" && idRange[i][0] !== null) {
+      lastUsedIndex = i;
+      break;
+    }
+  }
+
+  const nextRow = START_ROW + (lastUsedIndex + 1);
+  if (nextRow > END_ROW) {
+    SpreadsheetApp.getUi().alert("No hay más espacio en el rango de movimientos (B13:AB2003).");
+    return;
+  }
+
+  // --- Generar ID robusto (máximo correlativo global + 1) y prefijo por Tipo ---
+  const prefijo = getPrefijoPorTipo_(tipo);
+  if (prefijo === "X") {
+    SpreadsheetApp.getUi().alert(
+      'Tipo no reconocido para generar ID.\n' +
+      'Debe incluir "Capital", "Egreso(s)" o "Ingreso(s)".\n\n' +
+      'Tipo detectado: ' + tipo
+    );
+    return;
+  }
+
+  const maxN = getMaxCorrelativoGlobal_(idRange);
+  const nextId = generarId_(prefijo, maxN + 1);
+
+  // --- Escribir en fila destino (solo columnas del movimiento) ---
+  sh.getRange(nextRow, COL.id).setValue(nextId);
+  sh.getRange(nextRow, COL.fecha).setValue(fecha);
+  sh.getRange(nextRow, COL.tipo).setValue(tipo);
+  sh.getRange(nextRow, COL.categoria).setValue(categoria);
+  sh.getRange(nextRow, COL.concepto).setValue(concepto);
+
+  // Contra-parte: guardar como TEXTO con puntos (mantiene ceros a la izquierda)
+  const rContra = sh.getRange(nextRow, COL.contraparte);
+  rContra.setNumberFormat("@");
+  rContra.setValue(contraparte);
+
+  sh.getRange(nextRow, COL.sector).setValue(sector);
+  sh.getRange(nextRow, COL.monto).setValue(monto);
+  sh.getRange(nextRow, COL.impuestos).setValue(impuestos);
+  sh.getRange(nextRow, COL.estado).setValue(estado);
+  sh.getRange(nextRow, COL.mp).setValue(mp);
+
+  // --- Ordenar automáticamente el bloque por ID descendente ---
+  ordenarMovimientosPorIdDesc_(sh, START_ROW, END_ROW, START_COL, NUM_COLS);
+
+  // --- Sincronizar hojas sectoriales ---
+  sincronizarLocal1DesdeAdministracion();
+  sincronizarFitnessDesdeAdministracion();
+  actualizarEstadosInscriptosFitness();
+  sincronizarSalonDesdeAdministracion();
+  actualizarEstadosInscriptosSalon();
+    sincronizarAulaDesdeAdministracion();
+  actualizarEstadosInscriptosAula();
+
+  // --- Reset del formulario ---
+  resetFormulario_(sh);
+
+  // Feedback rápido
+  SpreadsheetApp.getActive().toast("Movimiento agregado: " + nextId, "OK", 3);
+}
+
+/**
+ * Ordena el bloque B13:AB2003 por ID descendente,
+ * usando el correlativo numérico del ID (no el texto completo).
+ *
+ * Ejemplo correcto:
+ * I-0031 > E-0030 > C-0029
+ *
+ * No modifica nada fuera del rango indicado.
+ */
+function ordenarMovimientosPorIdDesc_(sh, startRow, endRow, startCol, numCols) {
+  const range = sh.getRange(startRow, startCol, endRow - startRow + 1, numCols);
+  const values = range.getValues();
+
+  const conDatos = [];
+  const vacias = [];
+
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const id = row[0]; // columna B dentro del bloque
+    if (id === "" || id === null) {
+      vacias.push(row);
+    } else {
+      conDatos.push(row);
+    }
+  }
+
+  conDatos.sort((a, b) => {
+    const numA = extraerNumeroId_(a[0]);
+    const numB = extraerNumeroId_(b[0]);
+
+    // Descendente por correlativo numérico
+    if (numA !== numB) return numB - numA;
+
+    // Desempate opcional por texto ID, por prolijidad
+    return String(b[0]).localeCompare(String(a[0]));
+  });
+
+  const resultado = conDatos.concat(vacias);
+
+  range.setValues(resultado);
+}
+
+/**
+ * Extrae la parte numérica del ID.
+ * Ej: "E-0030" -> 30
+ */
+function extraerNumeroId_(id) {
+  const m = String(id || "").match(/(\d+)/);
+  if (!m) return 0;
+  const n = parseInt(m[1], 10);
+  return isFinite(n) ? n : 0;
+}
+
+/**
+ * BOTÓN en Dashboard (dibujo) → redirige a la hoja "ADMINISTRACIÓN"
+ * Asignar al dibujo: irAAdministracion
+ */
+function irAAdministracion() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("ADMINISTRACIÓN");
+  if (!sh) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+  ss.setActiveSheet(sh);
+}
+
+/** Limpia los campos del formulario, manteniendo la tasa si querés (configurable) */
+function resetFormulario_(sh) {
+  sh.getRange("AD4").clearContent(); // Tipo
+  sh.getRange("AF4").clearContent(); // Categoría
+  sh.getRange("AI4").clearContent(); // Sector
+  sh.getRange("AD6").clearContent(); // Concepto
+  sh.getRange("AH6").clearContent(); // Monto
+
+  // Contra-parte: dejamos vacío y texto plano
+  const r = sh.getRange("AG7");
+  r.setNumberFormat("@");
+  r.clearContent();
+
+  // AF8 (tasa) se mantiene
+  sh.getRange("AI8").clearContent(); // Medio de pago
+}
+
+/** Prefijo de ID según Tipo */
+function getPrefijoPorTipo_(tipo) {
+  const t = String(tipo || "").trim().toLowerCase();
+  if (t.includes("capital")) return "C";
+  if (t.includes("egreso")) return "E";
+  if (t.includes("ingreso")) return "I";
+  return "X";
+}
+
+/** Máximo correlativo global dentro del rango de IDs */
+function getMaxCorrelativoGlobal_(idRangeValues) {
+  let maxN = 0;
+  for (let i = 0; i < idRangeValues.length; i++) {
+    const v = idRangeValues[i][0];
+    if (v === "" || v === null || v === undefined) continue;
+    const m = String(v).match(/(\d+)/);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (isFinite(n) && n > maxN) maxN = n;
+  }
+  return maxN;
+}
+
+/** Genera ID en formato LETRA-000X */
+function generarId_(prefijo, correlativo) {
+  const padded = String(correlativo).padStart(4, "0");
+  return `${prefijo}-${padded}`;
+}
+
+/** Convierte valores a número, tolerando coma decimal */
+function parseNumber_(value) {
+  if (typeof value === "number") return value;
+  if (value === null || value === undefined) return NaN;
+  const s = String(value).trim().replace(/\./g, "").replace(",", ".");
+  return Number(s);
+}
+
+/* =========================================================
+   DNI AUTOFORMATEO EN AG7 (al presionar Enter / cambiar celda)
+   - Convierte 35004264 -> 35.004.264
+   - Acepta ceros adelante: 05364172 -> 05.364.172
+   - Mantiene el valor como texto (no número)
+   ========================================================= */
+
+/**
+ * Trigger simple (onEdit) — se ejecuta cuando el usuario edita.
+ * Formatea automáticamente ADMINISTRACIÓN!AG7 como DNI al confirmar la edición.
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+
+    const ss = e.source || SpreadsheetApp.getActiveSpreadsheet();
+    const range = e.range;
+    const sh = range.getSheet();
+
+    // =========================================================
+    // 1) ADMINISTRACIÓN!AG7 → autoformato DNI
+    // =========================================================
+    if (sh.getName() === "ADMINISTRACIÓN" && range.getA1Notation() === "AG7") {
+      const raw = e.value;
+      const formatted = formatDNIText_(raw);
+
+      if (!formatted) {
+        range.setNumberFormat("@");
+        return;
+      }
+
+      range.setNumberFormat("@");
+      range.setValue(formatted);
+      return;
+    }
+
+    // =========================================================
+    // 2) FITNESS → DNI en formulario de INSCRIPCIÓN
+    // =========================================================
+    const insDniRange = ss.getRangeByName("FIT_INS_DNI");
+    if (insDniRange && sameCell_(range, insDniRange)) {
+      const formatted = formatDNIText_(e.value);
+      range.setNumberFormat("@");
+      if (formatted) {
+        range.setValue(formatted);
+      } else {
+        range.clearContent();
+      }
+      return;
+    }
+
+    // =========================================================
+    // 3) FITNESS → DNI en formulario de PAGO
+    // =========================================================
+    const pagoDniRange = ss.getRangeByName("FIT_PAGO_DNI");
+    if (pagoDniRange && sameCell_(range, pagoDniRange)) {
+      const formatted = formatDNIText_(e.value);
+
+      range.setNumberFormat("@");
+      if (formatted) {
+        range.setValue(formatted);
+        autocompletarPagoFitnessPorDni_(formatted);
+      } else {
+        limpiarFormularioPagoFitness_();
+      }
+      return;
+    }
+
+    const salInsDniRange = ss.getRangeByName("SAL_INS_DNI");
+    if (salInsDniRange && sameCell_(range, salInsDniRange)) {
+      const formatted = formatDNIText_(e.value);
+      range.setNumberFormat("@");
+      if (formatted) {
+        range.setValue(formatted);
+      } else {
+        range.clearContent();
+      }
+      return;
+    }
+
+    const salPagoDniRange = ss.getRangeByName("SAL_PAGO_DNI");
+    if (salPagoDniRange && sameCell_(range, salPagoDniRange)) {
+      const formatted = formatDNIText_(e.value);
+      range.setNumberFormat("@");
+      if (formatted) {
+        range.setValue(formatted);
+        autocompletarPagoSalonPorDni_(formatted);
+      } else {
+        limpiarFormularioPagoSalon_();
+      }
+      return;
+    }
+
+        const aulInsDniRange = ss.getRangeByName("AUL_INS_DNI");
+    if (aulInsDniRange && sameCell_(range, aulInsDniRange)) {
+      const formatted = formatDNIText_(e.value);
+      range.setNumberFormat("@");
+      if (formatted) {
+        range.setValue(formatted);
+      } else {
+        range.clearContent();
+      }
+      return;
+    }
+
+    const aulPagoDniRange = ss.getRangeByName("AUL_PAGO_DNI");
+    if (aulPagoDniRange && sameCell_(range, aulPagoDniRange)) {
+      const formatted = formatDNIText_(e.value);
+      range.setNumberFormat("@");
+      if (formatted) {
+        range.setValue(formatted);
+        autocompletarPagoAulaPorDni_(formatted);
+      } else {
+        limpiarFormularioPagoAula_();
+      }
+      return;
+    }
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+/**
+ * Formatea un DNI como texto con puntos.
+ * - Extrae solo dígitos.
+ * - Si tiene menos de 8 dígitos: rellena con ceros a la izquierda hasta 8.
+ * - Si tiene 8: respeta.
+ * - Si tiene más de 8: igual agrupa de a 3 desde la derecha.
+ */
+function formatDNIText_(value) {
+  if (value === null || value === undefined) return "";
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+
+  let digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+
+  if (digits.length <= 8) {
+    digits = digits.padStart(8, "0");
+  }
+
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/**
+ * Sincroniza la hoja "LOCAL 1" con los movimientos de la hoja "ADMINISTRACIÓN"
+ * filtrando por Sector = "LOCAL 1".
+ *
+ * Preserva los valores manuales de la columna "Estado Finan."
+ * usando el ID del movimiento como clave.
+ *
+ * Fuente:
+ * ADMINISTRACIÓN!B13:AB2003
+ *
+ * Destino visual:
+ * LOCAL 1!B10:Z801
+ */
+function sincronizarLocal1DesdeAdministracion() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shAdmin = ss.getSheetByName("ADMINISTRACIÓN");
+  const shLocal = ss.getSheetByName("LOCAL 1");
+
+  if (!shAdmin) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+  if (!shLocal) throw new Error('No existe la hoja "LOCAL 1".');
+
+  // --- Configuración origen ---
+  const ADMIN_START_ROW = 13;
+  const ADMIN_END_ROW = 2003;
+  const ADMIN_NUM_ROWS = ADMIN_END_ROW - ADMIN_START_ROW + 1;
+
+  // B:AB = 27 columnas
+  const adminData = shAdmin.getRange(ADMIN_START_ROW, 2, ADMIN_NUM_ROWS, 27).getValues();
+
+  // Índices internos dentro del bloque B:AB
+  // B=0, C=1, E=3, H=6, K=9, P=14, S=17, U=19, X=22, Z=24, AB=26
+  const IDX = {
+    id: 0,
+    fecha: 1,
+    tipo: 3,
+    categoria: 6,
+    concepto: 9,
+    contraparte: 14,
+    sector: 17,
+    monto: 19,
+    impuestos: 22,
+    estado: 24,
+    mp: 26
+  };
+
+  // --- Filtrar solo filas con ID y Sector = LOCAL 1 ---
+  const filtrados = adminData.filter(row => {
+    const id = row[IDX.id];
+    const sector = String(row[IDX.sector] || "").trim().toUpperCase();
+    return id !== "" && id !== null && sector === "LOCAL 1";
+  });
+
+  // --- Configuración destino LOCAL 1 ---
+  const LOCAL_START_ROW = 10;
+  const LOCAL_END_ROW = 801;
+  const LOCAL_MAX_ROWS = LOCAL_END_ROW - LOCAL_START_ROW + 1;
+
+  // Columnas visuales top-left en LOCAL 1
+  const LOCAL_COL = {
+    id: 2,            // B
+    fecha: 3,         // C
+    tipo: 5,          // E
+    categoria: 7,     // G
+    concepto: 9,      // I
+    contraparte: 14,  // N
+    monto: 16,        // P
+    impuestos: 18,    // R
+    mp: 20,           // T
+    estadoFinan: 22,  // V  <-- MANUAL
+    estado: 25        // Y
+  };
+
+  // =========================================================
+  // 1) CAPTURAR ESTADO FINAN. EXISTENTE POR ID
+  // =========================================================
+  const existingIds = shLocal
+    .getRange(LOCAL_START_ROW, LOCAL_COL.id, LOCAL_MAX_ROWS, 1)
+    .getValues();
+
+  const existingEstadoFinan = shLocal
+    .getRange(LOCAL_START_ROW, LOCAL_COL.estadoFinan, LOCAL_MAX_ROWS, 1)
+    .getValues();
+
+  const estadoFinanPorId = {};
+  for (let i = 0; i < LOCAL_MAX_ROWS; i++) {
+    const id = existingIds[i][0];
+    const estadoFinan = existingEstadoFinan[i][0];
+
+    if (id !== "" && id !== null && estadoFinan !== "" && estadoFinan !== null) {
+      estadoFinanPorId[String(id)] = estadoFinan;
+    }
+  }
+
+  // =========================================================
+  // 2) LIMPIAR SOLO COLUMNAS AUTOMÁTICAS
+  //    (NO borrar Estado Finan., porque es manual)
+  // =========================================================
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.id, LOCAL_MAX_ROWS, 1).clearContent();          // B
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.fecha, LOCAL_MAX_ROWS, 1).clearContent();       // C
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.tipo, LOCAL_MAX_ROWS, 1).clearContent();        // E
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.categoria, LOCAL_MAX_ROWS, 1).clearContent();   // G
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.concepto, LOCAL_MAX_ROWS, 1).clearContent();    // I
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.contraparte, LOCAL_MAX_ROWS, 1).clearContent(); // N
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.monto, LOCAL_MAX_ROWS, 1).clearContent();       // P
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.impuestos, LOCAL_MAX_ROWS, 1).clearContent();   // R
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.mp, LOCAL_MAX_ROWS, 1).clearContent();          // T
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.estado, LOCAL_MAX_ROWS, 1).clearContent();      // Y
+
+  // También limpiamos Estado Finan. para reescribirlo correctamente por ID
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.estadoFinan, LOCAL_MAX_ROWS, 1).clearContent(); // V
+
+  // --- Recortar si hay más movimientos que filas disponibles ---
+  const data = filtrados.slice(0, LOCAL_MAX_ROWS);
+
+  // =========================================================
+  // 3) PREPARAR ARRAYS DE ESCRITURA
+  // =========================================================
+  const ids = [];
+  const fechas = [];
+  const tipos = [];
+  const categorias = [];
+  const conceptos = [];
+  const contrapartes = [];
+  const montos = [];
+  const impuestos = [];
+  const mps = [];
+  const estadosFinan = [];
+  const estados = [];
+
+  for (let i = 0; i < LOCAL_MAX_ROWS; i++) {
+    if (i < data.length) {
+      const row = data[i];
+      const id = row[IDX.id];
+
+      ids.push([id]);
+      fechas.push([row[IDX.fecha]]);
+      tipos.push([row[IDX.tipo]]);
+      categorias.push([row[IDX.categoria]]);
+      conceptos.push([row[IDX.concepto]]);
+      contrapartes.push([row[IDX.contraparte]]);
+      montos.push([row[IDX.monto]]);
+      impuestos.push([row[IDX.impuestos]]);
+      mps.push([row[IDX.mp]]);
+      estados.push([row[IDX.estado]]);
+
+      // Recuperar Estado Finan. previo por ID
+      estadosFinan.push([estadoFinanPorId[String(id)] || ""]);
+    } else {
+      ids.push([""]);
+      fechas.push([""]);
+      tipos.push([""]);
+      categorias.push([""]);
+      conceptos.push([""]);
+      contrapartes.push([""]);
+      montos.push([""]);
+      impuestos.push([""]);
+      mps.push([""]);
+      estadosFinan.push([""]);
+      estados.push([""]);
+    }
+  }
+
+  // =========================================================
+  // 4) ESCRIBIR DATOS
+  // =========================================================
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.id, LOCAL_MAX_ROWS, 1).setValues(ids);                 // B
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.fecha, LOCAL_MAX_ROWS, 1).setValues(fechas);           // C
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.tipo, LOCAL_MAX_ROWS, 1).setValues(tipos);             // E
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.categoria, LOCAL_MAX_ROWS, 1).setValues(categorias);   // G
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.concepto, LOCAL_MAX_ROWS, 1).setValues(conceptos);     // I
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.contraparte, LOCAL_MAX_ROWS, 1).setValues(contrapartes); // N
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.monto, LOCAL_MAX_ROWS, 1).setValues(montos);           // P
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.impuestos, LOCAL_MAX_ROWS, 1).setValues(impuestos);    // R
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.mp, LOCAL_MAX_ROWS, 1).setValues(mps);                 // T
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.estadoFinan, LOCAL_MAX_ROWS, 1).setValues(estadosFinan); // V
+  shLocal.getRange(LOCAL_START_ROW, LOCAL_COL.estado, LOCAL_MAX_ROWS, 1).setValues(estados);         // Y
+
+  SpreadsheetApp.flush();
+  SpreadsheetApp.getActive().toast("LOCAL 1 sincronizado desde ADMINISTRACIÓN", "OK", 3);
+}
+
+
+/* =========================================================
+   FITNESS
+   ========================================================= */
+
+const FITNESS_CFG = {
+  sheetName: "FITNESS",
+  headerRow: 19,
+
+  movimientos: {
+    startCol: 2,   // B
+    endCol: 25,    // Y
+    dataStartRow: 20,
+    dataEndRow: 801
+  },
+
+  inscriptos: {
+    startCol: 26,  // Z
+    endCol: 53,    // AX
+    dataStartRow: 20,
+    dataEndRow: 801
+  }
+};
+
+/**
+ * Sincroniza MOVIMIENTOS de FITNESS desde ADMINISTRACIÓN
+ * filtrando por Sector = FITNESS y preservando Estado Finan. manual por ID.
+ */
+function sincronizarFitnessDesdeAdministracion() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shAdmin = ss.getSheetByName("ADMINISTRACIÓN");
+  const shFit = ss.getSheetByName(FITNESS_CFG.sheetName);
+
+  if (!shAdmin) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+  if (!shFit) throw new Error('No existe la hoja "FITNESS".');
+
+  const movMap = getHeaderMapInRegion_(
+    shFit,
+    FITNESS_CFG.headerRow,
+    FITNESS_CFG.movimientos.startCol,
+    FITNESS_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const LOCAL_START_ROW = FITNESS_CFG.movimientos.dataStartRow;
+  const LOCAL_END_ROW = FITNESS_CFG.movimientos.dataEndRow;
+  const LOCAL_MAX_ROWS = LOCAL_END_ROW - LOCAL_START_ROW + 1;
+
+  // Capturar Estado Finan. existente por ID
+  const existingIds = shFit.getRange(LOCAL_START_ROW, movMap["Id."], LOCAL_MAX_ROWS, 1).getValues();
+  const existingEstadoFinan = shFit.getRange(LOCAL_START_ROW, movMap["Estado Finan."], LOCAL_MAX_ROWS, 1).getValues();
+
+  const estadoFinanPorId = {};
+  for (let i = 0; i < LOCAL_MAX_ROWS; i++) {
+    const id = existingIds[i][0];
+    const estadoFinan = existingEstadoFinan[i][0];
+    if (id !== "" && id !== null && estadoFinan !== "" && estadoFinan !== null) {
+      estadoFinanPorId[String(id)] = estadoFinan;
+    }
+  }
+
+  // Leer ADMINISTRACIÓN
+  const ADMIN_START_ROW = 13;
+  const ADMIN_END_ROW = 2003;
+  const ADMIN_NUM_ROWS = ADMIN_END_ROW - ADMIN_START_ROW + 1;
+  const adminData = shAdmin.getRange(ADMIN_START_ROW, 2, ADMIN_NUM_ROWS, 27).getValues();
+
+  // Índices dentro de B:AB
+  const IDX = {
+    id: 0,
+    fecha: 1,
+    tipo: 3,
+    categoria: 6,
+    concepto: 9,
+    contraparte: 14,
+    sector: 17,
+    monto: 19,
+    impuestos: 22,
+    estado: 24,
+    mp: 26
+  };
+
+  const filtrados = adminData.filter(row => {
+    const id = row[IDX.id];
+    const sector = String(row[IDX.sector] || "").trim().toUpperCase();
+    return id !== "" && id !== null && sector === "FITNESS";
+  });
+
+  // Limpiar columnas automáticas
+  const colsToClear = [
+    movMap["Id."],
+    movMap["Fecha"],
+    movMap["Tipo"],
+    movMap["Categoría"],
+    movMap["Concepto"],
+    movMap["Contra-parte"],
+    movMap["Monto"],
+    movMap["Impuestos"],
+    movMap["M.P."],
+    movMap["Estado"],
+    movMap["Estado Finan."]
+  ];
+
+  colsToClear.forEach(col => {
+    shFit.getRange(LOCAL_START_ROW, col, LOCAL_MAX_ROWS, 1).clearContent();
+  });
+
+  const data = filtrados.slice(0, LOCAL_MAX_ROWS);
+
+  const out = {
+    "Id.": [],
+    "Fecha": [],
+    "Tipo": [],
+    "Categoría": [],
+    "Concepto": [],
+    "Contra-parte": [],
+    "Monto": [],
+    "Impuestos": [],
+    "M.P.": [],
+    "Estado Finan.": [],
+    "Estado": []
+  };
+
+  for (let i = 0; i < LOCAL_MAX_ROWS; i++) {
+    if (i < data.length) {
+      const row = data[i];
+      const id = row[IDX.id];
+
+      out["Id."].push([id]);
+      out["Fecha"].push([row[IDX.fecha]]);
+      out["Tipo"].push([row[IDX.tipo]]);
+      out["Categoría"].push([row[IDX.categoria]]);
+      out["Concepto"].push([row[IDX.concepto]]);
+      out["Contra-parte"].push([row[IDX.contraparte]]);
+      out["Monto"].push([row[IDX.monto]]);
+      out["Impuestos"].push([row[IDX.impuestos]]);
+      out["M.P."].push([row[IDX.mp]]);
+      out["Estado Finan."].push([estadoFinanPorId[String(id)] || ""]);
+      out["Estado"].push([row[IDX.estado]]);
+    } else {
+      Object.keys(out).forEach(k => out[k].push([""]));
+    }
+  }
+
+  Object.keys(out).forEach(label => {
+    shFit.getRange(LOCAL_START_ROW, movMap[label], LOCAL_MAX_ROWS, 1).setValues(out[label]);
+  });
+
+  SpreadsheetApp.flush();
+}
+
+/**
+ * BOTÓN: agrega una inscripción nueva en INSCRIPTOS de FITNESS.
+ * Inserta arriba de todo y desplaza el resto hacia abajo.
+ */
+function agregarInscripcionFitness() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(FITNESS_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "FITNESS".');
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    FITNESS_CFG.headerRow,
+    FITNESS_CFG.inscriptos.startCol,
+    FITNESS_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const nombre = getNamedValueRequired_("FIT_INS_NOMBRE");
+  const apellido = getNamedValueRequired_("FIT_INS_APELLIDO");
+  const dni = formatDNIText_(getNamedValueRequired_("FIT_INS_DNI"));
+  const tel = getNamedValue_("FIT_INS_TEL");
+  const actividad = getNamedValueRequired_("FIT_INS_ACTIVIDAD");
+  const modalidad = getNamedValueRequired_("FIT_INS_MODALIDAD");
+  const cuota = parseNumber_(getNamedValueRequired_("FIT_INS_CUOTA"));
+
+  const existente = existeInscripcionMismaActividadEnSector_(
+    FITNESS_CFG,
+    dni,
+    actividad,
+    modalidad,
+    ""
+  );
+
+  if (existente) {
+    SpreadsheetApp.getUi().alert(
+      `Ya existe una inscripción igual para ese DNI:\n\n` +
+      `${existente.nombre} ${existente.apellido}\n` +
+      `${existente.actividad} - ${existente.modalidad}`
+    );
+    return;
+  }
+
+  const dataStartRow = FITNESS_CFG.inscriptos.dataStartRow;
+  const dataEndRow = FITNESS_CFG.inscriptos.dataEndRow;
+  const regionStartCol = FITNESS_CFG.inscriptos.startCol;
+  const regionEndCol = FITNESS_CFG.inscriptos.endCol;
+  const numRows = dataEndRow - dataStartRow + 1;
+  const numCols = regionEndCol - regionStartCol + 1;
+
+  if (!isFinite(cuota) || cuota < 0) {
+    SpreadsheetApp.getUi().alert("La cuota debe tener un valor numérico válido (puede ser 0, pero no negativa).");
+    return;
+  }
+
+  // Shift de toda la grilla de inscriptos 1 fila hacia abajo
+  const region = sh.getRange(dataStartRow, regionStartCol, numRows, numCols);
+  const values = region.getValues();
+  values.pop();
+  values.unshift(new Array(numCols).fill(""));
+  region.setValues(values);
+
+  const prefijoActividad = getPrefijoActividadFitness_(actividad);
+  const nextId = generarId_(prefijoActividad, getMaxFitnessInscriptosId_(sh, insMap) + 1);
+  const targetRow = dataStartRow;
+
+  sh.getRange(targetRow, insMap["Id."]).setValue(nextId);
+  sh.getRange(targetRow, insMap["Fecha"]).setValue(new Date());
+  sh.getRange(targetRow, insMap["Nombre"]).setValue(nombre);
+  sh.getRange(targetRow, insMap["Apellido"]).setValue(apellido);
+
+  const rDni = sh.getRange(targetRow, insMap["D.N.I."]);
+  rDni.setNumberFormat("@");
+  rDni.setValue(dni);
+
+  sh.getRange(targetRow, insMap["Tel."]).setValue(tel);
+  sh.getRange(targetRow, insMap["Actividad"]).setValue(actividad);
+  sh.getRange(targetRow, insMap["Modalidad"]).setValue(modalidad);
+  sh.getRange(targetRow, insMap["Cuota"]).setValue(cuota);
+
+  actualizarEstadosInscriptosFitness();
+  limpiarFormularioInscripcionFitness_();
+
+  SpreadsheetApp.getActive().toast("Inscripción cargada: " + nextId, "OK", 3);
+}
+
+/**
+ * Al ingresar DNI en el formulario de pago, completa Nombre, Apellido, Monto y Estado.
+ */
+function autocompletarPagoFitnessPorDni_(dniInput) {
+  const dni = formatDNIText_(dniInput);
+  const inscriptos = getInscriptosVigentesPorDniEnSector_(FITNESS_CFG, dni);
+
+  if (!inscriptos.length) {
+    setNamedValue_("FIT_PAGO_NOMBRE", "");
+    setNamedValue_("FIT_PAGO_APELLIDO", "");
+    setNamedValue_("FIT_PAGO_MONTO", "");
+    setNamedValue_("FIT_PAGO_ESTADO", "NO ENCONTRADO");
+    SpreadsheetApp.getActive().toast("No se encontró un inscripto vigente con ese DNI", "FITNESS", 3);
+    return;
+  }
+
+  completarFormularioPagoDesdeInscriptos_("FIT", inscriptos);
+
+  if (inscriptos.length > 1) {
+    SpreadsheetApp.getActive().toast(
+      `Se detectaron ${inscriptos.length} actividades. Se generará un pago por cada una.`,
+      "FITNESS",
+      5
+    );
+  }
+}
+
+/**
+ * BOTÓN: crea un pago de cuota en ADMINISTRACIÓN y luego refresca FITNESS.
+ */
+function cargarPagoCuotaFitness() {
+  const dni = formatDNIText_(getNamedValueRequired_("FIT_PAGO_DNI"));
+  const mp = getNamedValueRequired_("FIT_PAGO_MP");
+
+  let resultado;
+
+  try {
+    resultado = generarPagosCuotaPorDniEnSector_(
+      FITNESS_CFG,
+      "FITNESS",
+      dni,
+      mp
+    );
+  } catch (err) {
+    SpreadsheetApp.getUi().alert(err.message || String(err));
+    return;
+  }
+
+  sincronizarFitnessDesdeAdministracion();
+
+  resultado.ids.forEach(id => {
+    setEstadoFinanFitnessPorId_(id, "PAGADO");
+  });
+
+  actualizarEstadosInscriptosFitness();
+  limpiarFormularioPagoFitness_();
+
+  SpreadsheetApp.getActive().toast(
+    `Pagos FITNESS cargados: ${resultado.cantidad} | Total: $${resultado.total}`,
+    "OK",
+    5
+  );
+}
+
+/**
+ * Actualiza automáticamente el estado de cada inscripto.
+ */
+function actualizarEstadosInscriptosFitness() {
+  actualizarEstadosInscriptosSector_(FITNESS_CFG);
+}
+
+/**
+ * Inserta un movimiento nuevo en ADMINISTRACIÓN y devuelve el ID generado.
+ */
+function appendMovimientoAdministracion_(mov) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("ADMINISTRACIÓN");
+  if (!sh) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+
+  const START_ROW = 13;
+  const END_ROW = 2003;
+  const START_COL = 2;
+  const END_COL = 28;
+  const NUM_COLS = END_COL - START_COL + 1;
+
+  const COL = {
+    id: 2,
+    fecha: 3,
+    tipo: 5,
+    categoria: 8,
+    concepto: 11,
+    contraparte: 16,
+    sector: 19,
+    monto: 21,
+    impuestos: 24,
+    estado: 26,
+    mp: 28
+  };
+
+  const idRange = sh.getRange(START_ROW, COL.id, END_ROW - START_ROW + 1, 1).getValues();
+
+  let lastUsedIndex = -1;
+  for (let i = idRange.length - 1; i >= 0; i--) {
+    if (idRange[i][0] !== "" && idRange[i][0] !== null) {
+      lastUsedIndex = i;
+      break;
+    }
+  }
+
+  const nextRow = START_ROW + (lastUsedIndex + 1);
+  if (nextRow > END_ROW) {
+    throw new Error("No hay más espacio en ADMINISTRACIÓN.");
+  }
+
+  const prefijo = getPrefijoPorTipo_(mov.tipo);
+  if (prefijo === "X") {
+    throw new Error("Tipo no reconocido para generar ID: " + mov.tipo);
+  }
+
+  const maxN = getMaxCorrelativoGlobal_(idRange);
+  const nextId = generarId_(prefijo, maxN + 1);
+
+  sh.getRange(nextRow, COL.id).setValue(nextId);
+  sh.getRange(nextRow, COL.fecha).setValue(new Date());
+  sh.getRange(nextRow, COL.tipo).setValue(mov.tipo);
+  sh.getRange(nextRow, COL.categoria).setValue(mov.categoria);
+  sh.getRange(nextRow, COL.concepto).setValue(mov.concepto);
+
+  const rContra = sh.getRange(nextRow, COL.contraparte);
+  rContra.setNumberFormat("@");
+  rContra.setValue(formatDNIText_(mov.contraparte));
+
+  sh.getRange(nextRow, COL.sector).setValue(mov.sector);
+  sh.getRange(nextRow, COL.monto).setValue(mov.monto);
+  sh.getRange(nextRow, COL.impuestos).setValue(mov.impuestos || 0);
+  sh.getRange(nextRow, COL.estado).setValue(mov.estado || "COMPLETADO");
+  sh.getRange(nextRow, COL.mp).setValue(mov.mp || "");
+
+  ordenarMovimientosPorIdDesc_(sh, START_ROW, END_ROW, START_COL, NUM_COLS);
+
+  return nextId;
+}
+
+/**
+ * Busca un inscripto en FITNESS por DNI.
+ */
+function buscarInscriptoFitnessPorDni_(dniInput) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(FITNESS_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "FITNESS".');
+
+  const dniBuscado = formatDNIText_(dniInput);
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    FITNESS_CFG.headerRow,
+    FITNESS_CFG.inscriptos.startCol,
+    FITNESS_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const startRow = FITNESS_CFG.inscriptos.dataStartRow;
+  const numRows = FITNESS_CFG.inscriptos.dataEndRow - startRow + 1;
+
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+  const fechas = sh.getRange(startRow, insMap["Fecha"], numRows, 1).getValues();
+  const nombres = sh.getRange(startRow, insMap["Nombre"], numRows, 1).getValues();
+  const apellidos = sh.getRange(startRow, insMap["Apellido"], numRows, 1).getValues();
+  const dnis = sh.getRange(startRow, insMap["D.N.I."], numRows, 1).getDisplayValues();
+  const tels = sh.getRange(startRow, insMap["Tel."], numRows, 1).getValues();
+  const actividades = sh.getRange(startRow, insMap["Actividad"], numRows, 1).getValues();
+  const modalidades = sh.getRange(startRow, insMap["Modalidad"], numRows, 1).getValues();
+  const cuotas = sh.getRange(startRow, insMap["Cuota"], numRows, 1).getValues();
+  const estados = sh.getRange(startRow, insMap["Estado"], numRows, 1).getValues();
+
+  for (let i = 0; i < numRows; i++) {
+    const id = ids[i][0];
+    if (!id) continue;
+
+    const dni = formatDNIText_(dnis[i][0]);
+    if (dni === dniBuscado) {
+      return {
+        id: id,
+        fecha: fechas[i][0],
+        nombre: nombres[i][0],
+        apellido: apellidos[i][0],
+        dni: dni,
+        tel: tels[i][0],
+        actividad: actividades[i][0],
+        modalidad: modalidades[i][0],
+        cuota: cuotas[i][0],
+        estado: estados[i][0]
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Asigna Estado Finan. a un movimiento ya sincronizado en FITNESS.
+ */
+function setEstadoFinanFitnessPorId_(idBuscado, valor) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(FITNESS_CFG.sheetName);
+  if (!sh) return;
+
+  const movMap = getHeaderMapInRegion_(
+    sh,
+    FITNESS_CFG.headerRow,
+    FITNESS_CFG.movimientos.startCol,
+    FITNESS_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const startRow = FITNESS_CFG.movimientos.dataStartRow;
+  const numRows = FITNESS_CFG.movimientos.dataEndRow - startRow + 1;
+  const ids = sh.getRange(startRow, movMap["Id."], numRows, 1).getValues();
+
+  for (let i = 0; i < numRows; i++) {
+    if (String(ids[i][0]) === String(idBuscado)) {
+      sh.getRange(startRow + i, movMap["Estado Finan."]).setValue(valor);
+      return;
+    }
+  }
+}
+
+/**
+ * Trigger opcional para mantener estados/sincronización vivos.
+ */
+function refrescarFitness() {
+  sincronizarFitnessDesdeAdministracion();
+  actualizarEstadosInscriptosFitness();
+}
+
+function instalarTriggerFitnessCadaHora() {
+  borrarTriggerFitnessCadaHora();
+
+  ScriptApp.newTrigger("refrescarFitness")
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  SpreadsheetApp.getActive().toast("Trigger de FITNESS activado", "OK", 4);
+}
+
+function borrarTriggerFitnessCadaHora() {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === "refrescarFitness") {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+}
+
+/* =========================
+   HELPERS FITNESS
+   ========================= */
+
+function getMaxFitnessInscriptosId_(sh, insMap) {
+  const startRow = FITNESS_CFG.inscriptos.dataStartRow;
+  const numRows = FITNESS_CFG.inscriptos.dataEndRow - startRow + 1;
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+
+  let maxN = 0;
+  ids.forEach(r => {
+    const n = extraerNumeroId_(r[0]);
+    if (n > maxN) maxN = n;
+  });
+
+  return maxN;
+}
+
+function limpiarFormularioInscripcionFitness_() {
+  clearNamedIfExists_("FIT_INS_NOMBRE");
+  clearNamedIfExists_("FIT_INS_APELLIDO");
+  clearNamedIfExists_("FIT_INS_DNI");
+  clearNamedIfExists_("FIT_INS_TEL");
+  clearNamedIfExists_("FIT_INS_ACTIVIDAD");
+  clearNamedIfExists_("FIT_INS_MODALIDAD");
+  // FIT_INS_CUOTA no se limpia porque es dinámico
+  clearNamedIfExists_("FIT_INS_DESCUENTO");
+  clearNamedIfExists_("FIT_INS_PROMO");
+  clearNamedIfExists_("FIT_INS_ENTRENADOR");
+  clearNamedIfExists_("FIT_INS_TURNO");
+  clearNamedIfExists_("FIT_INS_OBS");
+}
+
+function limpiarFormularioPagoFitness_() {
+  clearNamedIfExists_("FIT_PAGO_DNI");
+  clearNamedIfExists_("FIT_PAGO_NOMBRE");
+  clearNamedIfExists_("FIT_PAGO_APELLIDO");
+  clearNamedIfExists_("FIT_PAGO_MONTO");
+  clearNamedIfExists_("FIT_PAGO_ESTADO");
+  clearNamedIfExists_("FIT_PAGO_MP");
+}
+
+function getNamedValueRequired_(name) {
+  const v = getNamedValue_(name);
+  if (v === "" || v === null || v === undefined) {
+    throw new Error("Falta completar el campo: " + name);
+  }
+  return v;
+}
+
+function getNamedValue_(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const r = ss.getRangeByName(name);
+  if (!r) return "";
+  return r.getValue();
+}
+
+function setNamedValue_(name, value) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const r = ss.getRangeByName(name);
+  if (!r) return;
+  r.setValue(value);
+}
+
+function clearNamedIfExists_(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const r = ss.getRangeByName(name);
+  if (!r) return;
+  r.clearContent();
+}
+
+function sameCell_(a, b) {
+  return a.getSheet().getSheetId() === b.getSheet().getSheetId()
+    && a.getRow() === b.getRow()
+    && a.getColumn() === b.getColumn();
+}
+
+function normalizeHeader_(text) {
+  return String(text || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getHeaderMapInRegion_(sheet, row, startCol, endCol, labels) {
+  const values = sheet.getRange(row, startCol, 1, endCol - startCol + 1).getDisplayValues()[0];
+  const map = {};
+
+  labels.forEach(label => {
+    const wanted = normalizeHeader_(label);
+    for (let i = 0; i < values.length; i++) {
+      if (normalizeHeader_(values[i]) === wanted) {
+        map[label] = startCol + i;
+        break;
+      }
+    }
+    if (!map[label]) {
+      throw new Error(`No encontré el encabezado "${label}" en ${sheet.getName()} fila ${row}.`);
+    }
+  });
+
+  return map;
+}
+
+function isSameMonthYear_(a, b) {
+  if (!a || !b) return false;
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getMonth() === db.getMonth() && da.getFullYear() === db.getFullYear();
+}
+
+function diffDays_(a, b) {
+  const ms = Math.abs(new Date(a).setHours(0,0,0,0) - new Date(b).setHours(0,0,0,0));
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
+function normalizarFechaSinHora_(value) {
+  const d = new Date(value);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * Devuelve el prefijo del ID de inscripto según la actividad elegida.
+ * - FUNCIONAL -> F
+ * - COMPLEMENTO -> C
+ * - F+C / FUNCIONAL+COMPLEMENTO / COMBO -> X
+ */
+function getPrefijoActividadFitness_(actividad) {
+  const a = String(actividad || "").trim().toUpperCase();
+
+  if (
+    a.includes("F+C") ||
+    a.includes("FUNCIONAL + COMPLEMENTO") ||
+    a.includes("FUNCIONAL+COMPLEMENTO") ||
+    a.includes("COMBO")
+  ) {
+    return "X";
+  }
+
+  if (a.includes("COMPLEMENTO")) return "C";
+  if (a.includes("FUNCIONAL")) return "F";
+
+  // fallback por si viene algo raro
+  return "F";
+}
+
+/* =========================================================
+   API PRIVADA PARA PLANILLAS PARTICULARES
+   FITNESS
+   ========================================================= */
+
+const API_TOKEN_FITNESS = "FITNESS_MiClub_2026_PRIVADO";
+
+function normalizeToken_(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function tokenFingerprint_(value) {
+  const t = normalizeToken_(value);
+  if (!t) return "(vacío)";
+  if (t.length <= 12) return `${t}|len=${t.length}`;
+  return `${t.slice(0, 6)}...${t.slice(-6)}|len=${t.length}`;
+}
+
+/**
+ * Web App endpoint
+ */
+function doPost(e) {
+  try {
+    const raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "";
+    let body = {};
+
+    try {
+      body = raw ? JSON.parse(raw) : {};
+    } catch (parseErr) {
+      body = {};
+    }
+
+    const tokenBodyRaw = body.token || "";
+    const tokenParamRaw = (e && e.parameter && e.parameter.token) || "";
+    const tokenBody = normalizeToken_(tokenBodyRaw);
+    const tokenParam = normalizeToken_(tokenParamRaw);
+    const token = tokenBody || tokenParam;
+
+    const actionBody = String(body.action || "").trim();
+    const actionParam = String((e && e.parameter && e.parameter.action) || "").trim();
+    const action = actionBody || actionParam;
+
+    const payload = body.payload || {};
+    const expectedToken = normalizeToken_(API_TOKEN_FITNESS);
+
+    if (token !== expectedToken) {
+      return jsonResponse_({
+        ok: false,
+        error: "Token inválido",
+        debug: {
+          recibidoBody: tokenFingerprint_(tokenBodyRaw),
+          recibidoParam: tokenFingerprint_(tokenParamRaw),
+          esperado: tokenFingerprint_(expectedToken),
+          action: action || "(vacía)"
+        }
+      });
+    }
+
+    switch (action) {
+      case "getFitnessSnapshot":
+        return jsonResponse_({
+          ok: true,
+          data: getFitnessSnapshotFromAdmin_()
+        });
+
+      case "addFitnessInscripto":
+        return jsonResponse_(addFitnessInscriptoFromSector_(payload));
+
+      case "syncFitnessParticularSheet":
+        return jsonResponse_(syncFitnessParticularSheetFromAdmin_(payload));
+
+      case "getFitnessMovimientos":
+        return jsonResponse_({
+          ok: true,
+          data: getFitnessMovimientosParticular_()
+        });
+
+      case "getFitnessInscriptos":
+        return jsonResponse_({
+          ok: true,
+          data: getFitnessInscriptosParticular_()
+        });
+
+      case "addFitnessInscripcion":
+        return jsonResponse_({
+          ok: true,
+          data: addFitnessInscripcionDesdeParticular_(payload)
+        });
+
+      default:
+        return jsonResponse_({
+          ok: false,
+          error: `Acción no reconocida: ${action}`
+        });
+    }
+
+  } catch (err) {
+    return jsonResponse_({
+      ok: false,
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+}
+
+function jsonResponse_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Devuelve snapshot del sector FITNESS:
+ * - movimientos desde hoja FITNESS (tabla espejo)
+ * - inscriptos desde hoja FITNESS
+ */
+function getFitnessSnapshotFromAdmin_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("FITNESS");
+  if (!sh) throw new Error('No existe la hoja "FITNESS".');
+
+  const movMap = getHeaderMapInRegion_(
+    sh, 19, 2, 25,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const insMap = getHeaderMapInRegion_(
+    sh, 19, 26, 50,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const movRows = 801 - 20 + 1;
+  const insRows = 801 - 20 + 1;
+
+  const movimientos = readTableByHeaders_(sh, 20, movRows, movMap, [
+    "Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"
+  ]);
+
+  const inscriptos = readTableByHeaders_(sh, 20, insRows, insMap, [
+    "Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"
+  ]);
+
+  return {
+    movimientos,
+    inscriptos
+  };
+}
+
+/**
+ * Carga una inscripción enviada desde la planilla particular de FITNESS
+ * directamente en la hoja FITNESS de ADMINISTRACIÓN.
+ */
+function addFitnessInscriptoFromSector_(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("FITNESS");
+  if (!sh) throw new Error('No existe la hoja "FITNESS".');
+
+  const insMap = getHeaderMapInRegion_(
+    sh, 19, 26, 53,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const nombre = String(payload.nombre || "").trim();
+  const apellido = String(payload.apellido || "").trim();
+  const dni = formatDNIText_(payload.dni);
+  const tel = String(payload.tel || "").trim();
+  const actividad = String(payload.actividad || "").trim();
+  const modalidad = String(payload.modalidad || "").trim();
+  const cuota = parseNumber_(payload.cuota);
+
+  if (!nombre) throw new Error("Falta Nombre");
+  if (!apellido) throw new Error("Falta Apellido");
+  if (!dni) throw new Error("Falta D.N.I.");
+  if (!actividad) throw new Error("Falta Actividad");
+  if (!modalidad) throw new Error("Falta Modalidad");
+  if (!isFinite(cuota) || cuota < 0) {
+    throw new Error("La cuota debe ser numérica y puede ser 0, pero no negativa.");
+  }
+
+  const existente = existeInscripcionMismaActividadEnSector_(
+  FITNESS_CFG,
+  dni,
+  actividad,
+  modalidad,
+  ""
+);
+
+if (existente) {
+  throw new Error(
+    `Ya existe una inscripción igual para ese DNI: ` +
+    `${existente.nombre} ${existente.apellido} - ${existente.actividad} (${existente.modalidad})`
+  );
+}
+
+  const dataStartRow = 20;
+  const dataEndRow = 801;
+  const regionStartCol = 26; // Z
+  const regionEndCol = 53;   // AX
+  const numRows = dataEndRow - dataStartRow + 1;
+  const numCols = regionEndCol - regionStartCol + 1;
+
+  const region = sh.getRange(dataStartRow, regionStartCol, numRows, numCols);
+  const values = region.getValues();
+  values.pop();
+  values.unshift(new Array(numCols).fill(""));
+  region.setValues(values);
+
+  const prefijoActividad = getPrefijoActividadFitness_(actividad);
+  const nextId = generarId_(prefijoActividad, getMaxFitnessInscriptosId_(sh, insMap) + 1);
+  const targetRow = dataStartRow;
+
+  sh.getRange(targetRow, insMap["Id."]).setValue(nextId);
+  sh.getRange(targetRow, insMap["Fecha"]).setValue(new Date());
+  sh.getRange(targetRow, insMap["Nombre"]).setValue(nombre);
+  sh.getRange(targetRow, insMap["Apellido"]).setValue(apellido);
+
+  const rDni = sh.getRange(targetRow, insMap["D.N.I."]);
+  rDni.setNumberFormat("@");
+  rDni.setValue(dni);
+
+  sh.getRange(targetRow, insMap["Tel."]).setValue(tel);
+  sh.getRange(targetRow, insMap["Actividad"]).setValue(actividad);
+  sh.getRange(targetRow, insMap["Modalidad"]).setValue(modalidad);
+  sh.getRange(targetRow, insMap["Cuota"]).setValue(cuota);
+
+  actualizarEstadosInscriptosFitness();
+  sincronizarFitnessDesdeAdministracion();
+
+  return {
+    ok: true,
+    newId: nextId,
+    data: getFitnessSnapshotFromAdmin_()
+  };
+}
+
+const FITNESS_PARTICULAR_REMOTE_CFG = {
+  sheetName: "Hoja 1",
+  headerRow: 14,
+  movimientos: {
+    startCol: 2,
+    endCol: 26,
+    dataStartRow: 15,
+    dataEndRow: 815
+  },
+  inscriptos: {
+    startCol: 28,
+    endCol: 50,
+    dataStartRow: 15,
+    dataEndRow: 815
+  }
+};
+
+function syncFitnessParticularSheetFromAdmin_(payload) {
+  const targetSpreadsheetId = String(payload.spreadsheetId || "").trim();
+  const targetSheetName = String(payload.sheetName || FITNESS_PARTICULAR_REMOTE_CFG.sheetName).trim();
+
+  if (!targetSpreadsheetId) {
+    return { ok: false, error: "Falta spreadsheetId de FITNESS ADMIN." };
+  }
+
+  const lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(30000);
+
+    sincronizarFitnessDesdeAdministracion();
+    actualizarEstadosInscriptosFitness();
+
+    const snapshot = getFitnessSnapshotFromAdmin_();
+
+    const targetSS = SpreadsheetApp.openById(targetSpreadsheetId);
+    const targetSh = targetSS.getSheetByName(targetSheetName);
+
+    if (!targetSh) {
+      throw new Error(`No existe la hoja "${targetSheetName}" en FITNESS ADMIN.`);
+    }
+
+    writeFitnessSnapshotToParticularSheet_(targetSh, snapshot);
+
+    SpreadsheetApp.flush();
+
+    return {
+      ok: true,
+      msg: "FITNESS ADMIN actualizado correctamente.",
+      movimientos: snapshot.movimientos.length,
+      inscriptos: snapshot.inscriptos.length
+    };
+
+  } catch (err) {
+    return {
+      ok: false,
+      error: err && err.message ? err.message : String(err)
+    };
+
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
+  }
+}
+
+function writeFitnessSnapshotToParticularSheet_(sheet, snapshot) {
+  const cfg = FITNESS_PARTICULAR_REMOTE_CFG;
+
+  const movLabels = [
+    "Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte",
+    "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"
+  ];
+
+  const insLabels = [
+    "Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.",
+    "Actividad", "Modalidad", "Cuota", "Estado"
+  ];
+
+  const movMap = getHeaderMapInRegion_(
+    sheet,
+    cfg.headerRow,
+    cfg.movimientos.startCol,
+    cfg.movimientos.endCol,
+    movLabels
+  );
+
+  const insMap = getHeaderMapInRegion_(
+    sheet,
+    cfg.headerRow,
+    cfg.inscriptos.startCol,
+    cfg.inscriptos.endCol,
+    insLabels
+  );
+
+  writeObjectsToParticularTable_(
+    sheet,
+    cfg.movimientos.dataStartRow,
+    cfg.movimientos.dataEndRow,
+    movMap,
+    snapshot.movimientos || [],
+    movLabels
+  );
+
+  writeObjectsToParticularTable_(
+    sheet,
+    cfg.inscriptos.dataStartRow,
+    cfg.inscriptos.dataEndRow,
+    insMap,
+    snapshot.inscriptos || [],
+    insLabels
+  );
+}
+
+function writeObjectsToParticularTable_(sheet, startRow, endRow, headerMap, objects, labels) {
+  const maxRows = endRow - startRow + 1;
+
+  labels.forEach(label => {
+    const col = headerMap[label];
+    const range = sheet.getRange(startRow, col, maxRows, 1);
+
+    const out = [];
+
+    for (let i = 0; i < maxRows; i++) {
+      if (i < objects.length) {
+        const value = objects[i][label];
+        out.push([value === null || value === undefined ? "" : value]);
+      } else {
+        out.push([""]);
+      }
+    }
+
+    if (label === "Contra-parte" || label === "D.N.I." || label === "Tel.") {
+      range.setNumberFormat("@");
+    }
+
+    range.setValues(out);
+  });
+}
+
+/**
+ * Lee una tabla por encabezados y devuelve array de objetos.
+ */
+function readTableByHeaders_(sheet, startRow, numRows, headerMap, labels) {
+  const colsData = {};
+  labels.forEach(label => {
+    colsData[label] = sheet.getRange(startRow, headerMap[label], numRows, 1).getDisplayValues();
+  });
+
+  const rows = [];
+  for (let i = 0; i < numRows; i++) {
+    const rowObj = {};
+    let hasData = false;
+
+    labels.forEach(label => {
+      const value = colsData[label][i][0];
+      rowObj[label] = value;
+      if (value !== "" && value !== null) hasData = true;
+    });
+
+    if (hasData) rows.push(rowObj);
+  }
+
+  return rows;
+}
+
+function getFitnessMovimientosParticular_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shAdmin = ss.getSheetByName("ADMINISTRACIÓN");
+  if (!shAdmin) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+
+  const data = shAdmin.getRange(13, 2, 2003 - 13 + 1, 27).getValues();
+
+  // índices dentro de B:AB
+  const IDX = {
+    id: 0,
+    fecha: 1,
+    tipo: 3,
+    categoria: 6,
+    concepto: 9,
+    contraparte: 14,
+    sector: 17,
+    monto: 19,
+    impuestos: 22,
+    estado: 24,
+    mp: 26
+  };
+
+  const rows = data
+    .filter(row => {
+      const id = row[IDX.id];
+      const sector = String(row[IDX.sector] || "").trim().toUpperCase();
+      return id !== "" && id !== null && sector === "FITNESS";
+    })
+    .map(row => ({
+      id: row[IDX.id],
+      fecha: row[IDX.fecha],
+      tipo: row[IDX.tipo],
+      categoria: row[IDX.categoria],
+      concepto: row[IDX.concepto],
+      contraparte: row[IDX.contraparte],
+      monto: row[IDX.monto],
+      impuestos: row[IDX.impuestos],
+      mp: row[IDX.mp],
+      estado: row[IDX.estado]
+    }));
+
+  return rows;
+}
+
+function getFitnessInscriptosParticular_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName("FITNESS");
+  if (!sh) throw new Error('No existe la hoja "FITNESS".');
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    FITNESS_CFG.headerRow,
+    FITNESS_CFG.inscriptos.startCol,
+    FITNESS_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const startRow = FITNESS_CFG.inscriptos.dataStartRow;
+  const numRows = FITNESS_CFG.inscriptos.dataEndRow - startRow + 1;
+
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+  const fechas = sh.getRange(startRow, insMap["Fecha"], numRows, 1).getValues();
+  const nombres = sh.getRange(startRow, insMap["Nombre"], numRows, 1).getValues();
+  const apellidos = sh.getRange(startRow, insMap["Apellido"], numRows, 1).getValues();
+  const dnis = sh.getRange(startRow, insMap["D.N.I."], numRows, 1).getDisplayValues();
+  const tels = sh.getRange(startRow, insMap["Tel."], numRows, 1).getValues();
+  const actividades = sh.getRange(startRow, insMap["Actividad"], numRows, 1).getValues();
+  const modalidades = sh.getRange(startRow, insMap["Modalidad"], numRows, 1).getValues();
+  const cuotas = sh.getRange(startRow, insMap["Cuota"], numRows, 1).getValues();
+  const estados = sh.getRange(startRow, insMap["Estado"], numRows, 1).getValues();
+
+  const out = [];
+
+  for (let i = 0; i < numRows; i++) {
+    if (!ids[i][0]) continue;
+
+    out.push({
+      id: ids[i][0],
+      fecha: fechas[i][0],
+      nombre: nombres[i][0],
+      apellido: apellidos[i][0],
+      dni: dnis[i][0],
+      tel: tels[i][0],
+      actividad: actividades[i][0],
+      modalidad: modalidades[i][0],
+      cuota: cuotas[i][0],
+      estado: estados[i][0]
+    });
+  }
+
+  return out;
+}
+
+function addFitnessInscripcionDesdeParticular_(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(FITNESS_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "FITNESS".');
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    FITNESS_CFG.headerRow,
+    FITNESS_CFG.inscriptos.startCol,
+    FITNESS_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const nombre = String(payload.nombre || "").trim();
+  const apellido = String(payload.apellido || "").trim();
+  const dni = formatDNIText_(payload.dni);
+  const tel = String(payload.tel || "").trim();
+  const actividad = String(payload.actividad || "").trim();
+  const modalidad = String(payload.modalidad || "").trim();
+  const cuota = parseNumber_(payload.cuota);
+
+  if (!nombre) throw new Error("Falta Nombre");
+  if (!apellido) throw new Error("Falta Apellido");
+  if (!dni) throw new Error("Falta DNI");
+  if (!actividad) throw new Error("Falta Actividad");
+  if (!modalidad) throw new Error("Falta Modalidad");
+  if (!isFinite(cuota) || cuota < 0) {
+    throw new Error("La cuota debe ser válida (puede ser 0 pero no negativa).");
+  }
+
+  const existente = existeInscripcionMismaActividadEnSector_(
+    FITNESS_CFG,
+    dni,
+    actividad,
+    modalidad,
+    ""
+  );
+
+  if (existente) {
+    throw new Error(
+      `Ya existe una inscripción igual para ese DNI: ` +
+      `${existente.nombre} ${existente.apellido} - ${existente.actividad} (${existente.modalidad})`
+    );
+  }
+
+  const dataStartRow = FITNESS_CFG.inscriptos.dataStartRow;
+  const dataEndRow = FITNESS_CFG.inscriptos.dataEndRow;
+  const regionStartCol = FITNESS_CFG.inscriptos.startCol;
+  const regionEndCol = FITNESS_CFG.inscriptos.endCol;
+  const numRows = dataEndRow - dataStartRow + 1;
+  const numCols = regionEndCol - regionStartCol + 1;
+
+  const region = sh.getRange(dataStartRow, regionStartCol, numRows, numCols);
+  const values = region.getValues();
+  values.pop();
+  values.unshift(new Array(numCols).fill(""));
+  region.setValues(values);
+
+  const prefijoActividad = getPrefijoActividadFitness_(actividad);
+  const nextId = generarId_(prefijoActividad, getMaxFitnessInscriptosId_(sh, insMap) + 1);
+  const targetRow = dataStartRow;
+
+  sh.getRange(targetRow, insMap["Id."]).setValue(nextId);
+  sh.getRange(targetRow, insMap["Fecha"]).setValue(new Date());
+  sh.getRange(targetRow, insMap["Nombre"]).setValue(nombre);
+  sh.getRange(targetRow, insMap["Apellido"]).setValue(apellido);
+
+  const rDni = sh.getRange(targetRow, insMap["D.N.I."]);
+  rDni.setNumberFormat("@");
+  rDni.setValue(dni);
+
+  sh.getRange(targetRow, insMap["Tel."]).setValue(tel);
+  sh.getRange(targetRow, insMap["Actividad"]).setValue(actividad);
+  sh.getRange(targetRow, insMap["Modalidad"]).setValue(modalidad);
+  sh.getRange(targetRow, insMap["Cuota"]).setValue(cuota);
+
+  actualizarEstadosInscriptosFitness();
+
+  return {
+    id: nextId,
+    nombre,
+    apellido,
+    dni
+  };
+}
+
+function doGet(e) {
+  return jsonResponse_({
+    ok: true,
+    msg: "Web App activo",
+    method: "GET"
+  });
+}
+
+function actualizarFitness() {
+  sincronizarFitnessDesdeAdministracion();
+  actualizarEstadosInscriptosFitness();
+  SpreadsheetApp.getActive().toast("Datos de FITNESS actualizados", "OK", 3);
+}
+
+const SALON_CFG = {
+  sheetName: "SALON",
+  headerRow: 33,
+
+  movimientos: {
+    startCol: 2,
+    endCol: 25,
+    dataStartRow: 34,
+    dataEndRow: 820
+  },
+
+  inscriptos: {
+    startCol: 28,  // AB
+    endCol: 54,    // BA
+    dataStartRow: 34,
+    dataEndRow: 820
+  }
+};
+
+function sincronizarSalonDesdeAdministracion() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shAdmin = ss.getSheetByName("ADMINISTRACIÓN");
+  const shSalon = ss.getSheetByName(SALON_CFG.sheetName);
+
+  if (!shAdmin) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+  if (!shSalon) throw new Error('No existe la hoja "SALON".');
+
+  const movMap = getHeaderMapInRegion_(
+    shSalon,
+    SALON_CFG.headerRow,
+    SALON_CFG.movimientos.startCol,
+    SALON_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const startRow = SALON_CFG.movimientos.dataStartRow;
+  const maxRows = SALON_CFG.movimientos.dataEndRow - startRow + 1;
+
+  const existingIds = shSalon.getRange(startRow, movMap["Id."], maxRows, 1).getValues();
+  const existingEstadoFinan = shSalon.getRange(startRow, movMap["Estado Finan."], maxRows, 1).getValues();
+
+  const estadoFinanPorId = {};
+  for (let i = 0; i < maxRows; i++) {
+    const id = existingIds[i][0];
+    const estadoFinan = existingEstadoFinan[i][0];
+    if (id !== "" && id !== null && estadoFinan !== "" && estadoFinan !== null) {
+      estadoFinanPorId[String(id)] = estadoFinan;
+    }
+  }
+
+  const adminData = shAdmin.getRange(13, 2, 2003 - 13 + 1, 27).getValues();
+
+  const IDX = {
+    id: 0,
+    fecha: 1,
+    tipo: 3,
+    categoria: 6,
+    concepto: 9,
+    contraparte: 14,
+    sector: 17,
+    monto: 19,
+    impuestos: 22,
+    estado: 24,
+    mp: 26
+  };
+
+  const filtrados = adminData.filter(row => {
+    const id = row[IDX.id];
+    const sector = String(row[IDX.sector] || "").trim().toUpperCase();
+    return id !== "" && id !== null && sector === "SALON";
+  });
+
+  const labels = ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"];
+
+  labels.forEach(label => {
+    shSalon.getRange(startRow, movMap[label], maxRows, 1).clearContent();
+  });
+
+  const out = {};
+  labels.forEach(label => out[label] = []);
+
+  for (let i = 0; i < maxRows; i++) {
+    if (i < filtrados.length) {
+      const row = filtrados[i];
+      const id = row[IDX.id];
+
+      out["Id."].push([id]);
+      out["Fecha"].push([row[IDX.fecha]]);
+      out["Tipo"].push([row[IDX.tipo]]);
+      out["Categoría"].push([row[IDX.categoria]]);
+      out["Concepto"].push([row[IDX.concepto]]);
+      out["Contra-parte"].push([row[IDX.contraparte]]);
+      out["Monto"].push([row[IDX.monto]]);
+      out["Impuestos"].push([row[IDX.impuestos]]);
+      out["M.P."].push([row[IDX.mp]]);
+      out["Estado Finan."].push([estadoFinanPorId[String(id)] || ""]);
+      out["Estado"].push([row[IDX.estado]]);
+    } else {
+      labels.forEach(label => out[label].push([""]));
+    }
+  }
+
+  labels.forEach(label => {
+    shSalon.getRange(startRow, movMap[label], maxRows, 1).setValues(out[label]);
+  });
+
+  SpreadsheetApp.flush();
+}
+
+function agregarInscripcionSalon() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SALON_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "SALON".');
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    SALON_CFG.headerRow,
+    SALON_CFG.inscriptos.startCol,
+    SALON_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const colInstructor = getOptionalHeaderColumn_(
+    sh,
+    SALON_CFG.headerRow,
+    SALON_CFG.inscriptos.startCol,
+    SALON_CFG.inscriptos.endCol,
+    "Instructor"
+  );
+
+  const nombre = getNamedValueRequired_("SAL_INS_NOMBRE");
+  const apellido = getNamedValueRequired_("SAL_INS_APELLIDO");
+  const dni = formatDNIText_(getNamedValueRequired_("SAL_INS_DNI"));
+  const tel = getNamedValue_("SAL_INS_TEL");
+  const actividad = getNamedValueRequired_("SAL_INS_ACTIVIDAD");
+  const modalidad = getNamedValueRequired_("SAL_INS_MODALIDAD");
+  const instructor = getNamedValue_("SAL_INS_INSTRUCTOR");
+  const cuota = parseNumber_(getNamedValueRequired_("SAL_INS_CUOTA"));
+
+  if (!isFinite(cuota) || cuota < 0) {
+    SpreadsheetApp.getUi().alert("La cuota debe ser un valor numérico válido. Puede ser 0, pero no negativa.");
+    return;
+  }
+
+  const existente = existeInscripcionMismaActividadEnSector_(
+    SALON_CFG,
+    dni,
+    actividad,
+    modalidad,
+    instructor
+  );
+
+  if (existente) {
+    SpreadsheetApp.getUi().alert(
+      `Ya existe una inscripción igual para ese DNI:\n\n` +
+      `${existente.nombre} ${existente.apellido}\n` +
+      `${existente.actividad} - ${existente.modalidad}\n` +
+      `Instructor: ${existente.instructor || "-"}`
+    );
+    return;
+  }
+
+  const startRow = SALON_CFG.inscriptos.dataStartRow;
+  const endRow = SALON_CFG.inscriptos.dataEndRow;
+  const startCol = SALON_CFG.inscriptos.startCol;
+  const endCol = SALON_CFG.inscriptos.endCol;
+  const numRows = endRow - startRow + 1;
+  const numCols = endCol - startCol + 1;
+
+  const region = sh.getRange(startRow, startCol, numRows, numCols);
+  const values = region.getValues();
+  values.pop();
+  values.unshift(new Array(numCols).fill(""));
+  region.setValues(values);
+
+  const prefijoActividad = getPrefijoActividadSalon_(actividad);
+  const nextId = generarId_(prefijoActividad, getMaxSalonInscriptosId_(sh, insMap) + 1);
+
+  sh.getRange(startRow, insMap["Id."]).setValue(nextId);
+  sh.getRange(startRow, insMap["Fecha"]).setValue(new Date());
+  sh.getRange(startRow, insMap["Nombre"]).setValue(nombre);
+  sh.getRange(startRow, insMap["Apellido"]).setValue(apellido);
+
+  const rDni = sh.getRange(startRow, insMap["D.N.I."]);
+  rDni.setNumberFormat("@");
+  rDni.setValue(dni);
+
+  const rTel = sh.getRange(startRow, insMap["Tel."]);
+  rTel.setNumberFormat("@");
+  rTel.setValue(String(tel || ""));
+
+  sh.getRange(startRow, insMap["Actividad"]).setValue(actividad);
+  sh.getRange(startRow, insMap["Modalidad"]).setValue(modalidad);
+  sh.getRange(startRow, insMap["Cuota"]).setValue(cuota);
+
+  if (colInstructor) {
+    sh.getRange(startRow, colInstructor).setValue(instructor);
+  }
+
+  actualizarEstadosInscriptosSalon();
+  limpiarFormularioInscripcionSalon_();
+
+  SpreadsheetApp.getActive().toast("Inscripción SALON cargada: " + nextId, "OK", 3);
+}
+
+function cargarPagoCuotaSalon() {
+  const dni = formatDNIText_(getNamedValueRequired_("SAL_PAGO_DNI"));
+  const mp = getNamedValueRequired_("SAL_PAGO_MP");
+
+  let resultado;
+
+  try {
+    resultado = generarPagosCuotaPorDniEnSector_(
+      SALON_CFG,
+      "SALON",
+      dni,
+      mp
+    );
+  } catch (err) {
+    SpreadsheetApp.getUi().alert(err.message || String(err));
+    return;
+  }
+
+  sincronizarSalonDesdeAdministracion();
+
+  resultado.ids.forEach(id => {
+    setEstadoFinanSalonPorId_(id, "PAGADO");
+  });
+
+  actualizarEstadosInscriptosSalon();
+  limpiarFormularioPagoSalon_();
+
+  SpreadsheetApp.getActive().toast(
+    `Pagos SALON cargados: ${resultado.cantidad} | Total: $${resultado.total}`,
+    "OK",
+    5
+  );
+}
+
+function autocompletarPagoSalonPorDni_(dniInput) {
+  const dni = formatDNIText_(dniInput);
+  const inscriptos = getInscriptosVigentesPorDniEnSector_(SALON_CFG, dni);
+
+  if (!inscriptos.length) {
+    setNamedValue_("SAL_PAGO_NOMBRE", "");
+    setNamedValue_("SAL_PAGO_APELLIDO", "");
+    setNamedValue_("SAL_PAGO_MONTO", "");
+    setNamedValue_("SAL_PAGO_ESTADO", "NO ENCONTRADO");
+    setNamedValue_("SAL_PAGO_ACTIVIDAD", "");
+    setNamedValue_("SAL_PAGO_INSTRUCTOR", "");
+    SpreadsheetApp.getActive().toast("No se encontró un inscripto vigente con ese DNI", "SALON", 3);
+    return;
+  }
+
+  completarFormularioPagoDesdeInscriptos_("SAL", inscriptos);
+
+  if (inscriptos.length > 1) {
+    SpreadsheetApp.getActive().toast(
+      `Se detectaron ${inscriptos.length} actividades. Se generará un pago por cada una.`,
+      "SALON",
+      5
+    );
+  }
+}
+
+function actualizarEstadosInscriptosSalon() {
+  actualizarEstadosInscriptosSector_(SALON_CFG);
+}
+
+function buscarInscriptoSalonPorDni_(dniInput) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SALON_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "SALON".');
+
+  const dniBuscado = formatDNIText_(dniInput);
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    SALON_CFG.headerRow,
+    SALON_CFG.inscriptos.startCol,
+    SALON_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const colInstructor = getOptionalHeaderColumn_(
+    sh,
+    SALON_CFG.headerRow,
+    SALON_CFG.inscriptos.startCol,
+    SALON_CFG.inscriptos.endCol,
+    "Instructor"
+  );
+
+  const startRow = SALON_CFG.inscriptos.dataStartRow;
+  const numRows = SALON_CFG.inscriptos.dataEndRow - startRow + 1;
+
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+  const fechas = sh.getRange(startRow, insMap["Fecha"], numRows, 1).getValues();
+  const nombres = sh.getRange(startRow, insMap["Nombre"], numRows, 1).getValues();
+  const apellidos = sh.getRange(startRow, insMap["Apellido"], numRows, 1).getValues();
+  const dnis = sh.getRange(startRow, insMap["D.N.I."], numRows, 1).getDisplayValues();
+  const tels = sh.getRange(startRow, insMap["Tel."], numRows, 1).getDisplayValues();
+  const actividades = sh.getRange(startRow, insMap["Actividad"], numRows, 1).getValues();
+  const modalidades = sh.getRange(startRow, insMap["Modalidad"], numRows, 1).getValues();
+  const cuotas = sh.getRange(startRow, insMap["Cuota"], numRows, 1).getValues();
+  const estados = sh.getRange(startRow, insMap["Estado"], numRows, 1).getValues();
+  const instructores = colInstructor
+    ? sh.getRange(startRow, colInstructor, numRows, 1).getValues()
+    : [];
+
+  for (let i = 0; i < numRows; i++) {
+    if (!ids[i][0]) continue;
+
+    const dni = formatDNIText_(dnis[i][0]);
+
+    if (dni === dniBuscado) {
+      return {
+        id: ids[i][0],
+        fecha: fechas[i][0],
+        nombre: nombres[i][0],
+        apellido: apellidos[i][0],
+        dni: dni,
+        tel: tels[i][0],
+        actividad: actividades[i][0],
+        modalidad: modalidades[i][0],
+        instructor: colInstructor ? instructores[i][0] : "",
+        cuota: cuotas[i][0],
+        estado: estados[i][0]
+      };
+    }
+  }
+
+  return null;
+}
+
+function getMaxSalonInscriptosId_(sh, insMap) {
+  const startRow = SALON_CFG.inscriptos.dataStartRow;
+  const numRows = SALON_CFG.inscriptos.dataEndRow - startRow + 1;
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+
+  let maxN = 0;
+  ids.forEach(r => {
+    const n = extraerNumeroId_(r[0]);
+    if (n > maxN) maxN = n;
+  });
+
+  return maxN;
+}
+
+function setEstadoFinanSalonPorId_(idBuscado, valor) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(SALON_CFG.sheetName);
+  if (!sh) return;
+
+  const movMap = getHeaderMapInRegion_(
+    sh,
+    SALON_CFG.headerRow,
+    SALON_CFG.movimientos.startCol,
+    SALON_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const startRow = SALON_CFG.movimientos.dataStartRow;
+  const numRows = SALON_CFG.movimientos.dataEndRow - startRow + 1;
+  const ids = sh.getRange(startRow, movMap["Id."], numRows, 1).getValues();
+
+  for (let i = 0; i < numRows; i++) {
+    if (String(ids[i][0]) === String(idBuscado)) {
+      sh.getRange(startRow + i, movMap["Estado Finan."]).setValue(valor);
+      return;
+    }
+  }
+}
+
+function limpiarFormularioInscripcionSalon_() {
+  clearNamedIfExists_("SAL_INS_NOMBRE");
+  clearNamedIfExists_("SAL_INS_APELLIDO");
+  clearNamedIfExists_("SAL_INS_DNI");
+  clearNamedIfExists_("SAL_INS_TEL");
+  clearNamedIfExists_("SAL_INS_ACTIVIDAD");
+  clearNamedIfExists_("SAL_INS_MODALIDAD");
+  clearNamedIfExists_("SAL_INS_HORARIO");
+}
+
+function limpiarFormularioPagoSalon_() {
+  clearNamedIfExists_("SAL_PAGO_DNI");
+  clearNamedIfExists_("SAL_PAGO_NOMBRE");
+  clearNamedIfExists_("SAL_PAGO_APELLIDO");
+  clearNamedIfExists_("SAL_PAGO_MONTO");
+  clearNamedIfExists_("SAL_PAGO_ESTADO");
+  clearNamedIfExists_("SAL_PAGO_MP");
+  clearNamedIfExists_("SAL_PAGO_ACTIVIDAD");
+  clearNamedIfExists_("SAL_PAGO_INSTRUCTOR");
+}
+
+function actualizarSalon() {
+  sincronizarSalonDesdeAdministracion();
+  actualizarEstadosInscriptosSalon();
+  SpreadsheetApp.getActive().toast("Datos de SALON actualizados", "OK", 3);
+}
+
+/* =========================================================
+   SALON - GENERACIÓN DE RECIBOS PDF ZIP
+   ========================================================= */
+
+function generarRecibosSalonProfesoresZip() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shSalon = ss.getSheetByName("SALON");
+  const shRecibos = ss.getSheetByName("Recibos");
+  const shDash = ss.getSheetByName("DASHBOARD");
+
+  if (!shSalon) throw new Error('No existe la hoja "SALON".');
+  if (!shRecibos) throw new Error('No existe la hoja "Recibos".');
+  if (!shDash) throw new Error('No existe la hoja "DASHBOARD".');
+
+  const anio = new Date(shDash.getRange("AY2").getValue()).getFullYear();
+
+  const profesores = getProfesoresSalonParaRecibos_(shSalon);
+  if (!profesores.length) {
+    SpreadsheetApp.getUi().alert('No encontré profesores con estado "EC" en SALON!B18:B30.');
+    return;
+  }
+
+  const movimientos = getMovimientosSalonParaRecibos_(shSalon);
+  const inscriptos = getInscriptosSalonParaRecibos_(shSalon);
+
+  const pdfs = [];
+
+  profesores.forEach(prof => {
+    limpiarPlantillaReciboSalon_(shRecibos);
+
+    const mesNum = getNumeroMes_(prof.mes);
+    if (!mesNum) {
+      throw new Error(`Mes inválido para ${prof.instructor}: "${prof.mes}"`);
+    }
+
+    const inicio = new Date(anio, mesNum - 1, 1);
+    const fin = new Date(anio, mesNum, 0);
+
+    const movimientosProfesor = filtrarMovimientosProfesorSalon_(
+      movimientos,
+      prof,
+      inicio,
+      fin
+    );
+
+    const inscriptosProfesor = filtrarInscriptosProfesorSalon_(
+      inscriptos,
+      prof
+    );
+
+    completarPlantillaReciboSalon_(
+      shRecibos,
+      prof,
+      inicio,
+      fin,
+      movimientosProfesor,
+      inscriptosProfesor
+    );
+
+    SpreadsheetApp.flush();
+    Utilities.sleep(30000);
+
+    const nombrePdf = sanitizarNombreArchivo_(
+      `Recibo_${prof.instructor}_${prof.disciplina}_${prof.mes}_${anio}.pdf`
+    );
+
+    try {
+      const pdfBlob = exportarHojaRecibosComoPDF_(ss, shRecibos, nombrePdf);
+      pdfs.push(pdfBlob);
+    } catch (err) {
+      throw new Error(
+        `Falló la exportación del recibo de:\n\n` +
+        `Profesor: ${prof.instructor}\n` +
+        `Disciplina: ${prof.disciplina}\n` +
+        `Mes: ${prof.mes}\n\n` +
+        (err && err.message ? err.message : String(err))
+      );
+    }
+  });
+
+  const zipName = sanitizarNombreArchivo_(
+    `Recibos_SALON_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd_HH-mm")}.zip`
+  );
+
+  const zipBlob = Utilities.zip(pdfs, zipName);
+  const zipFile = DriveApp.createFile(zipBlob);
+
+  SpreadsheetApp.getUi().alert(
+    "Recibos generados correctamente.\n\nArchivo ZIP creado en Drive:\n" +
+    zipFile.getUrl()
+  );
+}
+
+/**
+ * Lee profesores desde SALON!B18:V30.
+ * Ajustar columnas acá si cambia el diseño.
+ */
+function getProfesoresSalonParaRecibos_(shSalon) {
+  const START_ROW = 18;
+  const END_ROW = 30;
+
+  const profesores = [];
+
+  for (let row = START_ROW; row <= END_ROW; row++) {
+    const estado = String(shSalon.getRange(row, 2).getDisplayValue() || "").trim().toUpperCase(); // B
+    if (estado !== "EC") continue;
+
+    const disciplina = shSalon.getRange(row, 3).getDisplayValue();   // C
+    const instructor = shSalon.getRange(row, 7).getDisplayValue();   // G
+    const dni = shSalon.getRange(row, 10).getDisplayValue();         // J
+    const horas = shSalon.getRange(row, 12).getDisplayValue();       // L
+    const paga = parseNumber_(shSalon.getRange(row, 14).getValue()); // N
+    const precio = parseNumber_(shSalon.getRange(row, 17).getValue());// Q
+    const mes = shSalon.getRange(row, 21).getDisplayValue();         // U
+
+    if (!disciplina || !instructor) continue;
+
+    profesores.push({
+      row,
+      estado,
+      disciplina,
+      instructor,
+      dni: formatDNIText_(dni),
+      horas,
+      paga: isFinite(paga) ? paga : 0,
+      precio: isFinite(precio) ? precio : 0,
+      mes
+    });
+  }
+
+  return profesores;
+}
+
+/**
+ * Lee movimientos desde tabla MOVIMIENTOS de SALON.
+ */
+function getMovimientosSalonParaRecibos_(shSalon) {
+  const movMap = getHeaderMapInRegion_(
+    shSalon,
+    SALON_CFG.headerRow,
+    SALON_CFG.movimientos.startCol,
+    SALON_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Estado"]
+  );
+
+  const startRow = SALON_CFG.movimientos.dataStartRow;
+  const numRows = SALON_CFG.movimientos.dataEndRow - startRow + 1;
+
+  const ids = shSalon.getRange(startRow, movMap["Id."], numRows, 1).getDisplayValues();
+  const fechas = shSalon.getRange(startRow, movMap["Fecha"], numRows, 1).getValues();
+  const tipos = shSalon.getRange(startRow, movMap["Tipo"], numRows, 1).getDisplayValues();
+  const categorias = shSalon.getRange(startRow, movMap["Categoría"], numRows, 1).getDisplayValues();
+  const conceptos = shSalon.getRange(startRow, movMap["Concepto"], numRows, 1).getDisplayValues();
+  const contrapartes = shSalon.getRange(startRow, movMap["Contra-parte"], numRows, 1).getDisplayValues();
+  const montos = shSalon.getRange(startRow, movMap["Monto"], numRows, 1).getValues();
+  const estados = shSalon.getRange(startRow, movMap["Estado"], numRows, 1).getDisplayValues();
+
+  const out = [];
+
+  for (let i = 0; i < numRows; i++) {
+    if (!ids[i][0]) continue;
+
+    out.push({
+      id: ids[i][0],
+      fecha: fechas[i][0],
+      tipo: String(tipos[i][0] || "").trim().toUpperCase(),
+      categoria: String(categorias[i][0] || "").trim().toUpperCase(),
+      concepto: String(conceptos[i][0] || "").trim(),
+      contraparte: formatDNIText_(contrapartes[i][0]),
+      monto: parseNumber_(montos[i][0]),
+      estado: String(estados[i][0] || "").trim().toUpperCase()
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Lee inscriptos desde tabla INSCRIPTOS de SALON.
+ */
+function getInscriptosSalonParaRecibos_(shSalon) {
+  const insMap = getHeaderMapInRegion_(
+    shSalon,
+    SALON_CFG.headerRow,
+    SALON_CFG.inscriptos.startCol,
+    SALON_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const colInstructor = getOptionalHeaderColumn_(
+    shSalon,
+    SALON_CFG.headerRow,
+    SALON_CFG.inscriptos.startCol,
+    SALON_CFG.inscriptos.endCol,
+    "Instructor"
+  );
+
+  const startRow = SALON_CFG.inscriptos.dataStartRow;
+  const numRows = SALON_CFG.inscriptos.dataEndRow - startRow + 1;
+
+  const ids = shSalon.getRange(startRow, insMap["Id."], numRows, 1).getDisplayValues();
+  const fechas = shSalon.getRange(startRow, insMap["Fecha"], numRows, 1).getValues();
+  const nombres = shSalon.getRange(startRow, insMap["Nombre"], numRows, 1).getDisplayValues();
+  const apellidos = shSalon.getRange(startRow, insMap["Apellido"], numRows, 1).getDisplayValues();
+  const dnis = shSalon.getRange(startRow, insMap["D.N.I."], numRows, 1).getDisplayValues();
+  const tels = shSalon.getRange(startRow, insMap["Tel."], numRows, 1).getDisplayValues();
+  const actividades = shSalon.getRange(startRow, insMap["Actividad"], numRows, 1).getDisplayValues();
+  const modalidades = shSalon.getRange(startRow, insMap["Modalidad"], numRows, 1).getDisplayValues();
+  const cuotas = shSalon.getRange(startRow, insMap["Cuota"], numRows, 1).getValues();
+  const estados = shSalon.getRange(startRow, insMap["Estado"], numRows, 1).getDisplayValues();
+  const instructores = colInstructor
+    ? shSalon.getRange(startRow, colInstructor, numRows, 1).getDisplayValues()
+    : [];
+
+  const out = [];
+
+  for (let i = 0; i < numRows; i++) {
+    if (!ids[i][0]) continue;
+
+    out.push({
+      id: ids[i][0],
+      fecha: fechas[i][0],
+      nombre: nombres[i][0],
+      apellido: apellidos[i][0],
+      dni: formatDNIText_(dnis[i][0]),
+      tel: tels[i][0],
+      actividad: actividades[i][0],
+      modalidad: modalidades[i][0],
+      cuota: parseNumber_(cuotas[i][0]),
+      estado: estados[i][0],
+      instructor: colInstructor ? instructores[i][0] : ""
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Filtra movimientos del profesor/disciplina dentro del mes.
+ */
+function filtrarMovimientosProfesorSalon_(movimientos, prof, inicio, fin) {
+  const disciplina = normalizeText_(prof.disciplina);
+  const instructor = normalizeText_(prof.instructor);
+  const dniProfesor = formatDNIText_(prof.dni);
+
+  const categoriasIngreso = ["CUOTA", "INSCRIPCION", "INSCRIPCIÓN", "CLASES"].map(normalizeText_);
+  const categoriasEgresoComision = ["COMISION", "COMISIÓN"].map(normalizeText_);
+
+  return movimientos.filter(mov => {
+    if (!mov.fecha || !isFinite(mov.monto)) return false;
+    if (mov.estado !== "COMPLETADO") return false;
+
+    const fecha = normalizarFechaSinHora_(mov.fecha);
+    if (fecha < inicio || fecha > fin) return false;
+
+    const tipo = normalizeText_(mov.tipo || "");
+    const categoria = normalizeText_(mov.categoria || "");
+    const concepto = normalizeText_(mov.concepto || "");
+    const contraparte = formatDNIText_(mov.contraparte || "");
+
+    const relacionadoPorTexto =
+      concepto.includes(disciplina) &&
+      concepto.includes(instructor);
+
+    const relacionadoPorDni =
+      dniProfesor && contraparte === dniProfesor;
+
+    const esIngresoCuota =
+      tipo === "INGRESOS" &&
+      categoriasIngreso.includes(categoria) &&
+      relacionadoPorTexto;
+
+    const esEgresoComision =
+      tipo === "EGRESOS" &&
+      categoriasEgresoComision.includes(categoria) &&
+      (relacionadoPorDni || relacionadoPorTexto);
+
+    return esIngresoCuota || esEgresoComision;
+  });
+}
+
+/**
+ * Filtra inscriptos por disciplina e instructor.
+ */
+function filtrarInscriptosProfesorSalon_(inscriptos, prof) {
+  const disciplina = normalizeText_(prof.disciplina);
+  const instructor = normalizeText_(prof.instructor);
+
+  return inscriptos.filter(ins => {
+    const actividad = normalizeText_(ins.actividad);
+    const profIns = normalizeText_(ins.instructor);
+
+    const coincideActividad =
+      actividad === disciplina ||
+      actividad.includes(disciplina) ||
+      disciplina.includes(actividad);
+
+    const coincideInstructor =
+      !profIns ||
+      profIns === instructor ||
+      profIns.includes(instructor) ||
+      instructor.includes(profIns);
+
+    return coincideActividad && coincideInstructor;
+  });
+}
+
+/**
+ * Completa la plantilla Recibos.
+ */
+function completarPlantillaReciboSalon_(shRecibos, prof, inicio, fin, movimientos, inscriptos) {
+  shRecibos.getRange("F3").setValue(prof.mes);
+  shRecibos.getRange("K3").setValue(inicio);
+  shRecibos.getRange("M3").setValue(fin);
+  shRecibos.getRange("P3").setValue(prof.estado === "EC" ? "Activo" : "Inactivo");
+
+  shRecibos.getRange("D5").setValue(prof.disciplina);
+  shRecibos.getRange("H5").setValue(prof.instructor);
+  shRecibos.getRange("K5").setValue(prof.dni);
+  shRecibos.getRange("O5").setValue(prof.horas);
+
+  shRecibos.getRange("G6").setValue(inscriptos.length);
+  shRecibos.getRange("K6").setValue(prof.paga);
+  shRecibos.getRange("P6").setValue(prof.precio);
+
+  // IMPORTANTE:
+  // El formato de la plantilla Recibos debe quedar configurado manualmente en la hoja.
+  // No aplicamos formato en cada recibo porque fuerza re-renderizado y puede romper la exportación PDF.
+
+  let subtotalIngresos = 0;
+  let subtotalDescuentos = 0;
+
+  const maxMovRows = 39 - 9 + 1;
+  const movs = movimientos.slice(0, maxMovRows);
+
+  for (let i = 0; i < movs.length; i++) {
+    const row = 9 + i;
+    const mov = movs[i];
+
+    const categoria = String(mov.categoria || "").trim();
+    const categoriaNorm = normalizeText_(categoria);
+    const cant = 1;
+    const monto = Number(mov.monto) || 0;
+
+    const tipoNorm = normalizeText_(mov.tipo || "");
+
+    const esIngreso = 
+      tipoNorm === "INGRESOS" &&
+      ["CUOTA", "INSCRIPCION", "INSCRIPCIÓN", "CLASES"]
+        .map(normalizeText_)
+        .includes(categoriaNorm);
+
+    const esEgresoComision =
+      tipoNorm === "EGRESOS" &&
+      ["COMISION", "COMISIÓN"]
+        .map(normalizeText_)
+        .includes(categoriaNorm);
+
+    const ingreso = esIngreso ? cant * monto : 0;
+    const descuento = esEgresoComision ? cant * monto : 0;
+
+    subtotalIngresos += ingreso;
+    subtotalDescuentos += descuento;
+
+    // MOVIMIENTOS - escribir en celdas top-left reales de los bloques combinados
+    shRecibos.getRange(row, 2).setValue(mov.fecha || ""); // B - Fecha                         // B - Fecha
+    shRecibos.getRange(row, 3).setValue(categoria);       // C - Categoría
+    shRecibos.getRange(row, 5).setValue(mov.concepto);    // E - Concepto
+    shRecibos.getRange(row, 11).setValue(cant);           // K - Cant.
+    shRecibos.getRange(row, 12).setValue(monto);          // L - Monto
+    shRecibos.getRange(row, 14).setValue(ingreso);        // N - Ingresos
+    shRecibos.getRange(row, 16).setValue(descuento);      // P - Descuentos
+  }
+
+  const totalFinal = subtotalIngresos - subtotalDescuentos - prof.paga;
+  shRecibos.getRange("M40").setValue(totalFinal);
+
+  const maxInsRows = 110 - 48 + 1;
+  const ins = inscriptos.slice(0, maxInsRows);
+
+  for (let i = 0; i < ins.length; i++) {
+    const row = 48 + i;
+    const alumno = ins[i];
+
+    // INSCRIPTOS - escribir en celdas top-left reales de los bloques combinados
+    shRecibos.getRange(row, 2).setValue(alumno.id);                            // B - Id.
+    shRecibos.getRange(row, 3).setValue(alumno.fecha || "");                   // C - Fecha inscripción
+    shRecibos.getRange(row, 5).setValue(alumno.nombre || "");                  // E - Nombre
+    shRecibos.getRange(row, 7).setValue(alumno.apellido || "");                // G - Apellido
+    shRecibos.getRange(row, 9).setValue(alumno.dni || ""); // I - DNI
+    shRecibos.getRange(row, 11).setValue(alumno.tel || ""); // K - Tel.
+    shRecibos.getRange(row, 13).setValue(alumno.cuota || 0);                   // M - Cuota
+    shRecibos.getRange(row, 15).setValue(alumno.estado || "");                 // O - Estado
+  }
+
+// Las alturas de filas deben quedar configuradas directamente en la plantilla Recibos.
+// No las modificamos en cada recibo para evitar remaquetación pesada antes de exportar.
+}
+
+/**
+ * Limpia solo los contenidos dinámicos de la plantilla.
+ * No borra formatos.
+ */
+function limpiarPlantillaReciboSalon_(shRecibos) {
+  const ranges = [
+    "F3", "K3", "M3", "P3",
+    "D5", "H5", "K5", "O5",
+    "G6", "K6", "P6",
+    "B9:Q39",
+    "M40",
+    "B48:Q110"
+  ];
+
+  ranges.forEach(a1 => shRecibos.getRange(a1).clearContent());
+}
+
+/**
+ * Exporta Recibos!B2:Q110 como PDF.
+ * Mantiene la estructura actual: usa la hoja Recibos de la planilla principal.
+ * No crea hojas temporales, no borra hojas y no modifica estructura.
+ */
+/**
+ * Exporta Recibos como PDF.
+ * Mantiene la estructura actual: usa la hoja Recibos de la planilla principal.
+ * No crea hojas temporales, no borra hojas y no modifica estructura.
+ */
+function exportarHojaRecibosComoPDF_(ss, shRecibos, nombreArchivo) {
+  const ssId = ss.getId();
+  const gid = shRecibos.getSheetId();
+  const token = ScriptApp.getOAuthToken();
+
+  // Activar Recibos antes de exportar ayuda al renderizador de Google.
+  ss.setActiveSheet(shRecibos);
+  SpreadsheetApp.flush();
+  Utilities.sleep(15000);
+
+  const variantes = [
+    {
+      nombre: "Recibos!B2:Q110",
+      usarRango: true,
+      usarSingle: false
+    },
+    {
+      nombre: "Recibos hoja completa",
+      usarRango: false,
+      usarSingle: true
+    }
+  ];
+
+  const esperas = [0, 20000, 45000];
+
+  let ultimoError = "";
+  let ultimoCode = "";
+
+  for (const variante of variantes) {
+    for (let intento = 0; intento < esperas.length; intento++) {
+      SpreadsheetApp.flush();
+
+      if (esperas[intento] > 0) {
+        Utilities.sleep(esperas[intento]);
+      }
+
+      const url = construirUrlExportRecibosBasica_(
+        ssId,
+        gid,
+        variante.usarRango,
+        variante.usarSingle,
+        intento + 1
+      );
+
+      const response = UrlFetchApp.fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        muteHttpExceptions: true,
+        followRedirects: true
+      });
+
+      const code = response.getResponseCode();
+      ultimoCode = code;
+
+      const headers = response.getHeaders();
+      const contentType = String(
+        headers["Content-Type"] || headers["content-type"] || ""
+      ).toLowerCase();
+
+      if (code >= 200 && code < 300 && contentType.includes("pdf")) {
+        const blob = response.getBlob().setName(nombreArchivo);
+
+        if (blob.getBytes().length > 1000) {
+          return blob;
+        }
+
+        ultimoError =
+          `Variante ${variante.nombre}: Google devolvió un PDF vacío o demasiado liviano.`;
+        continue;
+      }
+
+      ultimoError =
+        `Variante ${variante.nombre} | HTTP ${code}\n\n` +
+        response.getContentText().slice(0, 1200);
+
+      if ([429, 500, 502, 503, 504].includes(code)) {
+        continue;
+      }
+
+      throw new Error(
+        `No se pudo exportar PDF. HTTP ${code}\n\n` +
+        ultimoError
+      );
+    }
+  }
+
+  throw new Error(
+    `No se pudo exportar PDF después de varios intentos. Último HTTP: ${ultimoCode}\n\n` +
+    "Google Sheets rechazó la exportación de la hoja Recibos.\n" +
+    "Se probó primero el rango B2:Q110 y luego la hoja Recibos completa.\n\n" +
+    ultimoError
+  );
+}
+
+/**
+ * Construye URL de exportación básica, similar al método que ya funcionaba.
+ */
+function construirUrlExportRecibosBasica_(ssId, gid, usarRango, usarSingle, intento) {
+  let url =
+    `https://docs.google.com/spreadsheets/d/${ssId}/export?` +
+    `format=pdf` +
+    `&gid=${gid}`;
+
+  if (usarRango) {
+    // Usamos el rango sin encodear, como en la versión anterior que funcionaba.
+    url += `&range=B2:Q110`;
+  }
+
+  if (usarSingle) {
+    url += `&single=true`;
+  }
+
+  url +=
+    `&size=A4` +
+    `&portrait=true` +
+    `&fitw=true` +
+    `&sheetnames=false` +
+    `&printtitle=false` +
+    `&pagenumbers=false` +
+    `&gridlines=false` +
+    `&fzr=false` +
+    `&t=${Date.now()}_${intento}`;
+
+  return url;
+}
+
+/**
+ * Mes texto -> número.
+ */
+function getNumeroMes_(mesTxt) {
+  const txt = normalizeText_(mesTxt);
+  const meses = {
+    "ENERO": 1,
+    "FEBRERO": 2,
+    "MARZO": 3,
+    "ABRIL": 4,
+    "MAYO": 5,
+    "JUNIO": 6,
+    "JULIO": 7,
+    "AGOSTO": 8,
+    "SEPTIEMBRE": 9,
+    "SETIEMBRE": 9,
+    "OCTUBRE": 10,
+    "NOVIEMBRE": 11,
+    "DICIEMBRE": 12
+  };
+
+  return meses[txt] || 0;
+}
+
+/**
+ * Normaliza texto para comparar.
+ */
+function normalizeText_(value) {
+  return String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+/**
+ * Limpia nombres de archivo.
+ */
+function sanitizarNombreArchivo_(name) {
+  return String(name || "archivo")
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, "_")
+    .trim();
+}
+
+/* =========================
+   HELPERS GENERALES
+   ========================= */
+
+function getOptionalHeaderColumn_(sheet, row, startCol, endCol, label) {
+  const values = sheet.getRange(row, startCol, 1, endCol - startCol + 1).getDisplayValues()[0];
+  const wanted = normalizeHeader_(label);
+
+  for (let i = 0; i < values.length; i++) {
+    if (normalizeHeader_(values[i]) === wanted) {
+      return startCol + i;
+    }
+  }
+
+  return null;
+}
+
+function getPrefijoActividadSalon_(actividad) {
+  const a = String(actividad || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+  const match = a.match(/[A-Z]/);
+  return match ? match[0] : "S";
+}
+
+function esEstadoAbandonado_(value) {
+  return normalizeText_(value) === "ABANDONADO";
+}
+
+/* =========================================================
+   INSCRIPCIONES MÚLTIPLES POR DNI
+   Helpers generales para FITNESS / SALON / AULA
+   ========================================================= */
+
+/**
+ * Lee todos los inscriptos de un sector según su CFG.
+ * Funciona para FITNESS, SALON y AULA.
+ */
+function getInscriptosSector_(cfg) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(cfg.sheetName);
+  if (!sh) throw new Error(`No existe la hoja "${cfg.sheetName}".`);
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    cfg.headerRow,
+    cfg.inscriptos.startCol,
+    cfg.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const colInstructor = getOptionalHeaderColumn_(
+    sh,
+    cfg.headerRow,
+    cfg.inscriptos.startCol,
+    cfg.inscriptos.endCol,
+    "Instructor"
+  );
+
+  const startRow = cfg.inscriptos.dataStartRow;
+  const numRows = cfg.inscriptos.dataEndRow - startRow + 1;
+
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getDisplayValues();
+  const fechas = sh.getRange(startRow, insMap["Fecha"], numRows, 1).getValues();
+  const nombres = sh.getRange(startRow, insMap["Nombre"], numRows, 1).getDisplayValues();
+  const apellidos = sh.getRange(startRow, insMap["Apellido"], numRows, 1).getDisplayValues();
+  const dnis = sh.getRange(startRow, insMap["D.N.I."], numRows, 1).getDisplayValues();
+  const tels = sh.getRange(startRow, insMap["Tel."], numRows, 1).getDisplayValues();
+  const actividades = sh.getRange(startRow, insMap["Actividad"], numRows, 1).getDisplayValues();
+  const modalidades = sh.getRange(startRow, insMap["Modalidad"], numRows, 1).getDisplayValues();
+  const cuotas = sh.getRange(startRow, insMap["Cuota"], numRows, 1).getValues();
+  const estados = sh.getRange(startRow, insMap["Estado"], numRows, 1).getDisplayValues();
+
+  const instructores = colInstructor
+    ? sh.getRange(startRow, colInstructor, numRows, 1).getDisplayValues()
+    : [];
+
+  const out = [];
+
+  for (let i = 0; i < numRows; i++) {
+    const id = String(ids[i][0] || "").trim();
+    if (!id) continue;
+
+    out.push({
+      row: startRow + i,
+      id,
+      fecha: fechas[i][0],
+      nombre: nombres[i][0],
+      apellido: apellidos[i][0],
+      dni: formatDNIText_(dnis[i][0]),
+      tel: tels[i][0],
+      actividad: actividades[i][0],
+      modalidad: modalidades[i][0],
+      cuota: cuotas[i][0],
+      estado: estados[i][0],
+      instructor: colInstructor ? instructores[i][0] : ""
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Devuelve todos los inscriptos de un sector por DNI.
+ */
+function getInscriptosPorDniEnSector_(cfg, dniInput) {
+  const dniBuscado = formatDNIText_(dniInput);
+  if (!dniBuscado) return [];
+
+  return getInscriptosSector_(cfg).filter(ins => ins.dni === dniBuscado);
+}
+
+/**
+ * Devuelve inscriptos por DNI que pueden recibir pago.
+ * Por ahora excluye Abandonado para no reactivar actividades viejas por accidente.
+ */
+function getInscriptosVigentesPorDniEnSector_(cfg, dniInput) {
+  return getInscriptosPorDniEnSector_(cfg, dniInput)
+    .filter(ins => !esEstadoAbandonado_(ins.estado));
+}
+
+/**
+ * Verifica si ya existe una inscripción igual:
+ * mismo DNI + misma Actividad + misma Modalidad + mismo Instructor, si existe.
+ */
+function existeInscripcionMismaActividadEnSector_(cfg, dniInput, actividadInput, modalidadInput, instructorInput) {
+  const dni = formatDNIText_(dniInput);
+  const actividad = normalizeText_(actividadInput);
+  const modalidad = normalizeText_(modalidadInput);
+  const instructor = normalizeText_(instructorInput);
+
+  return getInscriptosPorDniEnSector_(cfg, dni).find(ins => {
+    const mismaActividad = normalizeText_(ins.actividad) === actividad;
+    const mismaModalidad = normalizeText_(ins.modalidad) === modalidad;
+
+    const mismoInstructor = instructor
+      ? normalizeText_(ins.instructor) === instructor
+      : true;
+
+    return mismaActividad && mismaModalidad && mismoInstructor;
+  }) || null;
+}
+
+/**
+ * Crea un movimiento de pago de cuota para UNA inscripción concreta.
+ * Importante: incluye el ID de inscripción en el concepto.
+ */
+function crearMovimientoPagoCuotaInscripto_(inscripto, sector, mp) {
+  const monto = parseNumber_(inscripto.cuota);
+
+  if (!isFinite(monto) || monto < 0) {
+    throw new Error(
+      `La cuota de ${inscripto.nombre} ${inscripto.apellido} - ${inscripto.actividad} no es válida.`
+    );
+  }
+
+  const nombreCompleto = `${inscripto.nombre} ${inscripto.apellido}`.trim();
+  const modalidadTxt = "";
+
+  let concepto = "";
+
+  if (sector === "FITNESS") {
+    concepto = `Pago de cuota [${inscripto.id}] de ${nombreCompleto} por actividad de ${inscripto.actividad}${modalidadTxt}`;
+  } else {
+    concepto = `Pago de cuota [${inscripto.id}] de ${nombreCompleto} por clases de ${inscripto.actividad}${modalidadTxt}`;
+
+    if (inscripto.instructor) {
+      concepto += ` al profesor ${inscripto.instructor}`;
+    }
+  }
+
+  return appendMovimientoAdministracion_({
+    tipo: "INGRESOS",
+    categoria: "CUOTA",
+    concepto,
+    contraparte: inscripto.dni,
+    sector,
+    monto,
+    impuestos: 0,
+    mp,
+    estado: "COMPLETADO"
+  });
+}
+
+/**
+ * Genera tantos movimientos de pago como inscripciones vigentes tenga el DNI.
+ */
+function generarPagosCuotaPorDniEnSector_(cfg, sector, dniInput, mp) {
+  const dni = formatDNIText_(dniInput);
+  const inscriptos = getInscriptosVigentesPorDniEnSector_(cfg, dni);
+
+  if (!inscriptos.length) {
+    throw new Error("No se encontraron inscripciones vigentes para ese DNI.");
+  }
+
+  const ids = [];
+
+  inscriptos.forEach(ins => {
+    const newId = crearMovimientoPagoCuotaInscripto_(ins, sector, mp);
+    ids.push(newId);
+  });
+
+  return {
+    cantidad: ids.length,
+    ids,
+    total: inscriptos.reduce((acc, ins) => acc + (parseNumber_(ins.cuota) || 0), 0)
+  };
+}
+
+/**
+ * Completa visualmente el formulario de pago.
+ * Si hay varias actividades, muestra total y resumen.
+ */
+function completarFormularioPagoDesdeInscriptos_(prefix, inscriptos) {
+  if (!inscriptos || !inscriptos.length) return;
+
+  const first = inscriptos[0];
+  const total = inscriptos.reduce((acc, ins) => acc + (parseNumber_(ins.cuota) || 0), 0);
+
+  const actividades = inscriptos
+    .map(ins => String(ins.actividad || "").trim())
+    .filter(Boolean)
+    .join(" + ");
+
+  const instructores = [...new Set(
+    inscriptos
+      .map(ins => String(ins.instructor || "").trim())
+      .filter(Boolean)
+  )].join(" + ");
+
+  setNamedValue_(`${prefix}_PAGO_NOMBRE`, first.nombre || "");
+  setNamedValue_(`${prefix}_PAGO_APELLIDO`, first.apellido || "");
+  setNamedValue_(`${prefix}_PAGO_MONTO`, total);
+
+  if (inscriptos.length === 1) {
+    setNamedValue_(`${prefix}_PAGO_ESTADO`, first.estado || "");
+    setNamedValue_(`${prefix}_PAGO_ACTIVIDAD`, first.actividad || "");
+    setNamedValue_(`${prefix}_PAGO_INSTRUCTOR`, first.instructor || "");
+  } else {
+    setNamedValue_(`${prefix}_PAGO_ESTADO`, `${inscriptos.length} actividades detectadas`);
+    setNamedValue_(`${prefix}_PAGO_ACTIVIDAD`, actividades);
+    setNamedValue_(`${prefix}_PAGO_INSTRUCTOR`, instructores || "Varios");
+  }
+}
+
+/**
+ * Lee movimientos de un sector desde la tabla MOVIMIENTOS.
+ */
+function getMovimientosSector_(cfg) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(cfg.sheetName);
+  if (!sh) throw new Error(`No existe la hoja "${cfg.sheetName}".`);
+
+  const movMap = getHeaderMapInRegion_(
+    sh,
+    cfg.headerRow,
+    cfg.movimientos.startCol,
+    cfg.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Estado"]
+  );
+
+  const startRow = cfg.movimientos.dataStartRow;
+  const numRows = cfg.movimientos.dataEndRow - startRow + 1;
+
+  const ids = sh.getRange(startRow, movMap["Id."], numRows, 1).getDisplayValues();
+  const fechas = sh.getRange(startRow, movMap["Fecha"], numRows, 1).getValues();
+  const tipos = sh.getRange(startRow, movMap["Tipo"], numRows, 1).getDisplayValues();
+  const categorias = sh.getRange(startRow, movMap["Categoría"], numRows, 1).getDisplayValues();
+  const conceptos = sh.getRange(startRow, movMap["Concepto"], numRows, 1).getDisplayValues();
+  const contrapartes = sh.getRange(startRow, movMap["Contra-parte"], numRows, 1).getDisplayValues();
+  const montos = sh.getRange(startRow, movMap["Monto"], numRows, 1).getValues();
+  const estados = sh.getRange(startRow, movMap["Estado"], numRows, 1).getDisplayValues();
+
+  const out = [];
+
+  for (let i = 0; i < numRows; i++) {
+    if (!ids[i][0]) continue;
+
+    out.push({
+      id: ids[i][0],
+      fecha: fechas[i][0],
+      tipo: String(tipos[i][0] || "").trim().toUpperCase(),
+      categoria: String(categorias[i][0] || "").trim().toUpperCase(),
+      concepto: String(conceptos[i][0] || "").trim(),
+      contraparte: formatDNIText_(contrapartes[i][0]),
+      monto: parseNumber_(montos[i][0]),
+      estado: String(estados[i][0] || "").trim().toUpperCase()
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Busca el último pago de cuota asociado a una inscripción concreta.
+ * Prioridad:
+ * 1) Concepto contiene [ID_INSCRIPCIÓN]
+ * 2) Concepto contiene Actividad + Instructor, cuando aplique
+ * 3) Fallback histórico: si ese DNI tiene una sola inscripción, acepta pago genérico por DNI
+ */
+function buscarUltimoPagoCuotaParaInscripcion_(movimientos, inscripto, cantidadInscriptosPorDni) {
+  const dni = formatDNIText_(inscripto.dni);
+  const idNorm = normalizeText_(inscripto.id);
+  const actividadNorm = normalizeText_(inscripto.actividad);
+  const instructorNorm = normalizeText_(inscripto.instructor);
+
+  const cantidadMismoDni = cantidadInscriptosPorDni[dni] || 0;
+
+  let ultimoPago = null;
+
+  movimientos.forEach(mov => {
+    if (!mov.fecha) return;
+    if (mov.estado !== "COMPLETADO") return;
+    if (normalizeText_(mov.tipo) !== "INGRESOS") return;
+    if (normalizeText_(mov.categoria) !== "CUOTA") return;
+    if (formatDNIText_(mov.contraparte) !== dni) return;
+
+    const conceptoNorm = normalizeText_(mov.concepto);
+
+    const coincidePorId =
+      idNorm && conceptoNorm.includes(idNorm);
+
+    const coincidePorTexto =
+      (!actividadNorm || conceptoNorm.includes(actividadNorm)) &&
+      (!instructorNorm || conceptoNorm.includes(instructorNorm));
+
+    const fallbackHistorico =
+      cantidadMismoDni === 1;
+
+    if (!coincidePorId && !coincidePorTexto && !fallbackHistorico) return;
+
+    const fechaPago = normalizarFechaSinHora_(mov.fecha);
+
+    if (!ultimoPago || fechaPago > ultimoPago) {
+      ultimoPago = fechaPago;
+    }
+  });
+
+  return ultimoPago;
+}
+
+/**
+ * Actualiza estados por inscripción, no solo por DNI.
+ */
+const DIAS_VENCIMIENTO_CUOTA = 31;
+
+/**
+ * Calcula la fecha de vencimiento sumando los días definidos
+ * a la fecha del último pago.
+ */
+function calcularFechaVencimientoCuota_(ultimoPago) {
+  if (!ultimoPago) return null;
+
+  const vencimiento = normalizarFechaSinHora_(ultimoPago);
+  vencimiento.setDate(
+    vencimiento.getDate() + DIAS_VENCIMIENTO_CUOTA
+  );
+
+  return vencimiento;
+}
+
+/**
+ * Actualiza Estado y Vence para cada inscripción concreta.
+ *
+ * El último pago se busca por:
+ * 1) ID de inscripción incluido en el concepto.
+ * 2) Actividad e instructor.
+ * 3) Compatibilidad con movimientos históricos.
+ */
+function actualizarEstadosInscriptosSector_(cfg) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(cfg.sheetName);
+  const shDash = ss.getSheetByName("DASHBOARD");
+
+  if (!sh || !shDash) return;
+
+  const fechaActualRaw = shDash.getRange("AY2").getValue();
+  if (!fechaActualRaw) return;
+
+  const hoy = normalizarFechaSinHora_(fechaActualRaw);
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    cfg.headerRow,
+    cfg.inscriptos.startCol,
+    cfg.inscriptos.endCol,
+    [
+      "Id.",
+      "Fecha",
+      "Nombre",
+      "Apellido",
+      "D.N.I.",
+      "Tel.",
+      "Actividad",
+      "Modalidad",
+      "Cuota",
+      "Estado",
+      "Vence"
+    ]
+  );
+
+  const startRow = cfg.inscriptos.dataStartRow;
+  const numRows =
+    cfg.inscriptos.dataEndRow - startRow + 1;
+
+  const estadosActuales = sh
+    .getRange(
+      startRow,
+      insMap["Estado"],
+      numRows,
+      1
+    )
+    .getDisplayValues();
+
+  const inscriptos = getInscriptosSector_(cfg);
+  const movimientos = getMovimientosSector_(cfg);
+
+  const insPorRow = {};
+  const cantidadInscriptosPorDni = {};
+
+  inscriptos.forEach(ins => {
+    insPorRow[ins.row] = ins;
+
+    if (!cantidadInscriptosPorDni[ins.dni]) {
+      cantidadInscriptosPorDni[ins.dni] = 0;
+    }
+
+    cantidadInscriptosPorDni[ins.dni]++;
+  });
+
+  const estados = [];
+  const vencimientos = [];
+
+  for (let i = 0; i < numRows; i++) {
+    const row = startRow + i;
+    const ins = insPorRow[row];
+    const estadoActual = estadosActuales[i][0];
+
+    // Fila vacía
+    if (!ins) {
+      estados.push([""]);
+      vencimientos.push([""]);
+      continue;
+    }
+
+    // Inscripción existente pero sin datos suficientes
+    if (!ins.fecha || !ins.dni) {
+      estados.push([""]);
+      vencimientos.push(["SIN PAGOS"]);
+      continue;
+    }
+
+    const fechaIns =
+      normalizarFechaSinHora_(ins.fecha);
+
+    const diasDesdeInscripcion =
+      diffDays_(hoy, fechaIns);
+
+    const ultimoPago =
+      buscarUltimoPagoCuotaParaInscripcion_(
+        movimientos,
+        ins,
+        cantidadInscriptosPorDni
+      );
+
+    // =====================================================
+    // CALCULAR VENCIMIENTO
+    // =====================================================
+
+    if (ultimoPago) {
+      const fechaVencimiento =
+        calcularFechaVencimientoCuota_(ultimoPago);
+
+      vencimientos.push([fechaVencimiento]);
+    } else {
+      vencimientos.push(["SIN PAGOS"]);
+    }
+
+    // =====================================================
+    // CONSERVAR ABANDONADO MANUAL/AUTOMÁTICO
+    // =====================================================
+
+    if (esEstadoAbandonado_(estadoActual)) {
+      estados.push([estadoActual]);
+      continue;
+    }
+
+    // =====================================================
+    // CALCULAR ESTADO
+    // =====================================================
+
+    let estado = "";
+
+    // Nuevo inscripto durante 7 días
+    if (diasDesdeInscripcion <= 7) {
+      estado = "Nuevo inscripto";
+
+    } else if (ultimoPago) {
+      const diasDesdeUltimoPago =
+        diffDays_(hoy, ultimoPago);
+
+      if (diasDesdeUltimoPago <= 30) {
+        estado = "Al día";
+
+      } else if (diasDesdeUltimoPago >= 61) {
+        estado = "Abandonado";
+
+      } else {
+        estado = "Adeudando";
+      }
+
+    } else {
+      estado =
+        diasDesdeInscripcion >= 61
+          ? "Abandonado"
+          : "Adeudando";
+    }
+
+    estados.push([estado]);
+  }
+
+  // Escribir estados
+  sh
+    .getRange(
+      startRow,
+      insMap["Estado"],
+      numRows,
+      1
+    )
+    .setValues(estados);
+
+  // Escribir vencimientos
+  const rangoVencimientos = sh.getRange(
+    startRow,
+    insMap["Vence"],
+    numRows,
+    1
+  );
+
+  rangoVencimientos.setNumberFormat("dd/mm/yyyy");
+  rangoVencimientos.setValues(vencimientos);
+}
+
+/* =========================================================
+   AULA
+   ========================================================= */
+
+const AULA_CFG = {
+  sheetName: "AULA",
+  headerRow: 33,
+
+  movimientos: {
+    startCol: 2,   // B
+    endCol: 25,    // Y
+    dataStartRow: 34,
+    dataEndRow: 820
+  },
+
+  inscriptos: {
+    startCol: 28,  // AB
+    endCol: 54,    // BA
+    dataStartRow: 34,
+    dataEndRow: 820
+  }
+};
+
+function sincronizarAulaDesdeAdministracion() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shAdmin = ss.getSheetByName("ADMINISTRACIÓN");
+  const shAula = ss.getSheetByName(AULA_CFG.sheetName);
+
+  if (!shAdmin) throw new Error('No existe la hoja "ADMINISTRACIÓN".');
+  if (!shAula) throw new Error('No existe la hoja "AULA".');
+
+  const movMap = getHeaderMapInRegion_(
+    shAula,
+    AULA_CFG.headerRow,
+    AULA_CFG.movimientos.startCol,
+    AULA_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const startRow = AULA_CFG.movimientos.dataStartRow;
+  const maxRows = AULA_CFG.movimientos.dataEndRow - startRow + 1;
+
+  const existingIds = shAula.getRange(startRow, movMap["Id."], maxRows, 1).getValues();
+  const existingEstadoFinan = shAula.getRange(startRow, movMap["Estado Finan."], maxRows, 1).getValues();
+
+  const estadoFinanPorId = {};
+  for (let i = 0; i < maxRows; i++) {
+    const id = existingIds[i][0];
+    const estadoFinan = existingEstadoFinan[i][0];
+
+    if (id !== "" && id !== null && estadoFinan !== "" && estadoFinan !== null) {
+      estadoFinanPorId[String(id)] = estadoFinan;
+    }
+  }
+
+  const adminData = shAdmin.getRange(13, 2, 2003 - 13 + 1, 27).getValues();
+
+  const IDX = {
+    id: 0,
+    fecha: 1,
+    tipo: 3,
+    categoria: 6,
+    concepto: 9,
+    contraparte: 14,
+    sector: 17,
+    monto: 19,
+    impuestos: 22,
+    estado: 24,
+    mp: 26
+  };
+
+  const filtrados = adminData.filter(row => {
+    const id = row[IDX.id];
+    const sector = String(row[IDX.sector] || "").trim().toUpperCase();
+    return id !== "" && id !== null && sector === "AULA";
+  });
+
+  const labels = [
+    "Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte",
+    "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"
+  ];
+
+  labels.forEach(label => {
+    shAula.getRange(startRow, movMap[label], maxRows, 1).clearContent();
+  });
+
+  const out = {};
+  labels.forEach(label => out[label] = []);
+
+  for (let i = 0; i < maxRows; i++) {
+    if (i < filtrados.length) {
+      const row = filtrados[i];
+      const id = row[IDX.id];
+
+      out["Id."].push([id]);
+      out["Fecha"].push([row[IDX.fecha]]);
+      out["Tipo"].push([row[IDX.tipo]]);
+      out["Categoría"].push([row[IDX.categoria]]);
+      out["Concepto"].push([row[IDX.concepto]]);
+      out["Contra-parte"].push([row[IDX.contraparte]]);
+      out["Monto"].push([row[IDX.monto]]);
+      out["Impuestos"].push([row[IDX.impuestos]]);
+      out["M.P."].push([row[IDX.mp]]);
+      out["Estado Finan."].push([estadoFinanPorId[String(id)] || ""]);
+      out["Estado"].push([row[IDX.estado]]);
+    } else {
+      labels.forEach(label => out[label].push([""]));
+    }
+  }
+
+  labels.forEach(label => {
+    shAula.getRange(startRow, movMap[label], maxRows, 1).setValues(out[label]);
+  });
+
+  SpreadsheetApp.flush();
+}
+
+function agregarInscripcionAula() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(AULA_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "AULA".');
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    AULA_CFG.headerRow,
+    AULA_CFG.inscriptos.startCol,
+    AULA_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const colInstructor = getOptionalHeaderColumn_(
+    sh,
+    AULA_CFG.headerRow,
+    AULA_CFG.inscriptos.startCol,
+    AULA_CFG.inscriptos.endCol,
+    "Instructor"
+  );
+
+  const nombre = getNamedValueRequired_("AUL_INS_NOMBRE");
+  const apellido = getNamedValueRequired_("AUL_INS_APELLIDO");
+  const dni = formatDNIText_(getNamedValueRequired_("AUL_INS_DNI"));
+  const tel = getNamedValue_("AUL_INS_TEL");
+  const actividad = getNamedValueRequired_("AUL_INS_ACTIVIDAD");
+  const modalidad = getNamedValueRequired_("AUL_INS_MODALIDAD");
+  const instructor = getNamedValue_("AUL_INS_INSTRUCTOR");
+  const cuota = parseNumber_(getNamedValueRequired_("AUL_INS_CUOTA"));
+
+  if (!isFinite(cuota) || cuota < 0) {
+    SpreadsheetApp.getUi().alert("La cuota debe ser un valor numérico válido. Puede ser 0, pero no negativa.");
+    return;
+  }
+
+  const existente = existeInscripcionMismaActividadEnSector_(
+    AULA_CFG,
+    dni,
+    actividad,
+    modalidad,
+    instructor
+  );
+
+  if (existente) {
+    SpreadsheetApp.getUi().alert(
+      `Ya existe una inscripción igual para ese DNI:\n\n` +
+      `${existente.nombre} ${existente.apellido}\n` +
+      `${existente.actividad} - ${existente.modalidad}\n` +
+      `Instructor: ${existente.instructor || "-"}`
+    );
+    return;
+  }
+
+  const startRow = AULA_CFG.inscriptos.dataStartRow;
+  const endRow = AULA_CFG.inscriptos.dataEndRow;
+  const startCol = AULA_CFG.inscriptos.startCol;
+  const endCol = AULA_CFG.inscriptos.endCol;
+  const numRows = endRow - startRow + 1;
+  const numCols = endCol - startCol + 1;
+
+  const region = sh.getRange(startRow, startCol, numRows, numCols);
+  const values = region.getValues();
+  values.pop();
+  values.unshift(new Array(numCols).fill(""));
+  region.setValues(values);
+
+  const prefijoActividad = getPrefijoActividadAula_(actividad);
+  const nextId = generarId_(prefijoActividad, getMaxAulaInscriptosId_(sh, insMap) + 1);
+
+  sh.getRange(startRow, insMap["Id."]).setValue(nextId);
+  sh.getRange(startRow, insMap["Fecha"]).setValue(new Date());
+  sh.getRange(startRow, insMap["Nombre"]).setValue(nombre);
+  sh.getRange(startRow, insMap["Apellido"]).setValue(apellido);
+
+  const rDni = sh.getRange(startRow, insMap["D.N.I."]);
+  rDni.setNumberFormat("@");
+  rDni.setValue(dni);
+
+  const rTel = sh.getRange(startRow, insMap["Tel."]);
+  rTel.setNumberFormat("@");
+  rTel.setValue(String(tel || ""));
+
+  sh.getRange(startRow, insMap["Actividad"]).setValue(actividad);
+  sh.getRange(startRow, insMap["Modalidad"]).setValue(modalidad);
+  sh.getRange(startRow, insMap["Cuota"]).setValue(cuota);
+
+  if (colInstructor) {
+    sh.getRange(startRow, colInstructor).setValue(instructor);
+  }
+
+  actualizarEstadosInscriptosAula();
+  limpiarFormularioInscripcionAula_();
+
+  SpreadsheetApp.getActive().toast("Inscripción AULA cargada: " + nextId, "OK", 3);
+}
+
+function cargarPagoCuotaAula() {
+  const dni = formatDNIText_(getNamedValueRequired_("AUL_PAGO_DNI"));
+  const mp = getNamedValueRequired_("AUL_PAGO_MP");
+
+  let resultado;
+
+  try {
+    resultado = generarPagosCuotaPorDniEnSector_(
+      AULA_CFG,
+      "AULA",
+      dni,
+      mp
+    );
+  } catch (err) {
+    SpreadsheetApp.getUi().alert(err.message || String(err));
+    return;
+  }
+
+  sincronizarAulaDesdeAdministracion();
+
+  resultado.ids.forEach(id => {
+    setEstadoFinanAulaPorId_(id, "PAGADO");
+  });
+
+  actualizarEstadosInscriptosAula();
+  limpiarFormularioPagoAula_();
+
+  SpreadsheetApp.getActive().toast(
+    `Pagos AULA cargados: ${resultado.cantidad} | Total: $${resultado.total}`,
+    "OK",
+    5
+  );
+}
+
+function autocompletarPagoAulaPorDni_(dniInput) {
+  const dni = formatDNIText_(dniInput);
+  const inscriptos = getInscriptosVigentesPorDniEnSector_(AULA_CFG, dni);
+
+  if (!inscriptos.length) {
+    setNamedValue_("AUL_PAGO_NOMBRE", "");
+    setNamedValue_("AUL_PAGO_APELLIDO", "");
+    setNamedValue_("AUL_PAGO_MONTO", "");
+    setNamedValue_("AUL_PAGO_ESTADO", "NO ENCONTRADO");
+    setNamedValue_("AUL_PAGO_ACTIVIDAD", "");
+    setNamedValue_("AUL_PAGO_INSTRUCTOR", "");
+    SpreadsheetApp.getActive().toast("No se encontró un inscripto vigente con ese DNI", "AULA", 3);
+    return;
+  }
+
+  completarFormularioPagoDesdeInscriptos_("AUL", inscriptos);
+
+  if (inscriptos.length > 1) {
+    SpreadsheetApp.getActive().toast(
+      `Se detectaron ${inscriptos.length} actividades. Se generará un pago por cada una.`,
+      "AULA",
+      5
+    );
+  }
+}
+
+function actualizarEstadosInscriptosAula() {
+  actualizarEstadosInscriptosSector_(AULA_CFG);
+}
+
+function buscarInscriptoAulaPorDni_(dniInput) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(AULA_CFG.sheetName);
+  if (!sh) throw new Error('No existe la hoja "AULA".');
+
+  const dniBuscado = formatDNIText_(dniInput);
+
+  const insMap = getHeaderMapInRegion_(
+    sh,
+    AULA_CFG.headerRow,
+    AULA_CFG.inscriptos.startCol,
+    AULA_CFG.inscriptos.endCol,
+    ["Id.", "Fecha", "Nombre", "Apellido", "D.N.I.", "Tel.", "Actividad", "Modalidad", "Cuota", "Estado"]
+  );
+
+  const colInstructor = getOptionalHeaderColumn_(
+    sh,
+    AULA_CFG.headerRow,
+    AULA_CFG.inscriptos.startCol,
+    AULA_CFG.inscriptos.endCol,
+    "Instructor"
+  );
+
+  const startRow = AULA_CFG.inscriptos.dataStartRow;
+  const numRows = AULA_CFG.inscriptos.dataEndRow - startRow + 1;
+
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+  const fechas = sh.getRange(startRow, insMap["Fecha"], numRows, 1).getValues();
+  const nombres = sh.getRange(startRow, insMap["Nombre"], numRows, 1).getValues();
+  const apellidos = sh.getRange(startRow, insMap["Apellido"], numRows, 1).getValues();
+  const dnis = sh.getRange(startRow, insMap["D.N.I."], numRows, 1).getDisplayValues();
+  const tels = sh.getRange(startRow, insMap["Tel."], numRows, 1).getDisplayValues();
+  const actividades = sh.getRange(startRow, insMap["Actividad"], numRows, 1).getValues();
+  const modalidades = sh.getRange(startRow, insMap["Modalidad"], numRows, 1).getValues();
+  const cuotas = sh.getRange(startRow, insMap["Cuota"], numRows, 1).getValues();
+  const estados = sh.getRange(startRow, insMap["Estado"], numRows, 1).getValues();
+  const instructores = colInstructor
+    ? sh.getRange(startRow, colInstructor, numRows, 1).getValues()
+    : [];
+
+  for (let i = 0; i < numRows; i++) {
+    if (!ids[i][0]) continue;
+
+    const dni = formatDNIText_(dnis[i][0]);
+
+    if (dni === dniBuscado) {
+      return {
+        id: ids[i][0],
+        fecha: fechas[i][0],
+        nombre: nombres[i][0],
+        apellido: apellidos[i][0],
+        dni: dni,
+        tel: tels[i][0],
+        actividad: actividades[i][0],
+        modalidad: modalidades[i][0],
+        instructor: colInstructor ? instructores[i][0] : "",
+        cuota: cuotas[i][0],
+        estado: estados[i][0]
+      };
+    }
+  }
+
+  return null;
+}
+
+function getMaxAulaInscriptosId_(sh, insMap) {
+  const startRow = AULA_CFG.inscriptos.dataStartRow;
+  const numRows = AULA_CFG.inscriptos.dataEndRow - startRow + 1;
+  const ids = sh.getRange(startRow, insMap["Id."], numRows, 1).getValues();
+
+  let maxN = 0;
+  ids.forEach(r => {
+    const n = extraerNumeroId_(r[0]);
+    if (n > maxN) maxN = n;
+  });
+
+  return maxN;
+}
+
+function setEstadoFinanAulaPorId_(idBuscado, valor) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(AULA_CFG.sheetName);
+  if (!sh) return;
+
+  const movMap = getHeaderMapInRegion_(
+    sh,
+    AULA_CFG.headerRow,
+    AULA_CFG.movimientos.startCol,
+    AULA_CFG.movimientos.endCol,
+    ["Id.", "Fecha", "Tipo", "Categoría", "Concepto", "Contra-parte", "Monto", "Impuestos", "M.P.", "Estado Finan.", "Estado"]
+  );
+
+  const startRow = AULA_CFG.movimientos.dataStartRow;
+  const numRows = AULA_CFG.movimientos.dataEndRow - startRow + 1;
+  const ids = sh.getRange(startRow, movMap["Id."], numRows, 1).getValues();
+
+  for (let i = 0; i < numRows; i++) {
+    if (String(ids[i][0]) === String(idBuscado)) {
+      sh.getRange(startRow + i, movMap["Estado Finan."]).setValue(valor);
+      return;
+    }
+  }
+}
+
+function limpiarFormularioInscripcionAula_() {
+  clearNamedIfExists_("AUL_INS_NOMBRE");
+  clearNamedIfExists_("AUL_INS_APELLIDO");
+  clearNamedIfExists_("AUL_INS_DNI");
+  clearNamedIfExists_("AUL_INS_TEL");
+  clearNamedIfExists_("AUL_INS_ACTIVIDAD");
+  clearNamedIfExists_("AUL_INS_MODALIDAD");
+  clearNamedIfExists_("AUL_INS_HORARIO");
+  // No limpio AUL_INS_INSTRUCTOR porque normalmente viene por fórmula/búsqueda.
+  // No limpio AUL_INS_CUOTA si viene por fórmula automática.
+}
+
+function limpiarFormularioPagoAula_() {
+  clearNamedIfExists_("AUL_PAGO_DNI");
+  clearNamedIfExists_("AUL_PAGO_NOMBRE");
+  clearNamedIfExists_("AUL_PAGO_APELLIDO");
+  clearNamedIfExists_("AUL_PAGO_MONTO");
+  clearNamedIfExists_("AUL_PAGO_ESTADO");
+  clearNamedIfExists_("AUL_PAGO_MP");
+  clearNamedIfExists_("AUL_PAGO_ACTIVIDAD");
+  clearNamedIfExists_("AUL_PAGO_INSTRUCTOR");
+}
+
+function actualizarAula() {
+  sincronizarAulaDesdeAdministracion();
+  actualizarEstadosInscriptosAula();
+  SpreadsheetApp.getActive().toast("Datos de AULA actualizados", "OK", 3);
+}
+
+function getPrefijoActividadAula_(actividad) {
+  const a = String(actividad || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+  const match = a.match(/[A-Z]/);
+  return match ? match[0] : "A";
+}
+
+function actualizarTodoClub() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    SpreadsheetApp.getActive().toast("Actualizando toda la planilla...", "ADMIN CLUB", 5);
+
+    // LOCAL 1
+    if (typeof sincronizarLocal1DesdeAdministracion === "function") {
+      sincronizarLocal1DesdeAdministracion();
+    }
+
+    // FITNESS
+    if (typeof sincronizarFitnessDesdeAdministracion === "function") {
+      sincronizarFitnessDesdeAdministracion();
+    }
+
+    if (typeof actualizarEstadosInscriptosFitness === "function") {
+      actualizarEstadosInscriptosFitness();
+    }
+
+    // SALON
+    if (typeof sincronizarSalonDesdeAdministracion === "function") {
+      sincronizarSalonDesdeAdministracion();
+    }
+
+    if (typeof actualizarEstadosInscriptosSalon === "function") {
+      actualizarEstadosInscriptosSalon();
+    }
+
+    // AULA
+    if (typeof sincronizarAulaDesdeAdministracion === "function") {
+      sincronizarAulaDesdeAdministracion();
+    }
+
+    if (typeof actualizarEstadosInscriptosAula === "function") {
+      actualizarEstadosInscriptosAula();
+    }
+
+    SpreadsheetApp.flush();
+
+    SpreadsheetApp.getActive().toast("Planilla actualizada correctamente", "OK", 5);
+
+  } catch (err) {
+    SpreadsheetApp.getUi().alert(
+      "Error al actualizar la planilla:\n\n" +
+      (err && err.message ? err.message : String(err))
+    );
+  }
+}
+
+function probarExportReciboSalonActual() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shRecibos = ss.getSheetByName("Recibos");
+
+  if (!shRecibos) {
+    throw new Error('No existe la hoja "Recibos".');
+  }
+
+  SpreadsheetApp.flush();
+  Utilities.sleep(60000);
+
+  const pdfBlob = exportarHojaRecibosComoPDF_(
+    ss,
+    shRecibos,
+    "TEST_Recibo_Salon.pdf"
+  );
+
+  const file = DriveApp.createFile(pdfBlob);
+
+  SpreadsheetApp.getUi().alert(
+    "PDF de prueba generado correctamente:\n\n" +
+    file.getUrl()
+  );
+}
+
+function prepararFormatoPlantillaRecibosSalon() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shRecibos = ss.getSheetByName("Recibos");
+
+  if (!shRecibos) {
+    throw new Error('No existe la hoja "Recibos".');
+  }
+
+  // Formatos de fecha
+  shRecibos.getRange("K3").setNumberFormat("dd/mm/yyyy");
+  shRecibos.getRange("M3").setNumberFormat("dd/mm/yyyy");
+  shRecibos.getRange("B9:B39").setNumberFormat("dd/mm/yyyy");
+  shRecibos.getRange("C48:C110").setNumberFormat("dd/mm/yyyy");
+
+  // Formatos de texto
+  shRecibos.getRange("K5").setNumberFormat("@");
+  shRecibos.getRange("I48:I110").setNumberFormat("@");
+  shRecibos.getRange("K48:K110").setNumberFormat("@");
+
+  // Formato visual general
+  shRecibos.getRange("B9:Q39")
+    .setFontColor("#000000")
+    .setFontSize(7)
+    .setVerticalAlignment("middle");
+
+  shRecibos.getRange("B48:Q110")
+    .setFontColor("#000000")
+    .setFontSize(7)
+    .setVerticalAlignment("middle");
+
+  SpreadsheetApp.flush();
+
+  SpreadsheetApp.getUi().alert(
+    "Formato de la plantilla Recibos preparado correctamente."
+  );
+}
