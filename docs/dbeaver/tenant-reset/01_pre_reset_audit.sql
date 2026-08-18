@@ -1,5 +1,11 @@
-/* Sólo lectura persistente. Ejecutar completo en la misma conexión que 03. */
-SET statement_timeout = '15min';
+/*
+ * No modifica datos persistentes. Ejecutar completo en la misma conexión que
+ * 02 y 03. La transacción explícita es obligatoria cuando DBeaver tiene
+ * Auto-commit desactivado: el COMMIT final conserva las tablas temporales de
+ * sesión y evita que el ROLLBACK del ensayo de 02 deshaga el propio precheck.
+ */
+BEGIN;
+SET LOCAL statement_timeout = '15min';
 
 /*
  * PRIMER RESULT SET: filas que impedirían explicar todo por el único tenant de
@@ -396,3 +402,6 @@ TABLE reset_precheck_checks;
 SELECT CASE WHEN bool_and(passed) THEN 'RESET PRECHECK: PASS'
             ELSE 'RESET PRECHECK: FAIL' END AS reset_precheck
 FROM reset_precheck_checks;
+
+/* Sólo confirma objetos temporales de esta sesión; no hubo DML persistente. */
+COMMIT;

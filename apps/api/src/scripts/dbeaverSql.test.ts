@@ -125,6 +125,7 @@ function withoutSqlComments(source: string): string {
 
 test("precheck de reset reconoce catálogos globales reales y explica cada bloqueo", () => {
   const precheck = tenantResetSql("01_pre_reset_audit.sql");
+  const executablePrecheck = withoutSqlComments(precheck);
 
   for (const globalTable of [
     "category_catalog",
@@ -156,7 +157,10 @@ test("precheck de reset reconoce catálogos globales reales y explica cada bloqu
   assert.match(precheck, /no populated UNKNOWN tables/);
   assert.match(precheck, /TABLE reset_precheck_checks;/);
   assert.match(precheck, /bool_and\(passed\)/);
-  assert.doesNotMatch(withoutSqlComments(precheck), /\b(?:UPDATE|MERGE|ALTER|TRUNCATE|CALL)\b/i);
+  assert.match(executablePrecheck, /^\s*BEGIN;/i);
+  assert.match(executablePrecheck, /COMMIT;\s*$/i);
+  assert.match(precheck, /ROLLBACK del ensayo de 02 deshaga el propio precheck/);
+  assert.doesNotMatch(executablePrecheck, /\b(?:UPDATE|MERGE|ALTER|TRUNCATE|CALL)\b/i);
 });
 
 test("ensayo de reset exige el PASS de la misma sesión y aborta grafos FK irresolubles", () => {
