@@ -27,14 +27,10 @@ export interface UserRepository {
 export const getActiveMembershipContext = async (userId: string, membershipId: string) => {
   const pool = await getPostgresPool();
   const result = await pool.query<{ membership_id: string; club_id: string; role: string; permissions: string[]; sector_ids: string[]; session_revoked_before: Date | null }>(
-    `select ucm.id as membership_id, ucm.club_id, r.code as role,
-            ucm.permissions, ucm.sector_ids, u.session_revoked_before
-       from miclub.user_club_memberships ucm
-       join miclub.users u on u.id=ucm.user_id and u.status='active'
-       join miclub.clubs c on c.id=ucm.club_id and c.is_active=true
-       join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
-      where ucm.id=$1 and ucm.user_id=$2 and ucm.status='active'`,
-    [membershipId, userId],
+    `select membership_id, club_id, role_code as role, permissions, sector_ids,
+            session_revoked_before
+       from miclub.resolve_active_membership($1, $2)`,
+    [userId, membershipId],
   );
   return result.rows[0] ?? null;
 };
@@ -50,11 +46,9 @@ export const revokeUserSessions = async (userId: string, revokedAt = new Date())
 export const listActiveMemberships = async (userId: string) => {
   const pool = await getPostgresPool();
   const result = await pool.query<{ membershipId: string; clubId: string; clubName: string; role: string }>(
-    `select ucm.id as "membershipId", ucm.club_id as "clubId", c.name as "clubName", r.code as role
-       from miclub.user_club_memberships ucm
-       join miclub.clubs c on c.id=ucm.club_id and c.is_active=true
-       join miclub.roles r on r.id=ucm.role_id and r.club_id=ucm.club_id
-      where ucm.user_id=$1 and ucm.status='active' order by c.name, ucm.created_at`, [userId],
+    `select membership_id as "membershipId", club_id as "clubId",
+            club_name as "clubName", role_code as role
+       from miclub.list_active_memberships($1)`, [userId],
   );
   return result.rows;
 };

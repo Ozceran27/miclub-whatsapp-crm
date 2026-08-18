@@ -1,5 +1,6 @@
 import { getPostgresPool } from "../db/postgres.js";
 import type { QueryExecutor } from "../db/postgres.js";
+import { withTenantTransaction } from "../db/transaction.js";
 
 export const AUDIT_EVENT_TYPES = [
   "registration",
@@ -67,6 +68,15 @@ export const recordAuditEvent = async (
   event: AuditEvent,
   executor?: QueryExecutor,
 ): Promise<string> => {
+  if (!executor && event.clubId) {
+    const pool = await getPostgresPool();
+    return withTenantTransaction(
+      event.clubId,
+      (tenantExecutor) => recordAuditEvent(event, tenantExecutor),
+      pool,
+    );
+  }
+
   const db = executor ?? await getPostgresPool();
   const metadata = sanitizedJson({ ...(event.metadata ?? {}), eventType: event.type });
   const result = await db.query<{ id: string }>(`
