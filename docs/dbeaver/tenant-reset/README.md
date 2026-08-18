@@ -50,8 +50,17 @@ como evidencia de la ejecución.
   triggers internos ni claves foráneas.
 - `public.miclub_schema_migrations`, schemas de sistema y tablas clasificadas
   como `GLOBAL_STRUCTURAL`/`SYSTEM_INTERNAL` se conservan.
+- `reset_catalog_registry` enumera los catálogos globales, mixtos y la
+  configuración tenant (incluidos roles, `permissions[]`, grants de plan y
+  overrides) conforme al DDL real. En tablas mixtas, `club_id IS NULL` es el
+  subconjunto global conservado y sólo un `club_id` capturado demuestra que una
+  fila se puede borrar.
 - Las huellas globales son conteo y digest determinista del contenido textual
-  de cada fila. Se guardan en una tabla temporal de la conexión, no en la base.
+  **por subconjunto global**, no por tabla completa. Por eso una tabla mixta
+  puede perder las filas demostrablemente tenant sin alterar su huella global.
+  Si una tabla declarada global presenta `club_id`, el precheck falla con una
+  explicación y no autoriza que el reset la borre o reclasifique.
+  Las huellas se guardan en una tabla temporal de la conexión, no en la base.
 - Los scripts no sustituyen el backup, la revisión humana ni el gate de
   readiness de [`../../pre-reset-readiness.md`](../../pre-reset-readiness.md).
 
