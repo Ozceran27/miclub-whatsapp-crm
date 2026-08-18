@@ -68,8 +68,11 @@ export async function provisionClub(
   [user.rows[0].id, clubId, directorRole.id, [...CLUB_ROLE_DEFINITIONS.DIRECTOR.permissions]]);
 
   await client.query(`
-    insert into miclub.employees (club_id, person_id, user_id, membership_id, status, position, employment_start_date)
-    values ($1, $2, $3, $4, 'active', 'Director', current_date)`,
+    insert into miclub.employees (
+      club_id, person_id, user_id, membership_id, status, position,
+      employment_start_date, payment_mode, monthly_fixed_amount
+    )
+    values ($1, $2, $3, $4, 'active', 'Director', current_date, 'VARIABLE', null)`,
   [clubId, person.rows[0].id, user.rows[0].id, membership.rows[0].id]);
   await client.query(`
     insert into miclub.sectors (club_id, code, name, is_system, status, uses_activities)
