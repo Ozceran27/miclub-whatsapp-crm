@@ -157,7 +157,8 @@ WITH expected(name,checksum) AS (VALUES
     ('202608150005_prevent_split_settlement_movements.sql', 'ce170d44b2fab940e69ee0761350ea11f5c4c1c0911c7a8dcd98d6fa59948d28'),
     ('202608150006_remove_empty_bootstrap_legacy_club.sql', 'bb561df6444fa1a4680859f0ec1f262db6e0d51b5be95a72c82fda30d78c9488'),
     ('202608160001_commercial_plan_taxonomy.sql', '5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c'),
-    ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119')
+    ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119'),
+    ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
@@ -247,7 +248,8 @@ WITH expected(name,checksum) AS (VALUES
     ('202608150005_prevent_split_settlement_movements.sql', 'ce170d44b2fab940e69ee0761350ea11f5c4c1c0911c7a8dcd98d6fa59948d28'),
     ('202608150006_remove_empty_bootstrap_legacy_club.sql', 'bb561df6444fa1a4680859f0ec1f262db6e0d51b5be95a72c82fda30d78c9488'),
     ('202608160001_commercial_plan_taxonomy.sql', '5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c'),
-    ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119')
+    ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119'),
+    ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL

@@ -74,7 +74,7 @@ test("el club registrado obtiene FREE y no recibe features de DEVELOPMENT", asyn
 });
 
 test("cualquier fallo revierte integralmente el provisioning", async () => {
-  for (let operation = 0; operation < 10; operation += 1) {
+  for (let operation = 0; operation < 11; operation += 1) {
     const integration = harness(operation);
     await assert.rejects(integration.run(), /forced provisioning failure/);
     assert.deepEqual(integration.state(), emptyState(), `quedaron datos parciales al fallar la operación ${operation}`);

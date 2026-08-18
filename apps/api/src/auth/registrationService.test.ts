@@ -40,6 +40,9 @@ test("bootstrap crea integralmente Director, persona, usuario, membresía, emple
   const result = await provisionClub(client, input, "hash");
   assert.deepEqual(result, { clubId: "club-id", userId: "user-id", personId: "person-id", membershipId: "membership-id" });
   const sql = calls.map(({ sql }) => sql).join("\n");
+  const tenantBinding = calls.find(({ sql: statement }) => statement.includes("set_config('app.club_id'"));
+  assert.deepEqual(tenantBinding?.values, ["club-id"]);
+  assert.ok(calls.indexOf(tenantBinding!) < calls.findIndex(({ sql: statement }) => statement.includes("miclub.club_subscriptions")));
   assert.match(sql, /miclub\.roles[\s\S]*jsonb_to_recordset/);
   assert.equal(sql.match(/insert into miclub\.roles/g)?.length, 1, "debe existir un único Director");
   const roleDefinitions = JSON.parse(String(calls.find(({ sql: statement }) => statement.includes("miclub.roles"))?.values?.[1]));
@@ -57,7 +60,7 @@ test("bootstrap crea integralmente Director, persona, usuario, membresía, emple
 });
 
 test("cada fallo de bootstrap se propaga para que registrationService haga rollback", async () => {
-  for (let operation = 0; operation < 10; operation += 1) {
+  for (let operation = 0; operation < 11; operation += 1) {
     const { client, calls } = fakeClient(operation);
     await assert.rejects(provisionClub(client, input, "hash"), new RegExp(`falló ${operation}`));
     assert.equal(calls.length, operation + 1, `no debe ejecutar suboperaciones después del fallo ${operation}`);
