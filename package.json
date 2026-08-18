@@ -21,6 +21,7 @@
     "db:migrations:check": "tsx --test apps/api/src/scripts/migrationManifest.test.ts",
     "db:migrations:integration": "tsx apps/api/src/scripts/migrationInstallGate.ts",
     "db:tenant-isolation:integration": "tsx apps/api/integration/tenantIsolation.ts",
+    "db:public-registration:integration": "tsx apps/api/integration/publicRegistration.ts",
     "db:readiness-report": "tsx apps/api/src/scripts/migrationReadinessReport.ts",
     "db:backup": "bash scripts/backup-postgres.sh",
     "bootstrap:director": "tsx apps/api/src/scripts/bootstrapDirector.ts",

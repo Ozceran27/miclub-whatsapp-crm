@@ -160,6 +160,20 @@ INSERT INTO reset_validation
 SELECT 'catalog positive '||table_schema||'.'||table_name,row_count>0,row_count::text
 FROM pg_temp.reset_global_fingerprints;
 
+INSERT INTO reset_validation
+SELECT 'exactly one provisionable FREE plan',count(*)=1,count(*)::text||' provisionable FREE rows'
+FROM miclub.plans
+WHERE code='FREE' AND catalog_status='catalog' AND commercial_class='free'
+  AND NOT is_development;
+
+INSERT INTO reset_validation
+SELECT 'required global catalogs are not empty',count(*)=0,
+       COALESCE(string_agg(format('%I.%I',r.table_schema,r.table_name),', ' ORDER BY r.table_schema,r.table_name),
+                'all required GLOBAL catalogs contain rows')
+FROM pg_temp.reset_catalog_registry r
+LEFT JOIN pg_temp.reset_global_fingerprints f USING(table_schema,table_name)
+WHERE r.scope_kind='GLOBAL' AND COALESCE(f.row_count,0)=0;
+
 TABLE reset_validation;
 SELECT CASE WHEN bool_and(passed) THEN 'DATABASE RESET VALIDATION: PASS'
             ELSE 'DATABASE RESET VALIDATION: FAIL' END AS database_reset_validation
