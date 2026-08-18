@@ -78,10 +78,12 @@ const main = async () => {
   const state = await database.query<{
     first_name: string; last_name: string; email: string; club_name: string; plan_code: string;
     onboarding_status: string; role_code: string; membership_status: string; position: string;
+    payment_mode: string; monthly_fixed_amount: string | null;
     role_count: string; payment_methods: string[]; sectors: string[];
   }>(`
     select p.first_name,p.last_name,u.email,c.name club_name,s.plan_code,
            o.status onboarding_status,r.code role_code,m.status membership_status,e.position,
+           e.payment_mode,e.monthly_fixed_amount::text,
            (select count(*)::text from miclub.roles rr where rr.club_id=c.id) role_count,
            (select array_agg(pm.name order by pm.name) from miclub.payment_methods pm where pm.club_id=c.id) payment_methods,
            (select array_agg(sec.name order by sec.name) from miclub.sectors sec where sec.club_id=c.id) sectors
@@ -100,6 +102,7 @@ const main = async () => {
     first_name: registration.firstName, last_name: registration.lastName, email: registration.email,
     club_name: registration.club.name, plan_code: "FREE", onboarding_status: "NOT_STARTED",
     role_code: "DIRECTOR", membership_status: "active", position: "Director",
+    payment_mode: "VARIABLE", monthly_fixed_amount: null,
     role_count: String(Object.keys(CLUB_ROLE_DEFINITIONS).length),
   });
   assert.deepEqual(new Set(paymentMethods), new Set(["Efectivo", "Transferencia"]));

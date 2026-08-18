@@ -6,7 +6,7 @@ import { provisionClub, type TransactionClient } from "./clubProvisioningService
 
 const input = { firstName: "Ana", lastName: "Pérez", dni: "12345678", phone: "1155555555", email: "ana@example.com", club: { name: "Club Norte" } };
 
-type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; employees: string[] };
+type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; employees: { membershipId: string; paymentMode: string; monthlyFixedAmount: null }[] };
 const emptyState = (): State => ({ clubs: [], subscriptions: new Map(), roles: new Map(), onboarding: [], memberships: [], employees: [] });
 
 /** Small transactional adapter: it verifies the cross-statement provisioning contract without requiring a developer database. */
@@ -28,7 +28,10 @@ const harness = (failAt = -1) => {
     if (sql.includes("miclub.users")) return { rows: [{ id: "user-id" }] };
     if (sql.includes("miclub.people")) return { rows: [{ id: "person-id" }] };
     if (sql.includes("user_club_memberships")) { state.memberships.push(String(values?.[2])); return { rows: [{ id: "membership-id" }] }; }
-    if (sql.includes("miclub.employees")) state.employees.push(String(values?.[3]));
+    if (sql.includes("miclub.employees")) {
+      assert.match(sql, /payment_mode[\s\S]*monthly_fixed_amount[\s\S]*'VARIABLE', null/);
+      state.employees.push({ membershipId: String(values?.[3]), paymentMode: "VARIABLE", monthlyFixedAmount: null });
+    }
     return { rows: [] };
   };
   const client: TransactionClient = { query: query as TransactionClient["query"] };
@@ -60,7 +63,9 @@ test("el provisioning permite crear después trabajadores e instructores con sus
   }
   assert.deepEqual(integration.state().onboarding, ["club-id"]);
   assert.equal(integration.state().memberships[0], "director-id", "la membresía propietaria conserva DIRECTOR");
-  assert.equal(integration.state().employees[0], "membership-id", "el empleado propietario conserva esa membresía");
+  assert.deepEqual(integration.state().employees[0], {
+    membershipId: "membership-id", paymentMode: "VARIABLE", monthlyFixedAmount: null,
+  }, "el Director conserva su membresía y una compensación inicial válida sin monto inventado");
 });
 
 test("el club registrado obtiene FREE y no recibe features de DEVELOPMENT", async () => {
