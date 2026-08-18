@@ -4,7 +4,16 @@ Los archivos son SQL plano UTF-8. Abrirlos directamente desde DBeaver y usar
 **Execute SQL Script**; no copiar una representación JSON que muestre `\n`, ya
 que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 
-## Orden
+## Procedimientos históricos de Fernando (no usar en instalaciones nuevas)
+
+> **HISTÓRICO — REPARACIÓN LEGACY.** Los pasos 01/02/03/08 y el backfill
+> `integral-backfill-2026-08/` se diseñaron exclusivamente para la instalación
+> preexistente de miClub/Fernando Ramos. No son onboarding, provisioning ni
+> migraciones aplicables a una instalación nueva. Una instalación nueva debe usar
+> el alta normal y `npm run db:migrate`; no debe copiar UUID, identidad ni datos de
+> Fernando.
+
+## Orden histórico de reparación
 
 Para el backfill histórico integral posterior a la reestructuración, utilizar el
 runbook autocontenido [`integral-backfill-2026-08/README.md`](integral-backfill-2026-08/README.md).
@@ -18,8 +27,8 @@ no reemplazar ese orden con ejecuciones parciales.
    miClub: hacer backup y ejecutar `02_miclub_backfill_manual.sql` completo, no
    por selecciones parciales. El primer `ROLLBACK` limpia el estado `25P02`
    dejado por errores anteriores; luego el script abre su propia transacción.
-4. Crear/corregir la identidad con la CLI oficial (PostgreSQL no implementa el
-   hash `scrypt` usado por la aplicación):
+4. Sólo para reparar esa identidad legacy, crear/corregirla con la CLI explícita
+   (PostgreSQL no implementa el hash `scrypt` usado por la aplicación):
 
    ```bash
    BOOTSTRAP_DIRECTOR_ENABLED=true \
@@ -28,7 +37,9 @@ no reemplazar ese orden con ejecuciones parciales.
    ```
 
    En PowerShell, asignar ambas variables a `$env:` sólo para esa consola. Al
-   terminar, eliminarlas. La CLI no imprime la contraseña ni el hash.
+   terminar, eliminarlas y dejar `BOOTSTRAP_DIRECTOR_ENABLED=false`. La CLI no
+   imprime la contraseña ni el hash. Ningún startup invoca este script y
+   producción rechaza el flag habilitado.
 5. Reconectar la aplicación para forzar un login nuevo y ejecutar
    `03_final_validation_readonly.sql`. Todas las filas deben mostrar `PASS`.
 

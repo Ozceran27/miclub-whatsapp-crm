@@ -1,6 +1,6 @@
 # Runbook de corte a PostgreSQL
 
-Este documento define los controles operativos para retirar dependencias legacy (mocks, Google Sheets y SQLite) sin cortar endpoints productivos. Ninguna eliminación debe hacerse solo por disponibilidad técnica: primero debe existir evidencia de estabilidad, comparación de datos y backup.
+Este documento describe el estado vigente posterior al corte y los controles restantes para retirar SQLite. El corte de Google Sheets ya finalizó; sus antiguos pasos no son ejecutables en una instalación nueva y se conservan en [`history/google-sheets-postgres-migration.md`](history/google-sheets-postgres-migration.md).
 
 ## Estado objetivo de producción
 
@@ -9,6 +9,7 @@ Este documento define los controles operativos para retirar dependencias legacy 
 - `CRM_SOURCE=postgres` para que plantillas e historial CRM usen PostgreSQL en lugar de SQLite.
 - `IMPORT_ENDPOINTS_ENABLED=false` salvo durante ventanas controladas de importación.
 - `DEBUG_ENDPOINTS_ENABLED=false` salvo durante ventanas controladas de diagnóstico.
+- `BOOTSTRAP_DIRECTOR_ENABLED=false`; la CLI del director es sólo una reparación manual y nunca forma parte del startup.
 
 ## Períodos de estabilidad acordados
 
@@ -33,7 +34,7 @@ Si el equipo acuerda un período distinto, documentarlo con fecha/hora de inicio
    - `/debtors`
    - `/admin-movements`
    - `/club-finance-summary`
-4. Comparar legacy contra PostgreSQL usando los endpoints de comparación disponibles antes de deshabilitar Google Sheets.
+4. Validar los totales de PostgreSQL contra el backup o acta histórica del corte, si existe; ya no hay endpoints de comparación con Google Sheets.
 5. Dejar evidencia del período estable acordado: fechas, responsable, comandos usados y resultados.
 
 ### 2. Confirmar `CRM_SOURCE=postgres`
@@ -58,7 +59,7 @@ cp apps/api/data/miclub.sqlite backups/final-cutover/miclub.sqlite
 sqlite3 backups/final-cutover/miclub.sqlite ".backup 'backups/final-cutover/miclub.sqlite.backup'"
 ```
 
-Para Google Sheets, exportar desde Drive/Sheets una copia final en formato `.xlsx` y, si aplica, CSV por pestaña (`FITNESS`, `SALON`, `AULA`, `ADMINISTRACIÓN`). Registrar ubicación, fecha/hora y responsable del backup.
+El backup final de Google Sheets pertenece al acta histórica del corte. Para una instalación nueva, la importación soportada es un archivo `.xlsx` mediante `POST /api/migration`; no usa Google Sheets API, credenciales `GOOGLE_*` ni la dependencia `googleapis`. Véase [`import-xlsx.md`](import-xlsx.md).
 
 ## Reglas de eliminación
 
@@ -70,13 +71,9 @@ Eliminar referencias a mocks solo cuando se confirme que ningún endpoint produc
 - `GOOGLE_SHEETS_ENABLED=false` no debe activar respuestas `source=mock` en endpoints productivos.
 - No debe haber pantallas productivas que dependan de `syncStatus.source === "mock"` para funcionar.
 
-### Google Sheets
+### Google Sheets (retiro completado)
 
-Eliminar Google Sheets solo cuando no exista ningún importador, endpoint productivo o comparación operativa que dependa de la planilla.
-
-- Confirmar que los importadores ya no se usan o fueron reemplazados por una fuente PostgreSQL controlada.
-- Confirmar que `/summary`, `/members-debug`, `/debtors`, `/admin-movements` y `/club-finance-summary` responden desde PostgreSQL.
-- Conservar backup final exportado antes de retirar variables `GOOGLE_*`.
+No ejecutar un corte adicional ni configurar una cuenta de Google: el importador, los endpoints, las variables y `googleapis` ya no existen. Los documentos de rangos y archivado manual están rotulados dentro de `docs/history/`. El guardrail `npm run check:no-google-sheets-runtime` verifica que esa frontera se mantenga.
 
 ### SQLite
 
@@ -101,7 +98,7 @@ Resultado health check PostgreSQL:
 Resultado comparación legacy/postgres:
 Resultado comparación CRM SQLite/PostgreSQL:
 Ubicación backup SQLite:
-Ubicación backup Google Sheets:
+Ubicación backup histórico Google Sheets (si aplica):
 Decisión sobre mocks:
 Decisión sobre Google Sheets:
 Decisión sobre SQLite:

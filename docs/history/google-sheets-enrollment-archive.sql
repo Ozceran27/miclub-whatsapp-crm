@@ -1,5 +1,6 @@
--- SQL manual para habilitar archivado seguro de inscripciones de Google Sheets.
--- Revisar y ejecutar manualmente; no es una migración automática.
+-- HISTÓRICO: NO EJECUTAR EN INSTALACIONES NUEVAS.
+-- Antiguo SQL manual de archivado para el importador retirado de Google Sheets.
+-- Fue sustituido por migraciones versionadas y no forma parte del flujo XLSX.
 
 alter table miclub.enrollments
   add column if not exists inactive boolean not null default false;
