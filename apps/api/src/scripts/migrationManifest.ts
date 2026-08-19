@@ -10,6 +10,13 @@ export type MigrationManifestEntry = Readonly<{
   checkpointPurpose?: string;
 }>;
 
+/**
+ * Migration checksums are defined over canonical LF text. Git may materialize
+ * tracked text with CRLF on Windows, but that platform detail must not make an
+ * otherwise immutable migration appear modified.
+ */
+export const canonicalizeMigrationSql = (sql: string): string => sql.replace(/\r\n/g, "\n");
+
 // This array, not directory traversal or lexical sorting, is the execution order.
 // Root and multitenant migrations are deliberately interleaved below. Append only:
 // YYYYMMDDHHMM_<unique-description>.sql, with a timestamp never used before in
@@ -89,6 +96,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608180001_enrollment_operational_lifecycle.sql", sha256: "6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119", dependsOn: ["202608150003_fix_activity_status_enum_guard.sql", "202608060004_manual_movement_creation.sql"], checkpointPurpose: "Automatiza estados, vencimientos y cuotas adeudadas; deriva instructor/sector y sincroniza precios de actividad con inscripciones." },
   { path: "202608180002_restore_runtime_application_grants.sql", sha256: "65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea", dependsOn: ["202608150004_runtime_roles_and_priority_rls.sql", "202608180001_enrollment_operational_lifecycle.sql"], checkpointPurpose: "Restaura al rol runtime los permisos SQL requeridos por registro, onboarding, operación e importación sin desactivar el aislamiento RLS prioritario." },
   { path: "202608180003_fix_rls_login_membership_resolution.sql", sha256: "52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335", dependsOn: ["202608180002_restore_runtime_application_grants.sql", "202608160001_commercial_plan_taxonomy.sql"], provides: ["miclub.function.resolve_login_membership"], checkpointPurpose: "Permite resolver el contexto tenant mínimo después de validar la contraseña pese a FORCE RLS y completa con FREE los clubes sin suscripción activa." },
+  { path: "202608180004_fix_authenticated_membership_resolution.sql", sha256: "98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce", dependsOn: ["202608180003_fix_rls_login_membership_resolution.sql"], provides: ["miclub.function.resolve_active_membership", "miclub.function.list_active_memberships"], checkpointPurpose: "Valida y enumera membresías activas durante la rehidratación de sesión sin abrir las tablas protegidas por FORCE RLS." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

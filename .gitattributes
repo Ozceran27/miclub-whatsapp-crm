@@ -1,0 +1,3 @@
+# Migration checksums are defined over LF text. This also prevents future Git
+# checkouts from materializing SQL files differently on Windows.
+apps/api/db/migrations/**/*.sql text eol=lf

@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { hasOpenTransaction, migrationManifest, renderPostAdminMigrationTable, validateMigrationGraph } from "./migrationManifest.js";
+import { canonicalizeMigrationSql, hasOpenTransaction, migrationManifest, renderPostAdminMigrationTable, validateMigrationGraph } from "./migrationManifest.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -41,9 +41,18 @@ test("el manifiesto incluye exactamente una vez cada SQL versionado y conserva s
 
   for (const migration of migrationManifest) {
     const sql = await readFile(path.join(migrationsDir, migration.path), "utf8");
-    assert.equal(createHash("sha256").update(sql).digest("hex"), migration.sha256, migration.path);
+    assert.equal(createHash("sha256").update(canonicalizeMigrationSql(sql)).digest("hex"), migration.sha256, migration.path);
     assert.equal(hasOpenTransaction(sql), false, `transacción abierta en ${migration.path}`);
   }
+});
+
+test("los checksums de migración son estables entre checkouts LF y CRLF", () => {
+  const lf = "BEGIN;\nSELECT 1;\nCOMMIT;\n";
+  const crlf = lf.replace(/\n/g, "\r\n");
+  assert.equal(
+    createHash("sha256").update(canonicalizeMigrationSql(crlf)).digest("hex"),
+    createHash("sha256").update(canonicalizeMigrationSql(lf)).digest("hex"),
+  );
 });
 
 test("el grafo no tiene nombres, timestamps ni dependencias imposibles", () => {
