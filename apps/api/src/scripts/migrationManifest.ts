@@ -10,6 +10,13 @@ export type MigrationManifestEntry = Readonly<{
   checkpointPurpose?: string;
 }>;
 
+/**
+ * Migration checksums are defined over canonical LF text. Git may materialize
+ * tracked text with CRLF on Windows, but that platform detail must not make an
+ * otherwise immutable migration appear modified.
+ */
+export const canonicalizeMigrationSql = (sql: string): string => sql.replace(/\r\n/g, "\n");
+
 // This array, not directory traversal or lexical sorting, is the execution order.
 // Root and multitenant migrations are deliberately interleaved below. Append only:
 // YYYYMMDDHHMM_<unique-description>.sql, with a timestamp never used before in
