@@ -22,7 +22,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Configure en `.env` una conexión PostgreSQL, un `SESSION_SECRET` local de al menos 32 caracteres y los valores marcados como obligatorios en `.env.example`. La API usa `http://localhost:4000` y Vite `http://localhost:5173`.
+Configure en `.env` una conexión PostgreSQL, un `SESSION_SECRET` local de al menos 32 caracteres y los valores marcados como obligatorios en `.env.example`. `npm run db:migrate` carga ese mismo `.env`, pero requiere además la credencial administrativa independiente `ADMIN_DATABASE_URL` (o el bloque `PGADMIN*`); no utiliza la credencial runtime `DATABASE_URL` para ejecutar DDL. La API usa `http://localhost:4000` y Vite `http://localhost:5173`.
 
 ## Validación y ejecución
 

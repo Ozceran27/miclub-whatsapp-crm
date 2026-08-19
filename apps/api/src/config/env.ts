@@ -77,6 +77,23 @@ export const validatePostgresEnv = (env: PostgresEnv = getPostgresEnv()): string
   return missing.length > 0 ? [`Faltan variables PostgreSQL: ${missing.join(", ")}.`] : [];
 };
 
+/** Validates the deliberately separate credential used by migrations/jobs. */
+export const validatePostgresAdminEnv = (env: PostgresEnv = getPostgresAdminEnv()): string[] => {
+  if (env.databaseUrl) return [];
+
+  const missing = [
+    ["PGADMINHOST", env.host],
+    ["PGADMINDATABASE", env.database],
+    ["PGADMINUSER", env.user],
+  ]
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  return missing.length > 0
+    ? [`Faltan variables PostgreSQL administrativas: ${missing.join(", ")}. Definí ADMIN_DATABASE_URL o el bloque PGADMIN* en el archivo .env de la raíz del repositorio.`]
+    : [];
+};
+
 export const validateRuntimeConfig = ({ isProduction }: { isProduction: boolean }): void => {
   if (!isProduction) return;
   const errors: string[] = [];
