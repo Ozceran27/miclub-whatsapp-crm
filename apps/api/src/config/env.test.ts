@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPostgresAdminEnv, validateRuntimeConfig } from "./env.js";
+import { getPostgresAdminEnv, validatePostgresAdminEnv, validateRuntimeConfig } from "./env.js";
 
 test("admin admite una URL separada y un rol propietario explícito", () => {
   const original = { ...process.env };
@@ -23,6 +23,13 @@ test("admin admite una URL separada y un rol propietario explícito", () => {
   } finally {
     process.env = original;
   }
+});
+
+test("admin informa los nombres PGADMIN y la ubicación del .env", () => {
+  assert.deepEqual(validatePostgresAdminEnv({}), [
+    "Faltan variables PostgreSQL administrativas: PGADMINHOST, PGADMINDATABASE, PGADMINUSER. Definí ADMIN_DATABASE_URL o el bloque PGADMIN* en el archivo .env de la raíz del repositorio.",
+  ]);
+  assert.deepEqual(validatePostgresAdminEnv({ databaseUrl: "postgres://admin@example.invalid/miclub" }), []);
 });
 
 test("producción rechaza AUTH_ENABLED=false", () => {

@@ -1,4 +1,4 @@
-import { getPostgresAdminEnv, getPostgresEnv, validatePostgresEnv, type PostgresEnv } from "../config/env.js";
+import { getPostgresAdminEnv, getPostgresEnv, validatePostgresAdminEnv, validatePostgresEnv, type PostgresEnv } from "../config/env.js";
 
 export type QueryExecutor = {
   query: <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rows: T[] }>;
@@ -71,7 +71,7 @@ export const getPostgresPool = async (): Promise<PgPool> => {
 export const getPostgresAdminPool = async (): Promise<PgPool> => {
   if (adminPool) return adminPool;
   const env = getPostgresAdminEnv();
-  const warnings = validatePostgresEnv(env);
+  const warnings = validatePostgresAdminEnv(env);
   if (warnings.length > 0) throw new Error(`Credenciales PostgreSQL administrativas incompletas: ${warnings.join(" ")}`);
   const pgModule = (await import("pg")) as PgModule;
   const Pool = pgModule.Pool ?? pgModule.default?.Pool;

@@ -1,9 +1,10 @@
+import "dotenv/config";
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
-import { hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
+import { canonicalizeMigrationSql, hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 
@@ -30,10 +31,11 @@ if (missing.length > 0 || unlisted.length > 0) {
 
 const migrations = await Promise.all(migrationManifest.map(async (migration) => {
   const sql = await readFile(path.join(migrationsDir, migration.path), "utf8");
-  const checksum = createHash("sha256").update(sql).digest("hex");
+  const canonicalSql = canonicalizeMigrationSql(sql);
+  const checksum = createHash("sha256").update(canonicalSql).digest("hex");
   if (checksum !== migration.sha256) throw new Error(`Checksum no coincide con el manifiesto: ${migration.path}`);
-  if (hasOpenTransaction(sql)) throw new Error(`La migración deja una transacción abierta: ${migration.path}`);
-  return { ...migration, name: path.basename(migration.path), sql, checksum };
+  if (hasOpenTransaction(canonicalSql)) throw new Error(`La migración deja una transacción abierta: ${migration.path}`);
+  return { ...migration, name: path.basename(migration.path), sql: canonicalSql, checksum };
 }));
 
 const pool = await getPostgresAdminPool();
