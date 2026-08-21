@@ -1,5 +1,7 @@
 export { normalizeMembershipFeeUnit, normalizeReceivableAggregate, normalizeMovementAmount, normalizeMoneyAmount } from "./moneyNormalization.js";
 export { MOVEMENT_OPERATIONAL_STATUSES, isCompletedMovementStatus, isEconomyOperationalStatus, isPendingMovementStatus } from "./movementStatus.js";
+export { ACTIVE_MOVEMENT_CATEGORY_CODES, MOVEMENT_CATEGORY_CATALOG, MOVEMENT_CATEGORY_CLASSIFICATIONS } from "./movementCategoryCatalog.js";
+export type { MovementCategoryClassification, MovementCategoryDirection } from "./movementCategoryCatalog.js";
 export type { EconomyOperationalStatus } from "./movementStatus.js";
 
 // Compatibility facade: domain contracts now live in focused modules.

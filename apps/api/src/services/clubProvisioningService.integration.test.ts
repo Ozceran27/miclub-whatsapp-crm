@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CLUB_CAPABILITIES, CLUB_ROLE_DEFINITIONS, PERMISSIONS } from "@miclub/shared";
+import { CLUB_CAPABILITIES, CLUB_ROLE_DEFINITIONS, MOVEMENT_CATEGORY_CATALOG, PERMISSIONS } from "@miclub/shared";
 import { hasFeature } from "./clubCapabilityService.js";
 import { provisionClub, type TransactionClient } from "./clubProvisioningService.js";
 
 const input = { firstName: "Ana", lastName: "Pérez", dni: "12345678", phone: "1155555555", email: "ana@example.com", club: { name: "Club Norte" } };
 
-type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; employees: { membershipId: string; paymentMode: string; monthlyFixedAmount: null }[] };
-const emptyState = (): State => ({ clubs: [], subscriptions: new Map(), roles: new Map(), onboarding: [], memberships: [], employees: [] });
+type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; categories: string[]; employees: { membershipId: string; paymentMode: string; monthlyFixedAmount: null }[] };
+const emptyState = (): State => ({ clubs: [], subscriptions: new Map(), roles: new Map(), onboarding: [], memberships: [], categories: [], employees: [] });
 
 /** Small transactional adapter: it verifies the cross-statement provisioning contract without requiring a developer database. */
 const harness = (failAt = -1) => {
@@ -32,6 +32,7 @@ const harness = (failAt = -1) => {
       assert.match(sql, /payment_mode[\s\S]*monthly_fixed_amount[\s\S]*'VARIABLE', null/);
       state.employees.push({ membershipId: String(values?.[3]), paymentMode: "VARIABLE", monthlyFixedAmount: null });
     }
+    if (sql.includes("insert into miclub.movement_categories")) state.categories = JSON.parse(String(values?.[1])).map(({ code }: { code: string }) => code);
     return { rows: [] };
   };
   const client: TransactionClient = { query: query as TransactionClient["query"] };
@@ -66,8 +67,8 @@ test("el provisioning permite crear después trabajadores e instructores con sus
   assert.deepEqual(integration.state().employees[0], {
     membershipId: "membership-id", paymentMode: "VARIABLE", monthlyFixedAmount: null,
   }, "el Director conserva su membresía y una compensación inicial válida sin monto inventado");
+  assert.deepEqual(integration.state().categories, MOVEMENT_CATEGORY_CATALOG.map(([code]) => code));
 });
-
 test("el club registrado obtiene FREE y no recibe features de DEVELOPMENT", async () => {
   const integration = harness(); await integration.run();
   assert.equal(integration.state().subscriptions.get("club-id"), "FREE");
@@ -79,7 +80,7 @@ test("el club registrado obtiene FREE y no recibe features de DEVELOPMENT", asyn
 });
 
 test("cualquier fallo revierte integralmente el provisioning", async () => {
-  for (let operation = 0; operation < 11; operation += 1) {
+  for (let operation = 0; operation < 12; operation += 1) {
     const integration = harness(operation);
     await assert.rejects(integration.run(), /forced provisioning failure/);
     assert.deepEqual(integration.state(), emptyState(), `quedaron datos parciales al fallar la operación ${operation}`);
