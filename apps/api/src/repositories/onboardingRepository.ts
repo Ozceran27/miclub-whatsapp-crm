@@ -7,7 +7,18 @@ export type OnboardingActor = { userId:string; membershipId:string; clubId:strin
 type Row = { club_id:string; status:OnboardingStatus; current_step:number; completed_steps:number[]; skipped_steps:number[]; started_at:Date|string|null; completed_at:Date|string|null; created_at:Date|string; updated_at:Date|string; movement_count:string|number; enrollment_count:string|number; migration_available:boolean };
 const iso=(v:Date|string|null)=>v==null?null:new Date(v).toISOString();
 const steps=(values:number[])=>values.map(value=>value as OnboardingStep);
-const map=(r:Row):OnboardingState=>({status:r.status,currentStep:r.current_step as OnboardingStep,startedAt:iso(r.started_at),completedAt:iso(r.completed_at),createdAt:iso(r.created_at)!,updatedAt:iso(r.updated_at)!,movementCount:Number(r.movement_count),enrollmentCount:Number(r.enrollment_count),shouldShow:r.status!=="COMPLETED",completedSteps:steps(r.completed_steps??[]),skippedSteps:steps(r.skipped_steps??[]),migrationAvailable:r.migration_available});
+
+/**
+ * Product visibility rule: the walkthrough is available whenever the club has
+ * neither movements nor enrollments. Status and completedAt describe progress,
+ * not suppression: COMPLETED + completedAt therefore opens a read/review pass
+ * while retaining the persisted milestones. A client must dismiss that review
+ * locally after completing it; permanently suppressing it would require a new,
+ * explicit preference instead of overloading either progress or business data.
+ */
+export const isOnboardingVisible=(movementCount:number,enrollmentCount:number,_status:OnboardingStatus,_completedAt:Date|string|null)=>movementCount===0&&enrollmentCount===0;
+
+const map=(r:Row):OnboardingState=>{const movementCount=Number(r.movement_count);const enrollmentCount=Number(r.enrollment_count);return {status:r.status,currentStep:r.current_step as OnboardingStep,startedAt:iso(r.started_at),completedAt:iso(r.completed_at),createdAt:iso(r.created_at)!,updatedAt:iso(r.updated_at)!,movementCount,enrollmentCount,shouldShow:isOnboardingVisible(movementCount,enrollmentCount,r.status,r.completed_at),completedSteps:steps(r.completed_steps??[]),skippedSteps:steps(r.skipped_steps??[]),migrationAvailable:r.migration_available};};
 const select=`select o.*,
  (select count(*) from miclub.movements m where m.club_id=o.club_id) movement_count,
  (select count(*) from miclub.enrollments e where e.club_id=o.club_id) enrollment_count,
