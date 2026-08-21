@@ -20,7 +20,7 @@ export function OpeningBalancesStep() {
   const submit=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();void save().catch(()=>undefined);};
   return <form className="setup-form opening-balances-form" onSubmit={submit}>
     <p>Registrá el capital anterior a miClub. Se asentará en las cuentas canónicas Caja, Banco y Caja USD; el libro contable seguirá siendo la única fuente del saldo.</p>
-    <p role="note">Si vas a importar el historial completo de movimientos, omití este paso: los saldos se calcularán desde ese historial y no se generará un asiento de apertura artificial.</p>
+    <aside className="onboarding-balance-warning" role="note"><strong><span aria-hidden="true">⚠</span> Evitá duplicar tus saldos</strong><p>Si vas a importar el historial completo de movimientos, omití este paso. Si cargás capital inicial y luego importás ese mismo historial, los saldos quedarán duplicados.</p></aside>
     <label className="opening-balances-form__currency">Moneda operativa
       <select name="currency" value={values.currency} onChange={event=>change('currency',event.target.value)} required aria-required="true">
         <option value="" disabled>Seleccioná una moneda</option>
