@@ -476,9 +476,9 @@ export const getPostgresClubFinanceSummary =
       Promise.resolve({ rows: [] as Record<string, unknown>[] }),
       pool.query<Record<string, unknown>>(
         `select ssb.*
-         from miclub.v_sector_settlement_balances ssb
-         join miclub.sectors s on s.id = ssb.sector_id
-         where s.club_id = $1
+         from miclub.v_activity_settlement_sector_balances ssb
+         join miclub.sectors s on s.id = ssb.sector_id and s.club_id = ssb.club_id
+         where ssb.club_id = $1
            and ssb.settlement_balance <> 0
          order by ssb.sector_name asc nulls last, ssb.sector_id asc nulls last`, [clubId],
       ),
@@ -661,7 +661,7 @@ export const getPostgresSectorOperationalSummary =
          from miclub.sectors s
          left join enrollment_totals et on et.sector_id = s.id
          left join movement_totals mt on mt.sector_id = s.id
-         left join miclub.v_sector_settlement_balances ssb on ssb.sector_id = s.id
+         left join miclub.v_activity_settlement_sector_balances ssb on ssb.sector_id = s.id and ssb.club_id = s.club_id
          where s.club_id = $1
          order by s.name asc, s.id asc`,
         [clubId, monthWindow.from, monthWindow.to],
