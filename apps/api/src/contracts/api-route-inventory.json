@@ -1483,6 +1483,26 @@
       ]
     },
     {
+      "id": "PATCH /api/inscripciones/:id/estado",
+      "method": "PATCH",
+      "path": "/api/inscripciones/:id/estado",
+      "source": "apps/api/src/routes/enrollmentMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "enrollments.edit",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "write",
+      "idempotency": "optimistic-lock",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
       "id": "POST /api/inscripciones",
       "method": "POST",
       "path": "/api/inscripciones",
