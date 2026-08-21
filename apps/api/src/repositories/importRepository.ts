@@ -58,7 +58,7 @@ export const hasRecentSuccessfulDryRun = async (pool: Pool, clubId: string, maxA
   const result = await pool.query<{ valid: boolean }>(
     `select exists (
        select 1 from miclub.import_batches
-        where club_id = $1 and source = 'google_sheets' and status = 'dry_run'
+        where club_id = $1 and source = 'xlsx_import' and status = 'dry_run'
           and finished_at >= now() - make_interval(mins => $2)
           and notes like '{%'
           and coalesce((notes::jsonb ->> 'errors')::int, 1) = 0

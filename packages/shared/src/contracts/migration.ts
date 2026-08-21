@@ -1,5 +1,14 @@
 export type SourceSheet = "FITNESS" | "SALON" | "AULA" | "LOCAL_1" | "CANTINA" | "ADMINISTRACION";
 
+/** Canonical vocabulary emitted by the XLSX import runtime. */
+export const XLSX_IMPORT_SOURCE = "xlsx_import" as const;
+export const COMPLETED_IMPORT_BATCH = "completed_import_batch" as const;
+export const MISSING_FROM_IMPORT_BATCH = "missing_from_import_batch" as const;
+
+export type XlsxImportSource = typeof XLSX_IMPORT_SOURCE;
+export type CompletedImportBatchState = typeof COMPLETED_IMPORT_BATCH;
+export type MissingFromImportBatchReason = typeof MISSING_FROM_IMPORT_BATCH;
+
 export type ImportFailureCode =
   | "IMPORT_SCHEMA_PRECONDITION_FAILED"
   | "IMPORT_SCHEMA_CONFLICT_CONFIGURATION"

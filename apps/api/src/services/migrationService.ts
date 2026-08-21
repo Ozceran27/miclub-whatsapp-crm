@@ -1,11 +1,12 @@
 import type { QueryExecutor } from "../db/postgres.js";
 import { withTransaction } from "../db/transaction.js";
-import { archiveMissingEnrollments, isCompletedGoogleSheetsImport, lockMissingEnrollments } from "../repositories/migrationRepository.js";
+import { COMPLETED_IMPORT_BATCH, MISSING_FROM_IMPORT_BATCH, XLSX_IMPORT_SOURCE } from "@miclub/shared";
+import { archiveEnrollmentsMissingFromImportBatch as archiveMissingEnrollmentRecords, isCompletedXlsxImportBatch, lockEnrollmentsMissingFromImportBatch } from "../repositories/migrationRepository.js";
 import { auditService } from "./auditService.js";
 
-export type DeleteMissingEnrollmentInput = { importId: string; enrollmentIds: string[] };
-export type DeleteMissingEnrollmentContext = { clubId: string; userId: string; membershipId: string; requestId?: string; ip?: string; userAgent?: string };
-export type DeleteMissingEnrollmentResult = { ok: boolean; deletedCount: number; skippedCount: number; deletedIds: string[]; errors: Array<{ id: string; message: string }> };
+export type ArchiveMissingFromImportBatchInput = { batchId: string; enrollmentIds: string[] };
+export type ArchiveMissingFromImportBatchContext = { clubId: string; userId: string; membershipId: string; requestId?: string; ip?: string; userAgent?: string };
+export type ArchiveMissingFromImportBatchResult = { ok: boolean; archivedCount: number; skippedCount: number; archivedIds: string[]; errors: Array<{ id: string; message: string }> };
 
 export class InvalidMigrationBatchError extends Error {}
 
@@ -14,50 +15,50 @@ type Dependencies = {
   audit?: typeof auditService.enrollment;
 };
 
-export const removeMissingEnrollments = async (
-  input: DeleteMissingEnrollmentInput,
-  context: DeleteMissingEnrollmentContext,
+export const archiveEnrollmentsMissingFromImportBatch = async (
+  input: ArchiveMissingFromImportBatchInput,
+  context: ArchiveMissingFromImportBatchContext,
   dependencies: Dependencies = {},
-): Promise<DeleteMissingEnrollmentResult> => {
+): Promise<ArchiveMissingFromImportBatchResult> => {
   const transaction = dependencies.transaction ?? withTransaction;
   const audit = dependencies.audit ?? auditService.enrollment;
 
   return transaction(async (executor: QueryExecutor) => {
-    if (!await isCompletedGoogleSheetsImport(executor, input.importId, context.clubId)) {
-      throw new InvalidMigrationBatchError("El import indicado no es una importación real de Google Sheets finalizada.");
+    if (!await isCompletedXlsxImportBatch(executor, input.batchId, context.clubId)) {
+      throw new InvalidMigrationBatchError("El lote indicado no es una importación XLSX finalizada.");
     }
 
-    const candidates = await lockMissingEnrollments(executor, input.enrollmentIds, input.importId, context.clubId);
+    const candidates = await lockEnrollmentsMissingFromImportBatch(executor, input.enrollmentIds, input.batchId, context.clubId);
     const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
-    const errors: DeleteMissingEnrollmentResult["errors"] = [];
+    const errors: ArchiveMissingFromImportBatchResult["errors"] = [];
     const deletable: string[] = [];
     for (const id of input.enrollmentIds) {
       const candidate = byId.get(id);
-      if (!candidate) errors.push({ id, message: "La inscripción no existe, no tiene origen Google Sheets o ya no está marcada como faltante para este import." });
+      if (!candidate) errors.push({ id, message: "La inscripción no existe, no pertenece al lote XLSX o ya no está marcada como faltante para este lote." });
       else deletable.push(id);
     }
 
     const deletedIds = deletable.length > 0
-      ? await archiveMissingEnrollments(executor, deletable, input.importId, context.clubId)
+      ? await archiveMissingEnrollmentRecords(executor, deletable, input.batchId, context.clubId)
       : [];
     for (const id of deletable.filter((id) => !deletedIds.includes(id))) {
       errors.push({ id, message: "La inscripción cambió antes de poder eliminarla; actualizá la revisión." });
     }
 
     await audit({
-      action: "migration.enrollments.archive_missing",
+      action: "xlsx_import.enrollments.archive_missing",
       result: "success",
       userId: context.userId,
       clubId: context.clubId,
       membershipId: context.membershipId,
-      entityType: "import_batch",
-      entityId: input.importId,
+      entityType: "xlsx_import_batch",
+      entityId: input.batchId,
       requestId: context.requestId,
       ip: context.ip,
       userAgent: context.userAgent,
-      metadata: { requestedEnrollmentIds: input.enrollmentIds, archivedEnrollmentIds: deletedIds, importBatchId: input.importId, reason: "missing_from_google_sheets_import", skippedCount: errors.length },
+      metadata: { requestedEnrollmentIds: input.enrollmentIds, archivedEnrollmentIds: deletedIds, importBatchId: input.batchId, source: XLSX_IMPORT_SOURCE, batchState: COMPLETED_IMPORT_BATCH, reason: MISSING_FROM_IMPORT_BATCH, skippedCount: errors.length },
     }, executor);
 
-    return { ok: deletedIds.length > 0, deletedCount: deletedIds.length, skippedCount: errors.length, deletedIds, errors };
+    return { ok: deletedIds.length > 0, archivedCount: deletedIds.length, skippedCount: errors.length, archivedIds: deletedIds, errors };
   });
 };
