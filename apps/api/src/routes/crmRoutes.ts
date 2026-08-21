@@ -48,8 +48,11 @@ const unresolvedTemplateVariables = (message: string): string[] => {
 export const createCrmRoutes = (options: {
   getMembersSource: (clubId: string) => Promise<{ members: Member[] }>;
   isDebtorMember: (member: Member) => boolean;
+  /** Test seam for the retired SQLite compatibility suite; production always uses PostgreSQL. */
+  insertHistory?: typeof insertCrmHistory;
 }) => {
   const router = Router();
+  const persistHistory = options.insertHistory ?? insertCrmHistory;
   if (!isExplicitTestAuthBypass()) router.use(requireMembership);
   const requireCrmWrite = isExplicitTestAuthBypass() ? (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next() : requirePermission(PERMISSIONS.CRM_WRITE);
 
@@ -112,8 +115,8 @@ export const createCrmRoutes = (options: {
   });
 
   router.get("/history", async (req, res) => {
-    const pageRaw = Number.parseInt(String(req.query.page ?? "1"), 10);
-    const pageSizeRaw = Number.parseInt(String(req.query.pageSize ?? "20"), 10);
+    const pageRaw = Number.parseInt(typeof req.query.page === "string" ? req.query.page : "1", 10);
+    const pageSizeRaw = Number.parseInt(typeof req.query.pageSize === "string" ? req.query.pageSize : "20", 10);
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
     const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(pageSizeRaw, 20) : 20;
 
@@ -187,7 +190,7 @@ export const createCrmRoutes = (options: {
         const waLink = buildWaLink(phone, message);
         const createdAt = new Date().toISOString();
 
-        const created = await insertCrmHistory(getClubId(req), { memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, templateName: body.templateName?.trim() || null });
+        const created = await persistHistory(getClubId(req), { memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, templateName: body.templateName?.trim() || null });
 
         prepared.push(created);
       }

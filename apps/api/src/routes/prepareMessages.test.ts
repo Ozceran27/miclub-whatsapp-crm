@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import express from 'express';
 import type { Member } from '@miclub/shared';
-// This is an explicit compatibility test for the legacy SQLite migration path.
-// Ordinary runtime defaults to PostgreSQL even when CRM_SOURCE is absent.
-process.env.CRM_SOURCE = 'sqlite';
+// This is an explicit compatibility fixture. The productive service remains
+// PostgreSQL-only; persistence is injected so this route test stays hermetic.
 const { default: db } = await import('../legacy/sqlite/sqlite.js');
 const { createCrmRoutes } = await import('./crmRoutes.js');
 
@@ -27,8 +26,19 @@ const debtor: Member = {
 const app = express();
 app.use(express.json());
 app.use(createCrmRoutes({
-  getMembersSource: async () => ({ members: [debtor] }),
-  isDebtorMember: () => true
+  getMembersSource: () => Promise.resolve({ members: [debtor] }),
+  isDebtorMember: () => true,
+  insertHistory: async (_clubId, history) => {
+    const result = await new Promise<{ lastID: number }>((resolve, reject) => {
+      db.run(
+        `INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt, templateName)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [history.memberId, history.nombre, history.phone, history.message, history.waLink, history.status, history.status, history.createdAt, history.templateName],
+        function (err) { if (err) reject(err); else resolve({ lastID: this.lastID }); }
+      );
+    });
+    return { ...history, historyId: result.lastID };
+  }
 }));
 
 const runDb = (sql: string, params: unknown[] = []) =>
