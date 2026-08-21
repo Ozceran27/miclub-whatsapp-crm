@@ -35,7 +35,7 @@ export function OnboardingDialog({ step, migrationAvailable, pending, error, onA
       {(error||saveError) && <p className="onboarding-error" role="alert">{error||saveError}</p>}
       <footer className="onboarding-actions">
         {isSkippableStep(step) && <button className="ghost-btn" type="button" disabled={pending} onClick={()=>advance('SKIPPED')}>Omitir configuración ahora</button>}
-        {step < 7 ? <button className="primary-btn" data-initial-focus type="button" disabled={pending||saving||persistence?.canContinue===false} onClick={()=>void saveAndAdvance()}>{pending||saving ? 'Guardando…' : 'Guardar y continuar'}</button> : <button className="primary-btn" data-initial-focus type="button" disabled={pending} onClick={onComplete}>{pending ? 'Preparando tu club…' : 'INICIAR MI CLUB'}</button>}
+        {step < 7 ? <button className="primary-btn" data-initial-focus type="button" disabled={pending||saving||persistence?.canContinue===false||persistence?.saved===false} onClick={()=>void saveAndAdvance()}>{pending||saving ? 'Guardando…' : 'Continuar'}</button> : <button className="primary-btn" data-initial-focus type="button" disabled={pending} onClick={onComplete}>{pending ? 'Preparando tu club…' : 'INICIAR MI CLUB'}</button>}
       </footer>
     </div>
   </div>;

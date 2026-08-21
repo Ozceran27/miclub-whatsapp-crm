@@ -3220,6 +3220,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .setup-form legend { font-weight: 800; padding: 0 7px; }
 .setup-form label { color: var(--color-text-muted); display: grid; font-size: 12px; font-weight: 700; gap: 6px; }
 .setup-form input, .setup-form select { width: 100%; }
+.opening-balances-form > p, .opening-balances-form__currency, .opening-balances-form > button, .opening-balances-form > [role='status'] { grid-column: 1 / -1; }
+.opening-balances-form select { appearance: none; background: var(--color-card-muted) linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%) calc(100% - 16px) 50% / 6px 6px no-repeat; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text); min-height: 44px; padding: 9px 36px 9px 11px; }
 @keyframes onboarding-slide { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .onboarding-step { animation: none; } }
 @media (max-width: 680px) { .onboarding-dialog { border-radius: 18px; padding: 20px; } .setup-form { grid-template-columns: 1fr; } }

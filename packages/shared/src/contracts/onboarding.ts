@@ -46,7 +46,9 @@ export interface OnboardingState {
 
 /** The tenant is always taken from the authenticated membership. */
 export interface AdvanceOnboardingRequest { currentStep: OnboardingStep; outcome: OnboardingStepOutcome }
-export interface OpeningBalancesRequest { cash: number; bank: number; usdCash: number; idempotencyKey: string }
+export const SUPPORTED_OPERATIONAL_CURRENCIES = ["ARS", "USD", "BRL", "EUR"] as const;
+export type OperationalCurrency = typeof SUPPORTED_OPERATIONAL_CURRENCIES[number];
+export interface OpeningBalancesRequest { currency: OperationalCurrency; cash: number; bank: number; usdCash: number; idempotencyKey: string }
 export interface OpeningBalancesResponse { batchId: string }
 export type AdvanceOnboardingResponse = OnboardingState;
 export type CompleteOnboardingResponse = OnboardingState;

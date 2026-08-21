@@ -160,7 +160,8 @@ WITH expected(name,checksum) AS (VALUES
     ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119'),
     ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea'),
     ('202608180003_fix_rls_login_membership_resolution.sql', '52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335'),
-    ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce')
+    ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce'),
+    ('202608210001_operational_currency_opening_balances.sql', '309708c724168193a872ef6ba1b7b798f92835b6c9f3d2f6942e32e331566ea9')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
@@ -253,7 +254,8 @@ WITH expected(name,checksum) AS (VALUES
     ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119'),
     ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea'),
     ('202608180003_fix_rls_login_membership_resolution.sql', '52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335'),
-    ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce')
+    ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce'),
+    ('202608210001_operational_currency_opening_balances.sql', '309708c724168193a872ef6ba1b7b798f92835b6c9f3d2f6942e32e331566ea9')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL

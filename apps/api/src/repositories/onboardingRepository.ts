@@ -90,7 +90,7 @@ export const completeOnboarding=async(actor:OnboardingActor)=>withTenantTransact
 },await getPostgresPool());
 
 export const saveOpeningBalances=async(actor:OnboardingActor,input:OpeningBalancesRequest)=>withTenantTransaction(actor.clubId,async db=>{
- const result=await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6) batch_id",[actor.clubId,input.cash,input.bank,input.usdCash,input.idempotencyKey,actor.userId]);
- await auditService.sensitiveChange({action:"onboarding.opening_balances",result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,entityType:"opening_balance_batch",entityId:result.rows[0].batch_id,requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,newData:{cash:input.cash,bank:input.bank,usdCash:input.usdCash}},db);
+ const result=await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6,$7) batch_id",[actor.clubId,input.currency,input.cash,input.bank,input.usdCash,input.idempotencyKey,actor.userId]);
+ await auditService.sensitiveChange({action:"onboarding.opening_balances",result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,entityType:"opening_balance_batch",entityId:result.rows[0].batch_id,requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,newData:{currency:input.currency,cash:input.cash,bank:input.bank,usdCash:input.usdCash}},db);
  return {batchId:result.rows[0].batch_id};
 },await getPostgresPool());

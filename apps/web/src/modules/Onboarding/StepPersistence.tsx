@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 
-export type StepPersistence = { save: () => Promise<void>; canContinue: boolean };
+export type StepPersistence = { save: () => Promise<void>; canContinue: boolean; valid?: boolean; saved?: boolean; batchId?: string | null };
 type Registrar = (value: StepPersistence | null) => void;
 const Context = createContext<Registrar | null>(null);
 
