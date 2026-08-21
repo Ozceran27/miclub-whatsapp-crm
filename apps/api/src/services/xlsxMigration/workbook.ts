@@ -13,7 +13,7 @@ const error=(code:string,message:string)=>Object.assign(new Error(message),{code
 const audit=(deps:Dependencies,input:WorkbookInput,batchId:string,action:string,result:"success"|"failure",counts:Record<string,unknown>,db?:QueryExecutor)=>deps.audit({action,result,userId:input.actor.userId,clubId:input.actor.clubId,membershipId:input.actor.membershipId,entityType:"xlsx_import_batch",entityId:batchId,requestId:input.actor.requestId,ip:input.actor.ip,userAgent:input.actor.userAgent,metadata:{batchId,...counts}},db);
 
 async function insertErrors(db:QueryExecutor,input:WorkbookInput,batchId:string){
-  for(const item of input.errors) await db.query(`insert into miclub.import_errors(batch_id,club_id,source,row_number,severity,message,details,error_code,sheet,entity_type,field,value_normalized) values($1,$2,'xlsx',$3,$4,$5,'{}',$6,$7,$8,$9,$10)`,[batchId,input.actor.clubId,item.row_number??null,item.severity,item.message,item.error_code,item.sheet??null,item.entity_type??null,item.field??null,item.value_normalized??null]);
+  for(const item of input.errors) await db.query(`insert into miclub.import_errors(batch_id,club_id,source,row_number,severity,message,details,error_code,sheet,entity_type,field,value_normalized) values($1,$2,'xlsx',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[batchId,input.actor.clubId,item.row_number??null,item.severity,item.message,JSON.stringify({value_original:item.value_original??null}),item.error_code,item.sheet??null,item.entity_type??null,item.field??null,item.value_normalized??null]);
 }
 
 export async function dryRunWorkbook(input:WorkbookInput,deps:Dependencies=defaults){

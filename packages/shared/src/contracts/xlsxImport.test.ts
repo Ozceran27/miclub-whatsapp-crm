@@ -23,3 +23,10 @@ void test("derives enrollment sector instead of requiring a redundant cell", () 
   assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.columns.some((column) => column.key === "sector"), false);
   assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.columns.some((column) => column.key === "instructor" || column.key === "expiresOn"), false);
 });
+
+void test("documents every physical column and makes sheet order non-contractual", () => {
+  assert.deepEqual(XLSX_IMPORT_V1_SCHEMA.sheets.movements.physicalColumns.map(({column}) => column), "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""));
+  assert.deepEqual(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.physicalColumns.map(({column}) => column), "ABCDEFGHIJKLMNOPQRSTU".split(""));
+  assert.equal(XLSX_IMPORT_V1_SCHEMA.sheetOrderContractual, false);
+  assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.physicalColumns.find(({column}) => column === "U")?.kind, "spacer");
+});

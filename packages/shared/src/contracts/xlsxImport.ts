@@ -12,15 +12,45 @@ export type XlsxImportColumn = Readonly<{
   derived?: "activity.sector" | "counterparty.document";
 }>;
 
+export type XlsxImportPhysicalColumn = Readonly<{
+  column: string;
+  /** `null` means that the template deliberately leaves this header empty. */
+  header: string | null;
+  key?: string;
+  kind: "field" | "spacer";
+}>;
+
+const administrationPhysicalColumns = [
+  ["A", "Fecha", "date"], ["B", null], ["C", "Tipo", "type"], ["D", null], ["E", null],
+  ["F", "Categoría", "category"], ["G", null], ["H", null], ["I", "Concepto", "concept"],
+  ["J", null], ["K", null], ["L", null], ["M", null], ["N", "Contra-parte", "counterparty"],
+  ["O", null], ["P", null], ["Q", "Sector", "sector"], ["R", null], ["S", "Monto", "amount"],
+  ["T", null], ["U", null], ["V", "Impuestos", "taxes"], ["W", null], ["X", "Estado", "status"],
+  ["Y", null], ["Z", "M.P.", "paymentMethod"],
+] as const;
+
+const enrollmentPhysicalColumns = [
+  ["A", "Fecha", "date"], ["B", null], ["C", "Nombre", "firstName"], ["D", null], ["E", null],
+  ["F", "Apellido", "lastName"], ["G", null], ["H", null], ["I", "D.N.I.", "document"],
+  ["J", null], ["K", "Telefono", "phone"], ["L", null], ["M", "Actividad", "activity"],
+  ["N", null], ["O", "Modalidad", "modality"], ["P", null], ["Q", "Cuota", "fee"],
+  ["R", null], ["S", "Estado", "status"], ["T", null], ["U", null],
+] as const;
+
+const physicalColumns = (items: readonly (readonly [string, string | null, string?])[]): readonly XlsxImportPhysicalColumn[] =>
+  items.map(([column, header, key]) => ({ column, header, key, kind: header === null ? "spacer" : "field" }));
+
 export const XLSX_IMPORT_V1_SCHEMA = {
   version: MICLUB_XLSX_IMPORT_VERSION,
   versionDetection: "sheet-and-header-signature",
+  sheetOrderContractual: false,
   preservesPhysicalWorkbook: true,
   sheets: {
     movements: {
       name: "ADMINISTRACIÓN",
       headerRow: 1,
       firstDataRow: 2,
+      physicalColumns: physicalColumns(administrationPhysicalColumns),
       columns: [
         { key: "date", header: "Fecha", headerCell: "A1", dataCell: "A2", type: "date", required: true },
         { key: "type", header: "Tipo", headerCell: "C1", dataCell: "C2", type: "enum", enumValues: ["INGRESOS", "EGRESOS", "CAPITAL"], required: true },
@@ -38,6 +68,7 @@ export const XLSX_IMPORT_V1_SCHEMA = {
       name: "INSCRIPCIONES",
       headerRow: 1,
       firstDataRow: 2,
+      physicalColumns: physicalColumns(enrollmentPhysicalColumns),
       columns: [
         { key: "date", header: "Fecha", headerCell: "A1", dataCell: "A2", type: "date", required: true },
         { key: "firstName", header: "Nombre", headerCell: "C1", dataCell: "C2", type: "string", required: true },
@@ -59,7 +90,10 @@ export type XlsxWorkbookSignature = Readonly<Record<string, Readonly<Record<stri
 export function detectMiclubXlsxImportVersion(workbook: XlsxWorkbookSignature): typeof MICLUB_XLSX_IMPORT_VERSION {
   for (const sheet of Object.values(XLSX_IMPORT_V1_SCHEMA.sheets)) {
     const cells = workbook[sheet.name];
-    if (!cells || sheet.columns.some((column) => cells[column.headerCell] !== column.header)) {
+    if (!cells || sheet.physicalColumns.some(({column, header}) => {
+      const value = cells[`${column}${sheet.headerRow}`];
+      return (typeof value === "string" ? value : "") !== (header ?? "");
+    })) {
       throw new Error(`Formato XLSX desconocido: la firma de ${sheet.name} no corresponde a v2.`);
     }
   }

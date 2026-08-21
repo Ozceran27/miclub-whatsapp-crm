@@ -1,68 +1,64 @@
-# Importación XLSX v1 sobre las planillas existentes
+# Contrato de importación de `Modelo_Import_miClub.xlsx`
 
-## Decisión
+## Inspección y decisión contractual
 
-La versión v1 **conserva sin modificaciones** `apps/api/data/db/Modelo_Import_miClub.xlsx`: no agrega hojas, columnas, metadata ni fixtures binarios. El contrato identifica v1 mediante la firma formada por los nombres de las dos hojas y sus encabezados en las celdas actuales. Un archivo cuya firma no coincida se rechaza como formato desconocido; no se lo interpreta por posición aproximada.
+La fuente inspeccionada es `apps/api/data/db/Modelo_Import_miClub.xlsx`. El libro contiene exactamente las hojas `ADMINISTRACIÓN` e `INSCRIPCIONES`, ambas con cabecera en la fila 1 y datos desde la fila 2. **El orden de las hojas no es contractual**: sólo importan el conjunto exacto de nombres y la firma física de cabeceras de cada hoja. No se aceptan hojas adicionales.
 
-Las celdas espaciadas y mergeadas continúan siendo parte del formato físico porque ya existen en la plantilla. El importador debe tratarlas como una sola columna lógica por encabezado (la celda superior izquierda), sin pedir al usuario que descombine o rediseñe el libro.
+La plantilla usa columnas vacías como separadores visuales (no son campos disponibles). También son parte de la firma: deben conservar la cabecera vacía. Una referencia escrita en una columna separadora no se interpreta ni se desplaza a un campo vecino.
 
-## Tipos y filas
+## `ADMINISTRACIÓN` (A:Z)
 
-Ambas hojas tienen encabezados en la fila **1** y datos desde la fila **2**. `date` admite fecha de Excel o texto de fecha válido; `decimal` admite un número sin inventar un valor ante errores; `string` conserva texto; `enum` se normaliza contra el catálogo del dominio. En una fila con datos, los valores obligatorios deben estar presentes. Los ejemplos siguientes son sintéticos.
+| Columna | Cabecera / función | Campo | Tipo | Referencia o derivación |
+|---|---|---|---|---|
+| A | `Fecha` | `date` | date, obligatoria | — |
+| B | vacía | separador | — | — |
+| C | `Tipo` | `type` | enum, obligatorio | — |
+| D:E | vacías | separadores | — | — |
+| F | `Categoría` | `category` | string, obligatoria | categoría activa del tenant |
+| G:H | vacías | separadores | — | — |
+| I | `Concepto` | `concept` | string, obligatorio | — |
+| J:M | vacías | separadores | — | — |
+| N | `Contra-parte` | `counterparty` | string, opcional | documento de persona; conserva el texto aunque no exista aún |
+| O:P | vacías | separadores | — | — |
+| Q | `Sector` | `sector` | string, opcional | sector del tenant |
+| R | vacía | separador | — | — |
+| S | `Monto` | `amount` | decimal, obligatorio | — |
+| T:U | vacías | separadores | — | — |
+| V | `Impuestos` | `taxes` | decimal, opcional | — |
+| W | vacía | separador | — | — |
+| X | `Estado` | `status` | enum, obligatorio | — |
+| Y | vacía | separador | — | — |
+| Z | `M.P.` | `paymentMethod` | string, opcional | medio de pago activo del tenant |
 
-## Hoja `ADMINISTRACIÓN`
+No hay cabeceras de actividad, trabajador/instructor ni referencia externa en esta hoja. No se derivan esas referencias desde el concepto. `Contra-parte` puede enlazarse por documento a una persona del tenant, pero no bloquea la creación/upsert de personas de este mismo lote.
 
-| Encabezado | Celda de encabezado | Primera celda | Tipo | Obligatorio | Ejemplo |
-|---|---:|---:|---|---|---|
-| `Fecha` | A1 | A2 | date | Sí | `01/08/2026` |
-| `Tipo` | C1 | C2 | enum | Sí | `INGRESOS` |
-| `Categoría` | F1 | F2 | string | Sí | `CUOTA` |
-| `Concepto` | I1 | I2 | string | Sí | `Pago cuota` |
-| `Contra-parte` | N1 | N2 | string | No | `TEST-0001` |
-| `Sector` | Q1 | Q2 | string | No | `FITNESS` |
-| `Monto` | S1 | S2 | decimal | Sí | `25000` |
-| `Impuestos` | V1 | V2 | decimal | No | `0` |
-| `Estado` | X1 | X2 | enum | Sí | `COMPLETADO` |
-| `M.P.` | Z1 | Z2 | string | No | `Transferencia` |
+## `INSCRIPCIONES` (A:U)
 
-No se agrega `Actividad` ni `Referencia externa` a esta hoja. El `Id.` que contienen los layouts operativos es la referencia estable preferida; cuando falta, el importador mantiene su identificador determinista histórico basado en hoja, fila, fecha, tipo y monto.
+| Columna | Cabecera / función | Campo | Tipo | Referencia o derivación |
+|---|---|---|---|---|
+| A | `Fecha` | `date` | date, obligatoria | — |
+| B | vacía | separador | — | — |
+| C | `Nombre` | `firstName` | string, obligatorio | — |
+| D:E | vacías | separadores | — | — |
+| F | `Apellido` | `lastName` | string, obligatorio | — |
+| G:H | vacías | separadores | — | — |
+| I | `D.N.I.` | `document` | string, obligatorio | identidad de la persona creada/actualizada en el tenant |
+| J | vacía | separador | — | — |
+| K | `Telefono` | `phone` | string, opcional | — |
+| L | vacía | separador | — | — |
+| M | `Actividad` | `activity` | string, obligatoria | actividad activa del tenant |
+| N | vacía | separador | — | — |
+| O | `Modalidad` | `modality` | string, opcional | texto libre; no identifica la actividad |
+| P | vacía | separador | — | — |
+| Q | `Cuota` | `fee` | decimal, obligatoria | — |
+| R | vacía | separador | — | — |
+| S | `Estado` | `status` | enum, obligatorio | — |
+| T:U | vacías | separadores | — | — |
 
-### Relaciones automáticas de movimientos
+La plantilla real no contiene cabeceras `Sector`, `Trabajador`, `Instructor` ni `Vence`. Sector e instructor son **derivados** de la única actividad resuelta (`activity.sector_id` y `activity.instructor_id`). Por eso también se valida que la actividad tenga instructor vigente. Si un formato futuro incorpora referencias explícitas, requerirá otra firma/version contractual; no se reutilizan separadores silenciosamente.
 
-1. Si un layout existente ofrece encabezado `Actividad`, se busca una única actividad del club con ese nombre normalizado.
-2. Si no la ofrece, o no hay coincidencia única, `Contra-parte` se normaliza como DNI/documento y se busca el inscripto activo.
-3. Si ese inscripto tiene una única actividad activa, se asignan `movement.activity_id` y el sector canónico de esa actividad.
-4. Si hay cero o múltiples actividades, no se inventa la relación: `activity_id` queda nulo y se conserva el sector explícito o el de la hoja como fallback auditable.
-5. Nunca se crea una actividad a partir del texto de concepto o contraparte.
+## Resolución y bloqueo
 
-Así, un pago de cuota cuya contraparte sea un DNI se vincula al inscripto y a su actividad cuando la relación es inequívoca, sin exigir nuevas celdas.
+Las referencias se buscan exclusivamente en catálogos filtrados por el `club_id` de la sesión. La comparación elimina espacios exteriores/repetidos, diferencias de mayúsculas, acentos y formas Unicode NFC/NFD. Una coincidencia debe ser única: cero resultados produce `*_NOT_FOUND` y más de uno `REFERENCE_AMBIGUOUS`; nunca se elige arbitrariamente. Un instructor explícito, cuando una firma futura lo ofrezca, además debe ser el responsable vigente de la actividad.
 
-## Hoja `INSCRIPCIONES`
-
-| Encabezado | Celda de encabezado | Primera celda | Tipo | Obligatorio | Ejemplo |
-|---|---:|---:|---|---|---|
-| `Fecha` | A1 | A2 | date | Sí | `01/08/2026` |
-| `Nombre` | C1 | C2 | string | Sí | `Persona` |
-| `Apellido` | F1 | F2 | string | Sí | `Ejemplo` |
-| `D.N.I.` | I1 | I2 | string | Sí | `TEST-0001` |
-| `Tel.` | K1 | K2 | string | No | `0000000000` |
-| `Actividad` | M1 | M2 | string | Sí | `Natación` |
-| `Modalidad` | O1 | O2 | string | No | `Mensual` |
-| `Cuota` | Q1 | Q2 | decimal | Sí | `25000` |
-| `Estado` | S1 | S2 | enum | Sí | `Al Día` |
-| `Instructor` | V1 | V2 | string | No | `Instructor Ejemplo` |
-| `Vence` | X1 | X2 | date | No | `31/08/2026` |
-
-No existe ni se requiere una celda `Sector`. El sector se deriva exclusivamente de `Actividad`: toda actividad se guarda asociada al sector representado por su hoja de origen. La inscripción referencia la actividad, por lo que su sector se consulta por `enrollments.activity_id → activities.sector_id`; no se persiste información redundante.
-
-## Matching e idempotencia
-
-- Persona: primero DNI normalizado; si falta, nombre, apellido y teléfono normalizado.
-- Inscripción: DNI/persona + actividad; el identificador externo incluye ambos y permite reimportar sin duplicar.
-- Actividad: nombre normalizado dentro del sector de la hoja; nombres iguales en sectores distintos siguen siendo actividades distintas.
-- Movimiento: `Id.` de origen cuando existe; fallback determinista sólo para layouts sin ID.
-- Contraparte: se conserva el texto original y, si es un DNI inequívoco, se usa para derivar la actividad del movimiento.
-
-## Compatibilidad futura
-
-`packages/shared/src/contracts/xlsxImport.ts` es la fuente compartida de nombres y celdas. `detectMiclubXlsxImportVersion` acepta únicamente la firma v1 exacta y rechaza hojas ausentes, encabezados movidos o versiones desconocidas. Una futura firma incompatible se añadirá como un contrato y detector explícitos; v1 nunca cambiará de significado. Como la planilla actual no posee una celda de versión estable y no debe modificarse, la firma estructural reemplaza deliberadamente a `MICLUB_IMPORT_VERSION=v1`.
+Cada problema informa `value_original`, `value_normalized`, `sheet`, `row_number` y `field`. El valor original también se conserva en `import_errors.details`. Cualquier error de referencia —inexistente, ambiguo, relación actividad-sector/instructor inconsistente o actividad sin instructor— hace fallar el dry-run y `apply` rechaza todo libro que contenga errores.

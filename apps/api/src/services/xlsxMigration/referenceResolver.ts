@@ -16,10 +16,10 @@ function resolve<T extends ImportReference>(items:T[], raw:unknown, notFound:str
   if (!key) return undefined;
   const matches=items.filter((item)=>keys(item).includes(key));
   if (matches.length > 1) {
-    issues.push({error_code:"REFERENCE_AMBIGUOUS",message:`${field} coincide con más de una referencia.`,severity:"error",sheet:row.sheet,row_number:row.rowNumber,field,value_normalized:key});
+    issues.push({error_code:"REFERENCE_AMBIGUOUS",message:`${field} coincide con más de una referencia.`,severity:"error",sheet:row.sheet,row_number:row.rowNumber,field,value_original:raw,value_normalized:key});
     return undefined;
   }
-  if (!matches.length) issues.push({error_code:notFound,message:`No se encontró ${field} dentro del club de la sesión.`,severity:"error",sheet:row.sheet,row_number:row.rowNumber,field,value_normalized:key});
+  if (!matches.length) issues.push({error_code:notFound,message:`No se encontró ${field} dentro del club de la sesión.`,severity:"error",sheet:row.sheet,row_number:row.rowNumber,field,value_original:raw,value_normalized:key});
   return matches[0];
 }
 

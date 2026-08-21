@@ -26,6 +26,12 @@ test("rechaza referencias ambiguas en vez de elegir arbitrariamente",()=>{
   assert.ok(result.errors.some((error)=>error.error_code==="REFERENCE_AMBIGUOUS")); assert.equal(result.resolved[0].sectorId,null);
 });
 
+test("los errores informan original, normalizado, hoja, fila y campo",()=>{
+  const missing=resolveReferenceRows([row({sector:"  Inéxistente  "})],catalog).errors.find((error)=>error.error_code==="SECTOR_NOT_FOUND");
+  assert.deepEqual(missing&&{original:missing.value_original,normalized:missing.value_normalized,sheet:missing.sheet,row:missing.row_number,field:missing.field},
+    {original:"  Inéxistente  ",normalized:"inexistente",sheet:"INSCRIPCIONES",row:3,field:"sector"});
+});
+
 test("emite not-found y mismatches de sector y responsable",()=>{
   const missing=resolveReferenceRows([row({sector:"inexistente",activity:"otra",instructor:"nadie"})],catalog);
   assert.deepEqual(missing.errors.map((e)=>e.error_code),["SECTOR_NOT_FOUND","ACTIVITY_NOT_FOUND","INSTRUCTOR_NOT_FOUND"]);

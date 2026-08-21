@@ -1,6 +1,6 @@
 import { XLSX_IMPORT_V1_SCHEMA } from "@miclub/shared";
 
-type FixtureOptions={swappedHeaders?:boolean;missingRequiredCell?:boolean;formula?:boolean;sharedHeaders?:boolean;movementValues?:Record<string,string>};
+type FixtureOptions={swappedHeaders?:boolean;missingRequiredCell?:boolean;formula?:boolean;sharedHeaders?:boolean;reverseSheets?:boolean;movementValues?:Record<string,string>;enrollmentValues?:Record<string,string>};
 const xml=(value:string)=>value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const cell=(coordinate:string,value:string,type="inlineStr")=>`<c r="${coordinate}" t="${type}">${type==="inlineStr"?`<is><t>${xml(value)}</t></is>`:`<v>${value}</v>`}</c>`;
 
@@ -29,7 +29,7 @@ export function workbookFixture(options:FixtureOptions={}):Buffer {
     const values:Record<string,string>=sheetIndex===0
       ? {date:"2026-08-14",type:"INGRESOS",category:"Cuotas",concept:"Mensual",amount:"1234.50",status:"COMPLETADO"}
       : {date:"2026-08-14",firstName:"Ana",lastName:"Pérez",document:"123",activity:"Tenis",fee:"10,50",status:"ACTIVA"};
-    if(sheetIndex===0)Object.assign(values,options.movementValues);
+    if(sheetIndex===0)Object.assign(values,options.movementValues); else Object.assign(values,options.enrollmentValues);
     const data=schema.columns.map((column)=>{
       if(options.missingRequiredCell&&sheetIndex===0&&column.key==="concept") return "";
       const value=values[column.key]; if(value===undefined)return "";
@@ -39,8 +39,9 @@ export function workbookFixture(options:FixtureOptions={}):Buffer {
     }).join("");
     return `<worksheet><sheetData><row r="1">${headers}</row><row r="2">${data}</row></sheetData></worksheet>`;
   });
+  const ordered=options.reverseSheets?[...schemas].reverse():schemas;
   const files:Record<string,string>={
-    "xl/workbook.xml":`<workbook xmlns:r="r"><sheets>${schemas.map((schema,index)=>`<sheet name="${schema.name}" r:id="rId${index+1}"/>`).join("")}</sheets></workbook>`,
+    "xl/workbook.xml":`<workbook xmlns:r="r"><sheets>${ordered.map((schema)=>`<sheet name="${schema.name}" r:id="rId${schemas.indexOf(schema)+1}"/>`).join("")}</sheets></workbook>`,
     "xl/_rels/workbook.xml.rels":`<Relationships>${schemas.map((_,index)=>`<Relationship Id="rId${index+1}" Target="worksheets/sheet${index+1}.xml"/>`).join("")}</Relationships>`,
     ...Object.fromEntries(worksheets.map((sheet,index)=>[`xl/worksheets/sheet${index+1}.xml`,sheet])),
   };
@@ -49,3 +50,12 @@ export function workbookFixture(options:FixtureOptions={}):Buffer {
 }
 
 export const maliciousZipFixture=()=>zip({"../xl/workbook.xml":"hostile"});
+
+/** Minimal XLSX inputs used with tenant catalogs to exercise reference matching. */
+export const referenceWorkbookFixtures = {
+  exact: () => workbookFixture({movementValues:{sector:"Fútbol"},enrollmentValues:{activity:"Infantiles"}}),
+  normalized: () => workbookFixture({movementValues:{sector:"  FUTBOL  "},enrollmentValues:{activity:"  infantíles "}}),
+  missing: () => workbookFixture({movementValues:{sector:"Sector inexistente"},enrollmentValues:{activity:"Actividad inexistente"}}),
+  ambiguous: () => workbookFixture({movementValues:{sector:"Futbol"},enrollmentValues:{activity:"Infantiles"}}),
+  wrongInstructor: () => workbookFixture({enrollmentValues:{activity:"Infantiles"}}),
+} as const;
