@@ -133,6 +133,8 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
 
     // El onboarding debe poder crear entidades reales partiendo del tenant recién provisionado.
     const templateCatalog = await request("/api/administration/sector-templates", {}, cookie);
+    assert.equal(templateCatalog.body.items.length, 30, "el runner debe instalar las 30 plantillas canónicas");
+    assert.ok(templateCatalog.body.items.every((item: Record<string, unknown>) => typeof item.icon_key === "string" && item.icon_key.length > 0));
     const sectorCreated = await request("/api/administration/sectors", json({ templateId: templateCatalog.body.items[0].id, color: "#2563EB", status: "active" }), cookie);
     assert.equal(sectorCreated.response.status, 201);
     const workerCreated = await request("/api/administration/workers", json({ firstName: "Inés", lastName: "Instructora", dni: "32999888", email: `instructor-${databaseName}@integration.invalid`, password: "Instructor-12345", role: "INSTRUCTOR", sectorId: sectorCreated.body.id, paymentMode: "VARIABLE" }), cookie);

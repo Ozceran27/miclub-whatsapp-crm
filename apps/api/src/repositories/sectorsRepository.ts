@@ -120,7 +120,7 @@ export const archiveSector = async (actor: SectorActor, id: string, expectedUpda
 
 export const listSectorTemplates = async (): Promise<Record<string, unknown>[]> => {
   const pool = await getPostgresPool();
-  const result = await pool.query(`select id, code, display_name, icon_key, display_order from miclub.sector_templates where active=true order by display_order, display_name`);
+  const result = await pool.query(`select id, code, display_name, icon_key, display_order from miclub.sector_templates where is_active=true order by display_order, display_name`);
   return result.rows;
 };
 
@@ -128,7 +128,7 @@ export const createSector = async (actor: SectorActor, input: SectorCreate): Pro
   const pool = await getPostgresPool();
   return withTransaction(async (executor) => {
     const template = await executor.query<{ id: string; code: string; display_name: string; icon_key: string }>(
-      `select id, code, display_name, icon_key from miclub.sector_templates where id=$1 and active=true`, [input.templateId],
+      `select id, code, display_name, icon_key from miclub.sector_templates where id=$1 and is_active=true`, [input.templateId],
     );
     const item = template.rows[0];
     if (!item) return { kind: "invalid_template" };

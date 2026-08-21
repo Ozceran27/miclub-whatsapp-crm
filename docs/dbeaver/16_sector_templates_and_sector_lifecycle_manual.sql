@@ -1,5 +1,12 @@
 /* DBeaver/manual | 16 | Catálogo global y ciclo de vida de sectores
 
+   ESTADO: SUSTITUIDO POR LA MIGRACIÓN VERSIONADA
+   - Para una instancia administrada por el runner NO ejecutar este archivo.
+   - Ejecutar `npm run db:migrate`; la migración canónica es
+     apps/api/db/migrations/202608210004_sector_templates_and_lifecycle.sql.
+   - Este archivo se conserva únicamente para diagnóstico/remediación legacy
+     autorizada. No debe marcarse manualmente en el ledger de migraciones.
+
    OBJETIVO
    - Crear miclub.sector_templates sin club_id y cargar 30 plantillas.
    - Vincular miclub.sectors.template_id y admitir under_repair.
@@ -73,7 +80,7 @@ CREATE TABLE IF NOT EXISTS miclub.sector_templates (
   code text NOT NULL,
   display_name text NOT NULL,
   icon_key text NOT NULL,
-  active boolean NOT NULL DEFAULT true,
+  is_active boolean NOT NULL DEFAULT true,
   display_order integer NOT NULL,
   CONSTRAINT sector_templates_code_uk UNIQUE (code),
   CONSTRAINT sector_templates_code_format_ck CHECK (code ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
@@ -81,7 +88,30 @@ CREATE TABLE IF NOT EXISTS miclub.sector_templates (
 );
 COMMENT ON TABLE miclub.sector_templates IS 'Catálogo global, sin club_id, de identidades disponibles para sectores.';
 
-INSERT INTO miclub.sector_templates(code,display_name,icon_key,active,display_order) VALUES
+-- Compatibilidad exclusiva para instalaciones legacy que recibieron una versión
+-- anterior de este mismo manual. CREATE TABLE IF NOT EXISTS no modifica una tabla
+-- existente, por lo que se debe normalizar la columna antes del INSERT.
+DO $column_name$
+BEGIN
+  IF EXISTS (
+    SELECT FROM information_schema.columns
+    WHERE table_schema='miclub' AND table_name='sector_templates' AND column_name='active'
+  ) AND NOT EXISTS (
+    SELECT FROM information_schema.columns
+    WHERE table_schema='miclub' AND table_name='sector_templates' AND column_name='is_active'
+  ) THEN
+    ALTER TABLE miclub.sector_templates RENAME COLUMN active TO is_active;
+  ELSIF EXISTS (
+    SELECT FROM information_schema.columns
+    WHERE table_schema='miclub' AND table_name='sector_templates' AND column_name='active'
+  ) THEN
+    UPDATE miclub.sector_templates SET is_active=active;
+    ALTER TABLE miclub.sector_templates DROP COLUMN active;
+  END IF;
+END
+$column_name$;
+
+INSERT INTO miclub.sector_templates(code,display_name,icon_key,is_active,display_order) VALUES
  ('futbol','Fútbol','sports_soccer',true,10),('futsal','Futsal','sports_soccer',true,20),
  ('basquet','Básquet','sports_basketball',true,30),('voley','Vóley','sports_volleyball',true,40),
  ('handball','Handball','sports_handball',true,50),('hockey','Hockey','sports_hockey',true,60),
@@ -99,7 +129,7 @@ INSERT INTO miclub.sector_templates(code,display_name,icon_key,active,display_or
  ('alquileres','Alquileres','storefront',true,290),('otros','Otros','category',true,300)
 ON CONFLICT (code) DO UPDATE SET
  display_name=excluded.display_name, icon_key=excluded.icon_key,
- active=excluded.active, display_order=excluded.display_order;
+ is_active=excluded.is_active, display_order=excluded.display_order;
 
 -- 3. Evolución compatible de sectors. No se reemplaza una FK válida existente.
 ALTER TABLE miclub.sectors ADD COLUMN IF NOT EXISTS template_id uuid NULL;
@@ -175,7 +205,7 @@ WHERE NOT EXISTS (
 DO $validation$
 DECLARE problem record;
 BEGIN
-  IF (SELECT count(*) FROM miclub.sector_templates WHERE active) <> 30 THEN
+  IF (SELECT count(*) FROM miclub.sector_templates WHERE is_active) <> 30 THEN
     RAISE EXCEPTION 'VALIDATION: se esperaban 30 plantillas activas';
   END IF;
 
@@ -194,7 +224,7 @@ END $validation$;
 COMMIT;
 
 -- 6. Verificación post-commit (resultados esperados: 30 y 3 por club).
-SELECT count(*) AS active_templates FROM miclub.sector_templates WHERE active;
+SELECT count(*) AS active_templates FROM miclub.sector_templates WHERE is_active;
 SELECT c.id AS club_id, count(s.id) AS active_system_sectors
 FROM miclub.clubs c
 LEFT JOIN miclub.sectors s ON s.club_id=c.id AND s.is_system AND s.archived_at IS NULL
