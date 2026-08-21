@@ -1,4 +1,4 @@
-import type { AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
+import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -24,26 +24,7 @@ export const getAdministrationActivities = (signal?: AbortSignal) =>
 
 export type ActivityIconCatalogItem = { iconKey: string; displayName: string };
 export type ActivityInstructorCatalogItem = { id: string; displayName: string; isActive: boolean };
-export type ActivitySettlementTerms =
-  | { mode: 'FIXED'; monthlyFixedFee: number; clubSharePercentage: null }
-  | { mode: 'VARIABLE'; monthlyFixedFee: null; clubSharePercentage: number };
-export type AdministrationActivityMutation = {
-  sectorId: string;
-  instructorId: string;
-  managerPersonId: string | null;
-  code?: string | null;
-  name: string;
-  modality?: string | null;
-  color?: string | null;
-  iconKey: string;
-  /** Cuota de inscripción; deliberadamente independiente de los términos de liquidación. */
-  enrollmentFee: number;
-  instructorCommissionPercent?: number;
-  maxCapacity?: number | null;
-  status: 'active' | 'inactive';
-  notes?: string | null;
-  terms: ActivitySettlementTerms;
-};
+export type AdministrationActivityMutation = ActivityMutationContract;
 export type AdministrationActivityMutationResponse = { id: string; updatedAt: string } & Record<string, unknown>;
 
 export const getActivityFormCatalogs = async (signal?: AbortSignal) => {
