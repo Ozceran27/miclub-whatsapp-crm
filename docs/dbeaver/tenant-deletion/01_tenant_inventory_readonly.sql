@@ -162,7 +162,9 @@ WITH expected(name,checksum) AS (VALUES
     ('202608180003_fix_rls_login_membership_resolution.sql', '52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335'),
     ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce'),
     ('202608210001_operational_currency_opening_balances.sql', '309708c724168193a872ef6ba1b7b798f92835b6c9f3d2f6942e32e331566ea9'),
-    ('202608210002_canonical_activity_financial_views.sql', '6c28a57110b032111f610d5922a2425727234100afd00a4db773ddab6a3caeac')
+    ('202608210002_canonical_activity_financial_views.sql', '6c28a57110b032111f610d5922a2425727234100afd00a4db773ddab6a3caeac'),
+    ('202608210003_complete_product_category_catalog.sql', '625d17b1d410fc475ac38efa5e97188002245fce402fd9340dfa76ba03903120'),
+    ('202608210004_sector_templates_and_lifecycle.sql', 'f55f8cd3c21adb53b7d9b33d7c92a5aee04a199603c1926e8b7003f5c9df5758')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
@@ -257,7 +259,9 @@ WITH expected(name,checksum) AS (VALUES
     ('202608180003_fix_rls_login_membership_resolution.sql', '52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335'),
     ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce'),
     ('202608210001_operational_currency_opening_balances.sql', '309708c724168193a872ef6ba1b7b798f92835b6c9f3d2f6942e32e331566ea9'),
-    ('202608210002_canonical_activity_financial_views.sql', '6c28a57110b032111f610d5922a2425727234100afd00a4db773ddab6a3caeac')
+    ('202608210002_canonical_activity_financial_views.sql', '6c28a57110b032111f610d5922a2425727234100afd00a4db773ddab6a3caeac'),
+    ('202608210003_complete_product_category_catalog.sql', '625d17b1d410fc475ac38efa5e97188002245fce402fd9340dfa76ba03903120'),
+    ('202608210004_sector_templates_and_lifecycle.sql', 'f55f8cd3c21adb53b7d9b33d7c92a5aee04a199603c1926e8b7003f5c9df5758')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL

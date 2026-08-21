@@ -18,7 +18,6 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
-
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -57,7 +56,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608210001_operational_currency_opening_balances.sql` | Persiste la moneda operativa elegida y la aplica a los saldos iniciales idempotentes. | `309708c724168193a872ef6ba1b7b798f92835b6c9f3d2f6942e32e331566ea9` | Después de `202608140008_canonical_onboarding_and_opening_balances.sql`. |
 | `202608210002_canonical_activity_financial_views.sql` | Reemplaza saldos inferidos por etiquetas con liquidaciones canónicas por actividad, término histórico, período y asignaciones explícitas. | `6c28a57110b032111f610d5922a2425727234100afd00a4db773ddab6a3caeac` | Después de `202608150005_prevent_split_settlement_movements.sql`. |
 | `202608210003_complete_product_category_catalog.sql` | Sincroniza exactamente el catálogo activo de producto, sus aliases y las categorías disponibles de cada tenant sin borrar historia. | `625d17b1d410fc475ac38efa5e97188002245fce402fd9340dfa76ba03903120` | Después de `202608140004_correct_category_catalog.sql`. |
-
+| `202608210004_sector_templates_and_lifecycle.sql` | Versiona las 30 plantillas de sector con iconos, relaciones validadas y acceso runtime de solo lectura. | `f55f8cd3c21adb53b7d9b33d7c92a5aee04a199603c1926e8b7003f5c9df5758` | Después de `202608180002_restore_runtime_application_grants.sql` y `202608150002_scope_activity_catalog_fks.sql`. |
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
