@@ -22,16 +22,22 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "managerPersonId", "instructorId", "code", "name", "modality", "color", "iconKey", "enrollmentFee", "clubCommissionPercent", "instructorCommissionPercent", "maxCapacity", "status", "notes"]);
+  const allowed = new Set(["updatedAt", "sectorId", "managerPersonId", "instructorId", "code", "name", "modality", "color", "iconKey", "enrollmentFee", "clubCommissionPercent", "instructorCommissionPercent", "maxCapacity", "status", "notes", "terms"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
   for (const field of ["managerPersonId", "instructorId"] as const) if (body[field] !== undefined && body[field] !== null && (typeof body[field] !== "string" || !UUID.test(body[field]))) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser UUID o null.`); return null; }
   for (const field of ["enrollmentFee", "instructorCommissionPercent"] as const) if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]) || body[field] < 0)) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser un número no negativo.`); return null; }
-  if (typeof body.clubCommissionPercent !== "number" || !Number.isFinite(body.clubCommissionPercent) || body.clubCommissionPercent < 0 || body.clubCommissionPercent > 100) { fail(res, 400, "VALIDATION_ERROR", "clubCommissionPercent debe estar entre 0 y 100."); return null; }
+  const terms = body.terms as Record<string, unknown> | undefined;
+  if (terms) {
+    const keys = Object.keys(terms); const mode = terms.mode;
+    const fixedValid = mode === "FIXED" && typeof terms.monthlyFixedFee === "number" && Number.isFinite(terms.monthlyFixedFee) && terms.monthlyFixedFee >= 0 && terms.clubSharePercentage === null;
+    const variableValid = mode === "VARIABLE" && terms.monthlyFixedFee === null && typeof terms.clubSharePercentage === "number" && Number.isFinite(terms.clubSharePercentage) && terms.clubSharePercentage >= 0 && terms.clubSharePercentage <= 100;
+    if (keys.some((key) => !["mode", "monthlyFixedFee", "clubSharePercentage"].includes(key)) || (!fixedValid && !variableValid)) { fail(res, 400, "VALIDATION_ERROR", "Los términos FIXED o VARIABLE no son válidos."); return null; }
+  } else if (typeof body.clubCommissionPercent !== "number" || !Number.isFinite(body.clubCommissionPercent) || body.clubCommissionPercent < 0 || body.clubCommissionPercent > 100) { fail(res, 400, "VALIDATION_ERROR", "terms es obligatorio (o clubCommissionPercent para clientes anteriores)."); return null; }
   if (body.maxCapacity !== undefined && body.maxCapacity !== null && (!Number.isInteger(body.maxCapacity) || Number(body.maxCapacity) < 0)) { fail(res, 400, "VALIDATION_ERROR", "maxCapacity debe ser entero no negativo."); return null; }
   if (body.status !== undefined && !["active", "inactive"].includes(String(body.status))) { fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); return null; }
   if ((body.status ?? "inactive") === "active" && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "ACTIVE_ACTIVITY_REQUIRES_INSTRUCTOR", "Una actividad activa requiere instructor responsable."); return null; }
-  return { ...body, managerPersonId: body.managerPersonId ?? null, name: body.name.trim() } as ActivityInput;
+  return { ...body, clubCommissionPercent: body.clubCommissionPercent ?? (terms?.mode === "VARIABLE" ? terms.clubSharePercentage : 0), managerPersonId: body.managerPersonId ?? null, name: body.name.trim() } as ActivityInput;
 };
 
 const respond = (res: Response, result: ActivityMutationResult) => {

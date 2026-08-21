@@ -3241,3 +3241,20 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .request-panel__list small,.request-panel__list li>div:first-child span { color: var(--color-text-muted); }
 .request-panel__actions { display: flex; gap: 8px; }
 @media(max-width:850px){.request-panel__list li{grid-template-columns:1fr}.request-panel__actions{flex-wrap:wrap}}
+
+/* Activity create/edit workflow */
+.activity-list__header-actions, .activity-list__actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.activity-list__actions button { background: var(--color-card-muted); border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); cursor: pointer; padding: 6px 8px; }
+.activity-list__actions .activity-list__archive { color: var(--color-danger); }
+.activity-form-modal { max-width: 900px; }
+.activity-form, .activity-form label { display: grid; gap: 8px; }
+.activity-form__grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.activity-form input, .activity-form select, .activity-form textarea { background: var(--color-card-muted); border: 1px solid var(--color-border); border-radius: 9px; color: var(--color-text); font: inherit; padding: 9px 11px; }
+.activity-form__terms, .activity-form__icons { border: 1px solid var(--color-border); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 14px; }
+.activity-form__terms label { align-items: center; display: flex; }
+.activity-form__icons button { align-items: center; background: var(--color-card-muted); border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text); display: grid; gap: 3px; justify-items: center; min-height: 66px; padding: 7px; width: 76px; }
+.activity-form__icons button span { font-size: 24px; }
+.activity-form__icons button small { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 62px; }
+.activity-form__icons button[data-selected='true'] { border-color: var(--color-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent); }
+.activity-form__error { background: color-mix(in srgb, var(--color-danger) 10%, transparent); border: 1px solid var(--color-danger); border-radius: 10px; color: var(--color-danger); padding: 11px; }
+@media(max-width:680px){.activity-form__grid{grid-template-columns:1fr}.activity-list__header{align-items:flex-start}.activity-list__header-actions{justify-content:flex-start}}

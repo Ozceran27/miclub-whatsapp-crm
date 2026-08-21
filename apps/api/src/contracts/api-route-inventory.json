@@ -1839,7 +1839,13 @@
       "membership": "active",
       "role": "any-with-permission",
       "sectorScope": "tenant",
-      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"],
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
       "id": "POST /api/onboarding/opening-balances",
       "method": "POST",
       "path": "/api/onboarding/opening-balances",
@@ -1997,6 +2003,46 @@
       "permission": "dashboard:read",
       "role": "any-with-permission",
       "sectorScope": "tenant-catalog",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration/activity-icons",
+      "method": "GET",
+      "path": "/api/administration/activity-icons",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration/activity-instructors",
+      "method": "GET",
+      "path": "/api/administration/activity-instructors",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
       "mutability": "read",
       "idempotency": "safe",
       "testCategories": [
