@@ -3,7 +3,7 @@ import { XLSX_POLICY } from "./policy.js";
 import type { ReferenceRow } from "./referenceResolver.js";
 import { inspectZip, readEntry, type ZipEntry } from "./zipInspector.js";
 
-export type MigrationIssue = { error_code: string; message: string; severity: "error"|"warning"; sheet?: string; row_number?: number; entity_type?: string; field?: string; value_normalized?: string };
+export type MigrationIssue = { error_code: string; message: string; severity: "error"|"warning"; sheet?: string; row_number?: number; entity_type?: string; field?: string; value_original?: unknown; value_normalized?: string };
 export type ParsedWorkbookRow = { sheet:string; rowNumber:number; values:Record<string,string|number|null>; sourceValues:unknown[] };
 
 const issue = (error_code: string, message: string, extra: Partial<MigrationIssue> = {}): MigrationIssue => ({ error_code, message, severity: "error", ...extra });
@@ -76,7 +76,7 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
   const workbook=readEntry(buffer,workbookEntry);
   const sheetFiles=sheetEntries(workbook,readEntry(buffer,relationsEntry),entries);
   const sheets=sheetFiles.map(({name})=>name);
-  if (JSON.stringify(sheets)!==JSON.stringify(XLSX_POLICY.sheets)) errors.push(issue("INVALID_SHEETS", `Se requieren únicamente: ${XLSX_POLICY.sheets.join(", ")}.`));
+  if (sheets.length!==XLSX_POLICY.sheets.length || XLSX_POLICY.sheets.some((sheet)=>!sheets.includes(sheet))) errors.push(issue("INVALID_SHEETS", `Se requieren únicamente las hojas: ${XLSX_POLICY.sheets.join(", ")}; el orden no es contractual.`));
   const stringsEntry=entries.find((entry)=>entry.name==="xl/sharedStrings.xml");
   const strings=sharedStringTable(stringsEntry?readEntry(buffer,stringsEntry):"");
   const rowCounts:Record<string,number>={}; const referenceRows:ReferenceRow[]=[]; const rows:ParsedWorkbookRow[]=[];
@@ -88,9 +88,9 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
     if (/<f(?:\s|>)/i.test(xml)) errors.push(issue("FORMULAS_NOT_ALLOWED", "No se permiten fórmulas; use valores almacenados.", {sheet}));
     const rowMatches=[...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)];
     const headerCells=cells(rowMatches.find((row)=>Number(row[1])===schema.headerRow)?.[2]??"",strings);
-    for (const column of schema.columns as readonly XlsxImportColumn[]) {
-      const actual=headerCells.get(column.headerCell)??"";
-      if (actual!==column.header) errors.push(issue("INVALID_HEADERS", `Se esperaba ${column.header} en ${column.headerCell}.`,{sheet,row_number:schema.headerRow,field:column.key,value_normalized:actual}));
+    for (const physical of schema.physicalColumns) {
+      const coordinate=`${physical.column}${schema.headerRow}`, actual=headerCells.get(coordinate)??"", expected=physical.header??"";
+      if (actual!==expected) errors.push(issue("INVALID_HEADERS", expected ? `Se esperaba ${expected} en ${coordinate}.` : `La cabecera ${coordinate} debe permanecer vacía.`,{sheet,row_number:schema.headerRow,field:physical.key??`column_${physical.column}`,value_original:actual,value_normalized:actual.trim()}));
     }
     const populated=rowMatches.filter((match)=>Number(match[1])>=schema.firstDataRow&&[...cells(match[2],strings).values()].some((value)=>value.trim()!==""));
     for (const match of populated) {
@@ -98,10 +98,11 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
       const rawFor=(column:XlsxImportColumn)=>rowCells.get(`${columnOf(column.dataCell)}${rowNumber}`);
       for (const column of schema.columns as readonly XlsxImportColumn[]) {
         const raw=rawFor(column), normalized=String(raw??"").trim(); let value:string|number|null=normalized||null;
-        if (normalized&&column.type==="decimal") { const decimal=parseDecimal(normalized); if(decimal===null) errors.push(issue("INVALID_DECIMAL",`${column.header} debe ser decimal.`,{sheet,row_number:rowNumber,field:column.key,value_normalized:normalized})); else value=decimal; }
-        if (normalized&&column.type==="date") { const date=parseDate(normalized); if(date===null) errors.push(issue("INVALID_DATE",`${column.header} debe ser una fecha válida.`,{sheet,row_number:rowNumber,field:column.key,value_normalized:normalized})); else value=date; }
-        if (normalized&&column.type==="enum"&&column.enumValues&&!column.enumValues.includes(normalized)) errors.push(issue("INVALID_ENUM",`${column.header} no pertenece al catálogo permitido.`,{sheet,row_number:rowNumber,field:column.key,value_normalized:normalized}));
-        if (column.required&&value===null) errors.push(issue("REQUIRED_VALUE",`Falta ${column.header}.`,{sheet,row_number:rowNumber,field:column.key}));
+        const context={sheet,row_number:rowNumber,field:column.key,value_original:raw??null,value_normalized:normalized};
+        if (normalized&&column.type==="decimal") { const decimal=parseDecimal(normalized); if(decimal===null) errors.push(issue("INVALID_DECIMAL",`${column.header} debe ser decimal.`,context)); else value=decimal; }
+        if (normalized&&column.type==="date") { const date=parseDate(normalized); if(date===null) errors.push(issue("INVALID_DATE",`${column.header} debe ser una fecha válida.`,context)); else value=date; }
+        if (normalized&&column.type==="enum"&&column.enumValues&&!column.enumValues.includes(normalized)) errors.push(issue("INVALID_ENUM",`${column.header} no pertenece al catálogo permitido.`,context));
+        if (column.required&&value===null) errors.push(issue("REQUIRED_VALUE",`Falta ${column.header}.`,context));
         parsed[column.key]=value;
       }
       const sourceValues=(schema.columns as readonly XlsxImportColumn[]).map((column)=>rawFor(column)??null);
