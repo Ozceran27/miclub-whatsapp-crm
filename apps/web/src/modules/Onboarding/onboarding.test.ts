@@ -34,7 +34,7 @@ test('F5 vuelve a renderizar el paso persistido y la omisión temporal depende d
   const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
   assert.match(gate, /step=\{state\.currentStep\}/);
-  assert.match(dialog, /isSkippableStep\(step\).*Omitir configuración ahora/s);
+  assert.match(dialog, /isSkippableStep\(step\).*Omitir/s);
   assert.equal(isSkippableStep(2), false);
   assert.equal(isSkippableStep(5), true);
   assert.equal(isSkippableStep(6), true);
@@ -42,8 +42,45 @@ test('F5 vuelve a renderizar el paso persistido y la omisión temporal depende d
 
 test('los pasos representan exactamente el flujo solicitado y saldos usa la operación canónica', () => {
   const source = readFileSync(new URL('./steps.tsx', import.meta.url), 'utf8');
-  assert.deepEqual(ONBOARDING_STEPS.map(step=>step.title),['Bienvenida','Saldos','Sectores','Trabajadores','Actividades','Migración','Finalización']);
+  assert.deepEqual(ONBOARDING_STEPS.map(step=>step.title),['¡Te damos la bienvenida a miClub!','Definí los saldos iniciales','Organizá tus sectores','Sumá a tus trabajadores','Configurá las actividades','Importá tus datos históricos','¡Tu club está listo!']);
   assert.match(source, /OpeningBalancesStep/); assert.match(source,/MigrationStep/);
+});
+
+test('regresión visual: siete indicadores, acciones y estados tienen textos accesibles', () => {
+  const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
+  const progress = readFileSync(new URL('./OnboardingProgress.tsx', import.meta.url), 'utf8');
+  assert.match(progress, /labels = \[[\s\S]*'Listo'/);
+  assert.match(progress, /aria-current=.*'step'/);
+  assert.match(progress, /Progreso guardado/);
+  for (const action of ['Empezar Configuración','Siguiente','Omitir','INICIAR MI CLUB','Reintentar']) assert.match(dialog, new RegExp(action));
+  assert.match(dialog, /aria-live="polite"/);
+  assert.match(dialog, /Guardando este paso/);
+  assert.match(dialog, /No se guardaron los últimos cambios/);
+});
+
+test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reducido', () => {
+  const styles = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8');
+  assert.match(styles, /grid-template-columns: repeat\(7,1fr\)/);
+  assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.onboarding-dialog/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/);
+  assert.match(styles, /var\(--color-card\)/);
+  assert.match(styles, /\.setup-manager > ul[\s\S]*repeat\(auto-fit,minmax/);
+  assert.match(styles, /border: 2px dashed/);
+});
+
+test('la advertencia explica que importar capital histórico puede duplicar saldos', () => {
+  const source = readFileSync(new URL('./OpeningBalancesStep.tsx', import.meta.url), 'utf8');
+  assert.match(source, /Evitá duplicar tus saldos/);
+  assert.match(source, /saldos quedarán duplicados/);
+  assert.match(source, /role="note"/);
+});
+
+test('los modales secundarios atrapan foco, cierran con Escape y lo devuelven al invocador', () => {
+  const source = readFileSync(new URL('../Administration/WorkerDetailModal.tsx', import.meta.url), 'utf8');
+  assert.match(source, /event\.key !== 'Tab'/);
+  assert.match(source, /event\.key === 'Escape'/);
+  assert.match(source, /previousFocus\?\.focus\(\)/);
+  assert.match(source, /aria-modal="true"/);
 });
 
 test('la migración del onboarding permite aplicar un dry-run válido', () => {
