@@ -1,4 +1,4 @@
-import { CLUB_ROLE_DEFINITIONS, type ClubRegistrationDto } from "@miclub/shared";
+import { CLUB_ROLE_DEFINITIONS, MOVEMENT_CATEGORY_CATALOG, type ClubRegistrationDto } from "@miclub/shared";
 
 export interface TransactionClient {
   query<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: readonly unknown[]): Promise<{ rows: T[] }>;
@@ -80,6 +80,14 @@ export async function provisionClub(
            ($1, 'tesoreria', 'Tesorería', true, 'active', false),
            ($1, 'areas-comunes', 'Áreas Comunes', true, 'active', false)` , [clubId]);
   await client.query(`insert into miclub.payment_methods (club_id, name) values ($1, 'Efectivo'), ($1, 'Transferencia') on conflict do nothing`, [clubId]);
+  await client.query(`
+    insert into miclub.movement_categories (club_id, name, direction, is_active, catalog_id)
+    select $1, item.display_name, item.direction::miclub.movement_type, true, cc.id
+    from jsonb_to_recordset($2::jsonb) as item(code text, display_name text, direction text)
+    join miclub.category_catalog cc on cc.code = item.code and cc.is_active
+    on conflict (club_id, upper(trim(name))) do update
+      set catalog_id = excluded.catalog_id, direction = excluded.direction, is_active = true`,
+  [clubId, JSON.stringify(MOVEMENT_CATEGORY_CATALOG.map(([code, displayName, , direction]) => ({ code, display_name: displayName, direction })))]);
 
   return { clubId, userId: user.rows[0].id, personId: person.rows[0].id, membershipId: membership.rows[0].id };
 }

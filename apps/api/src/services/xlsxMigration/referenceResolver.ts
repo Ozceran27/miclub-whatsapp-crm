@@ -3,13 +3,13 @@ import { withTenantTransaction } from "../../db/transaction.js";
 import { normalizeComparableText } from "../../importers/normalizers.js";
 import type { MigrationIssue } from "./validator.js";
 
-export type ImportReference = { id:string; name:string; code?:string|null };
+export type ImportReference = { id:string; name:string; code?:string|null; aliases?:string[] };
 export type ImportActivity = ImportReference & { sectorId:string; instructorId:string|null; modality?:string|null };
 export type ReferenceCatalog = { sectors:ImportReference[]; activities:ImportActivity[]; instructors:ImportReference[]; categories?:ImportReference[]; paymentMethods?:ImportReference[]; people?:ImportReference[] };
 export type ReferenceRow = { sheet:string; rowNumber:number; sector?:unknown; activity?:unknown; modality?:unknown; instructor?:unknown; category?:unknown; paymentMethod?:unknown; document?:unknown; externalReference?:unknown; values:unknown[] };
 
 const keys = (reference: ImportReference): string[] =>
-  [...new Set([reference.name, reference.code].filter((value): value is string => Boolean(value)).map(normalizeComparableText))];
+  [...new Set([reference.name, reference.code, ...(reference.aliases??[])].filter((value): value is string => Boolean(value)).map(normalizeComparableText))];
 
 function resolve<T extends ImportReference>(items:T[], raw:unknown, notFound:string, field:string, row:ReferenceRow, issues:MigrationIssue[]):T|undefined {
   const key=normalizeComparableText(raw);
@@ -52,7 +52,7 @@ export async function loadReferenceCatalog(clubId:string):Promise<ReferenceCatal
       db.query<ImportReference>(`select id,name,code from miclub.sectors where club_id=$1`,[clubId]),
       db.query<{id:string;name:string;code:string|null;sector_id:string;instructor_id:string|null;modality:string|null}>(`select id,name,code,sector_id,instructor_id,modality from miclub.activities where club_id=$1 and archived_at is null`,[clubId]),
       db.query<ImportReference>(`select id,display_name as name,code from miclub.instructors where club_id=$1 and is_active=true`,[clubId]),
-      db.query<ImportReference>(`select mc.id,mc.name,cc.code from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id where mc.club_id=$1 and mc.is_active=true`,[clubId]),
+      db.query<ImportReference>(`select mc.id,mc.name,cc.code,coalesce(array_agg(cia.normalized_alias) filter (where cia.normalized_alias is not null),'{}') as aliases from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id left join miclub.category_import_aliases cia on cia.catalog_id=cc.id where mc.club_id=$1 and mc.is_active=true and cc.is_active=true group by mc.id,mc.name,cc.code`,[clubId]),
       db.query<ImportReference>(`select id,name,null::text as code from miclub.payment_methods where club_id=$1 and is_active=true`,[clubId]),
       db.query<ImportReference>(`select id,dni as name,dni as code from miclub.people where club_id=$1 and dni is not null`,[clubId]),
     ]);

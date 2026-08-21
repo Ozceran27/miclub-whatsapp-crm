@@ -39,3 +39,11 @@ test("un catálogo del tenant no permite resolver referencias de otro club",()=>
   assert.ok(result.errors.some((error)=>error.error_code==="ACTIVITY_NOT_FOUND"));
   assert.ok(result.errors.some((error)=>error.error_code==="INSTRUCTOR_NOT_FOUND"));
 });
+
+test("resuelve aliases XLSX del catálogo canónico sin crear categorías",()=>{
+  const result=resolveReferenceRows([row({category:"sueldos"})],{
+    ...catalog,categories:[{id:"salary",name:"Salarios",code:"SALARIOS",aliases:["SUELDOS","SALARIO"]}],
+  });
+  assert.equal(result.resolved[0].categoryId,"salary");
+  assert.ok(!result.errors.some((error)=>error.error_code==="CATEGORY_NOT_FOUND"));
+});
