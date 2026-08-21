@@ -9,7 +9,7 @@ test("lectura y escritura requieren sus permisos separados",()=>{assert.deepEqua
 test("Director recibe onboarding pero trabajadores e instructores sectoriales no",()=>{assert.ok(ROLE_DEFAULT_PERMISSIONS.DIRECTOR.includes(PERMISSIONS.ONBOARDING_READ));assert.ok(ROLE_DEFAULT_PERMISSIONS.DIRECTOR.includes(PERMISSIONS.ONBOARDING_WRITE));assert.ok(!SECTOR_OPERATOR_PERMISSIONS.includes(PERMISSIONS.ONBOARDING_READ as never));assert.ok(!SECTOR_OPERATOR_PERMISSIONS.includes(PERMISSIONS.ONBOARDING_WRITE as never));});
 test("clubId controlado por el cliente se rechaza",()=>{let status=200,next=false;const req={params:{},query:{},body:{clubId:"otro-club"}};const res={status(code:number){status=code;return this;},json(){return this;}};rejectClientClubId(req as never,res as never,()=>{next=true;});assert.deepEqual({status,next},{status:400,next:false});});
 
-test("la política permite omitir saldos al importar el historial y también Migración",()=>{assert.deepEqual([...OPTIONAL_ONBOARDING_STEPS],[2,6]);assert.deepEqual([...REQUIRED_ONBOARDING_STEPS],[1,3,4,5,7]);});
+test("la política exige Bienvenida y Saldos y permite postergar la configuración posterior",()=>{assert.deepEqual([...OPTIONAL_ONBOARDING_STEPS],[3,4,5,6]);assert.deepEqual([...REQUIRED_ONBOARDING_STEPS],[1,2,7]);});
 
 test("avance y finalización convierten precondiciones incumplidas en conflicto",()=>{
  const routes=readFileSync(new URL("./onboardingRoutes.ts",import.meta.url),"utf8");
@@ -24,4 +24,5 @@ test("el repositorio verifica hitos persistidos al avanzar y al finalizar",()=>{
  assert.match(repository,/miclub\.employees[\s\S]*miclub\.instructors/);
  assert.match(repository,/miclub\.activities/);
  assert.match(repository,/for\(const step of requiredBeforeFinish\)await verifyMilestone/);
+ assert.doesNotMatch(repository,/completedSteps\.includes\(6\).*skippedSteps\.includes\(6\)/);
 });
