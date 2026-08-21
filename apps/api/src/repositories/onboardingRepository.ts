@@ -70,7 +70,9 @@ export const advanceOnboarding=async(actor:OnboardingActor,target:OnboardingStep
 export const completeOnboarding=async(actor:OnboardingActor)=>withTenantTransaction(actor.clubId,async db=>{
  const before=await ensure(db,actor.clubId); if(before.status==="COMPLETED") return before;
  const requiredBeforeFinish=REQUIRED_ONBOARDING_STEPS.filter(step=>step!==7);
- if(before.currentStep!==7||!requiredBeforeFinish.every(step=>before.completedSteps.includes(step))||(!before.completedSteps.includes(6)&&!before.skippedSteps.includes(6))) throw Object.assign(new Error("Hay pasos de configuración pendientes."),{code:"ONBOARDING_PRECONDITION_FAILED"});
+ // Reaching step 7 proves that every prior screen was visited. Only required
+ // milestones must be completed; optional setup may have been postponed.
+ if(before.currentStep!==7||!requiredBeforeFinish.every(step=>before.completedSteps.includes(step))) throw Object.assign(new Error("Hay pasos obligatorios pendientes."),{code:"ONBOARDING_PRECONDITION_FAILED"});
  for(const step of requiredBeforeFinish)await verifyMilestone(db,actor.clubId,step);
  await db.query(`update miclub.club_onboarding set status='COMPLETED',completed_at=coalesce(completed_at,now()),started_at=coalesce(started_at,now()),updated_at=now() where club_id=$1`,[actor.clubId]);
  const after=map((await db.query<Row>(select,[actor.clubId])).rows[0]); await audit(actor,"onboarding.complete",before,after,db); return after;

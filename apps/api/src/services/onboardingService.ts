@@ -6,7 +6,7 @@ const defaultStore:OnboardingStore={read:readOnboarding,advance:advanceOnboardin
 export const createOnboardingService=(store:OnboardingStore=defaultStore)=>({
   read:(clubId:string)=>store.read(clubId),
   advance:(actor:OnboardingActor,step:OnboardingStep,outcome:OnboardingStepOutcome)=>{
-    const departedStep = step - 1;
+    const departedStep = (step - 1) as OnboardingStep;
     if (outcome === "SKIPPED" && !isOptionalOnboardingStep(departedStep)) {
       throw Object.assign(new Error("Este paso es obligatorio y no se puede omitir."), { code: "ONBOARDING_SKIP_NOT_ALLOWED" });
     }
