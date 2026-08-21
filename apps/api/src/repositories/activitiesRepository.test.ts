@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { upsertActivity } from './activitiesRepository.js';
-import { archiveActivity, setActivityStatus, updateActivity, type ActivityActor, type ActivityInput } from './activitiesRepository.js';
+import { archiveActivity, createActivity, setActivityStatus, updateActivity, type ActivityActor, type ActivityInput } from './activitiesRepository.js';
 import { setPostgresPoolForTests, type PgClient, type PgPool } from '../db/postgres.js';
 
 const CLUB_A = '11111111-1111-4111-8111-111111111111';
@@ -12,10 +12,10 @@ const ACTIVITY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const UPDATED_AT = '2026-08-05T12:00:00.000Z';
 const limitedActor: ActivityActor = { userId: 'user-limited', membershipId: 'membership-limited', clubId: CLUB_A, sectorIds: [SECTOR_A], canAccessAnySector: false };
 const anySectorActor: ActivityActor = { ...limitedActor, userId: 'user-any', membershipId: 'membership-any', sectorIds: [], canAccessAnySector: true };
-const input = (sectorId: string): ActivityInput => ({ sectorId, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive' });
+const input = (sectorId: string): ActivityInput => ({ sectorId, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', monthlyFixedFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
 
 type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; updated_at: string; archived_at: null };
-const installActivityPool = (stored: StoredActivity) => {
+const installActivityPool = (stored: StoredActivity, settlementLocked = false) => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = {
     query: async (sql: string, params?: unknown[]) => {
@@ -29,6 +29,10 @@ const installActivityPool = (stored: StoredActivity) => {
         return { rows: visible ? [stored] : [] };
       }
       if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true }] };
+      if (sql.includes('from miclub.activity_terms') && sql.includes('for update')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: null }] };
+      if (sql.includes('from miclub.activity_settlements')) return { rows: [{ locked: settlementLocked }] };
+      if (sql.includes('update miclub.activity_terms')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: '2026-08-31' }] };
+      if (sql.includes('insert into miclub.activity_terms')) return { rows: [{ id: 'term-2', effective_from: '2026-09-01', effective_to: null }] };
       if (sql.includes('from miclub.enrollments')) return { rows: [{ enrollments: 0, movements: 0 }] };
       if (sql.includes('update miclub.activities')) return { rows: [{ ...stored, sector_id: params?.[2] ?? stored.sector_id, updated_at: '2026-08-05T12:01:00.000Z' }] };
       if (sql.includes('INSERT INTO miclub.audit_log')) return { rows: [{ id: 'audit-1' }] };
@@ -41,6 +45,46 @@ const installActivityPool = (stored: StoredActivity) => {
 };
 
 test.afterEach(() => setPostgresPoolForTests(undefined));
+
+const createPool = (settlement: ActivityInput['settlement'], failAudit = false) => {
+  const queries: Array<{ sql: string; params?: unknown[] }> = [];
+  const client = { query: async (sql: string, params?: unknown[]) => {
+    queries.push({ sql, params });
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return { rows: [] };
+    if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
+    if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true }] };
+    if (sql.includes('insert into miclub.activities')) return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] };
+    if (sql.includes('insert into miclub.activity_terms')) return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] };
+    if (sql.includes('INSERT INTO miclub.audit_log')) {
+      if (failAudit) throw new Error('audit unavailable');
+      return { rows: [{ id: 'audit-1' }] };
+    }
+    throw new Error(`SQL inesperado: ${sql}`);
+  }, release: () => undefined } as PgClient;
+  setPostgresPoolForTests({ connect: async () => client, query: client.query, end: async () => undefined } as PgPool);
+  return queries;
+};
+
+for (const settlement of [
+  { mode: 'FIXED', monthlyFixedFee: 125000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
+  { mode: 'VARIABLE', monthlyFixedFee: null, clubSharePercentage: 35.5, effectiveFrom: '2026-10-15' } as const,
+]) test(`crea actividad y primer término ${settlement.mode} con su vigencia`, async () => {
+  const queries = createPool(settlement);
+  const result = await createActivity(limitedActor, { ...input(SECTOR_A), settlement });
+  assert.equal(result.kind, 'created');
+  const insert = queries.find(({ sql }) => sql.includes('insert into miclub.activity_terms'));
+  assert.deepEqual(insert?.params?.slice(2, 6), [settlement.mode, settlement.monthlyFixedFee, settlement.clubSharePercentage, settlement.effectiveFrom]);
+  assert.equal(queries.filter(({ sql }) => sql.includes('INSERT INTO miclub.audit_log')).length, 2, 'audita actividad y término');
+  assert.equal(queries.at(-1)?.sql, 'COMMIT');
+});
+
+test('revierte atómicamente actividad y término cuando falla la auditoría', async () => {
+  const settlement = { mode: 'FIXED', monthlyFixedFee: 100, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const;
+  const queries = createPool(settlement, true);
+  await assert.rejects(createActivity(limitedActor, { ...input(SECTOR_A), settlement }), /audit unavailable/);
+  assert.equal(queries.some(({ sql }) => sql === 'ROLLBACK'), true);
+  assert.equal(queries.some(({ sql }) => sql === 'COMMIT'), false);
+});
 
 test('upsertActivity permite que una importación normalizada baje monthly_fee y audita el cambio', async () => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
@@ -77,6 +121,31 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
   assert.match(query.sql, /lower\(name\) = lower\(\$3\)/);
   assert.match(query.sql, /on conflict \(club_id, sector_id, lower\(name\), coalesce\(modality, ''::text\)\)/);
   assert.doesNotMatch(query.sql, /greatest\(miclub\.activities\.monthly_fee, excluded\.monthly_fee\)/);
+});
+
+for (const settlement of [
+  { mode: 'VARIABLE', monthlyFixedFee: null, clubSharePercentage: 42, effectiveFrom: '2026-09-01' } as const,
+  { mode: 'FIXED', monthlyFixedFee: 250000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
+]) test(`versiona un cambio de ${settlement.mode === 'FIXED' ? 'monto' : 'porcentaje'} sin reescribir el término vigente`, async () => {
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
+  const queries = installActivityPool(stored);
+  assert.equal((await updateActivity(limitedActor, ACTIVITY_ID, UPDATED_AT, { ...input(SECTOR_A), settlement })).kind, 'updated');
+  const close = queries.find(({ sql }) => sql.includes('update miclub.activity_terms'));
+  assert.match(close?.sql ?? '', /effective_to=\$3::date - 1/);
+  assert.equal(close?.params?.[2], settlement.effectiveFrom);
+  const insert = queries.find(({ sql }) => sql.includes('insert into miclub.activity_terms'));
+  assert.deepEqual(insert?.params?.slice(2, 6), [settlement.mode, settlement.monthlyFixedFee, settlement.clubSharePercentage, settlement.effectiveFrom]);
+});
+
+test('rechaza vigencias solapadas y preserva historia liquidada antes de escribir la actividad', async () => {
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
+  let queries = installActivityPool(stored);
+  assert.equal((await updateActivity(limitedActor, ACTIVITY_ID, UPDATED_AT, { ...input(SECTOR_A), settlement: { ...input(SECTOR_A).settlement, effectiveFrom: '2026-08-01' } })).kind, 'invalid_terms');
+  assert.equal(queries.some(({ sql }) => sql.includes('update miclub.activities')), false);
+
+  queries = installActivityPool(stored, true);
+  assert.equal((await updateActivity(limitedActor, ACTIVITY_ID, UPDATED_AT, input(SECTOR_A))).kind, 'settled_history');
+  assert.equal(queries.some(({ sql }) => sql.includes('update miclub.activities')), false);
 });
 
 test('upsertActivity no pisa monthly_fee cuando la cuota del import viene en blanco', async () => {

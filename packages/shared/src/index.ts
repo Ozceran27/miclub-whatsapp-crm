@@ -15,3 +15,4 @@ export * from "./contracts/requests.js";
 export * from "./contracts/onboarding.js";
 export * from "./contracts/xlsxImport.js";
 export * from "./contracts/capabilities.js";
+export * from "./contracts/activities.js";
