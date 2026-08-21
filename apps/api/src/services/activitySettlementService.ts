@@ -8,7 +8,7 @@ export type ActivityTerm = {
   sectorId: string;
   mode: "VARIABLE" | "FIXED";
   monthlyFixedFee?: number | null;
-  responsibleSharePercentage?: number | null;
+  clubSharePercentage?: number | null;
   effectiveFrom: string;
   effectiveTo?: string | null;
 };
@@ -85,8 +85,8 @@ export const validateActivityTerms = (terms: ActivityTerm[]): void => {
     sorted.forEach((term) => {
       if (!ISO_DATE.test(term.effectiveFrom) || (term.effectiveTo && !ISO_DATE.test(term.effectiveTo))) throw new Error(`Invalid activity term date for ${activityId}`);
       if (term.effectiveTo && term.effectiveTo < term.effectiveFrom) throw new Error(`Invalid activity term range for ${activityId}`);
-      if (term.mode === "VARIABLE" && !(term.responsibleSharePercentage != null && term.responsibleSharePercentage >= 0 && term.responsibleSharePercentage <= 100 && term.monthlyFixedFee == null)) throw new Error(`Invalid VARIABLE term for ${activityId}`);
-      if (term.mode === "FIXED" && !(term.monthlyFixedFee != null && term.monthlyFixedFee >= 0 && term.responsibleSharePercentage == null)) throw new Error(`Invalid FIXED term for ${activityId}`);
+      if (term.mode === "VARIABLE" && !(term.clubSharePercentage != null && term.clubSharePercentage >= 0 && term.clubSharePercentage <= 100 && term.monthlyFixedFee == null)) throw new Error(`Invalid VARIABLE term for ${activityId}`);
+      if (term.mode === "FIXED" && !(term.monthlyFixedFee != null && term.monthlyFixedFee >= 0 && term.clubSharePercentage == null)) throw new Error(`Invalid FIXED term for ${activityId}`);
     });
     for (let index = 1; index < sorted.length; index += 1) {
       const previous = sorted[index - 1];
@@ -133,7 +133,7 @@ export const calculateActivitySettlements = (input: {
         .filter((row) => row.activityId === activityId && completed(row.status) && !row.voidedAt && belongs(row.occurredAt))
         .reduce((total, row) => total + row.amount, 0));
       const responsibleGross = term.mode === "VARIABLE"
-        ? money(completedIncome * (term.responsibleSharePercentage! / 100))
+        ? money(completedIncome * ((100 - term.clubSharePercentage!) / 100))
         : money(completedIncome - term.monthlyFixedFee! * fullMonthCount(from, to));
       return { activityId, sectorId: term.sectorId, termId: term.id, mode: term.mode, completedIncome,
         responsibleGross, completedAllocations, responsibleBalance: money(responsibleGross - completedAllocations) };
