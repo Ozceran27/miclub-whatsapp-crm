@@ -3,5 +3,7 @@ const normalize = (value: string | undefined): string | undefined => {
   return trimmed ? trimmed.toLowerCase() : undefined;
 };
 
-export const isPostgresEnabled = (): boolean => normalize(process.env.POSTGRES_ENABLED) === "true";
-export const getConfiguredDataSource = (): string => normalize(process.env.DATA_SOURCE) ?? "legacy";
+export type RuntimeDataSource = "postgres";
+
+export const isPostgresEnabled = (): boolean => normalize(process.env.POSTGRES_ENABLED) !== "false";
+export const getConfiguredDataSource = (): RuntimeDataSource => "postgres";

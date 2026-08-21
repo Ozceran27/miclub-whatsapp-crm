@@ -101,7 +101,7 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
     modality: 'Mensual',
     instructorId: 'instructor-1',
     monthlyFee: 30000,
-    monthlyFeeSource: 'google_sheets_import',
+    monthlyFeeSource: 'xlsx_import',
     monthlyFeeRawText: '300000',
     monthlyFeeRawAmount: 300000,
     monthlyFeeNormalizationReason: 'scale_adjustment:300000->30000',

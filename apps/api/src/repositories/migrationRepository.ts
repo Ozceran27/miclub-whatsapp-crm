@@ -2,15 +2,15 @@ import type { QueryExecutor } from "../db/postgres.js";
 
 export type MissingEnrollmentCandidate = { id: string; dependency_reason: string | null };
 
-export const isCompletedGoogleSheetsImport = async (executor: QueryExecutor, importId: string, clubId: string): Promise<boolean> => {
+export const isCompletedXlsxImportBatch = async (executor: QueryExecutor, batchId: string, clubId: string): Promise<boolean> => {
   const result = await executor.query<{ id: string }>(
-    "select id from miclub.import_batches where id = $1 and club_id = $2 and source = 'google_sheets' and status in ('completed', 'completed_with_errors')",
-    [importId, clubId],
+    "select id from miclub.import_batches where id = $1 and club_id = $2 and source = 'xlsx_import' and status in ('completed', 'completed_with_errors')",
+    [batchId, clubId],
   );
   return result.rows.length > 0;
 };
 
-export const lockMissingEnrollments = async (executor: QueryExecutor, enrollmentIds: string[], importId: string, clubId: string): Promise<MissingEnrollmentCandidate[]> => {
+export const lockEnrollmentsMissingFromImportBatch = async (executor: QueryExecutor, enrollmentIds: string[], batchId: string, clubId: string): Promise<MissingEnrollmentCandidate[]> => {
   const result = await executor.query<MissingEnrollmentCandidate>(
     `select e.id,
             case
@@ -23,26 +23,26 @@ export const lockMissingEnrollments = async (executor: QueryExecutor, enrollment
               else null
             end as dependency_reason
        from miclub.enrollments e
-      where e.id = any($1::uuid[]) and e.club_id = $3 and e.source = 'google_sheets' and e.missing_from_import_batch_id = $2
+      where e.id = any($1::uuid[]) and e.club_id = $3 and e.source = 'xlsx_import' and e.missing_from_import_batch_id = $2
       for update`,
-    [enrollmentIds, importId, clubId],
+    [enrollmentIds, batchId, clubId],
   );
   return result.rows;
 };
 
-export const archiveMissingEnrollments = async (executor: QueryExecutor, enrollmentIds: string[], importId: string, clubId: string): Promise<string[]> => {
+export const archiveEnrollmentsMissingFromImportBatch = async (executor: QueryExecutor, enrollmentIds: string[], batchId: string, clubId: string): Promise<string[]> => {
   const result = await executor.query<{ id: string }>(
     `update miclub.enrollments
         set inactive = true,
             inactive_at = coalesce(inactive_at, now()),
-            inactive_reason = 'missing_from_google_sheets_import',
+            inactive_reason = 'missing_from_import_batch',
             superseded_at = coalesce(superseded_at, now()),
-            superseded_reason = 'missing_from_google_sheets_import',
+            superseded_reason = 'missing_from_import_batch',
             status = 'cancelado'::miclub.enrollment_status,
             updated_at = now()
-      where id = any($1::uuid[]) and club_id = $3 and source = 'google_sheets' and missing_from_import_batch_id = $2
+      where id = any($1::uuid[]) and club_id = $3 and source = 'xlsx_import' and missing_from_import_batch_id = $2
       returning id`,
-    [enrollmentIds, importId, clubId],
+    [enrollmentIds, batchId, clubId],
   );
   return result.rows.map((row) => row.id);
 };

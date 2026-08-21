@@ -29,9 +29,10 @@ Fuente: `apps/api/src/routes/authRoutes.ts`.
 | GET | `/health` | Pública |
 | GET | `/api/db/health` | Sesión + tenant |
 | GET | `/api/db/enrollment-fee-audit` | Sesión + tenant + `finance:write` |
-| POST | `/api/migration` | Sesión + tenant + `imports:run`; XLSX |
+| GET | `/api/migration/template` | Sesión + tenant + `imports:run` + capacidad `data_migration`; descarga plantilla XLSX |
+| POST | `/api/migration/uploads` | Sesión + tenant + `imports:run` + capacidad `data_migration`; dry-run o aplicación de lote XLSX |
 
-Fuentes: `apps/api/src/routes/dbRoutes.ts`, `apps/api/src/routes/importRoutes.ts` y `apps/api/src/routes/legacyCompatRoutes.ts`. El “flag” es `IMPORT_ENDPOINTS_ENABLED=true`; solo protege operaciones que leen o mutan Sheets, tal como define el router actual.
+Fuentes: `apps/api/src/routes/dbRoutes.ts`, `apps/api/src/routes/migrationUploadRoutes.ts` y `apps/api/src/routes/legacyCompatRoutes.ts`. El importador operativo acepta exclusivamente archivos XLSX y persiste lotes con origen canónico `xlsx_import`.
 
 ## Catálogos, personas y finanzas — montaje `/api`
 

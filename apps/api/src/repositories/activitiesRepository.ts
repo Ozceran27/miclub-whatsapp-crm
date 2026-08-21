@@ -156,7 +156,7 @@ export const upsertSector = async (pool: Pool, clubId: string, name: string): Pr
   if (existing.rows[0]) return existing.rows[0].id;
   const result = await pool.query<{ id: string }>(
     `insert into miclub.sectors (club_id, code, name, uses_enrollments, uses_activities, notes)
-     values ($1, $2, $3, true, true, 'Importado desde Google Sheets') returning id`,
+     values ($1, $2, $3, true, true, 'Importado desde lote XLSX') returning id`,
     [clubId, code, cleanName]
   );
   return result.rows[0]?.id ?? "";
@@ -166,7 +166,7 @@ export const upsertInstructor = async (pool: Pool, clubId: string, personId: str
   await pool.query("insert into miclub.person_kind_links (club_id, person_id, kind) values ($1, $2, 'instructor') on conflict do nothing", [clubId, personId]);
   const result = await pool.query<{ id: string }>(
     `insert into miclub.instructors (club_id, person_id, display_name, notes)
-     values ($1, $2, $3, 'Importado desde Google Sheets')
+     values ($1, $2, $3, 'Importado desde lote XLSX')
      on conflict (club_id, person_id) do update set display_name = excluded.display_name, updated_at = now()
      returning id`,
     [clubId, personId, displayName]
@@ -201,7 +201,7 @@ export const upsertActivity = async (pool: Pool, input: {
        for update
      ), upserted_activity as (
        insert into miclub.activities (club_id, sector_id, name, modality, instructor_id, manager_person_id, monthly_fee, club_commission_percent, notes)
-       values ($1, $2, $3, $4, $5, (select person_id from miclub.instructors where club_id=$1 and id=$5), $6, $7, 'Importado desde Google Sheets')
+       values ($1, $2, $3, $4, $5, (select person_id from miclub.instructors where club_id=$1 and id=$5), $6, $7, 'Importado desde lote XLSX')
        on conflict (club_id, sector_id, lower(name), coalesce(modality, ''::text)) do update
          set instructor_id = excluded.instructor_id,
              manager_person_id = coalesce(miclub.activities.manager_person_id, excluded.manager_person_id),
@@ -235,7 +235,7 @@ export const upsertActivity = async (pool: Pool, input: {
       input.clubCommissionPercent ?? 0,
       hasNormalizedMonthlyFee,
       input.clubCommissionPercent !== undefined,
-      input.monthlyFeeSource ?? "google_sheets_import",
+      input.monthlyFeeSource ?? "xlsx_import",
       input.monthlyFeeRawText ?? null,
       input.monthlyFeeRawAmount ?? null,
       input.monthlyFeeNormalizationReason ?? null,
