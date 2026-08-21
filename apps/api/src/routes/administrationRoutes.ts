@@ -8,6 +8,7 @@ import { getAdministrationWorkers } from "../services/administration/workersServ
 import { parseListQuery } from "./listQuery.js";
 import { createSector, listSectorTemplates, type SectorActor } from "../repositories/sectorsRepository.js";
 import { archiveWorker, createWorker, updateWorker, WorkerMutationError, type WorkerActor } from "../services/administration/workerMutationService.js";
+import { getPostgresPool } from "../db/postgres.js";
 
 const router = Router();
 
@@ -40,6 +41,12 @@ router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), wor
 
 router.get("/sector-templates", requirePermission(PERMISSIONS.SECTORS_VIEW), asyncHandler(async (_req, res) => {
   res.json({ items: await listSectorTemplates() });
+}));
+
+router.get("/activity-icons", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (_req, res) => {
+  const pool = await getPostgresPool();
+  const result = await pool.query("select icon_key as \"iconKey\", display_name as \"displayName\" from miclub.activity_icon_catalog order by sort_order, display_name");
+  res.json({ items: result.rows });
 }));
 
 router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_EDIT), asyncHandler(async (req, res) => {
