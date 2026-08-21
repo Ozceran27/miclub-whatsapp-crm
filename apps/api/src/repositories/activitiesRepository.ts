@@ -14,6 +14,7 @@ export type ActivityInput = {
   sectorId: string; name: string; managerPersonId: string | null; instructorId?: string | null; code?: string | null;
   modality?: string | null; color?: string | null; iconKey?: string | null; enrollmentFee?: number; monthlyFee?: number; clubCommissionPercent: number;
   instructorCommissionPercent?: number; maxCapacity?: number | null; status?: "active" | "inactive"; notes?: string | null;
+  terms?: { mode: "FIXED" | "VARIABLE"; monthlyFixedFee: number | null; clubSharePercentage: number | null };
 };
 export type ActivityRow = Record<string, unknown> & { id: string; updated_at: Date | string };
 export type ActivityMutationResult =
@@ -60,6 +61,10 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
     [actor.clubId, input.sectorId, input.managerPersonId, input.instructorId ?? null, input.code ?? null, input.name, input.modality ?? null,
       input.color ?? null, input.iconKey ?? null, input.enrollmentFee ?? input.monthlyFee ?? 0, input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
       storedActivityStatus(input.status ?? "inactive"), input.notes ?? null, actor.userId]);
+    if (input.terms) await executor.query(`insert into miclub.activity_terms
+      (club_id, activity_id, mode, monthly_fixed_fee, club_share_percentage, effective_from, created_by, updated_by)
+      values ($1,$2,$3,$4,$5,current_date,$6::uuid,$6::uuid)`,
+    [actor.clubId, result.rows[0].id, input.terms.mode, input.terms.monthlyFixedFee, input.terms.clubSharePercentage, actor.userId]);
     await auditActivity(actor, "activity.create", null, result.rows[0], executor);
     return { kind: "created", activity: result.rows[0] };
   }, pool);
@@ -98,6 +103,17 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, icon_key=$10, monthly_fee=$11, club_commission_percent=$12, instructor_commission_percent=$13, max_capacity=$14, status=$15, notes=$16, updated_at=now(), updated_by=$17::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
     [actor.clubId, id, value.sectorId, value.managerPersonId, value.instructorId ?? null, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.enrollmentFee ?? value.monthlyFee ?? 0, value.clubCommissionPercent, value.instructorCommissionPercent ?? 0, value.maxCapacity ?? null, storedActivityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
     if (!result.rows[0]) return { kind: "conflict" };
+    if (value.terms) {
+      const activeTerms = await executor.query<{ id: string }>(`select id from miclub.activity_terms where club_id=$1 and activity_id=$2
+        and current_date between effective_from and coalesce(effective_to, 'infinity'::date) order by effective_from desc limit 1 for update`, [actor.clubId, id]);
+      if (activeTerms.rows[0]) await executor.query(`update miclub.activity_terms set mode=$3, monthly_fixed_fee=$4,
+        club_share_percentage=$5, updated_at=now(), updated_by=$6::uuid where club_id=$1 and id=$2`,
+      [actor.clubId, activeTerms.rows[0].id, value.terms.mode, value.terms.monthlyFixedFee, value.terms.clubSharePercentage, actor.userId]);
+      else await executor.query(`insert into miclub.activity_terms
+        (club_id, activity_id, mode, monthly_fixed_fee, club_share_percentage, effective_from, created_by, updated_by)
+        values ($1,$2,$3,$4,$5,current_date,$6::uuid,$6::uuid)`,
+      [actor.clubId, id, value.terms.mode, value.terms.monthlyFixedFee, value.terms.clubSharePercentage, actor.userId]);
+    }
     await auditActivity(actor, "activity.update", before, result.rows[0], executor);
     return { kind: "updated", activity: result.rows[0] };
   }, pool);

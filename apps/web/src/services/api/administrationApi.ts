@@ -22,6 +22,54 @@ export const createAdministrationSector = (input: {templateId:string;color:strin
 export const getAdministrationActivities = (signal?: AbortSignal) =>
   apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100', { cache: 'no-store', signal });
 
+export type ActivityIconCatalogItem = { iconKey: string; displayName: string };
+export type ActivityInstructorCatalogItem = { id: string; displayName: string; isActive: boolean };
+export type ActivitySettlementTerms =
+  | { mode: 'FIXED'; monthlyFixedFee: number; clubSharePercentage: null }
+  | { mode: 'VARIABLE'; monthlyFixedFee: null; clubSharePercentage: number };
+export type AdministrationActivityMutation = {
+  sectorId: string;
+  instructorId: string;
+  managerPersonId: string | null;
+  code?: string | null;
+  name: string;
+  modality?: string | null;
+  color?: string | null;
+  iconKey: string;
+  /** Cuota de inscripción; deliberadamente independiente de los términos de liquidación. */
+  enrollmentFee: number;
+  instructorCommissionPercent?: number;
+  maxCapacity?: number | null;
+  status: 'active' | 'inactive';
+  notes?: string | null;
+  terms: ActivitySettlementTerms;
+};
+export type AdministrationActivityMutationResponse = { id: string; updatedAt: string } & Record<string, unknown>;
+
+export const getActivityFormCatalogs = async (signal?: AbortSignal) => {
+  const [sectors, instructors, icons] = await Promise.all([
+    getAdministrationSectors(signal),
+    apiJson<{ items: Array<{ id: string; displayName?: string; name?: string; isActive?: boolean; status?: string }> }>('/api/administration/activity-instructors', { cache: 'no-store', signal }),
+    apiJson<{ items: ActivityIconCatalogItem[] }>('/api/administration/activity-icons', { cache: 'no-store', signal }),
+  ]);
+  return {
+    sectors: sectors.items.filter((sector) => sector.operationalStatus !== 'inactive'),
+    instructors: instructors.items
+      .filter((instructor) => instructor.isActive !== false && instructor.status !== 'inactive')
+      .map((instructor) => ({ id: instructor.id, displayName: instructor.displayName ?? instructor.name ?? 'Instructor sin nombre', isActive: true })),
+    icons: icons.items,
+  };
+};
+
+export const createAdministrationActivity = (input: AdministrationActivityMutation) =>
+  apiJson<AdministrationActivityMutationResponse>('/api/activities', { method: 'POST', body: JSON.stringify(input) });
+export const updateAdministrationActivity = (id: string, updatedAt: string, input: AdministrationActivityMutation) =>
+  apiJson<AdministrationActivityMutationResponse>(`/api/activities/${encodeURIComponent(id)}` as `/${string}`, { method: 'PATCH', body: JSON.stringify({ ...input, updatedAt }) });
+export const changeAdministrationActivityStatus = (id: string, updatedAt: string, status: 'active' | 'inactive') =>
+  apiJson<AdministrationActivityMutationResponse>(`/api/activities/${encodeURIComponent(id)}/status` as `/${string}`, { method: 'PATCH', body: JSON.stringify({ updatedAt, status }) });
+export const archiveAdministrationActivity = (id: string, updatedAt: string) =>
+  apiJson<AdministrationActivityMutationResponse>(`/api/activities/${encodeURIComponent(id)}/archive` as `/${string}`, { method: 'POST', body: JSON.stringify({ updatedAt }) });
+
 export const getAdministrationWorkers = (signal?: AbortSignal) =>
   apiJson<AdministrationWorkersResponse>('/api/administration/workers?page=1&limit=100', { cache: 'no-store', signal });
 export const createAdministrationWorker = (input: AdministrationWorkerMutationDto) => apiJson('/api/administration/workers', { method: 'POST', body: JSON.stringify(input) });

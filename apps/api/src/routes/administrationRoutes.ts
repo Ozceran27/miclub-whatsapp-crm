@@ -49,6 +49,13 @@ router.get("/activity-icons", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), as
   res.json({ items: result.rows });
 }));
 
+router.get("/activity-instructors", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (req, res) => {
+  const pool = await getPostgresPool();
+  const result = await pool.query(`select id, display_name as "displayName", true as "isActive"
+    from miclub.instructors where club_id=$1 and is_active=true order by display_name, id`, [req.auth!.clubId]);
+  res.json({ items: result.rows });
+}));
+
 router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_EDIT), asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
