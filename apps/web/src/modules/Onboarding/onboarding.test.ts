@@ -50,3 +50,14 @@ test('la migración del onboarding permite aplicar un dry-run válido', () => {
   assert.match(source, /summary\?\.dryRun&&state\.summary\.errors\.length===0/);
   assert.match(source, /state\.run\(state\.summary\?\.batchId\)/);
 });
+
+test('los componentes persistidos consultan catálogos, mutan entidades y refrescan la lectura', () => {
+  const forms = readFileSync(new URL('../Administration/SetupForms.tsx', import.meta.url), 'utf8');
+  const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
+  assert.match(forms, /Promise\.all\(\[getAdministrationSectors\(\),getSectorTemplates\(\)\]\)/);
+  assert.match(forms, /createAdministrationSector[\s\S]*\/api\/sectors\/\$\{s\.id\}\/status[\s\S]*\/archive/);
+  assert.match(forms, /WorkerDetailModal[\s\S]*createAdministrationWorker[\s\S]*updateAdministrationWorker/);
+  assert.match(forms, /\/api\/instructors[\s\S]*\/api\/administration\/activity-icons/);
+  assert.match(forms, /FIXED · monto fijo[\s\S]*VARIABLE · porcentaje/);
+  assert.match(dialog, /await persistence\?\.save\(\); advance\('COMPLETED'\)/);
+});

@@ -131,6 +131,24 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
       assert.ok(Array.isArray(items) && items.length > 0, `${route} debe exponer datos iniciales`);
     }
 
+    // El onboarding debe poder crear entidades reales partiendo del tenant recién provisionado.
+    const templateCatalog = await request("/api/administration/sector-templates", {}, cookie);
+    const sectorCreated = await request("/api/administration/sectors", json({ templateId: templateCatalog.body.items[0].id, color: "#2563EB", status: "active" }), cookie);
+    assert.equal(sectorCreated.response.status, 201);
+    const workerCreated = await request("/api/administration/workers", json({ firstName: "Inés", lastName: "Instructora", dni: "32999888", email: `instructor-${databaseName}@integration.invalid`, password: "Instructor-12345", role: "INSTRUCTOR", sectorId: sectorCreated.body.id, paymentMode: "VARIABLE" }), cookie);
+    assert.equal(workerCreated.response.status, 201);
+    const instructorCatalog = await request("/api/instructors", {}, cookie);
+    assert.ok(instructorCatalog.body.length > 0);
+    const activityCreated = await request("/api/activities", json({ sectorId: sectorCreated.body.id, instructorId: instructorCatalog.body[0].id, managerPersonId: null, name: "Actividad inicial", iconKey: "other", color: "#2563EB", enrollmentFee: 1000, clubCommissionPercent: 25, instructorCommissionPercent: 75, status: "active", notes: "Término económico VARIABLE" }), cookie);
+    assert.equal(activityCreated.response.status, 201);
+    const persistedEntities = await database.query<{ sectors: string; workers: string; activities: string }>(`select
+      (select count(*) from miclub.sectors where club_id=(select id from miclub.clubs where name=$1) and archived_at is null)::text sectors,
+      (select count(*) from miclub.employees where club_id=(select id from miclub.clubs where name=$1) and archived_at is null)::text workers,
+      (select count(*) from miclub.activities where club_id=(select id from miclub.clubs where name=$1) and archived_at is null)::text activities`, [registration.club.name]);
+    assert.ok(Number(persistedEntities.rows[0].sectors) >= 4);
+    assert.ok(Number(persistedEntities.rows[0].workers) >= 2);
+    assert.equal(Number(persistedEntities.rows[0].activities), 1);
+
     const logout = await request("/auth/logout", json({}), cookie);
     assert.equal(logout.response.status, 200);
     assert.equal(logout.body.authenticated, false);
