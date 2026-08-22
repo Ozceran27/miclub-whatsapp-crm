@@ -38,19 +38,20 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
     onNext(outcome);
   };
   const goBack=()=>onBack();
-  const status = pending ? 'Guardando toda la configuración…' : error ? 'No se pudo finalizar' : 'Borrador temporal · se guardará al finalizar';
+  const optional = isSkippableStep(step);
+  const status = pending ? 'Guardando configuración…' : error ? 'No se pudo finalizar' : 'Borrador temporal';
   const nextLabel=step===1?'Empezar Configuración':'Siguiente';
   return <div className="onboarding-backdrop" data-testid="onboarding-backdrop">
     <div className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef} tabIndex={-1}>
-      <OnboardingProgress step={step} />
-      <div className="onboarding-viewport"><section className="onboarding-step" data-direction={direction} key={step} aria-busy={pending}><header className="onboarding-step__header"><span className="onboarding-step__icon" aria-hidden="true">{content.icon}</span><div><p className="onboarding-step__eyebrow">{content.eyebrow}</p><h2 id={titleId} ref={headingRef} tabIndex={-1} data-initial-focus>{content.title}</h2><p>{content.description}</p></div></header>{content.body}</section></div>
-      <div className="onboarding-save-state" data-state={error?'error':pending?'loading':'ready'} role="status" aria-live="polite"><span aria-hidden="true">{error?'!':pending?'…':'○'}</span>{status}</div>
-      {error && <div className="onboarding-error" role="alert"><p>{error}</p></div>}
-      {validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}
+      <div className="onboarding-dialog__top"><OnboardingProgress step={step} optional={optional} /></div>
+      <div className="onboarding-viewport"><section className="onboarding-step" data-direction={direction} key={step} aria-busy={pending}><header className="onboarding-step__header"><span className="onboarding-step__icon" aria-hidden="true">{content.icon}</span><div><div className="onboarding-step__meta"><p className="onboarding-step__eyebrow">{content.eyebrow}</p><span className="onboarding-requirement">{optional ? 'Opcional' : 'Obligatorio'}</span></div><h2 id={titleId} ref={headingRef} tabIndex={-1} data-initial-focus>{content.title}</h2><p>{content.description}</p></div></header>{content.body}</section></div>
       <footer className="onboarding-actions">
+        <div className="onboarding-feedback"><div className="onboarding-save-state" data-state={error?'error':pending?'loading':'ready'} role="status" aria-live="polite"><span aria-hidden="true">{error?'!':pending?'…':'○'}</span>{status}</div>{error && <div className="onboarding-error" role="alert"><p>{error}</p></div>}{validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}</div>
+        <div className="onboarding-actions__buttons">
         {step>=2&&<button className="secondary-btn" type="button" disabled={pending} onClick={goBack}>← Atrás</button>}
-        {isSkippableStep(step) && <button className="ghost-btn" type="button" disabled={pending} title="Descartar los cambios temporales de este paso y continuar" onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
+        {optional && <button className="ghost-btn" type="button" disabled={pending} title="Descartar los cambios temporales de este paso y continuar" onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
         {step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending} onClick={onComplete}>{pending ? 'Preparando tu club…' : <><ActionIcon type="launch"/>INICIAR MI CLUB</>}</button>}
+        </div>
       </footer>
     </div>
   </div>;
