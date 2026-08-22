@@ -11,7 +11,7 @@ export const getOnboardingSteps = (migrationAvailable:boolean,draft:OnboardingDr
  {eyebrow:'Espacios del club',icon:'⌂',title:'Organizá tus sectores',description:'Prepará las áreas nuevas del club.',body:<LocalSectorSetupForm items={draft.sectors} onChange={v=>update('sectors',v)}/>},
  {eyebrow:'Tu equipo',icon:'♙',title:'Sumá a tus trabajadores',description:'Prepará las altas que se crearán al finalizar.',body:<LocalWorkerSetupForm items={draft.workers} onChange={v=>update('workers',v)}/>},
  {eyebrow:'Propuesta deportiva',icon:'◆',title:'Configurá las actividades',description:'Prepará el catálogo inicial.',body:<LocalActivitySetupForm items={draft.activities} sectors={draft.sectors} onChange={v=>update('activities',v)}/>},
- {eyebrow:'Traé tu información',icon:'⇧',title:'Importá tus datos históricos',description:'Podés dejar una importación validada pendiente.',body:<MigrationStep available={migrationAvailable} onPendingImport={batchId=>update('pendingImport',batchId?{batchId}:null)}/>},
+ {eyebrow:'Traé tu información',icon:'⇧',title:'Importá tus datos históricos',description:'Conocé el modelo y prepará tus datos para importarlos después del onboarding.',body:<MigrationStep available={migrationAvailable}/>},
  {eyebrow:'Todo preparado',icon:'✓',title:'¡Tu club está listo!',description:'Al iniciar se guardará toda la configuración en una única operación.',body:<div className="onboarding-finish"><p>Revisá los datos y presioná INICIAR MI CLUB.</p></div>},
 ] as const;
 export const isSkippableStep=isOptionalOnboardingStep;

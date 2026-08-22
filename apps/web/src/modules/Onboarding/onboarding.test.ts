@@ -121,10 +121,10 @@ test('los modales secundarios atrapan foco, cierran con Escape y lo devuelven al
   assert.match(source, /aria-modal="true"/);
 });
 
-test('la migración del onboarding conserva una referencia explícita al dry-run', () => {
+test('la migración del onboarding es informativa y deriva la carga al módulo normal', () => {
   const source = readFileSync(new URL('./MigrationStep.tsx', import.meta.url), 'utf8');
-  assert.match(source, /onPendingImport/);
-  assert.doesNotMatch(source, /Aplicar este dry-run/);
+  for (const text of ['Plan Complex','Plan Club','ADMINISTRACIÓN','INSCRIPCIONES','Descargar','Adaptar','Dry-run','Confirmar','actividades, sectores y responsables','cero los tres saldos del paso 2']) assert.match(source, new RegExp(text));
+  assert.doesNotMatch(source, /type="file"|state\.run|onPendingImport|Aplicar este dry-run/);
 });
 
 test('Administración conserva wrappers persistentes y onboarding usa editores locales', () => {
