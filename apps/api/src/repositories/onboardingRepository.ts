@@ -1,4 +1,4 @@
-import { ROLE_DEFAULT_PERMISSIONS, REQUIRED_ONBOARDING_STEPS, isOptionalOnboardingStep, type CompleteOnboardingResult, type OnboardingDraft, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
+import { ROLE_DEFAULT_PERMISSIONS, REQUIRED_ONBOARDING_STEPS, type CompleteOnboardingResult, type OnboardingDraft, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
 import { hashPassword } from "../auth/passwordHasher.js";
 import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
@@ -65,19 +65,12 @@ const verifyMilestone=async(db:QueryExecutor,clubId:string,step:OnboardingStep)=
  if(!result.rows[0]?.valid)throw Object.assign(new Error("El paso todavía no cumple sus datos obligatorios."),{code:"ONBOARDING_MILESTONE_NOT_MET"});
 };
 
-export const advanceOnboarding=async(actor:OnboardingActor,target:OnboardingStep,outcome:OnboardingStepOutcome)=>withTenantTransaction(actor.clubId,async db=>{
- const before=await ensure(db,actor.clubId); if(before.status==="COMPLETED") return before;
- const departed=(target-1) as OnboardingStep;
- if(target===before.currentStep&&((outcome==="COMPLETED"&&before.completedSteps.includes(departed))||(outcome==="SKIPPED"&&before.skippedSteps.includes(departed)))) return before;
- if(target!==before.currentStep+1) throw Object.assign(new Error("Sólo se puede avanzar al paso siguiente."),{code:"ONBOARDING_INVALID_TRANSITION"});
- if(outcome==="SKIPPED"&&!isOptionalOnboardingStep(departed)) throw Object.assign(new Error("Este paso es obligatorio y no se puede omitir."),{code:"ONBOARDING_SKIP_NOT_ALLOWED"});
- if(outcome==="COMPLETED") await verifyMilestone(db,actor.clubId,departed);
- await db.query(`update miclub.club_onboarding set status='IN_PROGRESS',current_step=$2,
-  completed_steps=case when $3='COMPLETED' then array(select distinct unnest(completed_steps||$4::smallint)) else completed_steps end,
-  skipped_steps=case when $3='SKIPPED' then array(select distinct unnest(skipped_steps||$4::smallint)) else skipped_steps end,
-  started_at=coalesce(started_at,now()),updated_at=now() where club_id=$1`,[actor.clubId,target,outcome,departed]);
- const after=map((await db.query<Row>(select,[actor.clubId])).rows[0]); await audit(actor,`onboarding.${outcome.toLowerCase()}`,before,after,db); return after;
-},await getPostgresPool());
+/**
+ * @deprecated Navigation is local to the web mount. This compatibility method
+ * deliberately performs a read only; current_step/completed_steps/skipped_steps
+ * remain legacy columns until a later contract and schema migration removes them.
+ */
+export const advanceOnboarding=async(actor:OnboardingActor,_target:OnboardingStep,_outcome:OnboardingStepOutcome)=>readOnboarding(actor.clubId);
 
 export const completeOnboarding=async(actor:OnboardingActor)=>withTenantTransaction(actor.clubId,async db=>{
  const before=await ensure(db,actor.clubId); if(before.status==="COMPLETED") return before;
