@@ -49,7 +49,7 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
       {validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}
       <footer className="onboarding-actions">
         {step>=2&&<button className="secondary-btn" type="button" disabled={pending} onClick={goBack}>← Atrás</button>}
-        {isSkippableStep(step) && <button className="ghost-btn" type="button" disabled={pending} onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
+        {isSkippableStep(step) && <button className="ghost-btn" type="button" disabled={pending} title="Descartar los cambios temporales de este paso y continuar" onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
         {step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending} onClick={onComplete}>{pending ? 'Preparando tu club…' : <><ActionIcon type="launch"/>INICIAR MI CLUB</>}</button>}
       </footer>
     </div>

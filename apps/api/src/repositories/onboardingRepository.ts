@@ -94,7 +94,8 @@ export const completeOnboardingDraft=async(actor:OnboardingActor,draft:Onboardin
  const balance=(await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6,$7) batch_id",[actor.clubId,draft.openingBalances.currency,draft.openingBalances.cash,draft.openingBalances.bank,draft.openingBalances.usdCash,draft.idempotencyKey,actor.userId])).rows[0];
  const sectorMap=new Map<string,string>(),sectorIds:string[]=[];
  for(const item of draft.sectors){
-  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,color,status,is_system,created_by,updated_by) values($1,nullif($2,'')::uuid,$3,$4,$5,$6,false,$7,$7) returning id::text`,[actor.clubId,item.templateId,item.name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-'),item.name.trim(),item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
+  if(item.isSystem){const row=(await db.query<{id:string}>(`select id::text from miclub.sectors where club_id=$1 and code=$2 and is_system=true and archived_at is null`,[actor.clubId,item.code])).rows[0];if(!row)throw Object.assign(new Error('Falta un sector de sistema provisionado.'),{code:'ONBOARDING_SYSTEM_SECTOR_MISSING'});sectorMap.set(item.clientId,row.id);continue;}
+  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,color,status,is_system,created_by,updated_by) values($1,nullif($2,'')::uuid,$3,$4,$5,$6,false,$7,$7) returning id::text`,[actor.clubId,item.templateId,item.code,item.name.trim(),item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
  }
  const workerMap=new Map<string,string>(),workerIds:string[]=[];
  for(const item of draft.workers){

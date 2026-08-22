@@ -53,10 +53,12 @@ test('al completar oculta el modal antes de refrescar el dashboard y reemplazar 
 test('cada montaje empieza en paso 1 y crea un borrador temporal nuevo', () => {
   const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const firstMount = createInitialOnboardingDraft();
-  firstMount.sectors.push({clientId:'temporary',templateId:'',name:'Temporal',color:'#000000',status:'active'});
+  firstMount.sectors.push({clientId:'temporary',templateId:'',code:'temporal',name:'Temporal',color:'#000000',status:'active',isSystem:false});
   const secondMount = createInitialOnboardingDraft();
   assert.notEqual(secondMount.idempotencyKey, firstMount.idempotencyKey);
-  assert.deepEqual(secondMount.sectors, []);
+  assert.deepEqual(secondMount.sectors.map(({code,isSystem})=>({code,isSystem})), [
+    {code:'administracion',isSystem:true},{code:'tesoreria',isSystem:true},{code:'areas-comunes',isSystem:true},
+  ]);
   assert.deepEqual(secondMount.workers, []);
   assert.deepEqual(secondMount.activities, []);
   assert.equal(secondMount.pendingImport, null);
@@ -102,10 +104,12 @@ test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reduci
   assert.match(styles, /border: 2px dashed/);
 });
 
-test('la advertencia explica que importar capital histórico puede duplicar saldos', () => {
+test('la advertencia exige ceros al importar capital histórico', () => {
   const source = readFileSync(new URL('./OpeningBalancesStep.tsx', import.meta.url), 'utf8');
   assert.match(source, /Evitá duplicar tus saldos/);
-  assert.match(source, /saldos quedarán duplicados/);
+  assert.match(source, /tres saldos son obligatorios y pueden ser cero/);
+  assert.match(source, /ingresá cero en Caja, Cuenta Corriente y Dólares/);
+  assert.doesNotMatch(source, /omití este paso/);
   assert.match(source, /role="note"/);
 });
 
