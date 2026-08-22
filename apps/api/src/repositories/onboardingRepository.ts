@@ -9,15 +9,10 @@ type Row = { club_id:string; status:OnboardingStatus; current_step:number; compl
 const iso=(v:Date|string|null)=>v==null?null:new Date(v).toISOString();
 const steps=(values:number[])=>values.map(value=>value as OnboardingStep);
 
-/**
- * Product visibility rule: the walkthrough is available whenever the club has
- * neither movements nor enrollments. Status and completedAt describe progress,
- * not suppression: COMPLETED + completedAt therefore opens a read/review pass
- * while retaining the persisted milestones. A client must dismiss that review
- * locally after completing it; permanently suppressing it would require a new,
- * explicit preference instead of overloading either progress or business data.
- */
-export const isOnboardingVisible=(movementCount:number,enrollmentCount:number,_status:OnboardingStatus,_completedAt:Date|string|null)=>movementCount===0&&enrollmentCount===0;
+/** Completion is an explicit, durable product decision. Business activity can
+ * never replace it: an unfinished empty club still sees onboarding, while a
+ * completed club never sees it again even when it has no movements/enrollments. */
+export const isOnboardingVisible=(_movementCount:number,_enrollmentCount:number,status:OnboardingStatus,completedAt:Date|string|null)=>status!=="COMPLETED"&&completedAt===null;
 
 const map=(r:Row):OnboardingState=>{const movementCount=Number(r.movement_count);const enrollmentCount=Number(r.enrollment_count);return {status:r.status,currentStep:r.current_step as OnboardingStep,startedAt:iso(r.started_at),completedAt:iso(r.completed_at),createdAt:iso(r.created_at)!,updatedAt:iso(r.updated_at)!,movementCount,enrollmentCount,shouldShow:isOnboardingVisible(movementCount,enrollmentCount,r.status,r.completed_at),completedSteps:steps(r.completed_steps??[]),skippedSteps:steps(r.skipped_steps??[]),migrationAvailable:r.migration_available};};
 const select=`select o.*,
