@@ -3240,6 +3240,23 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .onboarding-save-state[data-state='error'] { color: var(--color-danger); }
 .onboarding-warning { background: color-mix(in srgb, var(--color-warning) 12%, transparent); border: 1px solid color-mix(in srgb, var(--color-warning) 45%, transparent); border-radius: 12px; padding: 14px; }
 .onboarding-warning p { margin: 6px 0; }
+.migration-intro { display: grid; gap: 18px; }
+.migration-intro h3, .migration-intro h4, .migration-intro p { margin: 0; }
+.migration-intro__plans, .migration-intro__workbook, .migration-intro__flow { border: 1px solid var(--color-border); border-radius: 16px; display: grid; gap: 14px; padding: 18px; }
+.migration-intro__heading { display: grid; gap: 5px; }
+.migration-plan-grid, .migration-sheet-grid { display: grid; gap: 12px; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.migration-plan-card { background: color-mix(in srgb,var(--color-primary) 7%,var(--color-card)); border: 1px solid color-mix(in srgb,var(--color-primary) 28%,var(--color-border)); border-radius: 14px; display: grid; gap: 8px; padding: 15px; }
+.migration-plan-card__badge { color: var(--color-primary); font-size: 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.migration-sheet-grid article { background: var(--color-card-muted); border-radius: 12px; display: grid; gap: 5px; padding: 14px; }
+.migration-reference-note { border-left: 4px solid var(--color-primary); padding: 4px 0 4px 12px; }
+.migration-intro__workbook .secondary-button { justify-self: start; }
+.migration-intro__flow ol { display: grid; gap: 10px; grid-template-columns: repeat(4,minmax(0,1fr)); list-style: none; margin: 0; padding: 0; }
+.migration-intro__flow li { display: flex; gap: 9px; }
+.migration-intro__flow li > span { align-items: center; background: var(--color-primary); border-radius: 50%; color: white; display: flex; flex: 0 0 26px; font-weight: 800; height: 26px; justify-content: center; }
+.migration-intro__flow li p { color: var(--color-text-muted); font-size: 12px; margin-top: 3px; }
+.migration-capital-warning { align-items: flex-start; background: color-mix(in srgb,var(--color-warning) 18%,var(--color-card)); border: 2px solid var(--color-warning); border-radius: 14px; display: flex; gap: 12px; padding: 16px; }
+.migration-capital-warning > span { align-items: center; background: var(--color-warning); border-radius: 50%; color: #171717; display: flex; flex: 0 0 28px; font-weight: 900; height: 28px; justify-content: center; }
+.migration-capital-warning p { margin-top: 4px; }
 .onboarding-gate-status { align-items: center; display: flex; flex-direction: column; gap: 12px; justify-content: center; min-height: 100vh; }
 .setup-manager { display: grid; gap: 14px; }
 .setup-manager > header { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
@@ -3258,7 +3275,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 @keyframes onboarding-slide-forward { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes onboarding-slide-backward { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .onboarding-step { animation: none; } .onboarding-progress li > span { transition: none; } }
-@media (max-width: 680px) { .onboarding-backdrop { align-items: flex-end; padding: 0; } .onboarding-dialog { border-radius: 20px 20px 0 0; max-height: 96dvh; padding: 18px; } .onboarding-progress li small { display: none; } .onboarding-progress ol::before { left: 5%; right: 5%; } .onboarding-step__header { align-items: flex-start; } .onboarding-step__icon { height: 46px; width: 46px; } .setup-form { grid-template-columns: 1fr; } .onboarding-actions { display: grid; grid-template-columns: 1fr; } .onboarding-actions .primary-btn { grid-row: 1; } .onboarding-error { align-items: stretch; flex-direction: column; } }
+@media (max-width: 680px) { .onboarding-backdrop { align-items: flex-end; padding: 0; } .onboarding-dialog { border-radius: 20px 20px 0 0; max-height: 96dvh; padding: 18px; } .onboarding-progress li small { display: none; } .onboarding-progress ol::before { left: 5%; right: 5%; } .onboarding-step__header { align-items: flex-start; } .onboarding-step__icon { height: 46px; width: 46px; } .setup-form, .migration-plan-grid, .migration-sheet-grid, .migration-intro__flow ol { grid-template-columns: 1fr; } .onboarding-actions { display: grid; grid-template-columns: 1fr; } .onboarding-actions .primary-btn { grid-row: 1; } .onboarding-error { align-items: stretch; flex-direction: column; } }
 .task-panel { display: grid; gap: 18px; }
 .task-panel__form { align-items: end; display: grid; gap: 12px; grid-template-columns: 1fr 1.5fr minmax(180px,.7fr) auto; }
 .task-panel__form label { color: var(--color-text-muted); display: grid; font-size: 12px; gap: 6px; }
