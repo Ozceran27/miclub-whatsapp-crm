@@ -1,4 +1,5 @@
-import { REQUIRED_ONBOARDING_STEPS, isOptionalOnboardingStep, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
+import { ROLE_DEFAULT_PERMISSIONS, REQUIRED_ONBOARDING_STEPS, isOptionalOnboardingStep, type CompleteOnboardingResult, type OnboardingDraft, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
+import { hashPassword } from "../auth/passwordHasher.js";
 import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
@@ -93,4 +94,32 @@ export const saveOpeningBalances=async(actor:OnboardingActor,input:OpeningBalanc
  const result=await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6,$7) batch_id",[actor.clubId,input.currency,input.cash,input.bank,input.usdCash,input.idempotencyKey,actor.userId]);
  await auditService.sensitiveChange({action:"onboarding.opening_balances",result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,entityType:"opening_balance_batch",entityId:result.rows[0].batch_id,requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,newData:{currency:input.currency,cash:input.cash,bank:input.bank,usdCash:input.usdCash}},db);
  return {batchId:result.rows[0].batch_id};
+},await getPostgresPool());
+
+/** The only write boundary used by the onboarding UI. Every query shares this transaction. */
+export const completeOnboardingDraft=async(actor:OnboardingActor,draft:OnboardingDraft):Promise<CompleteOnboardingResult>=>withTenantTransaction(actor.clubId,async db=>{
+ // Serialize every completion for the club; the draft key is also the unique
+ // opening-balance key, so retries can neither interleave nor duplicate data.
+ await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[actor.clubId]);
+ const before=await ensure(db,actor.clubId);
+ if(before.status==='COMPLETED')return {state:before,created:{openingBalanceBatchId:'',sectorIds:[],workerIds:[],activityIds:[]}};
+ const balance=(await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6,$7) batch_id",[actor.clubId,draft.openingBalances.currency,draft.openingBalances.cash,draft.openingBalances.bank,draft.openingBalances.usdCash,draft.idempotencyKey,actor.userId])).rows[0];
+ const sectorMap=new Map<string,string>(),sectorIds:string[]=[];
+ for(const item of draft.sectors){
+  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,color,status,is_system,created_by,updated_by) values($1,nullif($2,'')::uuid,$3,$4,$5,$6,false,$7,$7) returning id::text`,[actor.clubId,item.templateId,item.name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-'),item.name.trim(),item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
+ }
+ const workerMap=new Map<string,string>(),workerIds:string[]=[];
+ for(const item of draft.workers){
+  const passwordHash=await hashPassword(item.password!);const user=(await db.query<{id:string}>(`insert into miclub.users(email,password_hash,display_name,status,is_active) values($1,$2,$3,'active',true) returning id::text`,[item.email,passwordHash,`${item.firstName} ${item.lastName}`])).rows[0];
+  const person=(await db.query<{id:string}>(`insert into miclub.people(club_id,first_name,last_name,dni,phone,email,user_id) values($1,$2,$3,$4,$5,$6,$7) returning id::text`,[actor.clubId,item.firstName,item.lastName,item.dni,item.phone??null,item.email,user.id])).rows[0];
+  const role=(await db.query<{id:string}>(`select id::text from miclub.roles where club_id=$1 and code=$2`,[actor.clubId,item.role])).rows[0];if(!role)throw new Error('Rol de trabajador no aprovisionado.');
+  const membership=(await db.query<{id:string}>(`insert into miclub.user_club_memberships(user_id,club_id,role_id,permissions,sector_ids) values($1,$2,$3,$4,'{}') returning id::text`,[user.id,actor.clubId,role.id,[...ROLE_DEFAULT_PERMISSIONS[item.role]]])).rows[0];
+  const employee=(await db.query<{id:string}>(`insert into miclub.employees(club_id,person_id,user_id,membership_id,status,payment_mode,monthly_fixed_amount,position,created_by,updated_by) values($1,$2,$3,$4,'active',$5,$6,$7,$8,$8) returning id::text`,[actor.clubId,person.id,user.id,membership.id,item.paymentMode,item.monthlyFixedAmount??null,item.role,actor.userId])).rows[0];workerIds.push(employee.id);
+  if(item.role==='INSTRUCTOR'){const instructor=(await db.query<{id:string}>(`insert into miclub.instructors(club_id,person_id,display_name,status) values($1,$2,$3,'activa') returning id::text`,[actor.clubId,person.id,`${item.firstName} ${item.lastName}`])).rows[0];workerMap.set(item.clientId,instructor.id);}
+ }
+ const activityIds:string[]=[];
+ for(const item of draft.activities){const activity=(await db.query<{id:string}>(`insert into miclub.activities(club_id,sector_id,instructor_id,name,color,icon_key,monthly_fee,club_commission_percent,status,updated_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id::text`,[actor.clubId,sectorMap.get(item.sectorClientId),item.instructorClientId?workerMap.get(item.instructorClientId):null,item.name,item.color,item.iconKey,item.enrollmentFee,item.settlementMode==='VARIABLE'?item.economicValue:0,item.status==='active'?'activa':'suspendida',actor.userId])).rows[0];activityIds.push(activity.id);await db.query(`insert into miclub.activity_terms(club_id,activity_id,mode,monthly_fixed_fee,club_share_percentage,effective_from,created_by,updated_by) values($1,$2,$3,$4,$5,current_date,$6,$6)`,[actor.clubId,activity.id,item.settlementMode,item.settlementMode==='FIXED'?item.economicValue:null,item.settlementMode==='VARIABLE'?item.economicValue:null,actor.userId]);}
+ await db.query(`update miclub.club_onboarding set status='COMPLETED',current_step=7,completed_steps='{1,2,7}',started_at=coalesce(started_at,now()),completed_at=now(),updated_at=now() where club_id=$1`,[actor.clubId]);
+ const state=map((await db.query<Row>(select,[actor.clubId])).rows[0]);await audit(actor,'onboarding.complete',before,state,db);
+ return {state,created:{openingBalanceBatchId:balance.batch_id,sectorIds,workerIds,activityIds}};
 },await getPostgresPool());
