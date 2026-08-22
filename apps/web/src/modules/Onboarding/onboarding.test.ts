@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { getNextStep } from './OnboardingDialog';
+import { getNextStep, getPreviousStep, hasValidOpeningBalances } from './OnboardingDialog';
 import { getOnboardingSteps, isSkippableStep } from './steps';
 const draft={idempotencyKey:'test-key',openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
 const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
@@ -15,6 +15,13 @@ test('define siete pasos y solo permite omitir los pasos opcionales', () => {
 
 test('navegación conserva el límite del séptimo paso para reanudación segura', () => {
   assert.equal(getNextStep(1), 2); assert.equal(getNextStep(6), 7); assert.equal(getNextStep(7), 7);
+  assert.equal(getPreviousStep(1), 1); assert.equal(getPreviousStep(2), 1); assert.equal(getPreviousStep(7), 6);
+});
+
+test('valida saldos localmente antes de abandonar el paso obligatorio', () => {
+  assert.equal(hasValidOpeningBalances(draft.openingBalances), true);
+  assert.equal(hasValidOpeningBalances({...draft.openingBalances,cash:-1}), false);
+  assert.equal(hasValidOpeningBalances({...draft.openingBalances,bank:Number.NaN}), false);
 });
 
 test('el diálogo implementa foco inicial, trap de teclado y bloqueo externo', () => {
