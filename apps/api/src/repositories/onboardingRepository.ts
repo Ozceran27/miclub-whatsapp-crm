@@ -91,14 +91,25 @@ export const completeOnboardingDraft=async(actor:OnboardingActor,draft:Onboardin
  await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[actor.clubId]);
  const before=await ensure(db,actor.clubId);
  if(before.status==='COMPLETED')return {state:before,created:{openingBalanceBatchId:'',sectorIds:[],workerIds:[],activityIds:[]}};
+ if(draft.pendingImport){
+  const imported=await db.query(`select 1 from miclub.import_batches where id=$1 and club_id=$2 and status in ('completed','completed_with_errors')`,[draft.pendingImport.batchId,actor.clubId]);
+  if(!imported.rows[0])throw Object.assign(new Error('La importación no pertenece al club o todavía no está completa.'),{code:'ONBOARDING_IMPORT_INVALID'});
+ }
  const balance=(await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6,$7) batch_id",[actor.clubId,draft.openingBalances.currency,draft.openingBalances.cash,draft.openingBalances.bank,draft.openingBalances.usdCash,draft.idempotencyKey,actor.userId])).rows[0];
  const sectorMap=new Map<string,string>(),sectorIds:string[]=[];
  for(const item of draft.sectors){
   if(item.isSystem){const row=(await db.query<{id:string}>(`select id::text from miclub.sectors where club_id=$1 and code=$2 and is_system=true and archived_at is null`,[actor.clubId,item.code])).rows[0];if(!row)throw Object.assign(new Error('Falta un sector de sistema provisionado.'),{code:'ONBOARDING_SYSTEM_SECTOR_MISSING'});sectorMap.set(item.clientId,row.id);continue;}
-  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,color,status,is_system,created_by,updated_by) values($1,nullif($2,'')::uuid,$3,$4,$5,$6,false,$7,$7) returning id::text`,[actor.clubId,item.templateId,item.code,item.name.trim(),item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
+  // templateId is presentation metadata owned by the client. In particular it
+  // must never be accepted as a database UUID that could name another tenant.
+  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,color,status,is_system,created_by,updated_by) values($1,null,$2,$3,$4,$5,false,$6,$6) returning id::text`,[actor.clubId,item.code,item.name.trim(),item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
  }
  const workerMap=new Map<string,string>(),workerIds:string[]=[];
  for(const item of draft.workers){
+  // Do not let a supplied password take over an existing global identity. New
+  // identities use the established password hasher and plaintext never enters
+  // persisted worker/audit data.
+  const existingUser=await db.query(`select 1 from miclub.users where lower(email::text)=lower($1) for update`,[item.email]);
+  if(existingUser.rows[0])throw Object.assign(new Error('No se pudo completar el alta del trabajador.'),{code:'ONBOARDING_WORKER_IDENTITY_CONFLICT'});
   const passwordHash=await hashPassword(item.password!);const user=(await db.query<{id:string}>(`insert into miclub.users(email,password_hash,display_name,status,is_active) values($1,$2,$3,'active',true) returning id::text`,[item.email,passwordHash,`${item.firstName} ${item.lastName}`])).rows[0];
   const person=(await db.query<{id:string}>(`insert into miclub.people(club_id,first_name,last_name,dni,phone,email,user_id) values($1,$2,$3,$4,$5,$6,$7) returning id::text`,[actor.clubId,item.firstName,item.lastName,item.dni,item.phone??null,item.email,user.id])).rows[0];
   const role=(await db.query<{id:string}>(`select id::text from miclub.roles where club_id=$1 and code=$2`,[actor.clubId,item.role])).rows[0];if(!role)throw new Error('Rol de trabajador no aprovisionado.');
@@ -108,7 +119,9 @@ export const completeOnboardingDraft=async(actor:OnboardingActor,draft:Onboardin
  }
  const activityIds:string[]=[];
  for(const item of draft.activities){const activity=(await db.query<{id:string}>(`insert into miclub.activities(club_id,sector_id,instructor_id,name,color,icon_key,monthly_fee,club_commission_percent,status,updated_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id::text`,[actor.clubId,sectorMap.get(item.sectorClientId),item.instructorClientId?workerMap.get(item.instructorClientId):null,item.name,item.color,item.iconKey,item.enrollmentFee,item.settlementMode==='VARIABLE'?item.economicValue:0,item.status==='active'?'activa':'suspendida',actor.userId])).rows[0];activityIds.push(activity.id);await db.query(`insert into miclub.activity_terms(club_id,activity_id,mode,monthly_fixed_fee,club_share_percentage,effective_from,created_by,updated_by) values($1,$2,$3,$4,$5,current_date,$6,$6)`,[actor.clubId,activity.id,item.settlementMode,item.settlementMode==='FIXED'?item.economicValue:null,item.settlementMode==='VARIABLE'?item.economicValue:null,actor.userId]);}
- await db.query(`update miclub.club_onboarding set status='COMPLETED',current_step=7,completed_steps='{1,2,7}',started_at=coalesce(started_at,now()),completed_at=now(),updated_at=now() where club_id=$1`,[actor.clubId]);
+ const completed=[1,2,...(sectorIds.length?[3]:[]),...(draft.workers.length?[4]:[]),...(draft.activities.length?[5]:[]),...(draft.pendingImport?[6]:[]),7];
+ const skipped=[...(sectorIds.length?[]:[3]),...(draft.workers.length?[]:[4]),...(draft.activities.length?[]:[5]),...(draft.pendingImport?[]:[6])];
+ await db.query(`update miclub.club_onboarding set status='COMPLETED',current_step=7,completed_steps=$2,skipped_steps=$3,started_at=coalesce(started_at,now()),completed_at=coalesce(completed_at,now()),updated_at=now() where club_id=$1`,[actor.clubId,completed,skipped]);
  const state=map((await db.query<Row>(select,[actor.clubId])).rows[0]);await audit(actor,'onboarding.complete',before,state,db);
  return {state,created:{openingBalanceBatchId:balance.batch_id,sectorIds,workerIds,activityIds}};
 },await getPostgresPool());
