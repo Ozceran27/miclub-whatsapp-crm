@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createInitialOnboardingDraft } from './OnboardingGate';
 import { getNextStep, getPreviousStep, hasValidOpeningBalances } from './OnboardingDialog';
 import { getOnboardingSteps, isSkippableStep } from './steps';
 const draft={idempotencyKey:'test-key',openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
@@ -37,6 +38,20 @@ test('gate recupera el estado y sólo persiste el borrador al finalizar', () => 
   const source = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   assert.match(source, /getOnboarding\(signal\)/); assert.match(source, /completeOnboarding\(draft\)/);
   assert.doesNotMatch(source, /advanceOnboarding/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
+});
+
+test('cada montaje empieza en paso 1 y crea un borrador temporal nuevo', () => {
+  const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
+  const firstMount = createInitialOnboardingDraft();
+  firstMount.sectors.push({clientId:'temporary',templateId:'',name:'Temporal',color:'#000000',status:'active'});
+  const secondMount = createInitialOnboardingDraft();
+  assert.notEqual(secondMount.idempotencyKey, firstMount.idempotencyKey);
+  assert.deepEqual(secondMount.sectors, []);
+  assert.deepEqual(secondMount.workers, []);
+  assert.deepEqual(secondMount.activities, []);
+  assert.equal(secondMount.pendingImport, null);
+  assert.match(gate, /useState<OnboardingStep>\(1\)/);
+  assert.doesNotMatch(gate, /setVisibleStep\(state\.currentStep|useState<OnboardingStep>\(state/);
 });
 
 test('el borrador permanece local y la omisión temporal depende de la política compartida', () => {

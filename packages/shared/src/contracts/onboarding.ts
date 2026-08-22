@@ -33,6 +33,7 @@ export const isOptionalOnboardingStep = (step: number): step is OnboardingStep =
 
 export interface OnboardingState {
   status: OnboardingStatus;
+  /** @deprecated Legacy progress snapshot. Clients must start every editing session at step 1. */
   currentStep: OnboardingStep;
   startedAt: string | null;
   completedAt: string | null;
@@ -41,7 +42,9 @@ export interface OnboardingState {
   movementCount: number;
   enrollmentCount: number;
   shouldShow: boolean;
+  /** @deprecated Legacy progress snapshot; it is not updated while editing. */
   completedSteps: OnboardingStep[];
+  /** @deprecated Legacy progress snapshot; it is not updated while editing. */
   skippedSteps: OnboardingStep[];
   migrationAvailable: boolean;
 }
