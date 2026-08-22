@@ -40,6 +40,16 @@ test('gate recupera el estado y sólo persiste el borrador al finalizar', () => 
   assert.doesNotMatch(source, /advanceOnboarding/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
 });
 
+test('al completar oculta el modal antes de refrescar el dashboard y reemplazar la ruta', () => {
+  const source = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
+  const hide = source.indexOf("setState({...result.state,status:'COMPLETED',shouldShow:false})");
+  const invalidate = source.indexOf('invalidateTenantQueries(clubId)');
+  const refresh = source.indexOf('await loadHomeDashboardResources()');
+  const navigate = source.indexOf("navigate('/app', { replace: true })");
+  assert.ok(hide >= 0 && hide < invalidate);
+  assert.ok(invalidate < refresh && refresh < navigate);
+});
+
 test('cada montaje empieza en paso 1 y crea un borrador temporal nuevo', () => {
   const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const firstMount = createInitialOnboardingDraft();

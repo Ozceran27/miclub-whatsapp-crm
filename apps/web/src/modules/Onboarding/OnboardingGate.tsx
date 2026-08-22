@@ -5,6 +5,7 @@ import { invalidateTenantQueries } from '../../serverState/invalidation';
 import { useSession } from '../../session';
 import { completeOnboarding, getOnboarding } from '../../services/api/onboardingApi';
 import { getPreviousStep, OnboardingDialog } from './OnboardingDialog';
+import { loadHomeDashboardResources } from '../Home/homeDashboardApi';
 
 export const createInitialOnboardingDraft = (): OnboardingDraft => ({
   idempotencyKey: crypto.randomUUID(), openingBalances: { currency: 'ARS', cash: 0, bank: 0, usdCash: 0 },
@@ -23,7 +24,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
   useEffect(() => { if (status !== 'authenticated' || !clubId || !canRead) return; const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [canRead, clubId, load, status]);
   useEffect(() => { if (!state?.shouldShow) return; setVisibleStep(1); setDirection('forward'); }, [clubId,state?.shouldShow]);
   const updateDraft=<K extends keyof OnboardingDraft>(key:K,value:OnboardingDraft[K])=>setDraft(current=>({...current,[key]:value}));
-  const complete = async () => { setLoading(true); setError(''); try { const result = await completeOnboarding(draft); setState(result.state); invalidateTenantQueries(clubId); navigate('/app', { replace: true }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo completar el onboarding.'); } finally { setLoading(false); } };
+  const complete = async () => { setLoading(true); setError(''); try { const result = await completeOnboarding(draft); setState({...result.state,status:'COMPLETED',shouldShow:false}); invalidateTenantQueries(clubId); await loadHomeDashboardResources(); navigate('/app', { replace: true }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo completar el onboarding.'); } finally { setLoading(false); } };
   if (canRead && !state && loading) return <div className="onboarding-gate-status" role="status">Preparando la configuración de tu club…</div>;
   if (canRead && !state && error) return <div className="onboarding-gate-status" role="alert"><p>{error}</p><button className="primary-btn" onClick={() => void load()}>Reintentar</button></div>;
   const onNext=(_outcome:OnboardingStepOutcome='COMPLETED')=>{setDirection('forward');setVisibleStep(current=>Math.min(7,current+1) as OnboardingStep);};

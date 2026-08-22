@@ -12,7 +12,9 @@ test("clubId controlado por el cliente se rechaza",()=>{let status=200,next=fals
 
 test("la política exige Bienvenida y Saldos y permite postergar la configuración posterior",()=>{assert.deepEqual([...OPTIONAL_ONBOARDING_STEPS],[3,4,5,6]);assert.deepEqual([...REQUIRED_ONBOARDING_STEPS],[1,2,7]);});
 
-test("la respuesta decide visibilidad por ambos conteos y no por status/completed_at",()=>{for(const status of ["NOT_STARTED","IN_PROGRESS","COMPLETED"] as const){const completedAt=status==="COMPLETED"?new Date("2026-08-12T02:00:00.000Z"):null;const combinations=[[0,0,true],[3,0,false],[0,4,false],[3,4,false]] as const;for(const [movements,enrollments,visible] of combinations)assert.equal(isOnboardingVisible(movements,enrollments,status,completedAt),visible,`${status}: ${movements}/${enrollments}`);}});
+test("un club finalizado no reabre onboarding tras otro login aunque no tenga movimientos ni inscripciones",()=>{for(const [movements,enrollments] of [[0,0],[3,0],[0,4],[3,4]] as const)assert.equal(isOnboardingVisible(movements,enrollments,"COMPLETED",new Date("2026-08-12T02:00:00.000Z")),false);});
+
+test("saldos en cero y ausencia de actividad no sustituyen la finalización explícita",()=>{assert.equal(isOnboardingVisible(0,0,"NOT_STARTED",null),true);assert.equal(isOnboardingVisible(0,0,"IN_PROGRESS",null),true);assert.equal(isOnboardingVisible(12,8,"IN_PROGRESS",null),true);assert.equal(isOnboardingVisible(0,0,"COMPLETED",null),false);assert.equal(isOnboardingVisible(0,0,"IN_PROGRESS",new Date("2026-08-12T02:00:00.000Z")),false);});
 
 test("avance y finalización convierten precondiciones incumplidas en conflicto",()=>{
  const routes=readFileSync(new URL("./onboardingRoutes.ts",import.meta.url),"utf8");
@@ -28,6 +30,5 @@ test("el repositorio verifica hitos persistidos al avanzar y al finalizar",()=>{
  assert.match(repository,/miclub\.activities/);
  assert.match(repository,/for\(const step of requiredBeforeFinish\)await verifyMilestone/);
  assert.doesNotMatch(repository,/completedSteps\.includes\(6\).*skippedSteps\.includes\(6\)/);
- assert.match(repository,/movementCount===0&&enrollmentCount===0/);
- assert.match(repository,/COMPLETED \+ completedAt therefore opens a read\/review pass/);
+ assert.match(repository,/status!=="COMPLETED"&&completedAt===null/);
 });
