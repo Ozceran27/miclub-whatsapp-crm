@@ -4,6 +4,7 @@ export const ONBOARDING_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"] a
 export type OnboardingStatus = typeof ONBOARDING_STATUSES[number];
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type OnboardingStepOutcome = "COMPLETED" | "SKIPPED";
+export type OnboardingStepRequirement = "WELCOME" | "OPENING_BALANCES" | "SECTORS" | "WORKERS" | "ACTIVITIES" | "MIGRATION" | "FINISH";
 
 /**
  * Product policy for the onboarding flow. This is the single source of truth
@@ -11,16 +12,16 @@ export type OnboardingStepOutcome = "COMPLETED" | "SKIPPED";
  * after product explicitly marks it as optional here.
  */
 export const ONBOARDING_STEP_POLICY = {
-  1: { required: true },
-  2: { required: true },
+  1: { required: true, requirement: "WELCOME", canContinueWithEmptyDraft: false },
+  2: { required: true, requirement: "OPENING_BALANCES", canContinueWithEmptyDraft: false, requiredFields: ["currency", "cash", "bank", "usdCash"] },
   // The remaining setup can be postponed and completed later from the
   // corresponding administration screens.
-  3: { required: false },
-  4: { required: false },
-  5: { required: false },
-  6: { required: false },
-  7: { required: true },
-} as const satisfies Record<OnboardingStep, { required: boolean }>;
+  3: { required: false, requirement: "SECTORS", canContinueWithEmptyDraft: true },
+  4: { required: false, requirement: "WORKERS", canContinueWithEmptyDraft: true },
+  5: { required: false, requirement: "ACTIVITIES", canContinueWithEmptyDraft: true },
+  6: { required: false, requirement: "MIGRATION", canContinueWithEmptyDraft: true },
+  7: { required: true, requirement: "FINISH", canContinueWithEmptyDraft: false },
+} as const satisfies Record<OnboardingStep, { required: boolean; requirement: OnboardingStepRequirement; canContinueWithEmptyDraft: boolean; requiredFields?: readonly string[] }>;
 
 const onboardingStepsByRequirement = (required: boolean): OnboardingStep[] =>
   Object.entries(ONBOARDING_STEP_POLICY)
@@ -58,7 +59,13 @@ export interface OpeningBalancesResponse { batchId: string }
 export type AdvanceOnboardingResponse = OnboardingState;
 export type CompleteOnboardingResponse = OnboardingState;
 
-export interface OnboardingSectorDraft { clientId: string; templateId: string; name: string; color: string; status: "active" | "inactive" | "under_repair" }
+export const PROVISIONED_ONBOARDING_SECTORS = [
+  { clientId: "system:administracion", code: "administracion", name: "Administración", isSystem: true },
+  { clientId: "system:tesoreria", code: "tesoreria", name: "Tesorería", isSystem: true },
+  { clientId: "system:areas-comunes", code: "areas-comunes", name: "Áreas Comunes", isSystem: true },
+] as const;
+export type ProvisionedOnboardingSectorCode = typeof PROVISIONED_ONBOARDING_SECTORS[number]["code"];
+export interface OnboardingSectorDraft { clientId: string; templateId: string; code: string; name: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean }
 export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto { clientId: string }
 export interface OnboardingActivityDraft {
   clientId: string; sectorClientId: string; instructorClientId: string | null; name: string; iconKey: string; color: string;
