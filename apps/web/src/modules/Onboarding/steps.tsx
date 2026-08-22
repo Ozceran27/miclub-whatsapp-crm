@@ -8,7 +8,7 @@ import { MigrationStep } from './MigrationStep';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
 
 export const getOnboardingSteps = (migrationAvailable:boolean,draft:OnboardingDraft,update:<K extends keyof OnboardingDraft>(key:K,value:OnboardingDraft[K])=>void) => [
- {eyebrow:'Tu club empieza acá',icon:'🏟',title:'¡Te damos la bienvenida a miClub!',description:'En siete pasos breves vamos a dejar listo el espacio de gestión de tu institución.',body:<div className="onboarding-welcome"><p>La configuración se mantiene temporalmente en este navegador hasta finalizar.</p></div>},
+ {eyebrow:'Tu club empieza acá',icon:'🏟',title:'¡Te damos la bienvenida a miClub!',description:'En siete pasos breves vamos a dejar listo el espacio de gestión de tu institución.',body:<div className="onboarding-welcome"><p>Esta configuración es temporal y solo se enviará cuando pulses <strong>INICIAR MI CLUB</strong>.</p><p role="note">Si abandonás esta pantalla o refrescás la página, el asistente se reiniciará y tendrás que comenzar de nuevo.</p></div>},
  {eyebrow:'Base contable',icon:'$',title:'Definí los saldos iniciales',description:'Registrá el capital con el que comienza a operar el club.',body:<OpeningBalancesStep values={draft.openingBalances} onChange={v=>update('openingBalances',v)}/>},
  {eyebrow:'Espacios del club',icon:'⌂',title:'Organizá tus sectores',description:'Prepará las áreas nuevas del club.',body:<SectorDraftList items={draft.sectors} onChange={v=>update('sectors',v)}/>},
  {eyebrow:'Tu equipo',icon:'♙',title:'Sumá a tus trabajadores',description:'Prepará las altas que se crearán al finalizar.',body:<WorkerDraftList items={draft.workers} onChange={v=>update('workers',v)}/>},

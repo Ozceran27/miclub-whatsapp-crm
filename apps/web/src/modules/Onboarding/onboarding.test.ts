@@ -87,10 +87,11 @@ test('regresión visual: siete indicadores, acciones y estados tienen textos acc
   const progress = readFileSync(new URL('./OnboardingProgress.tsx', import.meta.url), 'utf8');
   assert.match(progress, /labels = \[[\s\S]*'Listo'/);
   assert.match(progress, /aria-current=.*'step'/);
-  assert.match(progress, /Progreso guardado/);
+  assert.match(progress, /optional \? 'Opcional' : 'Obligatorio'/);
   for (const action of ['Empezar Configuración','Siguiente','Omitir','INICIAR MI CLUB']) assert.match(dialog, new RegExp(action));
   assert.match(dialog, /aria-live="polite"/);
-  assert.match(dialog, /Borrador temporal · se guardará al finalizar/);
+  assert.match(dialog, /Borrador temporal/);
+  assert.match(dialog, /Guardando configuración…/);
   assert.doesNotMatch(dialog, /Cambios guardados/);
 });
 
@@ -100,6 +101,8 @@ test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reduci
   assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.onboarding-dialog/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/);
   assert.match(styles, /var\(--color-card\)/);
+  assert.match(styles, /backdrop-filter: blur/);
+  assert.match(styles, /height: 100dvh/);
   assert.match(styles, /\.setup-manager > ul[\s\S]*repeat\(auto-fit,minmax/);
   assert.match(styles, /border: 2px dashed/);
 });
