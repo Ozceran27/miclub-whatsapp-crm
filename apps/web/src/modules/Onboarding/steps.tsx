@@ -1,18 +1,17 @@
-import React from 'react';
+import type { OnboardingDraft } from '@miclub/shared';
 import { isOptionalOnboardingStep } from '@miclub/shared';
-import { ActivitySetupForm, SectorSetupForm, WorkerSetupForm } from '../Administration/SetupForms';
+import React from 'react';
+import { LocalActivitySetupForm, LocalSectorSetupForm, LocalWorkerSetupForm } from '../Administration/SetupForms';
 import { MigrationStep } from './MigrationStep';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
 
-export const getOnboardingSteps = (migrationAvailable: boolean) => [
-  { eyebrow:'Tu club empieza acá', icon:'🏟', title: '¡Te damos la bienvenida a miClub!', description:'En siete pasos breves vamos a dejar listo el espacio de gestión de tu institución.', body: <div className="onboarding-welcome"><p>Configurá saldos, sectores, equipo y actividades. Podés omitir las secciones opcionales y completarlas más adelante desde Administración.</p><div className="onboarding-hero" aria-hidden="true">miClub</div><p className="onboarding-tip"><span aria-hidden="true">✓</span> Cada avance queda guardado para que puedas retomar cuando quieras.</p></div> },
-  { eyebrow:'Base contable', icon:'$', title: 'Definí los saldos iniciales', description:'Registrá el capital con el que comienza a operar el club en miClub.', body: <OpeningBalancesStep /> },
-  { eyebrow:'Espacios del club', icon:'⌂', title: 'Organizá tus sectores', description:'Creá las áreas donde sucede la actividad diaria y definí su estado operativo.', body: <><p>Los sectores del sistema están protegidos. Podrás sumar otros desde el catálogo y editarlos más adelante.</p><SectorSetupForm /></> },
-  { eyebrow:'Tu equipo', icon:'♙', title: 'Sumá a tus trabajadores', description:'Registrá a las personas que participan en la administración y operación del club.', body: <><p>Asigná datos laborales y accesos. La ficha se abre en una ventana accesible que podés cerrar con Escape.</p><WorkerSetupForm /></> },
-  { eyebrow:'Propuesta deportiva', icon:'◆', title: 'Configurá las actividades', description:'Relacioná cada propuesta con un sector, un instructor y sus condiciones económicas.', body: <><p>Podés crear una actividad inicial ahora o completar el catálogo después desde Administración.</p><ActivitySetupForm /></> },
-  { eyebrow:'Traé tu información', icon:'⇧', title: 'Importá tus datos históricos', description:'Validá una planilla antes de incorporar información previa a miClub.', body: <MigrationStep available={migrationAvailable} /> },
-  { eyebrow:'Todo preparado', icon:'✓', title: '¡Tu club está listo!', description:'Completaste la configuración inicial y ya podés empezar a gestionar desde el panel principal.', body: <div className="onboarding-finish"><div className="onboarding-hero" aria-hidden="true">✓</div><p>Tu progreso quedó guardado. Desde Administración podrás revisar sectores, trabajadores, actividades y preferencias cuando lo necesites.</p></div> }
+export const getOnboardingSteps = (migrationAvailable:boolean,draft:OnboardingDraft,update:<K extends keyof OnboardingDraft>(key:K,value:OnboardingDraft[K])=>void) => [
+ {eyebrow:'Tu club empieza acá',icon:'🏟',title:'¡Te damos la bienvenida a miClub!',description:'En siete pasos breves vamos a dejar listo el espacio de gestión de tu institución.',body:<div className="onboarding-welcome"><p>La configuración se mantiene temporalmente en este navegador hasta finalizar.</p></div>},
+ {eyebrow:'Base contable',icon:'$',title:'Definí los saldos iniciales',description:'Registrá el capital con el que comienza a operar el club.',body:<OpeningBalancesStep values={draft.openingBalances} onChange={v=>update('openingBalances',v)}/>},
+ {eyebrow:'Espacios del club',icon:'⌂',title:'Organizá tus sectores',description:'Prepará las áreas nuevas del club.',body:<LocalSectorSetupForm items={draft.sectors} onChange={v=>update('sectors',v)}/>},
+ {eyebrow:'Tu equipo',icon:'♙',title:'Sumá a tus trabajadores',description:'Prepará las altas que se crearán al finalizar.',body:<LocalWorkerSetupForm items={draft.workers} onChange={v=>update('workers',v)}/>},
+ {eyebrow:'Propuesta deportiva',icon:'◆',title:'Configurá las actividades',description:'Prepará el catálogo inicial.',body:<LocalActivitySetupForm items={draft.activities} sectors={draft.sectors} onChange={v=>update('activities',v)}/>},
+ {eyebrow:'Traé tu información',icon:'⇧',title:'Importá tus datos históricos',description:'Podés dejar una importación validada pendiente.',body:<MigrationStep available={migrationAvailable} onPendingImport={batchId=>update('pendingImport',batchId?{batchId}:null)}/>},
+ {eyebrow:'Todo preparado',icon:'✓',title:'¡Tu club está listo!',description:'Al iniciar se guardará toda la configuración en una única operación.',body:<div className="onboarding-finish"><p>Revisá los datos y presioná INICIAR MI CLUB.</p></div>},
 ] as const;
-
-export const ONBOARDING_STEPS = getOnboardingSteps(true);
-export const isSkippableStep = isOptionalOnboardingStep;
+export const isSkippableStep=isOptionalOnboardingStep;

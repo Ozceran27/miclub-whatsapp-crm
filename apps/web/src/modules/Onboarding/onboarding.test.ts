@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { getNextStep } from './OnboardingDialog';
-import { isSkippableStep, ONBOARDING_STEPS } from './steps';
+import { getOnboardingSteps, isSkippableStep } from './steps';
+const draft={idempotencyKey:'test-key',openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
+const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
 
 test('define siete pasos y solo permite omitir los pasos opcionales', () => {
   assert.equal(ONBOARDING_STEPS.length, 7);
@@ -24,16 +26,16 @@ test('el diálogo implementa foco inicial, trap de teclado y bloqueo externo', (
   assert.doesNotMatch(source, /onMouseDown|onClick=\{onClose\}/);
 });
 
-test('gate recupera currentStep del servidor y persiste cada avance', () => {
+test('gate recupera el estado y sólo persiste el borrador al finalizar', () => {
   const source = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
-  assert.match(source, /getOnboarding\(signal\)/); assert.match(source, /state\.currentStep/);
-  assert.match(source, /advanceOnboarding\(step,outcome\)/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
+  assert.match(source, /getOnboarding\(signal\)/); assert.match(source, /completeOnboarding\(draft\)/);
+  assert.doesNotMatch(source, /advanceOnboarding/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
 });
 
-test('F5 vuelve a renderizar el paso persistido y la omisión temporal depende de la política compartida', () => {
+test('el borrador permanece local y la omisión temporal depende de la política compartida', () => {
   const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
-  assert.match(gate, /step=\{state\.currentStep\}/);
+  assert.match(gate, /useState<OnboardingDraft>/);
   assert.match(dialog, /isSkippableStep\(step\).*Omitir/s);
   assert.equal(isSkippableStep(2), false);
   assert.equal(isSkippableStep(5), true);
@@ -52,10 +54,10 @@ test('regresión visual: siete indicadores, acciones y estados tienen textos acc
   assert.match(progress, /labels = \[[\s\S]*'Listo'/);
   assert.match(progress, /aria-current=.*'step'/);
   assert.match(progress, /Progreso guardado/);
-  for (const action of ['Empezar Configuración','Siguiente','Omitir','INICIAR MI CLUB','Reintentar']) assert.match(dialog, new RegExp(action));
+  for (const action of ['Empezar Configuración','Siguiente','Omitir','INICIAR MI CLUB']) assert.match(dialog, new RegExp(action));
   assert.match(dialog, /aria-live="polite"/);
-  assert.match(dialog, /Guardando este paso/);
-  assert.match(dialog, /No se guardaron los últimos cambios/);
+  assert.match(dialog, /Borrador temporal · se guardará al finalizar/);
+  assert.doesNotMatch(dialog, /Cambios guardados/);
 });
 
 test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reducido', () => {
@@ -83,13 +85,13 @@ test('los modales secundarios atrapan foco, cierran con Escape y lo devuelven al
   assert.match(source, /aria-modal="true"/);
 });
 
-test('la migración del onboarding permite aplicar un dry-run válido', () => {
+test('la migración del onboarding conserva una referencia explícita al dry-run', () => {
   const source = readFileSync(new URL('./MigrationStep.tsx', import.meta.url), 'utf8');
-  assert.match(source, /summary\?\.dryRun&&state\.summary\.errors\.length===0/);
-  assert.match(source, /state\.run\(state\.summary\?\.batchId\)/);
+  assert.match(source, /onPendingImport/);
+  assert.doesNotMatch(source, /Aplicar este dry-run/);
 });
 
-test('los componentes persistidos consultan catálogos, mutan entidades y refrescan la lectura', () => {
+test('Administración conserva wrappers persistentes y onboarding usa editores locales', () => {
   const forms = readFileSync(new URL('../Administration/SetupForms.tsx', import.meta.url), 'utf8');
   const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
   assert.match(forms, /Promise\.all\(\[getAdministrationSectors\(\),getSectorTemplates\(\)\]\)/);
@@ -97,5 +99,6 @@ test('los componentes persistidos consultan catálogos, mutan entidades y refres
   assert.match(forms, /WorkerDetailModal[\s\S]*createAdministrationWorker[\s\S]*updateAdministrationWorker/);
   assert.match(forms, /\/api\/instructors[\s\S]*\/api\/administration\/activity-icons/);
   assert.match(forms, /FIXED · monto fijo[\s\S]*VARIABLE · porcentaje/);
-  assert.match(dialog, /await persistence\?\.save\(\); advance\('COMPLETED'\)/);
+  assert.match(forms, /LocalSectorSetupForm/); assert.match(forms, /LocalWorkerSetupForm/); assert.match(forms, /LocalActivitySetupForm/);
+  assert.doesNotMatch(dialog, /persistence\?\.save/);
 });
