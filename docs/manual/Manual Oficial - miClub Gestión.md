@@ -66,6 +66,10 @@ Botón Sincronizar: vuelve a ejecutar loadHome y recarga en paralelo todos los e
 
 Origen de datos: DATA_SOURCE=postgres activa PostgreSQL mediante shouldUsePostgresDataSource. Google Sheets no es backend ni proceso de migración disponible: su API, credenciales y dependencia `googleapis` fueron retiradas.
 
+## Plan y migración durante el onboarding
+
+El asistente comienza en `FREE`, que no permite importar. Se puede continuar gratis o elegir `SOCIAL`, `COMPLEX` o `CLUB`, cuyos entitlements habilitan el módulo **Migración** para usarlo desde el panel después de finalizar. La guía XLSX está dividida en secciones desplegables. En esta fase no hay precios, cobro ni formulario de tarjeta; los planes pagos sólo se eligen libremente en pruebas y en producción esperan la integración de billing.
+
 Tablas/servicios: /sync-status usa getPostgresHealth y validatePostgresEnv. Los datos funcionales se construyen desde people, enrollments, activities, sectors, movements, operational_balances y sheet_metric_snapshots.
 
 

@@ -1,10 +1,7 @@
 # Capabilities de club
 
-Las funcionalidades de producto habilitadas para un tenant se resuelven exclusivamente desde
-`miclub.club_capabilities`. Cada grant registra su fuente, actor y ventana de vigencia. El permiso
-RBAC continúa siendo una condición independiente: `DATA_MIGRATION` no reemplaza `imports:run`.
+Las capabilities efectivas se resuelven con dos fuentes: un override vigente de `miclub.club_capabilities` tiene prioridad; de lo contrario se consulta el entitlement de una suscripción vigente con `billing_status='active'`. RBAC continúa siendo independiente: `DATA_MIGRATION` no reemplaza `imports.run`.
 
-Las rutas y la interfaz no deben inferir capabilities a partir del nombre de un plan. La asociación
-futura entre planes comerciales y capabilities, incluidos altas, bajas y cambios de plan, pertenece
-al módulo de **billing**. Billing deberá materializar esos cambios como grants explícitos y auditables;
-el servicio central de capabilities sólo los consume.
+El catálogo canónico y único es `FREE`, `SOCIAL`, `COMPLEX`, `CLUB`. Los tres planes pagos tienen `DATA_MIGRATION`; Free no. `DEVELOPMENT`, planes inactivos y los códigos históricos no son elegibles. `GET /api/commercial-plans` expone en modo read-only esos cuatro planes y sus capabilities, deliberadamente sin precios.
+
+Al completar onboarding, la suscripción se actualiza antes de resolver nuevamente el estado. Por eso Migración aparece inmediatamente para un plan activo. `pending_payment` modela la futura pasarela y no concede entitlements. Los cambios registran `onboarding.plan.change` en auditoría.

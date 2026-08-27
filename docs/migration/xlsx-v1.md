@@ -1,5 +1,9 @@
 # Contrato de importación de `Modelo_Import_miClub.xlsx`
 
+## Acceso desde onboarding
+
+La guía se presenta en secciones progresivas para poder consultar primero la estructura y luego el flujo sin scroll excesivo. `FREE` no permite importar. Una suscripción activa `SOCIAL`, `COMPLEX` o `CLUB` habilita el módulo **Migración** después de terminar el onboarding; la carga nunca ocurre dentro del asistente. El cobro aún no está implementado y no se recopilan datos de tarjeta.
+
 ## Inspección y decisión contractual
 
 La fuente inspeccionada es `apps/api/data/db/Modelo_Import_miClub.xlsx`. El libro contiene exactamente las hojas `ADMINISTRACIÓN` e `INSCRIPCIONES`, ambas con cabecera en la fila 1 y datos desde la fila 2. **El orden de las hojas no es contractual**: sólo importan el conjunto exacto de nombres y la firma física de cabeceras de cada hoja. No se aceptan hojas adicionales.

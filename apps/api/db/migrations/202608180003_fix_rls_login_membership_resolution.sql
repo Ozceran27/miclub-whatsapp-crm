@@ -37,11 +37,11 @@ ALTER FUNCTION miclub.resolve_login_membership(uuid) OWNER TO miclub_admin;
 REVOKE ALL ON FUNCTION miclub.resolve_login_membership(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION miclub.resolve_login_membership(uuid) TO miclub_runtime;
 
--- ENTERPRISE is the highest commercial tier and receives the complete current
+-- CLUB is the highest commercial tier and receives the complete current
 -- feature catalog. DEVELOPMENT remains non-commercial; no application branch
 -- treats it as a customer plan.
 INSERT INTO miclub.plan_entitlements (plan_code, feature_code)
-SELECT 'ENTERPRISE', feature.code
+SELECT 'CLUB', feature.code
   FROM miclub.features feature
 ON CONFLICT (plan_code, feature_code) DO NOTHING;
 

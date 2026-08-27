@@ -53,6 +53,7 @@ import economyRoutes from "./routes/economyRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import administrationRoutes from "./routes/administrationRoutes.js";
 import onboardingRoutes from "./routes/onboardingRoutes.js";
+import commercialPlanRoutes from "./routes/commercialPlanRoutes.js";
 import readOnlyRoutes from "./routes/readOnlyRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import migrationUploadRoutes from "./routes/migrationUploadRoutes.js";
@@ -131,6 +132,7 @@ app.use("/api", enrollmentMutationRoutes);
 app.use("/api/economy", economyRoutes);
 app.use("/api/administration", administrationRoutes);
 app.use("/api", onboardingRoutes);
+app.use("/api", commercialPlanRoutes);
 app.use("/api", dashboardRoutes);
 
 app.use(createLegacyCompatRoutes());

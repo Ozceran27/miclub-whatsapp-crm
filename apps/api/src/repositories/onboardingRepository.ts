@@ -3,6 +3,8 @@ import { hashPassword } from "../auth/passwordHasher.js";
 import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
+import { billingService } from "../services/billingService.js";
+import { readCommercialPlanCatalog } from "../services/planCommercialCatalog.js";
 import { storedEntityStatus } from "./entityStatusRepository.js";
 
 export type OnboardingActor = { userId:string; membershipId:string; clubId:string; requestId?:string; ip?:string; userAgent?:string };
@@ -27,7 +29,8 @@ const select=`select o.*,
    exists(select 1 from miclub.club_subscriptions s
      join miclub.plan_entitlements e on e.plan_code=s.plan_code
      where s.club_id=o.club_id and e.feature_code='DATA_MIGRATION'
-       and s.effective_from<=now() and (s.effective_until is null or s.effective_until>now())),
+       and s.effective_from<=now() and (s.effective_until is null or s.effective_until>now())
+       and s.billing_status='active'),
    false) migration_available
  from miclub.club_onboarding o where o.club_id=$1`;
 const ensure=async(db:QueryExecutor,clubId:string)=>{await db.query("insert into miclub.club_onboarding (club_id) values ($1) on conflict (club_id) do nothing",[clubId]);return map((await db.query<Row>(select,[clubId])).rows[0]);};
@@ -92,6 +95,21 @@ export const completeOnboardingDraft=async(actor:OnboardingActor,draft:Onboardin
  await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[actor.clubId]);
  const before=await ensure(db,actor.clubId);
  if(before.status==='COMPLETED')return {state:before,created:{openingBalanceBatchId:'',sectorIds:[],workerIds:[],activityIds:[]}};
+ const catalog=await readCommercialPlanCatalog(db);
+ const selectedPlan=catalog.find(plan=>plan.code===draft.selectedPlanCode);
+ if(!selectedPlan)throw Object.assign(new Error('El plan no está activo en el catálogo comercial.'),{code:'ONBOARDING_PLAN_INVALID'});
+ if(draft.pendingImport&&!selectedPlan.capabilities.includes('DATA_MIGRATION'))throw Object.assign(new Error('Free no permite importar. Elegí un plan habilitado o continuá sin migración.'),{code:'ONBOARDING_PLAN_MIGRATION_FORBIDDEN'});
+ const billing=billingService.prepareOnboardingSelection(selectedPlan.code);
+ const currentSubscription=(await db.query<{id:string;plan_code:string;billing_status:string}>(`select id::text,plan_code,billing_status from miclub.club_subscriptions
+   where club_id=$1 and effective_from<=now() and (effective_until is null or effective_until>now())
+   order by effective_from desc,id desc limit 1 for update`,[actor.clubId])).rows[0];
+ if(currentSubscription?.plan_code!==selectedPlan.code||currentSubscription.billing_status!==billing.status){
+  await db.query(`update miclub.club_subscriptions set effective_until=now()
+    where club_id=$1 and effective_from<now() and (effective_until is null or effective_until>now())`,[actor.clubId]);
+  const subscription=(await db.query<{id:string}>(`insert into miclub.club_subscriptions(club_id,plan_code,effective_from,billing_status)
+    values($1,$2,now(),$3) returning id::text`,[actor.clubId,selectedPlan.code,billing.status])).rows[0];
+  await auditService.sensitiveChange({action:'onboarding.plan.change',result:'success',userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,entityType:'club_subscription',entityId:subscription.id,requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,oldData:currentSubscription??{},newData:{planCode:selectedPlan.code,billingStatus:billing.status,billingSource:billing.source}},db);
+ }
  if(draft.pendingImport){
   const imported=await db.query(`select 1 from miclub.import_batches where id=$1 and club_id=$2 and status in ('completed','completed_with_errors')`,[draft.pendingImport.batchId,actor.clubId]);
   if(!imported.rows[0])throw Object.assign(new Error('La importación no pertenece al club o todavía no está completa.'),{code:'ONBOARDING_IMPORT_INVALID'});
