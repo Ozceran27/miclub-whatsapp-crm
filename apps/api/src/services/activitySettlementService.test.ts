@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { aggregateActivitySettlementsBySector, calculateActivitySettlements, validateActivityTerms, type ActivityTerm } from "./activitySettlementService.js";
 
-const term = (overrides: Partial<ActivityTerm> = {}): ActivityTerm => ({ id: "t1", activityId: "a1", sectorId: "s1", mode: "VARIABLE", clubSharePercentage: 40, effectiveFrom: "2026-01-01", ...overrides });
+const term = (overrides: Partial<ActivityTerm> = {}): ActivityTerm => ({ id: "t1", activityId: "a1", sectorId: "s1", mode: "VARIABLE", fixedClubFee: null, fixedFeeFrequency: null, clubSharePercentage: 40, effectiveFrom: "2026-01-01", ...overrides });
 const calculate = (terms: ActivityTerm[], income: number, paid: number, extras: Record<string, unknown> = {}) => calculateActivitySettlements({
   period: { from: "2026-08-01", to: "2026-08-31" }, terms,
   incomes: [{ activityId: "a1", occurredAt: "2026-08-10T03:00:00Z", amount: income, status: "COMPLETADO", ...(extras.income as object) }],
@@ -10,7 +10,7 @@ const calculate = (terms: ActivityTerm[], income: number, paid: number, extras: 
 })[0];
 
 test("Arte VARIABLE: 100.000 / club 40 / responsable 60 / pagado 20.000 = 40.000", () => assert.equal(calculate([term()], 100_000, 20_000).responsibleBalance, 40_000));
-test("Karate FIXED: 500.000 - fijo 150.000 - pagado 30.000 = 320.000", () => assert.equal(calculate([term({ mode: "FIXED", clubSharePercentage: null, monthlyFixedFee: 150_000 })], 500_000, 30_000).responsibleBalance, 320_000));
+test("Karate FIXED: 500.000 - fijo 150.000 - pagado 30.000 = 320.000", () => assert.equal(calculate([term({ mode: "FIXED", clubSharePercentage: null, fixedFeeFrequency: "MONTHLY", fixedClubFee: 150_000 })], 500_000, 30_000).responsibleBalance, 320_000));
 test("excluye pendientes, cancelados y anulados", () => {
   assert.equal(calculate([term()], 100_000, 20_000, { income: { status: "PENDIENTE" } }).responsibleBalance, -20_000);
   assert.equal(calculate([term()], 100_000, 20_000, { allocation: { status: "CANCELADO" } }).responsibleBalance, 60_000);
@@ -50,7 +50,7 @@ test("asigna ingresos al término local y suma subtotales cuando cambia el porce
 });
 
 test("FIXED multiplica la cuota únicamente para meses calendario completos", () => {
-  const fixed = term({ mode: "FIXED", clubSharePercentage: null, monthlyFixedFee: 150_000 });
+  const fixed = term({ mode: "FIXED", clubSharePercentage: null, fixedFeeFrequency: "MONTHLY", fixedClubFee: 150_000 });
   const rows = calculateActivitySettlements({
     period: { from: "2026-07-01", to: "2026-08-31" }, terms: [fixed],
     incomes: [{ activityId: "a1", occurredAt: "2026-08-10", amount: 650_000, status: "COMPLETADO" }], allocations: [],

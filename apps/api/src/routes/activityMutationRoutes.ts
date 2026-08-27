@@ -22,20 +22,21 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "code", "name", "modality", "color", "iconKey", "enrollmentFee", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
+  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "code", "name", "modality", "color", "iconKey", "enrollmentFee", "enrollmentFeeFrequency", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
   if (body.instructorId !== undefined && body.instructorId !== null && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "VALIDATION_ERROR", "instructorId debe ser UUID o null."); return null; }
-  for (const field of ["enrollmentFee", "instructorCommissionPercent"] as const) if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]) || body[field] < 0)) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser un número no negativo.`); return null; }
+  for (const field of ["enrollmentFee", "enrollmentFeeFrequency", "instructorCommissionPercent"] as const) if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]) || body[field] < 0)) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser un número no negativo.`); return null; }
+  if (body.enrollmentFeeFrequency !== undefined && !["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(body.enrollmentFeeFrequency))) { fail(res, 400, "VALIDATION_ERROR", "enrollmentFeeFrequency no es válida."); return null; }
   const settlement = body.settlement as Record<string, unknown> | undefined;
   if (!settlement) { fail(res, 400, "VALIDATION_ERROR", "settlement es obligatorio."); return null; }
   const keys = Object.keys(settlement); const mode = settlement.mode;
   const parsedEffectiveFrom = typeof settlement.effectiveFrom === "string" ? new Date(`${settlement.effectiveFrom}T00:00:00Z`) : null;
   const effectiveFromValid = typeof settlement.effectiveFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(settlement.effectiveFrom)
     && !Number.isNaN(parsedEffectiveFrom?.getTime()) && parsedEffectiveFrom?.toISOString().slice(0, 10) === settlement.effectiveFrom;
-  const fixedValid = mode === "FIXED" && typeof settlement.monthlyFixedFee === "number" && Number.isFinite(settlement.monthlyFixedFee) && settlement.monthlyFixedFee >= 0 && settlement.clubSharePercentage === null;
-  const variableValid = mode === "VARIABLE" && settlement.monthlyFixedFee === null && typeof settlement.clubSharePercentage === "number" && Number.isFinite(settlement.clubSharePercentage) && settlement.clubSharePercentage >= 0 && settlement.clubSharePercentage <= 100;
-  if (keys.some((key) => !["mode", "monthlyFixedFee", "clubSharePercentage", "effectiveFrom"].includes(key)) || !effectiveFromValid || (!fixedValid && !variableValid)) { fail(res, 400, "VALIDATION_ERROR", "La liquidación FIXED o VARIABLE no es válida."); return null; }
+  const fixedValid = mode === "FIXED" && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(settlement.fixedFeeFrequency)) && typeof settlement.fixedClubFee === "number" && Number.isFinite(settlement.fixedClubFee) && settlement.fixedClubFee >= 0 && settlement.clubSharePercentage === null;
+  const variableValid = mode === "VARIABLE" && settlement.fixedFeeFrequency === null && settlement.fixedClubFee === null && typeof settlement.clubSharePercentage === "number" && Number.isFinite(settlement.clubSharePercentage) && settlement.clubSharePercentage >= 0 && settlement.clubSharePercentage <= 100;
+  if (keys.some((key) => !["mode", "fixedClubFee", "fixedFeeFrequency", "clubSharePercentage", "effectiveFrom"].includes(key)) || !effectiveFromValid || (!fixedValid && !variableValid)) { fail(res, 400, "VALIDATION_ERROR", "La liquidación FIXED o VARIABLE no es válida."); return null; }
   if (body.maxCapacity !== undefined && body.maxCapacity !== null && (!Number.isInteger(body.maxCapacity) || Number(body.maxCapacity) < 0)) { fail(res, 400, "VALIDATION_ERROR", "maxCapacity debe ser entero no negativo."); return null; }
   if (body.status !== undefined && !["active", "inactive"].includes(String(body.status))) { fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); return null; }
   if ((body.status ?? "inactive") === "active" && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "ACTIVE_ACTIVITY_REQUIRES_INSTRUCTOR", "Una actividad activa requiere instructor responsable."); return null; }

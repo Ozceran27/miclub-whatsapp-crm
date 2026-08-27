@@ -1,6 +1,8 @@
 export type ActivitySettlementMutation =
-  | { mode: "FIXED"; monthlyFixedFee: number; clubSharePercentage: null; effectiveFrom: string }
-  | { mode: "VARIABLE"; monthlyFixedFee: null; clubSharePercentage: number; effectiveFrom: string };
+  | { mode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; clubSharePercentage: null; effectiveFrom: string }
+  | { mode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; clubSharePercentage: number; effectiveFrom: string };
+
+import type { ActivityFeeFrequency } from './onboarding.js';
 
 /** Canonical write contract. Economic values only live under `settlement`. */
 export interface ActivityMutationContract {
@@ -13,6 +15,7 @@ export interface ActivityMutationContract {
   color?: string | null;
   iconKey?: string | null;
   enrollmentFee?: number;
+  enrollmentFeeFrequency?: ActivityFeeFrequency;
   instructorCommissionPercent?: number;
   maxCapacity?: number | null;
   status?: "active" | "inactive";

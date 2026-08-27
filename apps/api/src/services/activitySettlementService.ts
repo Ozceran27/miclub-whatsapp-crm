@@ -7,7 +7,8 @@ export type ActivityTerm = {
   activityId: string;
   sectorId: string;
   mode: "VARIABLE" | "FIXED";
-  monthlyFixedFee?: number | null;
+  fixedClubFee?: number | null;
+  fixedFeeFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | null;
   clubSharePercentage?: number | null;
   effectiveFrom: string;
   effectiveTo?: string | null;
@@ -61,6 +62,13 @@ const fullMonthCount = (from: string, to: string) => {
   const end = dateAtUtc(to);
   return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth() + 1;
 };
+const fixedPeriodCount = (from: string, to: string, frequency: NonNullable<ActivityTerm["fixedFeeFrequency"]>) => {
+  const days = Math.round((dateAtUtc(to).valueOf() - dateAtUtc(from).valueOf()) / 86_400_000) + 1;
+  if (frequency === "DAILY") return days;
+  if (frequency === "WEEKLY") return Math.ceil(days / 7);
+  if (frequency === "MONTHLY") return fullMonthCount(from, to);
+  return Math.ceil(fullMonthCount(from, to) / 12);
+};
 
 const localDate = (value: string | Date): string => {
   if (typeof value === "string" && ISO_DATE.test(value)) return value;
@@ -85,8 +93,8 @@ export const validateActivityTerms = (terms: ActivityTerm[]): void => {
     sorted.forEach((term) => {
       if (!ISO_DATE.test(term.effectiveFrom) || (term.effectiveTo && !ISO_DATE.test(term.effectiveTo))) throw new Error(`Invalid activity term date for ${activityId}`);
       if (term.effectiveTo && term.effectiveTo < term.effectiveFrom) throw new Error(`Invalid activity term range for ${activityId}`);
-      if (term.mode === "VARIABLE" && !(term.clubSharePercentage != null && term.clubSharePercentage >= 0 && term.clubSharePercentage <= 100 && term.monthlyFixedFee == null)) throw new Error(`Invalid VARIABLE term for ${activityId}`);
-      if (term.mode === "FIXED" && !(term.monthlyFixedFee != null && term.monthlyFixedFee >= 0 && term.clubSharePercentage == null)) throw new Error(`Invalid FIXED term for ${activityId}`);
+      if (term.mode === "VARIABLE" && !(term.clubSharePercentage != null && term.clubSharePercentage >= 0 && term.clubSharePercentage <= 100 && term.fixedClubFee == null && term.fixedFeeFrequency == null)) throw new Error(`Invalid VARIABLE term for ${activityId}`);
+      if (term.mode === "FIXED" && !(term.fixedClubFee != null && term.fixedClubFee >= 0 && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(term.fixedFeeFrequency)) && term.clubSharePercentage == null)) throw new Error(`Invalid FIXED term for ${activityId}`);
     });
     for (let index = 1; index < sorted.length; index += 1) {
       const previous = sorted[index - 1];
@@ -100,8 +108,8 @@ export const validateActivityTerms = (terms: ActivityTerm[]): void => {
 /**
  * Positive balance means an amount owed to the activity responsible.
  * VARIABLE: income assigned by Buenos Aires calendar date × responsible share.
- * FIXED: income − one whole monthly fee per covered calendar month. Partial months
- * are deliberately rejected instead of being prorated.
+ * FIXED: income − the configured club fee for each covered frequency unit.
+ * Monthly terms require complete calendar months instead of implicit prorating.
  * Payments and advances enter only through explicit settlement allocations.
  */
 export const calculateActivitySettlements = (input: {
@@ -121,7 +129,7 @@ export const calculateActivitySettlements = (input: {
     return applicable.map((term) => {
       const from = term.effectiveFrom > input.period.from ? term.effectiveFrom : input.period.from;
       const to = term.effectiveTo && term.effectiveTo < input.period.to ? term.effectiveTo : input.period.to;
-      if (term.mode === "FIXED" && (!from.endsWith("-01") || to !== endOfMonth(to))) throw new Error(`FIXED settlements require complete calendar months for ${activityId}`);
+      if (term.mode === "FIXED" && term.fixedFeeFrequency === "MONTHLY" && (!from.endsWith("-01") || to !== endOfMonth(to))) throw new Error(`MONTHLY FIXED settlements require complete calendar months for ${activityId}`);
       const belongs = (value: string | Date) => {
         const day = localDate(value);
         return day >= from && day <= to;
@@ -134,7 +142,7 @@ export const calculateActivitySettlements = (input: {
         .reduce((total, row) => total + row.amount, 0));
       const responsibleGross = term.mode === "VARIABLE"
         ? money(completedIncome * ((100 - term.clubSharePercentage!) / 100))
-        : money(completedIncome - term.monthlyFixedFee! * fullMonthCount(from, to));
+        : money(completedIncome - term.fixedClubFee! * fixedPeriodCount(from, to, term.fixedFeeFrequency!));
       return { activityId, sectorId: term.sectorId, termId: term.id, mode: term.mode, completedIncome,
         responsibleGross, completedAllocations, responsibleBalance: money(responsibleGross - completedAllocations) };
     });
