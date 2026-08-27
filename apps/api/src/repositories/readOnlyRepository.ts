@@ -41,7 +41,7 @@ const listDefinitions = {
   sectores: {
     sectorColumn: "s.id",
     clubColumn: "s.club_id",
-    select: `s.id, s.manager_person_id, s.code, s.name, s.color, s.opening_time, s.closing_time,
+    select: `s.id, s.manager_person_id, s.code, s.name, s.icon_key, s.color, s.opening_time, s.closing_time,
       s.max_capacity, s.municipal_status, s.financial_status, s.operational_status,
       s.uses_enrollments, s.uses_activities, s.notes, s.created_at, s.updated_at,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name,

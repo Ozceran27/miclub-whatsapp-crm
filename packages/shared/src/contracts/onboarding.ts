@@ -60,12 +60,12 @@ export type AdvanceOnboardingResponse = OnboardingState;
 export type CompleteOnboardingResponse = OnboardingState;
 
 export const PROVISIONED_ONBOARDING_SECTORS = [
-  { clientId: "system:administracion", code: "administracion", name: "Administración", isSystem: true },
-  { clientId: "system:tesoreria", code: "tesoreria", name: "Tesorería", isSystem: true },
-  { clientId: "system:areas-comunes", code: "areas-comunes", name: "Áreas Comunes", isSystem: true },
+  { clientId: "system:administracion", code: "administracion", name: "Administración", iconKey: "administration", isSystem: true },
+  { clientId: "system:tesoreria", code: "tesoreria", name: "Tesorería", iconKey: "treasury", isSystem: true },
+  { clientId: "system:areas-comunes", code: "areas-comunes", name: "Áreas Comunes", iconKey: "social-hall", isSystem: true },
 ] as const;
 export type ProvisionedOnboardingSectorCode = typeof PROVISIONED_ONBOARDING_SECTORS[number]["code"];
-export interface OnboardingSectorDraft { clientId: string; templateId: string; code: string; name: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean }
+export interface OnboardingSectorDraft { clientId: string; code: string; name: string; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean }
 export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto { clientId: string }
 export interface OnboardingActivityDraft {
   clientId: string; sectorClientId: string; instructorClientId: string | null; name: string; iconKey: string; color: string;

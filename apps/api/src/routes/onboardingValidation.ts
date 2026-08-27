@@ -1,5 +1,6 @@
 import {
   PROVISIONED_ONBOARDING_SECTORS,
+  isSectorIconKey,
   SUPPORTED_OPERATIONAL_CURRENCIES,
   type CompleteOnboardingRequest,
   type OpeningBalancesRequest,
@@ -36,7 +37,7 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     typeof sector.code === "string" && Boolean(sector.code.trim())
     && typeof sector.isSystem === "boolean"
     && typeof sector.name === "string" && sector.name.trim().length > 0 && sector.name.length <= 120
-    && typeof sector.templateId === "string"
+    && isSectorIconKey(sector.iconKey)
     && typeof sector.color === "string" && /^#[0-9a-f]{6}$/i.test(sector.color)
     && ["active", "inactive", "under_repair"].includes(String(sector.status)))) return false;
   const systemSectors = draft.sectors.filter((sector) => sector.isSystem);

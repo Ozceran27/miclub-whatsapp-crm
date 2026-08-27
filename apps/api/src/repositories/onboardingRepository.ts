@@ -100,9 +100,7 @@ export const completeOnboardingDraft=async(actor:OnboardingActor,draft:Onboardin
  const sectorMap=new Map<string,string>(),sectorIds:string[]=[];
  for(const item of draft.sectors){
   if(item.isSystem){const row=(await db.query<{id:string}>(`select id::text from miclub.sectors where club_id=$1 and code=$2 and is_system=true and archived_at is null`,[actor.clubId,item.code])).rows[0];if(!row)throw Object.assign(new Error('Falta un sector de sistema provisionado.'),{code:'ONBOARDING_SYSTEM_SECTOR_MISSING'});sectorMap.set(item.clientId,row.id);continue;}
-  // templateId is presentation metadata owned by the client. In particular it
-  // must never be accepted as a database UUID that could name another tenant.
-  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,color,status,is_system,created_by,updated_by) values($1,null,$2,$3,$4,$5,false,$6,$6) returning id::text`,[actor.clubId,item.code,item.name.trim(),item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
+  const row=(await db.query<{id:string}>(`insert into miclub.sectors(club_id,template_id,code,name,icon_key,color,status,is_system,created_by,updated_by) values($1,null,$2,$3,$4,$5,$6,false,$7,$7) returning id::text`,[actor.clubId,item.code,item.name.trim(),item.iconKey,item.color,item.status,actor.userId])).rows[0];sectorMap.set(item.clientId,row.id);sectorIds.push(row.id);
  }
  const workerMap=new Map<string,string>(),workerIds:string[]=[];
  for(const item of draft.workers){

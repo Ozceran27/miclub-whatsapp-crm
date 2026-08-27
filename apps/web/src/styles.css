@@ -3313,7 +3313,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .draft-add-card:hover { background: color-mix(in srgb,var(--color-accent) 7%,transparent); border-color: var(--color-accent); color: var(--color-accent); }
 .draft-add-card > span { font-size: 28px; line-height: 1; }
 .draft-modal-backdrop { align-items: center; background: color-mix(in srgb,#000 58%,transparent); display: flex; inset: 0; justify-content: center; padding: var(--onboarding-edge); position: fixed; z-index: 1100; }
-.draft-modal { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 20px; box-shadow: var(--shadow-elevated); display: grid; gap: var(--onboarding-gap); max-height: calc(100dvh - (2 * var(--onboarding-edge))); max-width: 720px; overflow: auto; padding: var(--onboarding-block) var(--onboarding-inline); width: 100%; }
+.draft-modal { background: #ffffff; border: 1px solid var(--color-border); border-radius: 20px; box-shadow: var(--shadow-elevated); display: grid; gap: var(--onboarding-gap); max-height: calc(100dvh - (2 * var(--onboarding-edge))); max-width: 720px; overflow: auto; padding: var(--onboarding-block) var(--onboarding-inline); width: 100%; }
 .draft-modal > header { align-items: center; display: flex; justify-content: space-between; }
 .draft-modal > header h3 { margin: 0; }
 .draft-form { display: grid; gap: 16px; }
@@ -3333,6 +3333,10 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .draft-palette label:has(input:checked) { box-shadow: 0 0 0 3px var(--color-card),0 0 0 5px var(--color-accent); }
 .draft-icon-grid { display: grid; gap: 8px; grid-template-columns: repeat(8,1fr); }
 .draft-icon-grid label { align-items: center; border: 1px solid var(--color-border); border-radius: 9px; cursor: pointer; display: flex; font-size: 23px; justify-content: center; min-height: 46px; position: relative; }
+.draft-icon-filter { margin-bottom: 10px; }
+.draft-sector-icons { display: grid; gap: 10px; max-height: 290px; overflow: auto; }
+.draft-sector-icons section { display: grid; gap: 5px; }
+.draft-sector-icons section > strong { font-size: 11px; }
 .draft-photo { align-items: center; background: var(--color-card-muted); border: 2px dashed var(--color-border); border-radius: 50%; display: flex; font-size: 28px; height: 76px; justify-content: center; margin: auto; width: 76px; }
 .opening-balances-form > p, .opening-balances-form__currency, .opening-balances-form > button, .opening-balances-form > [role='status'] { grid-column: 1 / -1; }
 .currency-listbox { color: var(--color-text-muted); display: grid; font-size: 12px; font-weight: 700; gap: 6px; position: relative; }

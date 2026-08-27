@@ -140,6 +140,7 @@ export interface AdministrationSectorDto {
   code: string;
   name: string;
   color?: string | null;
+  iconKey?: string | null;
   openingTime?: string | null;
   closingTime?: string | null;
   maxCapacity?: number | null;
