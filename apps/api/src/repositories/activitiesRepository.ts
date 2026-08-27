@@ -14,7 +14,7 @@ export type ActivityActor = {
 };
 export type ActivityInput = {
   sectorId: string; name: string; managerPersonId: string | null; instructorId?: string | null; code?: string | null;
-  modality?: string | null; color?: string | null; iconKey?: string | null; enrollmentFee?: number; monthlyFee?: number; clubCommissionPercent: number;
+  modality?: string | null; color?: string | null; iconKey?: string | null; enrollmentFee?: number; enrollmentFeeFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"; monthlyFee?: number; clubCommissionPercent: number;
   instructorCommissionPercent?: number; maxCapacity?: number | null; status?: "active" | "inactive"; notes?: string | null;
   settlement: ActivitySettlementMutation;
 };
@@ -28,7 +28,7 @@ const isTermsConstraintError = (error: unknown) => error instanceof InvalidActiv
   || (typeof error === "object" && error !== null && "code" in error && ["23P01", "23514"].includes(String(error.code)));
 
 const activityColumns = `id, club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key,
-  monthly_fee, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, archived_at, created_at, updated_at`;
+  monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, archived_at, created_at, updated_at`;
 
 const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean> => {
   const result = await executor.query("select 1 from public.miclub_schema_migrations where name=$1", [ACTIVITY_MUTATION_MODEL_MIGRATION]);
@@ -53,7 +53,7 @@ const auditActivity = (actor: ActivityActor, action: string, before: ActivityRow
     entityType: "activity", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent, oldData: before, newData: after }, executor);
 
 type ActivityTermRow = Record<string, unknown> & { id: string; effective_from: string | Date; effective_to: string | Date | null };
-const termColumns = "id, club_id, activity_id, mode, monthly_fixed_fee, club_share_percentage, effective_from, effective_to, created_at, updated_at";
+const termColumns = "id, club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, effective_to, created_at, updated_at";
 const auditTerms = (actor: ActivityActor, action: string, activityId: string, before: ActivityTermRow | null, after: ActivityTermRow, executor: Parameters<typeof auditService.sensitiveChange>[1]) =>
   auditService.sensitiveChange({ action, result: "success", userId: actor.userId, membershipId: actor.membershipId, clubId: actor.clubId,
     entityType: "activity_terms", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent,
@@ -66,15 +66,15 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
     const invalid = await validReferences(executor, actor, input);
     if (invalid) return { kind: invalid };
     const result = await executor.query<ActivityRow>(`insert into miclub.activities
-      (club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key, monthly_fee, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::uuid) returning ${activityColumns}`,
+      (club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key, monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::uuid) returning ${activityColumns}`,
     [actor.clubId, input.sectorId, input.managerPersonId, input.instructorId ?? null, input.code ?? null, input.name, input.modality ?? null,
-      input.color ?? null, input.iconKey ?? null, input.enrollmentFee ?? input.monthlyFee ?? 0, input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
+      input.color ?? null, input.iconKey ?? null, input.enrollmentFee ?? input.monthlyFee ?? 0, input.enrollmentFeeFrequency ?? "MONTHLY", input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
       storedEntityStatus(input.status ?? "inactive"), input.notes ?? null, actor.userId]);
     const term = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
-      (club_id, activity_id, mode, monthly_fixed_fee, club_share_percentage, effective_from, created_by, updated_by)
-      values ($1,$2,$3,$4,$5,$6::date,$7::uuid,$7::uuid) returning ${termColumns}`,
-    [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.monthlyFixedFee, input.settlement.clubSharePercentage, input.settlement.effectiveFrom, actor.userId]);
+      (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, created_by, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7::date,$8::uuid,$8::uuid) returning ${termColumns}`,
+    [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.clubSharePercentage, input.settlement.effectiveFrom, actor.userId]);
     await auditActivity(actor, "activity.create", null, result.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", result.rows[0].id, null, term.rows[0], executor);
     return { kind: "created", activity: result.rows[0] };
@@ -122,17 +122,17 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
       where club_id=$1 and activity_id=$2 and voided_at is null and status='COMPLETADO' and period_to >= $3::date) locked`,
     [actor.clubId, id, value.settlement.effectiveFrom]);
     if (settled.rows[0]?.locked) return { kind: "settled_history" };
-    const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, icon_key=$10, monthly_fee=$11, club_commission_percent=$12, instructor_commission_percent=$13, max_capacity=$14, status=$15, notes=$16, updated_at=now(), updated_by=$17::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
-    [actor.clubId, id, value.sectorId, value.managerPersonId, value.instructorId ?? null, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.enrollmentFee ?? value.monthlyFee ?? 0, value.clubCommissionPercent, value.instructorCommissionPercent ?? 0, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
+    const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, icon_key=$10, monthly_fee=$11, enrollment_fee_frequency=$12, club_commission_percent=$13, instructor_commission_percent=$14, max_capacity=$15, status=$16, notes=$17, updated_at=now(), updated_by=$18::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
+    [actor.clubId, id, value.sectorId, value.managerPersonId, value.instructorId ?? null, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.enrollmentFee ?? value.monthlyFee ?? 0, value.enrollmentFeeFrequency ?? "MONTHLY", value.clubCommissionPercent, value.instructorCommissionPercent ?? 0, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
     if (!result.rows[0]) return { kind: "conflict" };
     const closed = await executor.query<ActivityTermRow>(`update miclub.activity_terms set effective_to=$3::date - 1,
       updated_at=now(), updated_by=$4::uuid where club_id=$1 and id=$2 and effective_to is null returning ${termColumns}`,
     [actor.clubId, latest.id, value.settlement.effectiveFrom, actor.userId]);
     if (!closed.rows[0]) throw new InvalidActivityTermsError("The current term changed while it was being versioned");
     const inserted = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
-      (club_id, activity_id, mode, monthly_fixed_fee, club_share_percentage, effective_from, created_by, updated_by)
-      values ($1,$2,$3,$4,$5,$6::date,$7::uuid,$7::uuid) returning ${termColumns}`,
-    [actor.clubId, id, value.settlement.mode, value.settlement.monthlyFixedFee, value.settlement.clubSharePercentage, value.settlement.effectiveFrom, actor.userId]);
+      (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, created_by, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7::date,$8::uuid,$8::uuid) returning ${termColumns}`,
+    [actor.clubId, id, value.settlement.mode, value.settlement.fixedClubFee, value.settlement.fixedFeeFrequency, value.settlement.clubSharePercentage, value.settlement.effectiveFrom, actor.userId]);
     await auditTerms(actor, "activity_terms.close", id, latest, closed.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", id, null, inserted.rows[0], executor);
     await auditActivity(actor, "activity.update", before, result.rows[0], executor);
@@ -199,7 +199,7 @@ export const upsertActivity = async (pool: Pool, input: {
          and coalesce(modality, ''::text) = coalesce($4::text, ''::text)
        for update
      ), upserted_activity as (
-       insert into miclub.activities (club_id, sector_id, name, modality, instructor_id, manager_person_id, monthly_fee, club_commission_percent, notes)
+       insert into miclub.activities (club_id, sector_id, name, modality, instructor_id, manager_person_id, monthly_fee, enrollment_fee_frequency, club_commission_percent, notes)
        values ($1, $2, $3, $4, $5, (select person_id from miclub.instructors where club_id=$1 and id=$5), $6, $7, 'Importado desde lote XLSX')
        on conflict (club_id, sector_id, lower(name), coalesce(modality, ''::text)) do update
          set instructor_id = excluded.instructor_id,

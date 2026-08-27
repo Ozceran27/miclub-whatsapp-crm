@@ -12,7 +12,7 @@ const ACTIVITY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const UPDATED_AT = '2026-08-05T12:00:00.000Z';
 const limitedActor: ActivityActor = { userId: 'user-limited', membershipId: 'membership-limited', clubId: CLUB_A, sectorIds: [SECTOR_A], canAccessAnySector: false };
 const anySectorActor: ActivityActor = { ...limitedActor, userId: 'user-any', membershipId: 'membership-any', sectorIds: [], canAccessAnySector: true };
-const input = (sectorId: string): ActivityInput => ({ sectorId, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', monthlyFixedFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
+const input = (sectorId: string): ActivityInput => ({ sectorId, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
 
 type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; updated_at: string; archived_at: null };
 const installActivityPool = (stored: StoredActivity, settlementLocked = false) => {
@@ -66,20 +66,20 @@ const createPool = (settlement: ActivityInput['settlement'], failAudit = false) 
 };
 
 for (const settlement of [
-  { mode: 'FIXED', monthlyFixedFee: 125000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
-  { mode: 'VARIABLE', monthlyFixedFee: null, clubSharePercentage: 35.5, effectiveFrom: '2026-10-15' } as const,
+  { mode: 'FIXED', fixedFeeFrequency: 'MONTHLY', fixedClubFee: 125000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
+  { mode: 'VARIABLE', fixedFeeFrequency: null, fixedClubFee: null, clubSharePercentage: 35.5, effectiveFrom: '2026-10-15' } as const,
 ]) test(`crea actividad y primer término ${settlement.mode} con su vigencia`, async () => {
   const queries = createPool(settlement);
   const result = await createActivity(limitedActor, { ...input(SECTOR_A), settlement });
   assert.equal(result.kind, 'created');
   const insert = queries.find(({ sql }) => sql.includes('insert into miclub.activity_terms'));
-  assert.deepEqual(insert?.params?.slice(2, 6), [settlement.mode, settlement.monthlyFixedFee, settlement.clubSharePercentage, settlement.effectiveFrom]);
+  assert.deepEqual(insert?.params?.slice(2, 7), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.clubSharePercentage, settlement.effectiveFrom]);
   assert.equal(queries.filter(({ sql }) => sql.includes('INSERT INTO miclub.audit_log')).length, 2, 'audita actividad y término');
   assert.equal(queries.at(-1)?.sql, 'COMMIT');
 });
 
 test('revierte atómicamente actividad y término cuando falla la auditoría', async () => {
-  const settlement = { mode: 'FIXED', monthlyFixedFee: 100, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const;
+  const settlement = { mode: 'FIXED', fixedFeeFrequency: 'MONTHLY', fixedClubFee: 100, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const;
   const queries = createPool(settlement, true);
   await assert.rejects(createActivity(limitedActor, { ...input(SECTOR_A), settlement }), /audit unavailable/);
   assert.equal(queries.some(({ sql }) => sql === 'ROLLBACK'), true);
@@ -124,8 +124,8 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
 });
 
 for (const settlement of [
-  { mode: 'VARIABLE', monthlyFixedFee: null, clubSharePercentage: 42, effectiveFrom: '2026-09-01' } as const,
-  { mode: 'FIXED', monthlyFixedFee: 250000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
+  { mode: 'VARIABLE', fixedFeeFrequency: null, fixedClubFee: null, clubSharePercentage: 42, effectiveFrom: '2026-09-01' } as const,
+  { mode: 'FIXED', fixedFeeFrequency: 'MONTHLY', fixedClubFee: 250000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
 ]) test(`versiona un cambio de ${settlement.mode === 'FIXED' ? 'monto' : 'porcentaje'} sin reescribir el término vigente`, async () => {
   const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
   const queries = installActivityPool(stored);
@@ -134,7 +134,7 @@ for (const settlement of [
   assert.match(close?.sql ?? '', /effective_to=\$3::date - 1/);
   assert.equal(close?.params?.[2], settlement.effectiveFrom);
   const insert = queries.find(({ sql }) => sql.includes('insert into miclub.activity_terms'));
-  assert.deepEqual(insert?.params?.slice(2, 6), [settlement.mode, settlement.monthlyFixedFee, settlement.clubSharePercentage, settlement.effectiveFrom]);
+  assert.deepEqual(insert?.params?.slice(2, 7), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.clubSharePercentage, settlement.effectiveFrom]);
 });
 
 test('rechaza vigencias solapadas y preserva historia liquidada antes de escribir la actividad', async () => {

@@ -67,10 +67,12 @@ export const PROVISIONED_ONBOARDING_SECTORS = [
 export type ProvisionedOnboardingSectorCode = typeof PROVISIONED_ONBOARDING_SECTORS[number]["code"];
 export interface OnboardingSectorDraft { clientId: string; code: string; name: string; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean }
 export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto { clientId: string }
-export interface OnboardingActivityDraft {
+export type ActivityFeeFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; instructorClientId: string | null; name: string; iconKey: string; color: string;
-  enrollmentFee: number; settlementMode: "FIXED" | "VARIABLE"; economicValue: number; status: "active" | "inactive";
-}
+  enrollmentFee: number; enrollmentFeeFrequency: ActivityFeeFrequency; status: "active" | "inactive";
+} & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; clubSharePercentage: null }
+  | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; clubSharePercentage: number });
 export interface PendingOnboardingImportReference { batchId: string }
 /** Complete, client-owned draft. No field in this object is persisted before completion. */
 export interface OnboardingDraft {

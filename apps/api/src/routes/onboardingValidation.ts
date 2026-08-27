@@ -66,9 +66,9 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     && typeof activity.sectorClientId === "string" && sectorIds.has(activity.sectorClientId)
     && (activity.instructorClientId === null || (typeof activity.instructorClientId === "string" && instructorIds.has(activity.instructorClientId)))
     && finiteNonNegative(activity.enrollmentFee)
+    && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.enrollmentFeeFrequency))
     && ["FIXED", "VARIABLE"].includes(String(activity.settlementMode))
-    && finiteNonNegative(activity.economicValue)
-    && (activity.settlementMode !== "VARIABLE" || activity.economicValue <= 100)
+    && (activity.settlementMode === "VARIABLE" ? activity.fixedClubFee === null && activity.fixedFeeFrequency === null && finiteNonNegative(activity.clubSharePercentage) && activity.clubSharePercentage <= 100 : activity.clubSharePercentage === null && finiteNonNegative(activity.fixedClubFee) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.fixedFeeFrequency)))
     && ["active", "inactive"].includes(String(activity.status)))) return false;
 
   return draft.pendingImport === null
