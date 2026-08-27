@@ -5,6 +5,7 @@ export const ONBOARDING_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"] a
 export type OnboardingStatus = typeof ONBOARDING_STATUSES[number];
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type OnboardingStepOutcome = "COMPLETED" | "SKIPPED";
+export const ONBOARDING_DRAFT_CONTRACT_VERSION = 1 as const;
 export type OnboardingStepRequirement = "WELCOME" | "OPENING_BALANCES" | "SECTORS" | "WORKERS" | "ACTIVITIES" | "MIGRATION" | "FINISH";
 
 /**
@@ -77,6 +78,7 @@ export type OnboardingActivityDraft = {
 export interface PendingOnboardingImportReference { batchId: string }
 /** Complete, client-owned draft. No field in this object is persisted before completion. */
 export interface OnboardingDraft {
+  contractVersion: typeof ONBOARDING_DRAFT_CONTRACT_VERSION;
   idempotencyKey: string;
   selectedPlanCode: CommercialPlanCode;
   openingBalances: Omit<OpeningBalancesRequest, "idempotencyKey">;

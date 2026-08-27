@@ -28,3 +28,13 @@ Validar siempre con el **zoom del navegador al 100%**, sin escalado CSS. En cada
 | Móvil compacto | 360 × 640 | 100% | Etiquetas de progreso ocultas; cabecera y acciones visibles; scroll central. |
 
 Comprobar además la apertura de los modales de edición dentro del onboarding: deben usar el mismo margen y densidad, conservar el foco en coordenadas reales y permitir su propio scroll sin `zoom` ni `transform: scale()`.
+
+## Recorrido integral de onboarding
+
+- Registrar un club nuevo y confirmar que el tenant se obtiene de la sesión, no del payload.
+- Cerrar sesión, iniciar sesión y abrir el onboarding pendiente.
+- Configurar saldos, sectores, trabajadores y actividades con sus referencias e iconos.
+- Seleccionar un plan, revisar términos económicos y llegar al resumen final.
+- Pulsar una vez **Iniciar mi club**, mantener visible el resumen durante el proceso y comprobar la confirmación de éxito.
+- Simular una interrupción y reintentar con la misma clave: no deben duplicarse entidades.
+- Después de la respuesta definitiva, acceder a Inicio, Administración, Economía y los módulos habilitados por el plan.

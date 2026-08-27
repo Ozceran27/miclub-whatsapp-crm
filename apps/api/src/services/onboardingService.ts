@@ -1,6 +1,7 @@
 import { isOptionalOnboardingStep, type CompleteOnboardingResult, type OnboardingDraft, type OnboardingState, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest, type OpeningBalancesResponse } from "@miclub/shared";
 import { completeOnboardingDraft, readOnboarding, saveOpeningBalances, type OnboardingActor } from "../repositories/onboardingRepository.js";
 import { validateWorkerMutation } from "./administration/workerMutationService.js";
+import { logger } from "../lib/logger.js";
 
 export interface OnboardingStore { read(clubId:string):Promise<OnboardingState>; advance(actor:OnboardingActor,step:OnboardingStep,outcome:OnboardingStepOutcome):Promise<OnboardingState>; complete(actor:OnboardingActor,draft:OnboardingDraft):Promise<CompleteOnboardingResult>; saveOpeningBalances(actor:OnboardingActor,input:OpeningBalancesRequest):Promise<OpeningBalancesResponse> }
 // `advance` remains in the transport contract for older clients, but is a
@@ -17,9 +18,19 @@ export const createOnboardingService=(store:OnboardingStore=defaultStore)=>({
     // navigation request. No walkthrough progress is durable before complete.
     return store.read(actor.clubId);
   },
-  complete:(actor:OnboardingActor,draft:OnboardingDraft)=>{
-    for(const worker of draft.workers)validateWorkerMutation(worker,true);
-    return store.complete(actor,draft);
+  complete:async(actor:OnboardingActor,draft:OnboardingDraft)=>{
+    const context={requestId:actor.requestId,club:actor.clubId};
+    try {
+      logger.info("onboarding completion phase",{...context,phase:"validate"});
+      for(const worker of draft.workers)validateWorkerMutation(worker,true);
+      logger.info("onboarding completion phase",{...context,phase:"transaction"});
+      const result=await store.complete(actor,draft);
+      logger.info("onboarding completion phase",{...context,phase:"completed"});
+      return result;
+    } catch(error) {
+      logger.warn("onboarding completion failed",{...context,phase:"failed",errorCode:typeof error==='object'&&error&&'code'in error?String(error.code):"UNEXPECTED"});
+      throw error;
+    }
   },
   saveOpeningBalances:(actor:OnboardingActor,input:OpeningBalancesRequest)=>store.saveOpeningBalances(actor,input),
 });

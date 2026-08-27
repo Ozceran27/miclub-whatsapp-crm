@@ -104,6 +104,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202608270001_sector_visual_metadata.sql", sha256: "44e55cec7ee537044313038d6cfae0452e9bc3a1a0004c2a8402fb12600143cb", dependsOn: ["202608210004_sector_templates_and_lifecycle.sql"], provides: ["miclub.sectors.icon_key"], checkpointPurpose: "Separa la identidad visual persistible del sector de la plantilla y completa los sectores existentes." },
   { path: "202608270002_employee_compensation_and_photos.sql", sha256: "cb483602ba65cd9c6beab17258115ba2925d765573d63485b3034f68131e6a44", provides: ["miclub.employees.has_fixed_compensation", "miclub.employee_photos"], checkpointPurpose: "Migra la remuneración personal a monto y frecuencia canónicos y prepara metadatos tenant-scoped para fotos privadas." },
   { path: "202608270003_activity_fee_frequencies.sql", sha256: "6e52f6d23967e423d7e2b2d4446078fb785db012f0146b61fc1b643544a66885", dependsOn: ["202608270002_employee_compensation_and_photos.sql"], checkpointPurpose: "Añade frecuencias de inscripción y monto fijo, conservando el valor mensual histórico." },
+  { path: "202608270004_atomic_onboarding_completion.sql", sha256: "eda334def350c6cf78597a80c2bd4d7dc2f3f60e58ec62654060d1ae7a5c4f25", dependsOn: ["202608270003_activity_fee_frequencies.sql"], provides: ["miclub.table.onboarding_operations", "miclub.import_batches.onboarding_completion_key"], checkpointPurpose: "Hace atómica e idempotente la finalización versionada del onboarding por club y operación." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";
