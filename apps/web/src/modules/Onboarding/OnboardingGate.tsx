@@ -9,6 +9,7 @@ import { loadHomeDashboardResources } from '../Home/homeDashboardApi';
 
 export const createInitialOnboardingDraft = (): OnboardingDraft => ({
   idempotencyKey: crypto.randomUUID(), openingBalances: { currency: 'ARS', cash: 0, bank: 0, usdCash: 0 },
+  selectedPlanCode: 'FREE',
   sectors: PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:'#2563EB',status:'active'})), workers: [], activities: [], pendingImport: null,
 });
 

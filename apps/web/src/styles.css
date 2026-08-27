@@ -3272,6 +3272,11 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .migration-intro__heading { display: grid; gap: 5px; }
 .migration-plan-grid, .migration-sheet-grid { display: grid; gap: 12px; grid-template-columns: repeat(2,minmax(0,1fr)); }
 .migration-plan-card { background: color-mix(in srgb,var(--color-primary) 7%,var(--color-card)); border: 1px solid color-mix(in srgb,var(--color-primary) 28%,var(--color-border)); border-radius: 14px; display: grid; gap: 8px; padding: 15px; }
+.migration-plan-card[data-selected="true"] { box-shadow: 0 0 0 2px var(--color-primary); }
+.migration-plan-card input { justify-self: end; }
+.migration-guide { border: 1px solid var(--color-border); border-radius: 14px; padding: 14px 18px; }
+.migration-guide summary { cursor: pointer; font-weight: 800; }
+.migration-guide[open] summary { margin-bottom: 14px; }
 .migration-plan-card__badge { color: var(--color-primary); font-size: 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
 .migration-sheet-grid article { background: var(--color-card-muted); border-radius: 12px; display: grid; gap: 5px; padding: 14px; }
 .migration-reference-note { border-left: 4px solid var(--color-primary); padding: 4px 0 4px 12px; }

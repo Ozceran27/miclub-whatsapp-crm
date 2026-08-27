@@ -1,5 +1,6 @@
 import {
   PROVISIONED_ONBOARDING_SECTORS,
+  COMMERCIAL_PLAN_CODES,
   isSectorIconKey,
   SUPPORTED_OPERATIONAL_CURRENCIES,
   type CompleteOnboardingRequest,
@@ -19,9 +20,11 @@ export const isOpeningBalancesRequest = (body: unknown): body is OpeningBalances
 };
 
 export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnboardingRequest => {
-  if (!record(body) || Object.keys(body).some((key) => key !== "draft") || !record(body.draft)) return false;
+  if (!record(body) || Object.keys(body).some((key) => !["draft","selectedPlanCode"].includes(key)) || !record(body.draft)) return false;
   const draft = body.draft;
   if (typeof draft.idempotencyKey !== "string" || !/^[\w-]{8,128}$/.test(draft.idempotencyKey)) return false;
+  if (!COMMERCIAL_PLAN_CODES.some((code) => code === draft.selectedPlanCode)) return false;
+  if (body.selectedPlanCode !== draft.selectedPlanCode) return false;
   if (!record(draft.openingBalances) || !isOpeningBalancesRequest({ ...draft.openingBalances, idempotencyKey: draft.idempotencyKey })) return false;
   if (!Array.isArray(draft.sectors) || !Array.isArray(draft.workers) || !Array.isArray(draft.activities)
     || draft.sectors.length > 100 || draft.workers.length > 100 || draft.activities.length > 200) return false;

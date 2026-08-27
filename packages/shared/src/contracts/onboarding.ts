@@ -1,4 +1,5 @@
 import type { AdministrationWorkerMutationDto } from "./administration.js";
+import type { CommercialPlanCode } from "./commercialPlans.js";
 
 export const ONBOARDING_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"] as const;
 export type OnboardingStatus = typeof ONBOARDING_STATUSES[number];
@@ -77,13 +78,14 @@ export interface PendingOnboardingImportReference { batchId: string }
 /** Complete, client-owned draft. No field in this object is persisted before completion. */
 export interface OnboardingDraft {
   idempotencyKey: string;
+  selectedPlanCode: CommercialPlanCode;
   openingBalances: Omit<OpeningBalancesRequest, "idempotencyKey">;
   sectors: OnboardingSectorDraft[];
   workers: OnboardingWorkerDraft[];
   activities: OnboardingActivityDraft[];
   pendingImport: PendingOnboardingImportReference | null;
 }
-export interface CompleteOnboardingRequest { draft: OnboardingDraft }
+export interface CompleteOnboardingRequest { draft: OnboardingDraft; selectedPlanCode: CommercialPlanCode }
 export interface CompleteOnboardingResult {
   state: OnboardingState;
   created: { openingBalanceBatchId: string; sectorIds: string[]; workerIds: string[]; activityIds: string[] };

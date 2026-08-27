@@ -67,6 +67,7 @@ export async function hasFeature(
         where subscription.club_id=$1 and entitlement.feature_code=$2
           and subscription.effective_from <= $3
           and (subscription.effective_until is null or subscription.effective_until > $3)
+          and subscription.billing_status='active'
         limit 1
      )
      select coalesce((select enabled from current_override),
