@@ -8,6 +8,8 @@
 - [`legacy-runtime-inventory.md`](legacy-runtime-inventory.md): grafo, clasificación y puerta de eliminación de legado.
 - [`import-xlsx.md`](import-xlsx.md): operación soportada de importación.
 - [`deployment-runbook.md`](deployment-runbook.md): procedimiento de despliegue.
+- [`onboarding-delivery-plan.md`](onboarding-delivery-plan.md): secuencia de
+  cortes desplegables, gates y promoción controlada del nuevo onboarding.
 - [`postgres-cutover-runbook.md`](postgres-cutover-runbook.md): procedimiento de corte y reversión de datos.
 
 Los runbooks y SQL manuales describen procedimientos. Su presencia, contenido o
