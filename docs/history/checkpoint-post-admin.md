@@ -18,7 +18,6 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
-
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -59,7 +58,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608210003_complete_product_category_catalog.sql` | Sincroniza exactamente el catálogo activo de producto, sus aliases y las categorías disponibles de cada tenant sin borrar historia. | `625d17b1d410fc475ac38efa5e97188002245fce402fd9340dfa76ba03903120` | Después de `202608140004_correct_category_catalog.sql`. |
 | `202608210004_sector_templates_and_lifecycle.sql` | Versiona las 30 plantillas de sector con iconos, relaciones validadas y acceso runtime de solo lectura. | `f55f8cd3c21adb53b7d9b33d7c92a5aee04a199603c1926e8b7003f5c9df5758` | Después de `202608180002_restore_runtime_application_grants.sql` y `202608150002_scope_activity_catalog_fks.sql`. |
 | `202608270001_sector_visual_metadata.sql` | Separa la identidad visual persistible del sector de la plantilla y completa los sectores existentes. | `44e55cec7ee537044313038d6cfae0452e9bc3a1a0004c2a8402fb12600143cb` | Después de `202608210004_sector_templates_and_lifecycle.sql`. |
-
+| `202608270002_employee_compensation_and_photos.sql` | Migra la remuneración personal a monto y frecuencia canónicos y prepara metadatos tenant-scoped para fotos privadas. | `cb483602ba65cd9c6beab17258115ba2925d765573d63485b3034f68131e6a44` | Sin dependencia operativa adicional. |
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
