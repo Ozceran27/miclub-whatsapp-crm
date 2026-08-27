@@ -102,7 +102,14 @@ test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reduci
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/);
   assert.match(styles, /var\(--color-card\)/);
   assert.match(styles, /backdrop-filter: blur/);
-  assert.match(styles, /height: 100dvh/);
+  assert.match(styles, /@media \(max-height: 800px\)/);
+  assert.match(styles, /@media \(max-height: 700px\)/);
+  assert.match(styles, /grid-template-rows: auto minmax\(0,1fr\) auto/);
+  assert.match(styles, /\.onboarding-viewport \{[^}]*overflow-y: auto/);
+  assert.match(styles, /\.onboarding-actions button,[^}]*min-height: 44px/);
+  assert.match(styles, /--onboarding-edge:[^;]+;[^}]*--onboarding-inline:/);
+  assert.match(styles, /max-height: min\(760px,calc\(100dvh/);
+  assert.doesNotMatch(styles, /\.onboarding-(?:dialog|backdrop|viewport|actions)[^{]*\{[^}]*(?:zoom\s*:|transform\s*:\s*scale\()/);
   assert.match(styles, /\.setup-manager > ul[\s\S]*repeat\(auto-fit,minmax/);
   assert.match(styles, /border: 2px dashed/);
 });
