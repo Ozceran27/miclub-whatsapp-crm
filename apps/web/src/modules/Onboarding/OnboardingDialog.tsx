@@ -39,7 +39,7 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
   };
   const goBack=()=>onBack();
   const optional = isSkippableStep(step);
-  const status = pending ? 'Guardando configuración…' : error ? 'No se pudo finalizar' : 'Borrador temporal';
+  const status = pending ? 'Enviando configuración definitiva…' : error ? 'Error recuperable: no se pudo finalizar' : 'Listo para revisar; todavía no se envió';
   const nextLabel=step===1?'Empezar Configuración':'Siguiente';
   return <div className="onboarding-backdrop" data-testid="onboarding-backdrop">
     <div className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef} tabIndex={-1}>
@@ -50,7 +50,7 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
         <div className="onboarding-actions__buttons">
         {step>=2&&<button className="secondary-btn" type="button" disabled={pending} onClick={goBack}>← Atrás</button>}
         {optional && <button className="ghost-btn" type="button" disabled={pending} title="Descartar los cambios temporales de este paso y continuar" onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
-        {step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending} onClick={onComplete}>{pending ? 'Preparando tu club…' : <><ActionIcon type="launch"/>INICIAR MI CLUB</>}</button>}
+        {step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending} onClick={onComplete}>{pending ? 'Enviando una única vez…' : <><ActionIcon type={error?'retry':'launch'}/>{error?'REINTENTAR':'INICIAR MI CLUB'}</>}</button>}
         </div>
       </footer>
     </div>

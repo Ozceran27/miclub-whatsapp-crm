@@ -82,6 +82,26 @@ test('los pasos representan exactamente el flujo solicitado y saldos usa la oper
   assert.match(source, /OpeningBalancesStep/); assert.match(source,/MigrationStep/);
 });
 
+test('la bienvenida anticipa el recorrido y explica opcionalidad y envío definitivo', () => {
+  const source=readFileSync(new URL('./steps.tsx',import.meta.url),'utf8');
+  for(const label of ['Saldos','Sectores','Trabajadores','Actividades','Plan / migración','Revisión final']) assert.match(source,new RegExp(label));
+  assert.match(source,/completar más adelante desde Administración/); assert.match(source,/el envío definitivo ocurre al finalizar/);
+  assert.doesNotMatch(source,/configuración es temporal|asistente se reiniciará/);
+});
+
+test('el cierre calcula el resumen desde OnboardingDraft con componentes semánticos', () => {
+  const summary=readFileSync(new URL('./OnboardingSummary.tsx',import.meta.url),'utf8');
+  for(const component of ['OnboardingDraftSummary','OnboardingSummaryCard','OnboardingStepList','OnboardingRecommendation']) assert.match(summary,new RegExp(component));
+  for(const field of ['openingBalances','sectors','workers','activities','pendingImport']) assert.match(summary,new RegExp(`draft\\.${field}`));
+  for(const label of ['Moneda y saldos','Sectores','Trabajadores','Actividades','Plan / migración','Pasos omitidos']) assert.match(summary,new RegExp(label));
+});
+
+test('los labels de estado y avance no dependen de texto en negrita', () => {
+  const styles=readFileSync(new URL('../../styles.css',import.meta.url),'utf8');
+  assert.match(styles,/\.onboarding-save-state \{[^}]*font-weight: 400/); assert.match(styles,/\.onboarding-actions button,[^}]*font-weight: 400/);
+  assert.match(styles,/\.onboarding-save-state\[data-state='error'\] \{ font-weight: 700/);
+});
+
 test('regresión visual: siete indicadores, acciones y estados tienen textos accesibles', () => {
   const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
   const progress = readFileSync(new URL('./OnboardingProgress.tsx', import.meta.url), 'utf8');
@@ -90,8 +110,10 @@ test('regresión visual: siete indicadores, acciones y estados tienen textos acc
   assert.match(progress, /optional \? 'Opcional' : 'Obligatorio'/);
   for (const action of ['Empezar Configuración','Siguiente','Omitir','INICIAR MI CLUB']) assert.match(dialog, new RegExp(action));
   assert.match(dialog, /aria-live="polite"/);
-  assert.match(dialog, /Borrador temporal/);
-  assert.match(dialog, /Guardando configuración…/);
+  assert.match(dialog, /todavía no se envió/);
+  assert.match(dialog, /Enviando configuración definitiva…/);
+  assert.match(dialog, /Error recuperable/);
+  assert.match(dialog, /error\?'retry':'launch'/);
   assert.doesNotMatch(dialog, /Cambios guardados/);
 });
 
