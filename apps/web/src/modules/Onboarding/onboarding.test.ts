@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
 import { createInitialOnboardingDraft } from './OnboardingGate';
 import { getNextStep, getPreviousStep, hasValidOpeningBalances } from './OnboardingDialog';
 import { getOnboardingSteps, isSkippableStep } from './steps';
+import { OpeningBalancesStep } from './OpeningBalancesStep';
+import { CURRENCY_PRESENTATIONS, formatCurrencyLabel, getCurrencyAfterKey, getCurrencyPrefix } from './currencyPresentation';
 const draft={idempotencyKey:'test-key',openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
 const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
 
@@ -143,6 +147,32 @@ test('la advertencia exige ceros al importar capital histórico', () => {
   assert.match(source, /ingresá cero en Caja, Cuenta Corriente y Dólares/);
   assert.doesNotMatch(source, /omití este paso/);
   assert.match(source, /role="note"/);
+});
+
+test('el catálogo de presentación cubre la lista canónica y ofrece fallback seguro', () => {
+  assert.deepEqual(CURRENCY_PRESENTATIONS.map(currency=>currency.code), ['ARS','USD','BRL','EUR']);
+  assert.equal(formatCurrencyLabel('ARS'), '🇦🇷 Peso argentino (ARS)');
+  assert.equal(formatCurrencyLabel('ZZZ'), 'Moneda desconocida (ZZZ)');
+  assert.equal(getCurrencyPrefix('ZZZ'), 'ZZZ');
+});
+
+test('el listbox renderiza bandera, semántica accesible y conserva el valor del borrador', () => {
+  const values={currency:'BRL' as const,cash:12,bank:34,usdCash:56};
+  const markup=renderToStaticMarkup(createElement(OpeningBalancesStep,{values,onChange:()=>undefined}));
+  assert.match(markup, /🇧🇷 Real brasileño \(BRL\)/);
+  assert.match(markup, /aria-haspopup="listbox"/); assert.match(markup, /aria-expanded="false"/);
+  assert.match(markup, /type="hidden" name="currency" value="BRL"/);
+  assert.match(markup, /Efectivo \(R\$\)/);
+});
+
+test('la navegación de teclado recorre monedas y el handler envía la selección al borrador', () => {
+  assert.equal(getCurrencyAfterKey('ARS','ArrowDown'),'USD');
+  assert.equal(getCurrencyAfterKey('ARS','ArrowUp'),'EUR');
+  assert.equal(getCurrencyAfterKey('USD','End'),'EUR');
+  const source=readFileSync(new URL('./OpeningBalancesStep.tsx',import.meta.url),'utf8');
+  assert.match(source,/event\.key==='Enter'/); assert.match(source,/event\.key==='Escape'/);
+  assert.match(source,/select=\(code:OperationalCurrency\)=>\{change\('currency',code\)/);
+  assert.match(source,/aria-activedescendant/); assert.match(source,/role="option"/);
 });
 
 test('los modales secundarios atrapan foco, cierran con Escape y lo devuelven al invocador', () => {
