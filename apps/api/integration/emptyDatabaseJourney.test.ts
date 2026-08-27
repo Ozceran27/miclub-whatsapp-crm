@@ -123,6 +123,11 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
     assert.equal(onboarding.body.status, "NOT_STARTED");
     assert.equal(onboarding.body.movementCount, 0);
     assert.equal(onboarding.body.enrollmentCount, 0);
+    assert.equal(onboarding.body.shouldShow, true, "el onboarding debe ser visible inmediatamente después del primer login");
+
+    const navigation = await request("/api/modules/navigation", {}, cookie);
+    assert.equal(navigation.response.status, 200, "la navegación debe responder tras registro, login y lectura del onboarding");
+    assert.ok(Array.isArray(navigation.body.sectors));
 
     for (const route of ["/api/movement-categories", "/api/catalogs/roles", "/api/administration/sector-templates", "/templates"]) {
       const catalog = await request(route, {}, cookie);
