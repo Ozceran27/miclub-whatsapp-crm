@@ -68,6 +68,7 @@ import { rejectClientClubId, requireAuth, requireMembership } from "./middleware
 import { authRateLimit, cors, corsOptions, csrfProtection, getAllowedOrigins, helmet, importMutationRateLimit, jsonBodyLimit, requestId } from "./security/index.js";
 import { getPostgresPool } from "./db/postgres.js";
 import { diagnosePermissions } from "./auth/permissionDiagnostics.js";
+import { assertOnboardingSchema } from "./db/onboardingSchemaGate.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -147,6 +148,7 @@ app.use(errorHandler);
 
 export const startServer = async () => {
   validateRuntimeConfig({ isProduction });
+  await assertOnboardingSchema(await getPostgresPool());
   try {
     const diagnostic = await diagnosePermissions(await getPostgresPool());
     if (diagnostic.unknownStoredPermissions.length) {

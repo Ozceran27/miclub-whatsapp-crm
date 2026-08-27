@@ -9,12 +9,12 @@ export const getPreviousStep = (step: OnboardingStep) => Math.max(1, step - 1) a
 export const hasValidOpeningBalances = ({currency,cash,bank,usdCash}:OnboardingDraft['openingBalances']) =>
   SUPPORTED_OPERATIONAL_CURRENCIES.includes(currency) && [cash,bank,usdCash].every(value=>Number.isFinite(value)&&value>=0);
 
-type Props = { step:OnboardingStep; direction:'forward'|'backward'; draft:OnboardingDraft; updateDraft:<K extends keyof OnboardingDraft>(key:K,value:OnboardingDraft[K])=>void; migrationAvailable: boolean; pending: boolean; error: string; onNext:(outcome?:OnboardingStepOutcome)=>void; onBack:()=>void; onComplete: () => void };
+type Props = { step:OnboardingStep; direction:'forward'|'backward'; draft:OnboardingDraft; updateDraft:<K extends keyof OnboardingDraft>(key:K,value:OnboardingDraft[K])=>void; migrationAvailable: boolean; pending: boolean; success: boolean; error: string; onNext:(outcome?:OnboardingStepOutcome)=>void; onBack:()=>void; onComplete: () => void };
 function ActionIcon({ type }: { type: 'next'|'skip'|'retry'|'launch' }) {
   const symbols={next:'→',skip:'↷',retry:'↻',launch:'★'};
   return <span className="onboarding-action-icon" aria-hidden="true">{symbols[type]}</span>;
 }
-export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAvailable, pending, error, onNext,onBack,onComplete }: Props) {
+export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAvailable, pending, success, error, onNext,onBack,onComplete }: Props) {
   const titleId = useId(); const dialogRef = useRef<HTMLDivElement>(null); const headingRef=useRef<HTMLHeadingElement>(null); const [validationError,setValidationError]=useState(''); const content = getOnboardingSteps(migrationAvailable,draft,updateDraft)[step - 1];
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -39,18 +39,18 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
   };
   const goBack=()=>onBack();
   const optional = isSkippableStep(step);
-  const status = pending ? 'Enviando configuración definitiva…' : error ? 'Error recuperable: no se pudo finalizar' : 'Listo para revisar; todavía no se envió';
+  const status = success ? '¡Configuración creada! Entrando a tu club…' : pending ? 'Enviando configuración definitiva…' : error ? 'Error recuperable: no se pudo finalizar' : 'Listo para revisar; todavía no se envió';
   const nextLabel=step===1?'Empezar Configuración':'Siguiente';
   return <div className="onboarding-backdrop" data-testid="onboarding-backdrop">
     <div className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef} tabIndex={-1}>
       <div className="onboarding-dialog__top"><OnboardingProgress step={step} optional={optional} /></div>
       <div className="onboarding-viewport"><section className="onboarding-step" data-direction={direction} key={step} aria-busy={pending}><header className="onboarding-step__header"><span className="onboarding-step__icon" aria-hidden="true">{content.icon}</span><div><div className="onboarding-step__meta"><p className="onboarding-step__eyebrow">{content.eyebrow}</p><span className="onboarding-requirement">{optional ? 'Opcional' : 'Obligatorio'}</span></div><h2 id={titleId} ref={headingRef} tabIndex={-1} data-initial-focus>{content.title}</h2><p>{content.description}</p></div></header>{content.body}</section></div>
       <footer className="onboarding-actions">
-        <div className="onboarding-feedback"><div className="onboarding-save-state" data-state={error?'error':pending?'loading':'ready'} role="status" aria-live="polite"><span aria-hidden="true">{error?'!':pending?'…':'○'}</span>{status}</div>{error && <div className="onboarding-error" role="alert"><p>{error}</p></div>}{validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}</div>
+        <div className="onboarding-feedback"><div className="onboarding-save-state" data-state={error?'error':pending?'loading':success?'success':'ready'} role="status" aria-live="polite"><span aria-hidden="true">{error?'!':pending?'…':'○'}</span>{status}</div>{success && <div className="onboarding-success" role="status"><strong>Tu club está listo</strong><p>La configuración fue confirmada. Te estamos llevando al panel.</p></div>}{error && <div className="onboarding-error" role="alert"><p>{error}</p></div>}{validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}</div>
         <div className="onboarding-actions__buttons">
         {step>=2&&<button className="secondary-btn" type="button" disabled={pending} onClick={goBack}>← Atrás</button>}
         {optional && <button className="ghost-btn" type="button" disabled={pending} title="Descartar los cambios temporales de este paso y continuar" onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
-        {step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending} onClick={onComplete}>{pending ? 'Enviando una única vez…' : <><ActionIcon type={error?'retry':'launch'}/>{error?'REINTENTAR':'INICIAR MI CLUB'}</>}</button>}
+        {step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending||success} onClick={onComplete}>{pending ? 'Enviando una única vez…' : <><ActionIcon type={error?'retry':'launch'}/>{error?'REINTENTAR':'INICIAR MI CLUB'}</>}</button>}
         </div>
       </footer>
     </div>

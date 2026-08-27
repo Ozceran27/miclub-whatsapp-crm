@@ -1,5 +1,6 @@
 import {
   PROVISIONED_ONBOARDING_SECTORS,
+  ONBOARDING_DRAFT_CONTRACT_VERSION,
   COMMERCIAL_PLAN_CODES,
   isSectorIconKey,
   SUPPORTED_OPERATIONAL_CURRENCIES,
@@ -22,6 +23,8 @@ export const isOpeningBalancesRequest = (body: unknown): body is OpeningBalances
 export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnboardingRequest => {
   if (!record(body) || Object.keys(body).some((key) => !["draft","selectedPlanCode"].includes(key)) || !record(body.draft)) return false;
   const draft = body.draft;
+  if (draft.contractVersion !== ONBOARDING_DRAFT_CONTRACT_VERSION) return false;
+  if (Object.keys(draft).some((key) => !["contractVersion","idempotencyKey","selectedPlanCode","openingBalances","sectors","workers","activities","pendingImport"].includes(key))) return false;
   if (typeof draft.idempotencyKey !== "string" || !/^[\w-]{8,128}$/.test(draft.idempotencyKey)) return false;
   if (!COMMERCIAL_PLAN_CODES.some((code) => code === draft.selectedPlanCode)) return false;
   if (body.selectedPlanCode !== draft.selectedPlanCode) return false;
