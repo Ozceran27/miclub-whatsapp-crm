@@ -52,8 +52,10 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     && typeof worker.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(worker.email)
     && typeof worker.password === "string" && worker.password.length >= 10
     && ["TRABAJADOR", "INSTRUCTOR"].includes(String(worker.role))
-    && ["FIXED", "VARIABLE"].includes(String(worker.paymentMode))
-    && (worker.paymentMode === "FIXED" ? finiteNonNegative(worker.monthlyFixedAmount) : worker.monthlyFixedAmount == null))) return false;
+    && typeof worker.hasFixedCompensation === "boolean"
+    && (worker.hasFixedCompensation
+      ? finiteNonNegative(worker.fixedCompensationAmount) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(worker.fixedCompensationFrequency))
+      : worker.fixedCompensationAmount == null && worker.fixedCompensationFrequency == null))) return false;
 
   const sectorIds = new Set(draft.sectors.map((sector) => sector.clientId));
   const instructorIds = new Set(draft.workers.filter((worker) => worker.role === "INSTRUCTOR").map((worker) => worker.clientId));

@@ -214,8 +214,9 @@ export interface AdministrationWorkerDto {
   role?: string | null;
   sector?: string | null;
   salary?: number | null;
-  paymentMode?: "FIXED" | "VARIABLE" | null;
-  monthlyFixedAmount?: number | null;
+  hasFixedCompensation: boolean;
+  fixedCompensationAmount: number | null;
+  fixedCompensationFrequency: FixedCompensationFrequency | null;
   status: string;
   systemAccess: boolean;
   employmentStartDate?: string | null;
@@ -241,11 +242,16 @@ export interface AdministrationWorkerMutationDto {
   password?: string;
   role: "TRABAJADOR" | "INSTRUCTOR" | "DIRECTOR";
   sectorId?: string | null;
-  paymentMode: "FIXED" | "VARIABLE";
-  monthlyFixedAmount?: number | null;
+  hasFixedCompensation: boolean;
+  fixedCompensationAmount: number | null;
+  fixedCompensationFrequency: FixedCompensationFrequency | null;
   employmentStartDate?: string | null;
   notes?: string | null;
 }
+
+/** Personal base compensation; deliberately unrelated to activity settlement terms. */
+export const FIXED_COMPENSATION_FREQUENCIES = ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as const;
+export type FixedCompensationFrequency = typeof FIXED_COMPENSATION_FREQUENCIES[number];
 
 export type AdministrationWorkersDataSource = "employees" | "legacy";
 

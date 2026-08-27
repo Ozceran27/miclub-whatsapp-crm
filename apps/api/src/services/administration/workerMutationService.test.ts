@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from "../../auth/passwordHasher.js";
 import { setPostgresPoolForTests, type PgPool } from "../../db/postgres.js";
 import { createWorker, resolveWorkerInvitation, validateWorkerMutation, WorkerMutationError } from "./workerMutationService.js";
 
-const base = { firstName: " Ana ", lastName: " Pérez ", dni: "12.345.678", email: "ANA@EXAMPLE.COM", password: "segura12345", role: "TRABAJADOR", paymentMode: "VARIABLE" };
+const base = { firstName: " Ana ", lastName: " Pérez ", dni: "12.345.678", email: "ANA@EXAMPLE.COM", password: "segura12345", role: "TRABAJADOR", hasFixedCompensation: false, fixedCompensationAmount: null, fixedCompensationFrequency: null };
 test("normaliza DNI/correo y exige las reglas públicas de contraseña", async () => {
   const input = validateWorkerMutation(base, true);
   assert.equal(input.dni, "12345678"); assert.equal(input.email, "ana@example.com");
@@ -14,9 +14,9 @@ test("normaliza DNI/correo y exige las reglas públicas de contraseña", async (
   const hash = await hashPassword(input.password!); assert.notEqual(hash, input.password); assert.equal(await verifyPassword(input.password!, hash), true);
 });
 test("FIXED y VARIABLE respetan la invariantes de monto", () => {
-  assert.equal(validateWorkerMutation({ ...base, paymentMode: "FIXED", monthlyFixedAmount: 0 }, true).monthlyFixedAmount, 0);
-  assert.throws(() => validateWorkerMutation({ ...base, paymentMode: "FIXED", monthlyFixedAmount: -1 }, true));
-  assert.throws(() => validateWorkerMutation({ ...base, paymentMode: "VARIABLE", monthlyFixedAmount: 1 }, true));
+  assert.equal(validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: 0, fixedCompensationFrequency: "MONTHLY" }, true).fixedCompensationAmount, 0);
+  assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: -1, fixedCompensationFrequency: "MONTHLY" }, true));
+  assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: false, fixedCompensationAmount: 1, fixedCompensationFrequency: null }, true));
 });
 test("roles operativos no heredan privilegios administrativos de Director", () => {
   for (const role of ["TRABAJADOR", "INSTRUCTOR"] as const) {

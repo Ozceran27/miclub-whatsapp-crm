@@ -14,8 +14,9 @@ type WorkerRow = {
   role: string | null;
   sector: string | null;
   salary: string | number | null;
-  payment_mode: "FIXED" | "VARIABLE" | null;
-  monthly_fixed_amount: string | number | null;
+  has_fixed_compensation: boolean;
+  fixed_compensation_amount: string | number | null;
+  fixed_compensation_frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | null;
   status: string;
   system_access: boolean;
   employment_start_date: string | null;
@@ -52,7 +53,7 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
         select e.id::text, e.club_id::text, e.person_id::text, null::text as code,
           p.first_name, p.last_name, p.dni, p.phone, p.email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), 'Sin nombre') as display_name,
-          r.code as role, s.name as sector, e.salary, e.payment_mode, e.monthly_fixed_amount, e.status,
+          r.code as role, s.name as sector, e.salary, e.has_fixed_compensation, e.fixed_compensation_amount, e.fixed_compensation_frequency, e.status,
           (e.user_id is not null and ucm.status = 'active' and coalesce(u.is_active, false) and u.status = 'active') as system_access,
           e.employment_start_date::text, e.employment_end_date::text, e.notes,
           coalesce(ucm.permissions, '{}'::text[]) as permissions,
@@ -80,7 +81,7 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
           p.first_name, p.last_name, p.dni, p.phone, p.email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), i.display_name, 'Sin nombre') as display_name,
           coalesce(r.code, case when i.id is not null then 'INSTRUCTOR' end) as role,
-          sectors.names as sector, null::numeric as salary, null::text as payment_mode, null::numeric as monthly_fixed_amount,
+          sectors.names as sector, null::numeric as salary, false as has_fixed_compensation, null::numeric as fixed_compensation_amount, null::text as fixed_compensation_frequency,
           case when coalesce(ucm.status, 'active') = 'active' and p.status::text in ('activa', 'active') then 'active' else 'inactive' end as status,
           (ucm.status = 'active' and coalesce(u.is_active, false) and u.status = 'active') as system_access,
           null::text as employment_start_date, null::text as employment_end_date, null::text as notes,
