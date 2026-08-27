@@ -2,6 +2,7 @@ import type { AdministrationSectorDto, AdministrationSectorsResponse } from '@mi
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { createAdministrationSector, getAdministrationSectors, getSectorTemplates, type SectorTemplate } from '../../services/api/administrationApi';
 import { SectorDetailModal } from './SectorDetailModal';
+import { getSectorVisualMeta } from '../sectorVisualMeta';
 
 const integer = new Intl.NumberFormat('es-AR');
 
@@ -92,6 +93,7 @@ export function SectorList() {
               onClick={() => setSelectedSectorId(sector.id)}
             >
               <span className="sector-list__identity">
+                <span role="img" aria-label={`Icono de ${sector.name}`}>{getSectorVisualMeta(sector).icon}</span>
                 <span className="sector-list__color" style={{ backgroundColor: sector.color || '#91a4c8' }} aria-label={`Color ${sector.color || 'no configurado'}`} />
                 <span><strong>{sector.name}</strong><small>{sector.code}</small></span>
               </span>

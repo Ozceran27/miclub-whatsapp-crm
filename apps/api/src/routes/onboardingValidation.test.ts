@@ -16,7 +16,7 @@ test("rechaza importes negativos y campos adicionales",()=>{
 
 const completeRequest=():CompleteOnboardingRequest=>({draft:{
   idempotencyKey:"retry-complete-1",openingBalances:{currency:"ARS",cash:0,bank:0,usdCash:0},
-  sectors:PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,templateId:"",color:"#2563EB",status:"active"})),
+  sectors:PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:"#2563EB",status:"active"})),
   workers:[],activities:[],pendingImport:null,
 }});
 test("permite finalizar sin altas opcionales y con los tres sectores provisionados",()=>{
@@ -27,6 +27,12 @@ test("identifica la base de sectores por code e isSystem, no por cantidad",()=>{
   assert.equal(isCompleteOnboardingRequest(missing),false);
   const fake=completeRequest();fake.draft.sectors[0]={...fake.draft.sectors[0],isSystem:false};
   assert.equal(isCompleteOnboardingRequest(fake),false);
+});
+test("exige una clave semántica del catálogo para cada sector",()=>{
+  const emoji=completeRequest();emoji.draft.sectors[0]={...emoji.draft.sectors[0],iconKey:"🏢"};
+  assert.equal(isCompleteOnboardingRequest(emoji),false);
+  const unknown=completeRequest();unknown.draft.sectors[0]={...unknown.draft.sectors[0],iconKey:"not-in-catalog"};
+  assert.equal(isCompleteOnboardingRequest(unknown),false);
 });
 test("rechaza identificadores temporales repetidos y referencias cruzadas inválidas",()=>{
   const duplicate=completeRequest();duplicate.draft.workers=[{clientId:duplicate.draft.sectors[0].clientId,firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"INSTRUCTOR",paymentMode:"VARIABLE",monthlyFixedAmount:null}];

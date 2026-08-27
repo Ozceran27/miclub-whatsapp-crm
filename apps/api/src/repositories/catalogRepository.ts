@@ -90,7 +90,7 @@ const catalogQueries: Record<CatalogName, CatalogQuery> = {
   sectors: {
     tenantScoped: true,
     sql: `
-      select id, manager_person_id, code, name, color, opening_time, closing_time, max_capacity, municipal_status,
+      select id, manager_person_id, code, name, icon_key, color, opening_time, closing_time, max_capacity, municipal_status,
         financial_status, operational_status, uses_enrollments, uses_activities, notes, created_at, updated_at
       from miclub.sectors where club_id = $1
       order by name asc

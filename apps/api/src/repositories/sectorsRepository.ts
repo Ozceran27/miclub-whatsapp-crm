@@ -30,7 +30,7 @@ export type SectorMutationResult =
   | { kind: "updated"; sector: SectorRow }
   | { kind: "missing" | "conflict" | "protected" | "dependencies" | "invalid_manager"; dependencies?: Record<string, number> };
 
-const sectorColumns = `id, club_id, manager_person_id, code, name, description, icon, color,
+const sectorColumns = `id, club_id, manager_person_id, code, name, description, icon, icon_key, color,
   capacity_mode, configured_capacity, status, is_system, archived_at, created_at, updated_at`;
 
 export const isProtectedSector = (row: Record<string, unknown>): boolean => row.is_system === true;
