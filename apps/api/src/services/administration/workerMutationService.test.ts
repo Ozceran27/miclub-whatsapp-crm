@@ -14,8 +14,8 @@ test("normaliza DNI/correo y exige las reglas públicas de contraseña", async (
   const hash = await hashPassword(input.password!); assert.notEqual(hash, input.password); assert.equal(await verifyPassword(input.password!, hash), true);
 });
 test("FIXED y VARIABLE respetan la invariantes de monto", () => {
-  assert.equal(validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: 0, fixedCompensationFrequency: "MONTHLY" }, true).fixedCompensationAmount, 0);
-  assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: -1, fixedCompensationFrequency: "MONTHLY" }, true));
+  assert.equal(validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: 0, fixedCompensationFrequency: "MONTHLY", currencyCode: "ARS" }, true).fixedCompensationAmount, 0);
+  assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: -1, fixedCompensationFrequency: "MONTHLY", currencyCode: "ARS" }, true));
   assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: false, fixedCompensationAmount: 1, fixedCompensationFrequency: null }, true));
 });
 test("roles operativos no heredan privilegios administrativos de Director", () => {

@@ -25,6 +25,7 @@ export const getAdministrationWorkers = async (clubId: string, limit: number, of
       hasFixedCompensation: worker.has_fixed_compensation,
       fixedCompensationAmount: worker.fixed_compensation_amount == null ? null : Number(worker.fixed_compensation_amount),
       fixedCompensationFrequency: worker.fixed_compensation_frequency,
+      currencyCode: worker.currency_code,
       status: worker.status,
       systemAccess: worker.system_access,
       employmentStartDate: worker.employment_start_date,

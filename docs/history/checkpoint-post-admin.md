@@ -18,6 +18,7 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
+
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -63,6 +64,8 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608270004_atomic_onboarding_completion.sql` | Hace atómica e idempotente la finalización versionada del onboarding por club y operación. | `eda334def350c6cf78597a80c2bd4d7dc2f3f60e58ec62654060d1ae7a5c4f25` | Después de `202608270003_activity_fee_frequencies.sql`. |
 | `202608280001_separate_legacy_activity_enrollment_fee.sql` | Hace nullable la cuota histórica de inscripción, documenta su semántica legado y la separa de la liquidación canónica sin borrar valores. | `2046914a6f164eecc79f0ecd81ab79a9ed48d15de172832896ee81fd0c768f64` | Después de `202608270004_atomic_onboarding_completion.sql`. |
 | `202608280002_sync_activity_visual_catalog.sql` | Sincroniza iconos de actividad con el contrato compartido, canoniza fútbol y conserva aliases para datos históricos. | `3a1a53ea858c41c722b6ec21fc70ccd7351157145164e33ca9cf26641a112bd4` | Después de `202608130001_version_activity_terms.sql`. |
+| `202608280003_compensation_and_activity_term_currencies.sql` | Explicita y valida la moneda de remuneraciones fijas y términos FIXED sin alterar versiones históricas. | `eec48dafea3a924b9a2f2ef70e59814a09eb83020783994fac43d00b7c875e00` | Después de `202608210001_operational_currency_opening_balances.sql` y `202608270002_employee_compensation_and_photos.sql` y `202608270003_activity_fee_frequencies.sql`. |
+
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
