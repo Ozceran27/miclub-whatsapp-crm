@@ -87,6 +87,24 @@ test('la utilidad sr-only conserva los nombres accesibles de selectores visuales
   assert.match(activities, /<span className="sr-only">\{key\}<\/span>/);
 });
 
+test('los catálogos de iconos son adaptables y no generan scroll horizontal', async () => {
+  const [styles, activities] = await Promise.all([
+    readFile(new URL('./styles.css', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/ActivityDraftList.tsx', import.meta.url), 'utf8'),
+  ]);
+  const iconGridRule = styles.match(/\.draft-icon-grid\s*\{([^}]*)\}/)?.[1];
+
+  assert.ok(iconGridRule, 'Falta la cuadrícula de iconos');
+  assert.match(iconGridRule, /grid-template-columns:\s*repeat\(auto-fill,minmax\(44px,1fr\)\)/);
+  assert.doesNotMatch(styles, /\.draft-icon-grid\s*\{[^}]*repeat\(\d+,/s, 'La cuadrícula no debe fijar columnas en escritorio ni móvil');
+  assert.match(styles, /\.draft-icon-grid label\s*\{[^}]*aspect-ratio:\s*1[^}]*min-height:\s*44px[^}]*min-width:\s*44px/s);
+  assert.match(styles, /\.draft-form fieldset\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*hidden/s);
+  assert.match(styles, /\.draft-icon-catalog,\.draft-sector-icons\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*hidden/s);
+  assert.match(activities, /className="draft-icon-catalog"/);
+  assert.match(activities, /categories\.map\(category=><section/);
+  assert.match(activities, /aria-label=\{`\$\{key\} · \$\{category\}`\}/);
+});
+
 test('los modales de borradores usan superficies y texto semánticos en ambos temas', async () => {
   const styles = await readFile(new URL('./styles.css', import.meta.url), 'utf8');
   const expectedThemeTokens = {

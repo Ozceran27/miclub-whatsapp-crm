@@ -16,7 +16,8 @@ function ColorControl({ value, onChange }:{value:string;onChange:(value:string)=
 }
 function IconPicker({ value, onChange }:{value:string;onChange:(value:string)=>void}) {
   const [query,setQuery]=useState(''); const visible=activityIcons.filter(([key,,category])=>`${key} ${category}`.toLowerCase().includes(query.toLowerCase()));
-  return <fieldset><legend>Icono de la actividad</legend><input type="search" placeholder="Buscar por nombre o categoría" value={query} onChange={event=>setQuery(event.target.value)}/><div className="draft-icon-grid">{visible.map(([key,icon,category])=><label key={key} title={`${key} · ${category}`}><input type="radio" checked={value===key} onChange={()=>onChange(key)}/><span aria-hidden="true">{icon}</span><span className="sr-only">{key}</span></label>)}</div></fieldset>;
+  const categories=[...new Set(visible.map(([, ,category])=>category))];
+  return <fieldset><legend>Icono de la actividad</legend><input type="search" aria-label="Buscar iconos de actividad" placeholder="Buscar por nombre o categoría" value={query} onChange={event=>setQuery(event.target.value)}/><div className="draft-icon-catalog">{categories.map(category=><section key={category} aria-label={category}><strong>{category}</strong><div className="draft-icon-grid">{visible.filter(([, ,iconCategory])=>iconCategory===category).map(([key,icon])=><label key={key} title={`${key} · ${category}`} aria-label={`${key} · ${category}`}><input type="radio" name="activityIcon" checked={value===key} onChange={()=>onChange(key)}/><span aria-hidden="true">{icon}</span><span className="sr-only">{key}</span></label>)}</div></section>)}</div></fieldset>;
 }
 function ActivityEditor({ initial, sectors, workers, currency, onSave }:EditorProps) {
   const [mode,setMode]=useState<'FIXED'|'VARIABLE'>(initial?.settlementMode??'VARIABLE');
