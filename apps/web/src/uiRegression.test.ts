@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { createElement } from 'react';
+import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PaginatedList } from './modules/Administration/PaginatedList';
+
+Object.assign(globalThis, { React });
 
 const noop = () => undefined;
 const renderList = (overrides: Partial<Parameters<typeof PaginatedList>[0]> = {}) => renderToStaticMarkup(createElement(PaginatedList, {
@@ -57,4 +59,41 @@ test('checklist UI: modal, Escape, teclado, restauración de foco y foco visible
   assert.match(modal, /previousFocus\?\.focus\(\)/);
   assert.match(list, /event\.key === 'Enter' \|\| event\.key === ' '/);
   assert.match(styles, /:focus-visible/);
+});
+
+test('los modales de borradores usan superficies y texto semánticos en ambos temas', async () => {
+  const styles = await readFile(new URL('./styles.css', import.meta.url), 'utf8');
+  const expectedThemeTokens = {
+    dark: {
+      '--color-card': 'rgba(19, 31, 53, 0.88)',
+      '--color-card-muted': 'rgba(9, 18, 34, 0.46)',
+      '--color-text': '#f0f4ff',
+      '--color-text-strong': '#f4f8ff',
+    },
+    light: {
+      '--color-card': 'rgba(255, 255, 255, 0.96)',
+      '--color-card-muted': '#eef3f8',
+      '--color-text': '#152033',
+      '--color-text-strong': '#0b1220',
+    },
+  } as const;
+
+  for (const [theme, tokens] of Object.entries(expectedThemeTokens)) {
+    const themeBlock = styles.match(new RegExp(`\\[data-theme='${theme}'\\]\\s*\\{([^}]+)\\}`))?.[1];
+    assert.ok(themeBlock, `Falta la definición de tokens del tema ${theme}`);
+    for (const [token, value] of Object.entries(tokens)) {
+      const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      assert.match(themeBlock, new RegExp(`${token}\\s*:\\s*${escapedValue}\\s*;`));
+    }
+  }
+
+  const modalRules = [...styles.matchAll(/([^{}]*\.draft-modal[^{}]*)\{([^{}]*)\}/g)];
+  assert.ok(modalRules.length > 0, 'No se encontraron reglas del modal de borradores');
+  for (const [, selector, declarations] of modalRules) {
+    assert.doesNotMatch(declarations, /background(?:-color)?\s*:\s*(?:#fff(?:fff)?\b|white\b|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))/i, `Fondo blanco hardcodeado en ${selector.trim()}`);
+  }
+
+  assert.match(styles, /\.draft-modal\s*\{[^}]*background:\s*var\(--color-card\)[^}]*color:\s*var\(--color-text\)/s);
+  assert.match(styles, /\.draft-modal\s*>\s*header,\.draft-modal__footer\s*\{[^}]*background:\s*var\(--color-card\)/s);
+  assert.match(styles, /\.draft-modal__body\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/s);
 });
