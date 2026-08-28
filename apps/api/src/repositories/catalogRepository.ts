@@ -23,7 +23,7 @@ const catalogQueries: Record<CatalogName, CatalogQuery> = {
   activities: {
     tenantScoped: true,
     sql: `
-      select id, sector_id, manager_person_id, instructor_id, code, name, modality, color, monthly_fee,
+      select id, sector_id, manager_person_id, instructor_id, code, name, modality, color, monthly_fee as legacy_enrollment_fee,
         club_commission_percent, instructor_commission_percent, max_capacity, status, notes, created_at, updated_at
       from miclub.activities where club_id = $1
       order by name asc

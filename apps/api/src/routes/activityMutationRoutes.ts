@@ -22,12 +22,11 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "code", "name", "modality", "color", "iconKey", "enrollmentFee", "enrollmentFeeFrequency", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
+  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "code", "name", "modality", "color", "iconKey", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
   if (body.instructorId !== undefined && body.instructorId !== null && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "VALIDATION_ERROR", "instructorId debe ser UUID o null."); return null; }
-  for (const field of ["enrollmentFee", "enrollmentFeeFrequency", "instructorCommissionPercent"] as const) if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]) || body[field] < 0)) { fail(res, 400, "VALIDATION_ERROR", `${field} debe ser un número no negativo.`); return null; }
-  if (body.enrollmentFeeFrequency !== undefined && !["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(body.enrollmentFeeFrequency))) { fail(res, 400, "VALIDATION_ERROR", "enrollmentFeeFrequency no es válida."); return null; }
+  if (body.instructorCommissionPercent !== undefined && (typeof body.instructorCommissionPercent !== "number" || !Number.isFinite(body.instructorCommissionPercent) || body.instructorCommissionPercent < 0)) { fail(res, 400, "VALIDATION_ERROR", "instructorCommissionPercent debe ser un número no negativo."); return null; }
   const settlement = body.settlement as Record<string, unknown> | undefined;
   if (!settlement) { fail(res, 400, "VALIDATION_ERROR", "settlement es obligatorio."); return null; }
   const keys = Object.keys(settlement); const mode = settlement.mode;

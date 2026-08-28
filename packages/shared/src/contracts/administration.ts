@@ -175,9 +175,9 @@ export interface AdministrationActivityDto {
   color?: string | null;
   iconKey?: string | null;
   /** Cuota cobrada al inscribirse; no representa la liquidación mensual del club. */
-  enrollmentFee: number;
+  enrollmentFee: number | null;
   /** @deprecated Usar enrollmentFee. */
-  monthlyFee: number;
+  monthlyFee: number | null;
   clubCommissionPercent: number;
   clubSharePercentage?: number | null;
   instructorCommissionPercent: number;
