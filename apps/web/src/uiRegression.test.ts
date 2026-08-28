@@ -61,6 +61,32 @@ test('checklist UI: modal, Escape, teclado, restauración de foco y foco visible
   assert.match(styles, /:focus-visible/);
 });
 
+test('la utilidad sr-only conserva los nombres accesibles de selectores visuales', async () => {
+  const [styles, sectors, activities] = await Promise.all([
+    readFile(new URL('./styles.css', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/SectorDraftList.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/ActivityDraftList.tsx', import.meta.url), 'utf8'),
+  ]);
+  const srOnlyRule = styles.match(/\.sr-only\s*\{([^}]*)\}/)?.[1];
+
+  assert.ok(srOnlyRule, 'Falta la utilidad .sr-only');
+  assert.match(srOnlyRule, /position:\s*absolute/);
+  assert.match(srOnlyRule, /width:\s*1px/);
+  assert.match(srOnlyRule, /height:\s*1px/);
+  assert.match(srOnlyRule, /margin:\s*-1px/);
+  assert.match(srOnlyRule, /overflow:\s*hidden/);
+  assert.match(srOnlyRule, /clip:\s*rect\(0,\s*0,\s*0,\s*0\)/);
+  assert.match(srOnlyRule, /clip-path:\s*inset\(50%\)/);
+  assert.match(srOnlyRule, /white-space:\s*nowrap/);
+  assert.doesNotMatch(srOnlyRule, /(?:display:\s*none|visibility:\s*hidden)/);
+  assert.match(styles, /\.sr-only\.sr-only-focusable:focus/);
+  assert.match(styles, /\.sr-only\.sr-only-focusable:focus-within/);
+
+  assert.match(sectors, /<span className="sr-only">\{icon\.name\}<\/span>/);
+  assert.match(sectors, /<span className="sr-only">\{color\.name\}, \{color\.hex\}<\/span>/);
+  assert.match(activities, /<span className="sr-only">\{key\}<\/span>/);
+});
+
 test('los modales de borradores usan superficies y texto semánticos en ambos temas', async () => {
   const styles = await readFile(new URL('./styles.css', import.meta.url), 'utf8');
   const expectedThemeTokens = {
