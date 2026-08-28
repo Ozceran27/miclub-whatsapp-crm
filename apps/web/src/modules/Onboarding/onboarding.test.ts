@@ -7,6 +7,7 @@ import { createInitialOnboardingDraft } from './OnboardingGate';
 import { getNextStep, getPreviousStep, hasValidOpeningBalances } from './OnboardingDialog';
 import { getOnboardingSteps, isSkippableStep } from './steps';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
+import { CurrencyFlag } from './CurrencyFlag';
 import { CURRENCY_PRESENTATIONS, formatCurrencyLabel, getCurrencyAfterKey, getCurrencyPrefix } from './currencyPresentation';
 const draft={contractVersion:1 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
 const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
@@ -151,15 +152,28 @@ test('la advertencia exige ceros al importar capital histórico', () => {
 
 test('el catálogo de presentación cubre la lista canónica y ofrece fallback seguro', () => {
   assert.deepEqual(CURRENCY_PRESENTATIONS.map(currency=>currency.code), ['ARS','USD','BRL','EUR']);
-  assert.equal(formatCurrencyLabel('ARS'), '🇦🇷 Peso argentino (ARS)');
+  assert.equal(formatCurrencyLabel('ARS'), 'Peso argentino (ARS)');
   assert.equal(formatCurrencyLabel('ZZZ'), 'Moneda desconocida (ZZZ)');
   assert.equal(getCurrencyPrefix('ZZZ'), 'ZZZ');
+});
+
+test('las cuatro monedas tienen una bandera local con nombre accesible', () => {
+  for (const currency of CURRENCY_PRESENTATIONS) {
+    const markup=renderToStaticMarkup(createElement(CurrencyFlag,currency));
+    assert.match(markup, /class="currency-flag"/);
+    assert.match(markup, /role="img"/);
+    assert.match(markup, new RegExp(`aria-label="${currency.flagName}"`));
+    assert.match(markup, new RegExp(`data-flag-region="${currency.flagRegion}"`));
+    assert.match(markup, /<svg/);
+  }
 });
 
 test('el listbox renderiza bandera, semántica accesible y conserva el valor del borrador', () => {
   const values={currency:'BRL' as const,cash:12,bank:34,usdCash:56};
   const markup=renderToStaticMarkup(createElement(OpeningBalancesStep,{values,onChange:()=>undefined}));
-  assert.match(markup, /🇧🇷 Real brasileño \(BRL\)/);
+  assert.match(markup, /aria-label="Bandera de Brasil"/);
+  assert.match(markup, /currency-option__name">Real brasileño/);
+  assert.match(markup, /currency-option__code">BRL/);
   assert.match(markup, /aria-haspopup="listbox"/); assert.match(markup, /aria-expanded="false"/);
   assert.match(markup, /type="hidden" name="currency" value="BRL"/);
   assert.match(markup, /Efectivo \(R\$\)/);

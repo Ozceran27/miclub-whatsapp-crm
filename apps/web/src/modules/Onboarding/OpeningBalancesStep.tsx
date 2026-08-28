@@ -1,9 +1,11 @@
 import type { OpeningBalancesRequest, OperationalCurrency } from '@miclub/shared';
 import React, { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { CURRENCY_PRESENTATIONS, formatCurrencyLabel, getCurrencyAfterKey, getCurrencyPrefix } from './currencyPresentation';
+import { CurrencyFlag } from './CurrencyFlag';
+import { CURRENCY_PRESENTATIONS, getCurrencyAfterKey, getCurrencyPrefix, getCurrencyPresentation } from './currencyPresentation';
 
 type Values = Omit<OpeningBalancesRequest,'idempotencyKey'>;
 export function OpeningBalancesStep({values,onChange}:{values:Values;onChange:(values:Values)=>void}) {
+  const selectedCurrency=getCurrencyPresentation(values.currency) ?? CURRENCY_PRESENTATIONS[0];
   const change=(field:keyof Values,value:string)=>onChange({...values,[field]:field==='currency'?value:Number(value)});
   const [open,setOpen]=useState(false);
   const [activeCode,setActiveCode]=useState<OperationalCurrency>(()=>values.currency);
@@ -31,10 +33,10 @@ export function OpeningBalancesStep({values,onChange}:{values:Values;onChange:(v
     <div className="opening-balances-form__currency currency-listbox" ref={rootRef}>
       <span id={`${listboxId}-label`}>Moneda operativa</span><input type="hidden" name="currency" value={values.currency}/>
       <button ref={buttonRef} type="button" className="currency-listbox__trigger" aria-haspopup="listbox" aria-expanded={open} aria-controls={listboxId} aria-labelledby={`${listboxId}-label ${listboxId}-value`} aria-activedescendant={open?`${listboxId}-${activeCode}`:undefined} onClick={()=>setOpen(value=>!value)} onKeyDown={onButtonKeyDown}>
-        <span id={`${listboxId}-value`}>{formatCurrencyLabel(values.currency)}</span><span aria-hidden="true">▾</span>
+        <span id={`${listboxId}-value`} className="currency-option"><CurrencyFlag {...selectedCurrency}/><span className="currency-option__name">{selectedCurrency.name}</span><span className="currency-option__code">{selectedCurrency.code}</span></span><span aria-hidden="true">▾</span>
       </button>
       {open&&<ul id={listboxId} role="listbox" aria-labelledby={`${listboxId}-label`} className="currency-listbox__options">
-        {CURRENCY_PRESENTATIONS.map(currency=><li id={`${listboxId}-${currency.code}`} key={currency.code} role="option" aria-selected={values.currency===currency.code} tabIndex={activeCode===currency.code?0:-1} data-active={activeCode===currency.code} onMouseEnter={()=>setActiveCode(currency.code)} onClick={()=>select(currency.code)} onKeyDown={onOptionKeyDown}>{formatCurrencyLabel(currency.code)}</li>)}
+        {CURRENCY_PRESENTATIONS.map(currency=><li id={`${listboxId}-${currency.code}`} key={currency.code} role="option" aria-selected={values.currency===currency.code} tabIndex={activeCode===currency.code?0:-1} data-active={activeCode===currency.code} onMouseEnter={()=>setActiveCode(currency.code)} onClick={()=>select(currency.code)} onKeyDown={onOptionKeyDown}><span className="currency-option"><CurrencyFlag {...currency}/><span className="currency-option__name">{currency.name}</span><span className="currency-option__code">{currency.code}</span></span></li>)}
       </ul>}
     </div>
     <label>Efectivo ({getCurrencyPrefix(values.currency)})<input name="cash" type="number" min="0" step="0.01" value={values.cash} onChange={event=>change('cash',event.target.value)} required /></label>
