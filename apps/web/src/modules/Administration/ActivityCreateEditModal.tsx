@@ -38,7 +38,7 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
       sectorId: String(data.get('sectorId')), instructorId: String(data.get('instructorId')),
       name: String(data.get('name')).trim(), code: String(data.get('code') || '').trim() || null,
       modality: String(data.get('modality') || '').trim() || null, color: String(data.get('color')), iconKey,
-      enrollmentFee: number('enrollmentFee'), enrollmentFeeFrequency: String(data.get('enrollmentFeeFrequency')) as 'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY', maxCapacity: data.get('maxCapacity') ? number('maxCapacity') : null,
+      maxCapacity: data.get('maxCapacity') ? number('maxCapacity') : null,
       status: String(data.get('status')) as 'active' | 'inactive', notes: String(data.get('notes') || '').trim() || null,
       settlement: mode === 'FIXED'
         ? { mode, fixedClubFee: number('fixedClubFee'), fixedFeeFrequency: String(data.get('fixedFeeFrequency')) as 'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY', clubSharePercentage: null, effectiveFrom: String(data.get('effectiveFrom')) }
@@ -56,7 +56,7 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
 
   return <div className="sector-modal__backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
     <div className="sector-modal activity-form-modal" role="dialog" aria-modal="true" aria-labelledby="activity-form-title">
-      <header className="sector-modal__header"><div><p className="eyebrow">Actividades</p><h2 id="activity-form-title">{activity ? 'Editar actividad' : 'Crear Nueva Actividad'}</h2><p>La cuota de inscripción y la liquidación se registran por separado.</p></div><button className="sector-modal__close" type="button" onClick={onClose} disabled={saving} aria-label="Cerrar">×</button></header>
+      <header className="sector-modal__header"><div><p className="eyebrow">Actividades</p><h2 id="activity-form-title">{activity ? 'Editar actividad' : 'Crear Nueva Actividad'}</h2><p>Definí la liquidación del club. La cuota del socio se configura en el flujo de inscripciones.</p></div><button className="sector-modal__close" type="button" onClick={onClose} disabled={saving} aria-label="Cerrar">×</button></header>
       {error && <p className="activity-form__error" role="alert">{error}</p>}
       {loadingCatalogs ? <p role="status">Cargando sectores, instructores e iconos…</p> : <form className="activity-form" onSubmit={(event) => void submit(event)}>
         <div className="activity-form__grid">
@@ -66,7 +66,6 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
           <label>Instructor responsable<select name="instructorId" required defaultValue={activity?.instructorId ?? ''}><option value="" disabled>Seleccionar instructor…</option>{instructors.map((instructor) => <option key={instructor.id} value={instructor.id}>{instructor.displayName}</option>)}</select></label>
           <label>Modalidad<input name="modality" defaultValue={activity?.modality ?? ''} /></label>
           <label>Estado<select name="status" defaultValue={activity?.status === 'active' ? 'active' : 'inactive'}><option value="active">Activa</option><option value="inactive">Inactiva</option></select></label>
-          <label>Cuota de inscripción<input name="enrollmentFee" type="number" min="0" step="0.01" required defaultValue={activity?.enrollmentFee ?? 0} /></label><label>Frecuencia de inscripción<select name="enrollmentFeeFrequency"><option value="DAILY">Diaria</option><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensual</option><option value="YEARLY">Anual</option></select></label>
           <label>Cupo máximo<input name="maxCapacity" type="number" min="0" step="1" defaultValue={activity?.maxCapacity ?? ''} /></label>
           <label>Color<input name="color" type="color" defaultValue={activity?.color ?? '#2563EB'} /></label>
         </div>

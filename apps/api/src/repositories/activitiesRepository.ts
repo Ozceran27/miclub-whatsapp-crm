@@ -14,7 +14,7 @@ export type ActivityActor = {
 };
 export type ActivityInput = {
   sectorId: string; name: string; managerPersonId: string | null; instructorId?: string | null; code?: string | null;
-  modality?: string | null; color?: string | null; iconKey?: string | null; enrollmentFee?: number; enrollmentFeeFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"; monthlyFee?: number; clubCommissionPercent: number;
+  modality?: string | null; color?: string | null; iconKey?: string | null; clubCommissionPercent: number;
   instructorCommissionPercent?: number; maxCapacity?: number | null; status?: "active" | "inactive"; notes?: string | null;
   settlement: ActivitySettlementMutation;
 };
@@ -66,10 +66,10 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
     const invalid = await validReferences(executor, actor, input);
     if (invalid) return { kind: invalid };
     const result = await executor.query<ActivityRow>(`insert into miclub.activities
-      (club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key, monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::uuid) returning ${activityColumns}`,
+      (club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::uuid) returning ${activityColumns}`,
     [actor.clubId, input.sectorId, input.managerPersonId, input.instructorId ?? null, input.code ?? null, input.name, input.modality ?? null,
-      input.color ?? null, input.iconKey ?? null, input.enrollmentFee ?? input.monthlyFee ?? 0, input.enrollmentFeeFrequency ?? "MONTHLY", input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
+      input.color ?? null, input.iconKey ?? null, input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
       storedEntityStatus(input.status ?? "inactive"), input.notes ?? null, actor.userId]);
     const term = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
       (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, created_by, updated_by)
@@ -122,8 +122,8 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
       where club_id=$1 and activity_id=$2 and voided_at is null and status='COMPLETADO' and period_to >= $3::date) locked`,
     [actor.clubId, id, value.settlement.effectiveFrom]);
     if (settled.rows[0]?.locked) return { kind: "settled_history" };
-    const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, icon_key=$10, monthly_fee=$11, enrollment_fee_frequency=$12, club_commission_percent=$13, instructor_commission_percent=$14, max_capacity=$15, status=$16, notes=$17, updated_at=now(), updated_by=$18::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
-    [actor.clubId, id, value.sectorId, value.managerPersonId, value.instructorId ?? null, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.enrollmentFee ?? value.monthlyFee ?? 0, value.enrollmentFeeFrequency ?? "MONTHLY", value.clubCommissionPercent, value.instructorCommissionPercent ?? 0, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
+    const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, icon_key=$10, club_commission_percent=$11, instructor_commission_percent=$12, max_capacity=$13, status=$14, notes=$15, updated_at=now(), updated_by=$16::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
+    [actor.clubId, id, value.sectorId, value.managerPersonId, value.instructorId ?? null, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.instructorCommissionPercent ?? 0, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
     if (!result.rows[0]) return { kind: "conflict" };
     const closed = await executor.query<ActivityTermRow>(`update miclub.activity_terms set effective_to=$3::date - 1,
       updated_at=now(), updated_by=$4::uuid where club_id=$1 and id=$2 and effective_to is null returning ${termColumns}`,

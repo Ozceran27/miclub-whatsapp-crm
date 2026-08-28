@@ -14,8 +14,6 @@ export interface ActivityMutationContract {
   modality?: string | null;
   color?: string | null;
   iconKey?: string | null;
-  enrollmentFee?: number;
-  enrollmentFeeFrequency?: ActivityFeeFrequency;
   instructorCommissionPercent?: number;
   maxCapacity?: number | null;
   status?: "active" | "inactive";

@@ -72,7 +72,7 @@ export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto {
 export type ActivityFeeFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; instructorClientId: string | null; name: string; iconKey: string; color: string;
-  enrollmentFee: number; enrollmentFeeFrequency: ActivityFeeFrequency; status: "active" | "inactive";
+  status: "active" | "inactive";
 } & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; clubSharePercentage: null }
   | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; clubSharePercentage: number });
 export interface PendingOnboardingImportReference { batchId: string }
