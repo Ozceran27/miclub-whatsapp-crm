@@ -1,4 +1,4 @@
-import { ACTIVITY_VISUAL_CATALOG, getActivityVisual, type ActivityFeeFrequency, type OnboardingActivityDraft, type OnboardingSectorDraft, type OnboardingWorkerDraft, type OperationalCurrency } from '@miclub/shared';
+import { ACTIVITY_VISUAL_CATALOG, getActivityVisual, SECTOR_COLOR_PALETTE, type ActivityFeeFrequency, type OnboardingActivityDraft, type OnboardingSectorDraft, type OnboardingWorkerDraft, type OperationalCurrency } from '@miclub/shared';
 import { useState, type FormEvent } from 'react';
 import { DraftEditorModal } from './DraftEditorModal';
 
@@ -9,7 +9,7 @@ type Props = { items: OnboardingActivityDraft[]; sectors: OnboardingSectorDraft[
 type EditorProps = Omit<Props,'items'|'onChange'> & { initial: OnboardingActivityDraft | null; onSave:(value:OnboardingActivityDraft)=>void };
 
 function ColorControl({ value, onChange }:{value:string;onChange:(value:string)=>void}) {
-  return <label>Color<div className="draft-color-control"><span className="draft-color-control__sample" style={{backgroundColor:value}}/><code>{value.toUpperCase()}</code><label className="draft-color-control__button">Elegir<input aria-label="Abrir selector de color" type="color" value={value} onChange={event=>onChange(event.target.value)}/></label></div></label>;
+  return <fieldset className="draft-color-control"><legend>Color de la actividad</legend><div className="draft-palette">{SECTOR_COLOR_PALETTE.map(color=><label key={color.hex} style={{backgroundColor:color.hex}} title={color.name}><input type="radio" name="activityColor" value={color.hex} checked={value.toUpperCase()===color.hex} onChange={()=>onChange(color.hex)}/><span className="sr-only">{color.name}</span></label>)}</div><label className="draft-color-control__button">Elegir color personalizado<input aria-label="Abrir selector de color personalizado" type="color" value={value} onChange={event=>onChange(event.target.value)}/></label></fieldset>;
 }
 function IconPicker({ value, onChange }:{value:string;onChange:(value:string)=>void}) {
   const [query,setQuery]=useState(''); const visible=ACTIVITY_VISUAL_CATALOG.filter(item=>`${item.key} ${item.name} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
