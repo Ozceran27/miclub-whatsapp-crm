@@ -73,8 +73,8 @@ export type ActivityFeeFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; instructorClientId: string | null; name: string; iconKey: string; color: string;
   status: "active" | "inactive";
-} & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; clubSharePercentage: null }
-  | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; clubSharePercentage: number });
+} & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; currencyCode: OperationalCurrency; clubSharePercentage: null }
+  | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; currencyCode: null; clubSharePercentage: number });
 export interface PendingOnboardingImportReference { batchId: string }
 /** Complete, client-owned draft. No field in this object is persisted before completion. */
 export interface OnboardingDraft {

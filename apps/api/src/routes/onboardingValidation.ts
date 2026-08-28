@@ -61,20 +61,20 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     && ["TRABAJADOR", "INSTRUCTOR"].includes(String(worker.role))
     && typeof worker.hasFixedCompensation === "boolean"
     && (worker.hasFixedCompensation
-      ? finiteNonNegative(worker.fixedCompensationAmount) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(worker.fixedCompensationFrequency))
-      : worker.fixedCompensationAmount == null && worker.fixedCompensationFrequency == null))) return false;
+      ? finiteNonNegative(worker.fixedCompensationAmount) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(worker.fixedCompensationFrequency)) && SUPPORTED_OPERATIONAL_CURRENCIES.includes(worker.currencyCode as never)
+      : worker.fixedCompensationAmount == null && worker.fixedCompensationFrequency == null && worker.currencyCode == null))) return false;
 
   const sectorIds = new Set(draft.sectors.map((sector) => sector.clientId));
   const instructorIds = new Set(draft.workers.filter((worker) => worker.role === "INSTRUCTOR").map((worker) => worker.clientId));
   if (!draft.activities.every((activity) =>
-    !Object.keys(activity).some((key) => !["clientId","sectorClientId","instructorClientId","name","iconKey","color","status","settlementMode","fixedClubFee","fixedFeeFrequency","clubSharePercentage"].includes(key))
+    !Object.keys(activity).some((key) => !["clientId","sectorClientId","instructorClientId","name","iconKey","color","status","settlementMode","fixedClubFee","fixedFeeFrequency","currencyCode","clubSharePercentage"].includes(key))
     && typeof activity.name === "string" && Boolean(activity.name.trim())
     && isActivityIconKey(activity.iconKey)
     && typeof activity.color === "string" && /^#[0-9a-f]{6}$/i.test(activity.color)
     && typeof activity.sectorClientId === "string" && sectorIds.has(activity.sectorClientId)
     && (activity.instructorClientId === null || (typeof activity.instructorClientId === "string" && instructorIds.has(activity.instructorClientId)))
     && ["FIXED", "VARIABLE"].includes(String(activity.settlementMode))
-    && (activity.settlementMode === "VARIABLE" ? activity.fixedClubFee === null && activity.fixedFeeFrequency === null && finiteNonNegative(activity.clubSharePercentage) && activity.clubSharePercentage <= 100 : activity.clubSharePercentage === null && finiteNonNegative(activity.fixedClubFee) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.fixedFeeFrequency)))
+    && (activity.settlementMode === "VARIABLE" ? activity.fixedClubFee === null && activity.fixedFeeFrequency === null && activity.currencyCode === null && finiteNonNegative(activity.clubSharePercentage) && activity.clubSharePercentage <= 100 : activity.clubSharePercentage === null && finiteNonNegative(activity.fixedClubFee) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.fixedFeeFrequency)) && SUPPORTED_OPERATIONAL_CURRENCIES.includes(activity.currencyCode as never))
     && ["active", "inactive"].includes(String(activity.status)))) return false;
 
   return draft.pendingImport === null

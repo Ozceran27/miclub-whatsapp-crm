@@ -217,6 +217,7 @@ export interface AdministrationWorkerDto {
   hasFixedCompensation: boolean;
   fixedCompensationAmount: number | null;
   fixedCompensationFrequency: FixedCompensationFrequency | null;
+  currencyCode: import("./onboarding.js").OperationalCurrency | null;
   status: string;
   systemAccess: boolean;
   employmentStartDate?: string | null;
@@ -245,6 +246,7 @@ export interface AdministrationWorkerMutationDto {
   hasFixedCompensation: boolean;
   fixedCompensationAmount: number | null;
   fixedCompensationFrequency: FixedCompensationFrequency | null;
+  currencyCode: import("./onboarding.js").OperationalCurrency | null;
   employmentStartDate?: string | null;
   notes?: string | null;
 }

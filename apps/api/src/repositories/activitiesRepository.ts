@@ -53,7 +53,7 @@ const auditActivity = (actor: ActivityActor, action: string, before: ActivityRow
     entityType: "activity", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent, oldData: before, newData: after }, executor);
 
 type ActivityTermRow = Record<string, unknown> & { id: string; effective_from: string | Date; effective_to: string | Date | null };
-const termColumns = "id, club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, effective_to, created_at, updated_at";
+const termColumns = "id, club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, effective_from, effective_to, created_at, updated_at";
 const auditTerms = (actor: ActivityActor, action: string, activityId: string, before: ActivityTermRow | null, after: ActivityTermRow, executor: Parameters<typeof auditService.sensitiveChange>[1]) =>
   auditService.sensitiveChange({ action, result: "success", userId: actor.userId, membershipId: actor.membershipId, clubId: actor.clubId,
     entityType: "activity_terms", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent,
@@ -72,9 +72,9 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
       input.color ?? null, input.iconKey ?? null, input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
       storedEntityStatus(input.status ?? "inactive"), input.notes ?? null, actor.userId]);
     const term = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
-      (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, created_by, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7::date,$8::uuid,$8::uuid) returning ${termColumns}`,
-    [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.clubSharePercentage, input.settlement.effectiveFrom, actor.userId]);
+      (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, effective_from, created_by, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7,$8::date,$9::uuid,$9::uuid) returning ${termColumns}`,
+    [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.currencyCode, input.settlement.clubSharePercentage, input.settlement.effectiveFrom, actor.userId]);
     await auditActivity(actor, "activity.create", null, result.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", result.rows[0].id, null, term.rows[0], executor);
     return { kind: "created", activity: result.rows[0] };
@@ -130,9 +130,9 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     [actor.clubId, latest.id, value.settlement.effectiveFrom, actor.userId]);
     if (!closed.rows[0]) throw new InvalidActivityTermsError("The current term changed while it was being versioned");
     const inserted = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
-      (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, club_share_percentage, effective_from, created_by, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7::date,$8::uuid,$8::uuid) returning ${termColumns}`,
-    [actor.clubId, id, value.settlement.mode, value.settlement.fixedClubFee, value.settlement.fixedFeeFrequency, value.settlement.clubSharePercentage, value.settlement.effectiveFrom, actor.userId]);
+      (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, effective_from, created_by, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7,$8::date,$9::uuid,$9::uuid) returning ${termColumns}`,
+    [actor.clubId, id, value.settlement.mode, value.settlement.fixedClubFee, value.settlement.fixedFeeFrequency, value.settlement.currencyCode, value.settlement.clubSharePercentage, value.settlement.effectiveFrom, actor.userId]);
     await auditTerms(actor, "activity_terms.close", id, latest, closed.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", id, null, inserted.rows[0], executor);
     await auditActivity(actor, "activity.update", before, result.rows[0], executor);
