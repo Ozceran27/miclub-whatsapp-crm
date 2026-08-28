@@ -3,6 +3,7 @@ import {
   ONBOARDING_DRAFT_CONTRACT_VERSION,
   COMMERCIAL_PLAN_CODES,
   isSectorIconKey,
+  isActivityIconKey,
   SUPPORTED_OPERATIONAL_CURRENCIES,
   type CompleteOnboardingRequest,
   type OpeningBalancesRequest,
@@ -68,7 +69,7 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
   if (!draft.activities.every((activity) =>
     !Object.keys(activity).some((key) => !["clientId","sectorClientId","instructorClientId","name","iconKey","color","status","settlementMode","fixedClubFee","fixedFeeFrequency","clubSharePercentage"].includes(key))
     && typeof activity.name === "string" && Boolean(activity.name.trim())
-    && typeof activity.iconKey === "string"
+    && isActivityIconKey(activity.iconKey)
     && typeof activity.color === "string" && /^#[0-9a-f]{6}$/i.test(activity.color)
     && typeof activity.sectorClientId === "string" && sectorIds.has(activity.sectorClientId)
     && (activity.instructorClientId === null || (typeof activity.instructorClientId === "string" && instructorIds.has(activity.instructorClientId)))
