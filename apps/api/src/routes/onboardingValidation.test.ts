@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PROVISIONED_ONBOARDING_SECTORS, type CompleteOnboardingRequest } from "@miclub/shared";
+import { ACTIVITY_VISUAL_CATALOG, PROVISIONED_ONBOARDING_SECTORS, type CompleteOnboardingRequest } from "@miclub/shared";
 import { isCompleteOnboardingRequest, isOpeningBalancesRequest } from "./onboardingValidation.js";
 
 const valid = { currency:"ARS", cash:0, bank:10.25, usdCash:0.01, idempotencyKey:"retry-1" };
@@ -65,6 +65,19 @@ test("finaliza las modalidades FIXED y VARIABLE sin una cuota implícita",()=>{
   const variable=completeRequest();
   variable.draft.activities=[{...common,clientId:"activity:variable",sectorClientId:variable.draft.sectors[0].clientId,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,clubSharePercentage:35}];
   assert.equal(isCompleteOnboardingRequest(variable),true);
+});
+
+test("permite finalizar con cada clave canónica de actividad y rechaza aliases o claves desconocidas",()=>{
+  for(const visual of ACTIVITY_VISUAL_CATALOG){
+    const request=completeRequest();
+    request.draft.activities=[{clientId:`activity:${visual.key}`,sectorClientId:request.draft.sectors[0].clientId,instructorClientId:null,name:visual.name,iconKey:visual.key,color:"#2563EB",status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,clubSharePercentage:25}];
+    assert.equal(isCompleteOnboardingRequest(request),true,visual.key);
+  }
+  for(const iconKey of ["soccer","not-in-catalog"]){
+    const request=completeRequest();
+    request.draft.activities=[{clientId:"activity:invalid",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:null,name:"Inválida",iconKey,color:"#2563EB",status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,clubSharePercentage:25}];
+    assert.equal(isCompleteOnboardingRequest(request),false,iconKey);
+  }
 });
 
 test("rechaza una cuota de inscripción silenciosa en el borrador canónico",()=>{

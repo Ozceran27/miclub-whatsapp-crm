@@ -20,3 +20,4 @@ export * from "./contracts/capabilities.js";
 export * from "./contracts/commercialPlans.js";
 export * from "./contracts/activities.js";
 export * from "./sectorVisualCatalog.js";
+export * from "./activityVisualCatalog.js";
