@@ -9,7 +9,7 @@ import type { CurrencyCode } from "../services/moneyConversion.js";
 // npm workspaces starts this script with apps/api as cwd. Resolve the repository
 // root explicitly so it reads the same .env as the API and migration scripts.
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-dotenv.config({ path: path.join(repositoryRoot, ".env") });
+dotenv.config({ path: path.join(repositoryRoot, ".env"), quiet: true });
 
 const provider = new BcraA3500ExchangeRateProvider();
 const pivot = (process.env.EXCHANGE_RATE_PIVOT_CURRENCY || "USD") as CurrencyCode;

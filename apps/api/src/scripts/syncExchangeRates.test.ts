@@ -7,6 +7,6 @@ const source = fs.readFileSync(new URL("./syncExchangeRates.ts", import.meta.url
 test("carga el .env raíz aunque npm ejecute el script desde el workspace", () => {
   assert.match(source, /fileURLToPath\(import\.meta\.url\)/);
   assert.match(source, /"\.\.\/\.\.\/\.\.\/\.\."/);
-  assert.match(source, /dotenv\.config\(\{ path: path\.join\(repositoryRoot, "\.env"\) \}\)/);
+  assert.match(source, /dotenv\.config\(\{ path: path\.join\(repositoryRoot, "\.env"\), quiet: true \}\)/);
   assert.doesNotMatch(source, /import "dotenv\/config"/);
 });

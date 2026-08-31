@@ -4,7 +4,7 @@ La integración incluida usa la serie mayorista USD/ARS de la Comunicación A 35
 del BCRA (variable monetaria 5). El endpoint es público y no requiere token.
 
 ```dotenv
-EXCHANGE_RATE_PROVIDER_URL=https://api.bcra.gob.ar/estadisticas/v3.0/Monetarias
+EXCHANGE_RATE_PROVIDER_URL=https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias
 EXCHANGE_RATE_BCRA_VARIABLE_ID=5
 EXCHANGE_RATE_SYNC_PAIRS=USD/ARS
 EXCHANGE_RATE_TIMEOUT_MS=5000
@@ -14,6 +14,12 @@ EXCHANGE_RATE_MAX_AGE_DAYS=4
 EXCHANGE_RATE_PIVOT_CURRENCY=USD
 EXCHANGE_RATE_SOURCE=BCRA-A3500
 ```
+
+La versión `v3.0` fue retirada por el BCRA y responde HTTP 410. Debe usarse
+`v4.0`; el adaptador también reemplaza automáticamente una URL `v3.0` heredada.
+La consulta v4 usa únicamente `Desde`, `Hasta`, `Limit` y `Offset`; no debe
+agregarse `Order`, porque v4 rechaza ese parámetro con HTTP 400. El adaptador
+ordena las observaciones recibidas por fecha antes de elegir la última admisible.
 
 Después de ejecutar las migraciones, cargar una cotización con:
 
