@@ -1,8 +1,15 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { closePostgresAdminPool, getPostgresAdminPool } from "../db/postgres.js";
 import { createExchangeRateService } from "../services/exchangeRateService.js";
 import { BcraA3500ExchangeRateProvider } from "../services/officialExchangeRateProvider.js";
 import type { CurrencyCode } from "../services/moneyConversion.js";
+
+// npm workspaces starts this script with apps/api as cwd. Resolve the repository
+// root explicitly so it reads the same .env as the API and migration scripts.
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+dotenv.config({ path: path.join(repositoryRoot, ".env") });
 
 const provider = new BcraA3500ExchangeRateProvider();
 const pivot = (process.env.EXCHANGE_RATE_PIVOT_CURRENCY || "USD") as CurrencyCode;

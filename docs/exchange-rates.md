@@ -24,7 +24,11 @@ npm run sync:exchange-rates -w @miclub/api -- 2026-08-28
 ```
 
 El job usa deliberadamente las credenciales administrativas `ADMIN_DATABASE_URL`
-o `PGADMIN*`, no las credenciales runtime de la API.
+o `PGADMIN*`, no las credenciales runtime de la API. El archivo se busca siempre
+en `.env` de la raíz del repositorio, aunque npm inicie el proceso desde `apps/api`.
+Para una instalación manual donde el mismo login es propietario puede apuntarse
+`ADMIN_DATABASE_URL` a esa conexión; el login debe tener `INSERT` y `UPDATE` sobre
+las tablas de cotizaciones y estado de sincronización.
 
 Verificarla con `select * from miclub.exchange_rates order by rate_date desc;` y
 revisar fallos con `select * from miclub.exchange_rate_sync_state;`. Programar el
@@ -34,3 +38,13 @@ La fuente A 3500 sólo cubre USD/ARS. BRL y EUR continúan admitidos por el domi
 pero para valuarlos es necesario incorporar otra fuente oficial que publique
 BRL/USD y EUR/USD (o sus pares inversos) y persistir esas cotizaciones. No se debe
 agregar esos pares a `EXCHANGE_RATE_SYNC_PAIRS` mientras se use el proveedor A 3500.
+
+## Instalaciones existentes administradas manualmente
+
+`db:migrate` es el instalador incremental para bases cuyo historial está registrado
+en `public.miclub_schema_migrations`. No debe ejecutarse para intentar reconstruir
+el historial sobre un esquema `miclub` existente que fue actualizado manualmente.
+Si las tres tablas de cotizaciones, sus restricciones, el trigger, el índice y el
+grant ya se aplicaron con el script DBeaver, no hay otra migración que ejecutar para
+esta funcionalidad. La adopción posterior del ledger requiere comparar el esquema
+real con cada versión y aprobación DBA; no se resuelve insertando todas las filas.

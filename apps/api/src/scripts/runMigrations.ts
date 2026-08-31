@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
 import { canonicalizeMigrationSql, hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
 import { prepareMigrationSql } from "./migrationCompatibility.js";
+import { assertMigrationLedgerCompatible } from "./migrationPreflight.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 
@@ -41,6 +42,7 @@ const migrations = await Promise.all(migrationManifest.map(async (migration) => 
 
 const pool = await getPostgresAdminPool();
 try {
+  await assertMigrationLedgerCompatible(pool);
   await pool.query(`create table if not exists public.miclub_schema_migrations (name text primary key, checksum text not null, applied_at timestamptz not null default now())`);
   for (const migration of migrations) {
     const existing = await pool.query<{ checksum: string }>("select checksum from public.miclub_schema_migrations where name=$1", [migration.name]);
