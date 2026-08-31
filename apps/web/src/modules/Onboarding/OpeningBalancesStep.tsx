@@ -2,6 +2,7 @@ import type { OpeningBalancesRequest, OperationalCurrency } from '@miclub/shared
 import React, { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { CurrencyFlag } from './CurrencyFlag';
 import { CURRENCY_PRESENTATIONS, getCurrencyAfterKey, getCurrencyPrefix, getCurrencyPresentation } from './currencyPresentation';
+import { MoneyInput } from './MoneyInput';
 
 type Values = Omit<OpeningBalancesRequest,'idempotencyKey'>;
 export function OpeningBalancesStep({values,onChange}:{values:Values;onChange:(values:Values)=>void}) {
@@ -39,8 +40,8 @@ export function OpeningBalancesStep({values,onChange}:{values:Values;onChange:(v
         {CURRENCY_PRESENTATIONS.map(currency=><li id={`${listboxId}-${currency.code}`} key={currency.code} role="option" aria-selected={values.currency===currency.code} tabIndex={activeCode===currency.code?0:-1} data-active={activeCode===currency.code} onMouseEnter={()=>setActiveCode(currency.code)} onClick={()=>select(currency.code)} onKeyDown={onOptionKeyDown}><span className="currency-option"><CurrencyFlag {...currency}/><span className="currency-option__name">{currency.name}</span><span className="currency-option__code">{currency.code}</span></span></li>)}
       </ul>}
     </div>
-    <label>Efectivo ({getCurrencyPrefix(values.currency)})<input name="cash" type="number" min="0" step="0.01" value={values.cash} onChange={event=>change('cash',event.target.value)} required /></label>
-    <label>Cuenta Corriente ({getCurrencyPrefix(values.currency)})<input name="bank" type="number" min="0" step="0.01" value={values.bank} onChange={event=>change('bank',event.target.value)} required /></label>
-    <label>Dólares ({getCurrencyPrefix('USD')})<input name="usdCash" type="number" min="0" step="0.01" value={values.usdCash} onChange={event=>change('usdCash',event.target.value)} required /></label>
+    <label>Efectivo<MoneyInput prefix={getCurrencyPrefix(values.currency)} name="cash" min="0" step="0.01" value={values.cash} onChange={event=>change('cash',event.target.value)} required /></label>
+    <label>Cuenta Corriente<MoneyInput prefix={getCurrencyPrefix(values.currency)} name="bank" min="0" step="0.01" value={values.bank} onChange={event=>change('bank',event.target.value)} required /></label>
+    <label>Dólares<MoneyInput prefix={getCurrencyPrefix('USD')} name="usdCash" min="0" step="0.01" value={values.usdCash} onChange={event=>change('usdCash',event.target.value)} required /></label>
   </div>;
 }

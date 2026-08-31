@@ -180,7 +180,17 @@ test('el listbox renderiza bandera, semántica accesible y conserva el valor del
   assert.match(markup, /currency-option__code">BRL/);
   assert.match(markup, /aria-haspopup="listbox"/); assert.match(markup, /aria-expanded="false"/);
   assert.match(markup, /type="hidden" name="currency" value="BRL"/);
-  assert.match(markup, /Efectivo \(R\$\)/);
+  assert.match(markup, /Efectivo<div class="onboarding-money-input"><span class="onboarding-money-input__prefix" aria-hidden="true">R\$<\/span>/);
+});
+
+test('Caja y Banco usan la moneda operativa mientras Caja USD conserva dólares', () => {
+  for (const currency of CURRENCY_PRESENTATIONS) {
+    const prefix=getCurrencyPrefix(currency.code);
+    const markup=renderToStaticMarkup(createElement(OpeningBalancesStep,{values:{currency:currency.code,cash:12,bank:34,usdCash:56},onChange:()=>undefined}));
+    for (const name of ['cash','bank']) assert.match(markup,new RegExp(`<span class="onboarding-money-input__prefix" aria-hidden="true">${prefix.replace(/[$]/g,'\\$&')}<\\/span><input[^>]*name="${name}"[^>]*type="number"`));
+    assert.match(markup,/<span class="onboarding-money-input__prefix" aria-hidden="true">US\$<\/span><input[^>]*name="usdCash"[^>]*type="number"/);
+    for (const name of ['cash','bank','usdCash']) assert.match(markup,new RegExp(`<input[^>]*name="${name}"[^>]*min="0"[^>]*step="0.01"`));
+  }
 });
 
 test('la navegación de teclado recorre monedas y el handler envía la selección al borrador', () => {
