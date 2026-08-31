@@ -21,6 +21,11 @@ export interface FinancialSummary {
   cash: number;
   bank: number;
   dollars: number;
+  presentationCurrencyCode: string;
+  appliedRate: number | null;
+  rateDate: string | null;
+  rateSource: string | null;
+  dollarsConverted: number;
 }
 
 export interface SectorBalance {
