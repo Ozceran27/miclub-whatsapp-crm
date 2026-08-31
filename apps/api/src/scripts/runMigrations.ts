@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
 import { canonicalizeMigrationSql, hasOpenTransaction, migrationManifest, validateMigrationGraph } from "./migrationManifest.js";
+import { prepareMigrationSql } from "./migrationCompatibility.js";
 
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../db/migrations");
 
@@ -39,15 +40,23 @@ const migrations = await Promise.all(migrationManifest.map(async (migration) => 
 }));
 
 const pool = await getPostgresAdminPool();
-await pool.query(`create table if not exists public.miclub_schema_migrations (name text primary key, checksum text not null, applied_at timestamptz not null default now())`);
-for (const migration of migrations) {
-  const existing = await pool.query<{ checksum: string }>("select checksum from public.miclub_schema_migrations where name=$1", [migration.name]);
-  if (existing.rows[0]) {
-    if (existing.rows[0].checksum !== migration.checksum) throw new Error(`Checksum modificado para migración ya aplicada: ${migration.name}`);
-    continue;
+try {
+  await pool.query(`create table if not exists public.miclub_schema_migrations (name text primary key, checksum text not null, applied_at timestamptz not null default now())`);
+  for (const migration of migrations) {
+    const existing = await pool.query<{ checksum: string }>("select checksum from public.miclub_schema_migrations where name=$1", [migration.name]);
+    if (existing.rows[0]) {
+      if (existing.rows[0].checksum !== migration.checksum) throw new Error(`Checksum modificado para migración ya aplicada: ${migration.name}`);
+      continue;
+    }
+    try {
+      await pool.query(prepareMigrationSql(migration.name, migration.sql));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Falló la migración ${migration.path}: ${detail}`, { cause: error });
+    }
+    await pool.query("insert into public.miclub_schema_migrations(name, checksum) values ($1,$2)", [migration.name, migration.checksum]);
+    console.log(`Aplicada ${migration.path}`);
   }
-  await pool.query(migration.sql);
-  await pool.query("insert into public.miclub_schema_migrations(name, checksum) values ($1,$2)", [migration.name, migration.checksum]);
-  console.log(`Aplicada ${migration.path}`);
+} finally {
+  await closePostgresAdminPool();
 }
-await closePostgresAdminPool();

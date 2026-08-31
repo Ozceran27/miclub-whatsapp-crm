@@ -104,6 +104,8 @@ export interface AdministrationSummaryResponse {
     cash: AdministrationMetric;
     bank: AdministrationMetric;
     dollars: AdministrationMetric;
+    /** Nominal USD balance and its immutable valuation detail. */
+    conversion?: { presentationCurrencyCode: string; appliedRate: number | null; rateDate: string | null; source: string | null; usdNominal: number; convertedValue: number };
   };
   pending: {
     income: AdministrationMetric;
