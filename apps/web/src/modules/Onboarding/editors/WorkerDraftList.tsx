@@ -1,6 +1,7 @@
 import type { OnboardingWorkerDraft, OperationalCurrency } from '@miclub/shared';
 import { useState, type FormEvent } from 'react';
 import { getCurrencyPrefix } from '../currencyPresentation';
+import { MoneyInput } from '../MoneyInput';
 import { DraftEditorModal } from './DraftEditorModal';
 
 type FixedCompensationFieldsProps = {
@@ -10,7 +11,7 @@ type FixedCompensationFieldsProps = {
 
 export function FixedCompensationFields({ currency, worker }: FixedCompensationFieldsProps) {
   const currencyPrefix = getCurrencyPrefix(currency);
-  return <><label>Monto ({currency})<div className="draft-input-affix"><span aria-hidden="true">{currencyPrefix}</span><input name="fixedCompensationAmount" type="number" min="0" step="0.01" required defaultValue={worker?.fixedCompensationAmount ?? 0} aria-describedby="fixed-compensation-amount-help"/></div><small id="fixed-compensation-amount-help" className="sr-only">Monto de remuneración fija en {currency}; la periodicidad se selecciona en el campo Frecuencia.</small></label><label>Frecuencia<select name="fixedCompensationFrequency" required defaultValue={worker?.fixedCompensationFrequency ?? 'MONTHLY'}><option value="DAILY">Diaria</option><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensual</option><option value="YEARLY">Anual</option></select></label></>;
+  return <><label>Monto ({currency})<MoneyInput prefix={currencyPrefix} name="fixedCompensationAmount" min="0" step="0.01" required defaultValue={worker?.fixedCompensationAmount ?? 0} aria-describedby="fixed-compensation-amount-help"/><small id="fixed-compensation-amount-help" className="sr-only">Monto de remuneración fija en {currency}; la periodicidad se selecciona en el campo Frecuencia.</small></label><label>Frecuencia<select name="fixedCompensationFrequency" required defaultValue={worker?.fixedCompensationFrequency ?? 'MONTHLY'}><option value="DAILY">Diaria</option><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensual</option><option value="YEARLY">Anual</option></select></label></>;
 }
 
 export function WorkerDraftList({ items, onChange, currency = 'ARS' }: { items: OnboardingWorkerDraft[]; onChange: (items: OnboardingWorkerDraft[]) => void; currency?: OperationalCurrency }) {
