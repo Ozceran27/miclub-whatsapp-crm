@@ -6,8 +6,30 @@ const positiveInteger = (value: string | undefined, fallback: number) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-type BcraObservation = { idVariable?: number; fecha?: string; valor?: number | string };
-type BcraResponse = { results?: BcraObservation[]; status?: number; errorMessages?: string[] };
+type BcraObservation = { idVariable?: number; fecha: string; valor: number | string };
+
+const extractBcraObservations = (payload: unknown): BcraObservation[] => {
+  const observations: BcraObservation[] = [];
+  const visit = (value: unknown, inheritedId?: number): void => {
+    if (Array.isArray(value)) { for (const item of value) visit(item, inheritedId); return; }
+    if (value == null || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    const id = typeof record.idVariable === "number" ? record.idVariable : inheritedId;
+    if (typeof record.fecha === "string" && (typeof record.valor === "number" || typeof record.valor === "string")) {
+      observations.push({ idVariable: id, fecha: record.fecha.slice(0, 10), valor: record.valor });
+      return;
+    }
+    for (const nested of Object.values(record)) visit(nested, id);
+  };
+  visit(payload);
+  return observations;
+};
+
+const responseSummary = (payload: unknown): string => {
+  if (payload == null || typeof payload !== "object") return `tipo=${typeof payload}`;
+  const keys = Object.keys(payload as Record<string, unknown>).slice(0, 10).join(",") || "sin-claves";
+  return `claves=${keys}`;
+};
 
 /** Official wholesale USD/ARS rate (Comunicación A 3500, monetary variable 5). */
 export class BcraA3500ExchangeRateProvider implements OfficialExchangeRateProvider {
@@ -50,12 +72,13 @@ export class BcraA3500ExchangeRateProvider implements OfficialExchangeRateProvid
             if (response.status === 410 && baseUrl.includes("/v3.0/")) { lastError = error; break; }
             throw error;
           }
-          const body = await response.json() as BcraResponse;
-          const observation = body.results
+          const body = await response.json() as unknown;
+          const observations = extractBcraObservations(body);
+          const observation = observations
             ?.filter(({ fecha, valor }) => Boolean(fecha) && valor != null && Number(valor) > 0 && fecha! <= date)
             .sort((left, right) => right.fecha!.localeCompare(left.fecha!))[0];
           if (!observation?.fecha || observation.valor == null) {
-            throw new Error(body.errorMessages?.join("; ") || "BCRA no devolvió una observación admisible");
+            throw new Error(`BCRA no devolvió una observación admisible para ${since.toISOString().slice(0, 10)}..${date} (${responseSummary(body)}, observaciones=${observations.length})`);
           }
           return {
             rate: String(observation.valor),

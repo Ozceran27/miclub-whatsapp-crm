@@ -22,7 +22,8 @@ try {
   for (const pair of pairs) {
     const [base, quote, extra] = pair.split("/");
     if (!base || !quote || extra) throw new Error(`Par inválido en EXCHANGE_RATE_SYNC_PAIRS: ${pair}`);
-    await service.sync(base as CurrencyCode, quote as CurrencyCode, date);
+    const stored = await service.sync(base as CurrencyCode, quote as CurrencyCode, date);
+    console.log(`Cotización sincronizada ${base}/${quote}: ${stored.rate} al ${stored.rateDate} (${stored.source})`);
   }
 } finally {
   await closePostgresAdminPool();

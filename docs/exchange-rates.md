@@ -20,6 +20,9 @@ La versión `v3.0` fue retirada por el BCRA y responde HTTP 410. Debe usarse
 La consulta v4 usa únicamente `Desde`, `Hasta`, `Limit` y `Offset`; no debe
 agregarse `Order`, porque v4 rechaza ese parámetro con HTTP 400. El adaptador
 ordena las observaciones recibidas por fecha antes de elegir la última admisible.
+El parser admite tanto la lista plana histórica como la respuesta v4 agrupada por
+variable y normaliza fechas ISO con hora. Si la serie está vacía, el error informa
+la ventana consultada, las claves superiores y cuántas observaciones se encontraron.
 
 Después de ejecutar las migraciones, cargar una cotización con:
 
