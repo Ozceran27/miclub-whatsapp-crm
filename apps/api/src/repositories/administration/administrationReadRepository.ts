@@ -7,6 +7,11 @@ type AdministrationBalanceRow = {
   cash: string | number | null;
   bank: string | number | null;
   dollars: string | number | null;
+  dollars_converted: string | number | null;
+  presentation_currency_code: string | null;
+  applied_rate: string | number | null;
+  rate_date: string | null;
+  rate_source: string | null;
 };
 
 type AdministrationPendingRow = {
@@ -35,6 +40,11 @@ export type AdministrationReadModel = {
     cash: number;
     bank: number;
     dollars: number;
+    dollarsConverted: number;
+    presentationCurrencyCode: string;
+    appliedRate: number | null;
+    rateDate: string | null;
+    rateSource: string | null;
   };
   pending: {
     income: number;
@@ -61,12 +71,20 @@ export const getAdministrationReadModel = async (clubId: string): Promise<Admini
   const pool = await getPostgresPool();
   const [balanceResult, pendingResult, recentMovementsResult] = await Promise.all([
     pool.query<AdministrationBalanceRow>(`
+      with valued as (select a.*, c.base_currency_code,
+        case when a.currency_code=c.base_currency_code then balance when r.base_currency_code=a.currency_code then balance*r.rate else balance/r.rate end presented_balance,
+        r.rate,r.rate_date,r.source from miclub.v_financial_account_liquidity a join miclub.clubs c on c.id=a.club_id
+        left join lateral (select er.* from miclub.exchange_rates er where er.rate_date<=current_date and er.rate_type='official'
+          and ((er.base_currency_code=a.currency_code and er.quote_currency_code=c.base_currency_code) or (er.base_currency_code=c.base_currency_code and er.quote_currency_code=a.currency_code)) order by er.rate_date desc limit 1) r on a.currency_code<>c.base_currency_code)
       select current_date::text as cutoff_date,
-        coalesce(sum(balance) filter (where code in ('CASH','BANK')), 0) as liquidity,
+        coalesce(sum(presented_balance), 0) as liquidity,
         coalesce(sum(balance) filter (where code='CASH'), 0) as cash,
         coalesce(sum(balance) filter (where code='BANK'), 0) as bank,
-        coalesce(sum(balance) filter (where code='USD_CASH'), 0) as dollars
-      from miclub.v_financial_account_liquidity
+        coalesce(sum(balance) filter (where currency_code='USD'), 0) as dollars,
+        coalesce(sum(presented_balance) filter (where currency_code='USD'), 0) as dollars_converted,
+        max(base_currency_code) presentation_currency_code,max(rate) filter(where currency_code='USD') applied_rate,
+        max(rate_date) filter(where currency_code='USD') rate_date,max(source) filter(where currency_code='USD') rate_source
+      from valued
       where club_id = $1
     `, [clubId]),
     pool.query<AdministrationPendingRow>(`
@@ -100,6 +118,11 @@ export const getAdministrationReadModel = async (clubId: string): Promise<Admini
       cash: toNumber(balance?.cash),
       bank: toNumber(balance?.bank),
       dollars: toNumber(balance?.dollars),
+      dollarsConverted: toNumber(balance?.dollars_converted),
+      presentationCurrencyCode: balance?.presentation_currency_code ?? "ARS",
+      appliedRate: balance?.applied_rate == null ? null : toNumber(balance.applied_rate),
+      rateDate: balance?.rate_date ?? null,
+      rateSource: balance?.rate_source ?? null,
     },
     pending: {
       income: toNumber(pending?.pending_income),
