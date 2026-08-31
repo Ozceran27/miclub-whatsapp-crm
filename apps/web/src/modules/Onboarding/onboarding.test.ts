@@ -87,11 +87,15 @@ test('los pasos representan exactamente el flujo solicitado y saldos usa la oper
   assert.match(source, /OpeningBalancesStep/); assert.match(source,/MigrationStep/);
 });
 
-test('la bienvenida anticipa el recorrido y explica opcionalidad y envío definitivo', () => {
+test('la bienvenida muestra únicamente el recorrido y conserva la recomendación crítica final', () => {
   const source=readFileSync(new URL('./steps.tsx',import.meta.url),'utf8');
   for(const label of ['Saldos','Sectores','Trabajadores','Actividades','Plan / migración','Revisión final']) assert.match(source,new RegExp(label));
-  assert.match(source,/completar más adelante desde Administración/); assert.match(source,/el envío definitivo ocurre al finalizar/);
-  assert.doesNotMatch(source,/configuración es temporal|asistente se reiniciará/);
+  const welcomeDefinition=source.slice(source.indexOf("eyebrow:'Tu club empieza acá'"),source.indexOf("eyebrow:'Base contable'"));
+  assert.match(welcomeDefinition,/body:<div className="onboarding-welcome"><OnboardingStepList items=\{welcomeSteps\}\/><\/div>/);
+  assert.doesNotMatch(welcomeDefinition,/OnboardingRecommendation|Avanzá a tu ritmo|completar más adelante desde Administración|el envío definitivo ocurre al finalizar/);
+  const finishDefinition=source.slice(source.indexOf("eyebrow:'Todo preparado'"));
+  assert.match(finishDefinition,/<OnboardingRecommendation icon="!" title="Una sola operación definitiva" tone="critical">/);
+  assert.match(source,/import \{ OnboardingDraftSummary, OnboardingRecommendation, OnboardingStepList \}/);
 });
 
 test('el cierre calcula el resumen desde OnboardingDraft con componentes semánticos', () => {
