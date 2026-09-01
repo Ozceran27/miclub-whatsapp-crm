@@ -108,6 +108,10 @@ export interface AdministrationTrends {
 export interface AdministrationSummaryResponse {
   cards?: AdministrationSummaryCard[];
   balance: {
+    valuationStatus: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+    unvaluedAccountCount: number;
+    missingPairs: Array<{ baseCurrencyCode: string; quoteCurrencyCode: string }>;
+    valuationMode: "LIVE_RECALCULATED" | "CLOSED_REPRODUCIBLE";
     cutoffDate: string | null;
     liquidity: AdministrationMetric;
     cash: AdministrationMetric;
