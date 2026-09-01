@@ -26,7 +26,7 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
   if (!record(body) || Object.keys(body).some((key) => !["draft","selectedPlanCode"].includes(key)) || !record(body.draft)) return false;
   const draft = body.draft;
   if (draft.contractVersion !== ONBOARDING_DRAFT_CONTRACT_VERSION) return false;
-  if (Object.keys(draft).some((key) => !["contractVersion","idempotencyKey","selectedPlanCode","openingBalances","sectors","workers","activities","pendingImport"].includes(key))) return false;
+  if (Object.keys(draft).some((key) => !["contractVersion","idempotencyKey","selectedPlanCode","openingBalances","sectors","workers","activities"].includes(key))) return false;
   if (typeof draft.idempotencyKey !== "string" || !/^[\w-]{8,128}$/.test(draft.idempotencyKey)) return false;
   if (!COMMERCIAL_PLAN_CODES.some((code) => code === draft.selectedPlanCode)) return false;
   if (body.selectedPlanCode !== draft.selectedPlanCode) return false;
@@ -82,6 +82,5 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     && (activity.settlementMode === "VARIABLE" ? activity.fixedClubFee === null && activity.fixedFeeFrequency === null && activity.currencyCode === null && finiteNonNegative(activity.clubSharePercentage) && activity.clubSharePercentage <= 100 : activity.clubSharePercentage === null && finiteNonNegative(activity.fixedClubFee) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.fixedFeeFrequency)) && SUPPORTED_OPERATIONAL_CURRENCIES.includes(activity.currencyCode as never))
     && ["active", "inactive"].includes(String(activity.status)))) return false;
 
-  return draft.pendingImport === null
-    || (record(draft.pendingImport) && Object.keys(draft.pendingImport).length === 1 && clientId(draft.pendingImport.batchId));
+  return true;
 };

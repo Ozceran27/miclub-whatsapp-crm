@@ -9,7 +9,7 @@ import { getOnboardingSteps, isSkippableStep } from './steps';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
 import { CurrencyFlag } from './CurrencyFlag';
 import { CURRENCY_PRESENTATIONS, formatCurrencyLabel, getCurrencyAfterKey, getCurrencyPrefix } from './currencyPresentation';
-const draft={contractVersion:2 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
+const draft={contractVersion:2 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[]};
 const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
 
 test('define siete pasos y solo permite omitir los pasos opcionales', () => {
@@ -45,16 +45,16 @@ test('gate recupera el estado y sólo persiste el borrador al finalizar', () => 
   assert.doesNotMatch(source, /advanceOnboarding/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
 });
 
-test('al completar oculta el modal antes de refrescar el dashboard y reemplazar la ruta', () => {
+test('al completar consulta capacidades efectivas y ofrece un destino explícito y recuperable tras refresh', () => {
   const source = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
-  const hide = source.indexOf("setState({...result.state,status:'COMPLETED',shouldShow:false})");
-  const invalidate = source.indexOf('invalidateTenantQueries(clubId)');
-  const refresh = source.indexOf('await loadHomeDashboardResources()');
-  const navigate = source.indexOf("navigate('/app', { replace: true })");
-  assert.ok(hide >= 0 && hide < invalidate);
-  assert.ok(invalidate < refresh && refresh < navigate);
+  const complete = source.indexOf('await completeOnboarding(draft)');
+  const refreshCapabilities = source.indexOf('await getNavigation()', complete);
+  const persist = source.indexOf('sessionStorage.setItem', refreshCapabilities);
+  assert.ok(complete >= 0 && complete < refreshCapabilities && refreshCapabilities < persist);
+  assert.match(source,/hasClubCapability\(navigation\.capabilities,CLUB_CAPABILITIES\.DATA_MIGRATION\)/);
+  assert.match(source,/sessionStorage\.getItem\(completionStorageKey\(clubId\)\)/);
+  assert.match(source,/destination==='MIGRATION'\?'\/app\/migration':'\/app'/);
 });
-
 test('cada montaje empieza en paso 1 y crea un borrador temporal nuevo', () => {
   const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const firstMount = createInitialOnboardingDraft();
@@ -66,7 +66,6 @@ test('cada montaje empieza en paso 1 y crea un borrador temporal nuevo', () => {
   ]);
   assert.deepEqual(secondMount.workers, []);
   assert.deepEqual(secondMount.activities, []);
-  assert.equal(secondMount.pendingImport, null);
   assert.match(gate, /useState<OnboardingStep>\(1\)/);
   assert.doesNotMatch(gate, /setVisibleStep\(state\.currentStep|useState<OnboardingStep>\(state/);
 });
@@ -83,7 +82,7 @@ test('el borrador permanece local y la omisión temporal depende de la política
 
 test('los pasos representan exactamente el flujo solicitado y saldos usa la operación canónica', () => {
   const source = readFileSync(new URL('./steps.tsx', import.meta.url), 'utf8');
-  assert.deepEqual(ONBOARDING_STEPS.map(step=>step.title),['¡Te damos la bienvenida a miClub!','Definí los saldos iniciales','Organizá tus sectores','Sumá a tus trabajadores','Configurá las actividades','Importá tus datos históricos','¡Tu club está listo!']);
+  assert.deepEqual(ONBOARDING_STEPS.map(step=>step.title),['¡Te damos la bienvenida a miClub!','Definí los saldos iniciales','Organizá tus sectores','Sumá a tus trabajadores','Configurá las actividades','Elegí tu plan y prepará la migración','¡Tu club está listo!']);
   assert.match(source, /OpeningBalancesStep/); assert.match(source,/MigrationStep/);
 });
 
@@ -101,7 +100,7 @@ test('la bienvenida muestra únicamente el recorrido y conserva la recomendació
 test('el cierre calcula el resumen desde OnboardingDraft con componentes semánticos', () => {
   const summary=readFileSync(new URL('./OnboardingSummary.tsx',import.meta.url),'utf8');
   for(const component of ['OnboardingDraftSummary','OnboardingSummaryCard','OnboardingStepList','OnboardingRecommendation']) assert.match(summary,new RegExp(component));
-  for(const field of ['openingBalances','sectors','workers','activities','pendingImport']) assert.match(summary,new RegExp(`draft\\.${field}`));
+  for(const field of ['openingBalances','sectors','workers','activities','selectedPlanCode']) assert.match(summary,new RegExp(`draft\\.${field}`));
   for(const label of ['Moneda y saldos','Sectores','Trabajadores','Actividades','Plan / migración','Pasos omitidos']) assert.match(summary,new RegExp(label));
 });
 
@@ -213,7 +212,7 @@ test('los modales secundarios atrapan foco, cierran con Escape y lo devuelven al
 
 test('la migración del onboarding es informativa y deriva la carga al módulo normal', () => {
   const source = readFileSync(new URL('./MigrationStep.tsx', import.meta.url), 'utf8');
-  for (const text of ['CommercialPlanCards','ADMINISTRACIÓN','INSCRIPCIONES','Descargar','Adaptar','Dry-run','Confirmar','cero los tres saldos del paso 2']) assert.match(source, new RegExp(text));
+  for (const text of ['CommercialPlanCards','ADMINISTRACIÓN','INSCRIPCIONES','Completar onboarding','Ir a Migración','Dry-run','Confirmar','cero los tres saldos del paso 2']) assert.match(source, new RegExp(text));
   assert.doesNotMatch(source, /type="file"|state\.run|onPendingImport|Aplicar este dry-run/);
 });
 
