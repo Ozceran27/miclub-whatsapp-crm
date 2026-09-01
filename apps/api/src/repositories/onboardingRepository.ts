@@ -1,4 +1,4 @@
-import { ROLE_DEFAULT_PERMISSIONS, REQUIRED_ONBOARDING_STEPS, type CompleteOnboardingResult, type OnboardingDraft, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
+import { isActivityIconKey, ROLE_DEFAULT_PERMISSIONS, REQUIRED_ONBOARDING_STEPS, type CompleteOnboardingResult, type OnboardingDraft, type OnboardingState, type OnboardingStatus, type OnboardingStep, type OnboardingStepOutcome, type OpeningBalancesRequest } from "@miclub/shared";
 import { hashPassword } from "../auth/passwordHasher.js";
 import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
@@ -98,6 +98,7 @@ async function validateDraftCatalog(ctx:CompletionContext) {
  if(!selectedPlan)throw Object.assign(new Error('El plan no está activo en el catálogo comercial.'),{code:'ONBOARDING_PLAN_INVALID'});
  if(draft.pendingImport&&!selectedPlan.capabilities.includes('DATA_MIGRATION'))throw Object.assign(new Error('El plan elegido no permite importaciones.'),{code:'ONBOARDING_PLAN_MIGRATION_FORBIDDEN'});
  const iconKeys=[...new Set(draft.activities.map(item=>item.iconKey))];
+ if(!iconKeys.every(isActivityIconKey))throw Object.assign(new Error('El borrador contiene iconos fuera del catálogo compartido.'),{code:'ONBOARDING_ICON_INVALID'});
  if(iconKeys.length){const icons=await db.query<{icon_key:string}>(`select icon_key from miclub.activity_icon_catalog where icon_key=any($1::text[]) and active=true`,[iconKeys]);if(icons.rows.length!==iconKeys.length)throw Object.assign(new Error('El borrador contiene iconos de actividad no disponibles.'),{code:'ONBOARDING_ICON_INVALID'});}
  if(draft.pendingImport){const imported=await db.query(`select 1 from miclub.import_batches where id=$1 and club_id=$2 and status in ('completed','completed_with_errors')`,[draft.pendingImport.batchId,actor.clubId]);if(!imported.rows[0])throw Object.assign(new Error('La importación no pertenece al club o todavía no está completa.'),{code:'ONBOARDING_IMPORT_INVALID'});}
  return selectedPlan;
