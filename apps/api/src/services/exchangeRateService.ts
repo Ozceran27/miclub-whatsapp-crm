@@ -1,7 +1,7 @@
 import { SUPPORTED_OPERATIONAL_CURRENCIES } from "@miclub/shared";
 import { getPostgresPool } from "../db/postgres.js";
 import type { QueryExecutor } from "../db/postgres.js";
-import type { AppliedExchangeRate, CurrencyCode } from "./moneyConversion.js";
+import { divideDecimal, multiplyDecimal, type AppliedExchangeRate, type CurrencyCode, type ExchangeRateComponent } from "./moneyConversion.js";
 
 export interface OfficialExchangeRateProvider {
   readonly source: string;
@@ -14,7 +14,7 @@ const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Numbe
 
 export const validateProviderRate = (value: { rate?: string; rateDate?: string }, base: string, quote: string) => {
   if (!supported.has(base) || !supported.has(quote) || base === quote) throw new ExchangeRateError("Código de moneda no soportado");
-  if (!value.rate || !value.rateDate || !validDate(value.rateDate) || !/^\d+(\.\d+)?$/.test(value.rate) || Number(value.rate) <= 0) {
+  if (!value.rate || !value.rateDate || !validDate(value.rateDate) || !/^\d+(\.\d+)?$/.test(value.rate) || /^0+(\.0+)?$/.test(value.rate)) {
     throw new ExchangeRateError("Respuesta de cotización incompleta o inválida");
   }
 };
@@ -32,7 +32,7 @@ export const createExchangeRateService = (provider: OfficialExchangeRateProvider
         do nothing returning id`, [base, quote, fetched.rate, fetched.rateDate, options.rateType ?? "official", provider.source, fetched.reference ?? null]);
       await pool.query(`insert into miclub.exchange_rate_sync_state(source,last_attempt_at,last_success_at,last_error)
         values($1,now(),now(),null) on conflict(source) do update set last_attempt_at=now(),last_success_at=now(),last_error=null,updated_at=now()`, [provider.source]);
-      return { id: result.rows[0]?.id, baseCurrencyCode: base, quoteCurrencyCode: quote, rate: fetched.rate, rateDate: fetched.rateDate, rateType: options.rateType ?? "official", source: provider.source };
+      return { id: result.rows[0]?.id, baseCurrencyCode: base, quoteCurrencyCode: quote, rate: fetched.rate, rateDate: fetched.rateDate, rateType: options.rateType ?? "official", source: provider.source, kind: "direct" };
     } catch (error) {
       const pool = options.executor ?? await getPostgresPool();
       await pool.query(`insert into miclub.exchange_rate_sync_state(source,last_attempt_at,last_error) values($1,now(),$2)
@@ -55,11 +55,26 @@ export const createExchangeRateService = (provider: OfficialExchangeRateProvider
     if (row) {
       const age = (Date.parse(`${valuationDate}T00:00:00Z`) - Date.parse(`${row.rate_date}T00:00:00Z`)) / 86400000;
       if (age > options.maxAgeDays) throw new ExchangeRateError(`Cotización vencida (${age} días; máximo ${options.maxAgeDays})`);
-      return { id: row.id, baseCurrencyCode: row.base_currency_code as CurrencyCode, quoteCurrencyCode: row.quote_currency_code as CurrencyCode, rate: row.rate, rateDate: row.rate_date, rateType: row.rate_type, source: row.source };
+      const inverse = row.base_currency_code !== base;
+      const component: ExchangeRateComponent = Object.freeze({
+        id: row.id, baseCurrencyCode: row.base_currency_code as CurrencyCode,
+        quoteCurrencyCode: row.quote_currency_code as CurrencyCode, rate: row.rate,
+        rateDate: row.rate_date, rateType: row.rate_type, source: row.source,
+        direction: inverse ? "inverse" : "direct",
+      });
+      return { id: row.id, baseCurrencyCode: base, quoteCurrencyCode: quote,
+        rate: inverse ? divideDecimal("1", row.rate) : row.rate, rateDate: row.rate_date,
+        rateType: row.rate_type, source: row.source, kind: inverse ? "inverse" : "direct",
+        components: Object.freeze([component]) };
     }
     if (base !== options.pivot && quote !== options.pivot) {
       const [left, right] = await Promise.all([this.latest(base, options.pivot, valuationDate), this.latest(options.pivot, quote, valuationDate)]);
-      return { baseCurrencyCode: base, quoteCurrencyCode: quote, rate: String(Number(left.rate) * Number(right.rate)), rateDate: left.rateDate < right.rateDate ? left.rateDate : right.rateDate, rateType: options.rateType ?? "official", source: `${left.source}+${right.source}` };
+      const components = Object.freeze([...(left.components ?? []), ...(right.components ?? [])]);
+      return { baseCurrencyCode: base, quoteCurrencyCode: quote,
+        rate: multiplyDecimal(left.rate, right.rate),
+        rateDate: left.rateDate < right.rateDate ? left.rateDate : right.rateDate,
+        rateType: options.rateType ?? "official", source: `${left.source}+${right.source}`,
+        kind: "cross", components };
     }
     throw new ExchangeRateError(`No existe cotización admisible para ${base}/${quote} al ${valuationDate}`);
   },
