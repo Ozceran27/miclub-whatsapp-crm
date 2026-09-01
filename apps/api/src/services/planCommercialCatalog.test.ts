@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readCommercialPlanCatalog } from "./planCommercialCatalog.js";
 
 const migrationUrl = new URL("../../db/migrations/202608160001_commercial_plan_taxonomy.sql", import.meta.url);
 
@@ -33,4 +34,14 @@ test("DEVELOPMENT queda reservado a testing y fuera del catálogo comercial", as
   assert.match(sql, /DEVELOPMENT[\s\S]*non_commercial/);
   assert.match(sql, /catalog_status='development'[\s\S]*commercial_class='non_commercial'[\s\S]*code='DEVELOPMENT'/);
   assert.match(sql, /code IN \('STARTER','GROWTH','PROFESSIONAL','ENTERPRISE'\)/);
+});
+
+test("expone metadatos canónicos, orden y disponibilidad derivada de entitlements",async()=>{
+ const rows=["CLUB","FREE","COMPLEX","SOCIAL"].map((code,index)=>({code,name:code,description:`Descripción ${code}`,target_audience:`Público ${code}`,highlighted_features:[`Prestación ${code}`],display_order:({FREE:1,SOCIAL:2,COMPLEX:3,CLUB:4} as Record<string,number>)[code],recommended:code==="COMPLEX",cta_text:`Elegir ${code}`,price_label:"Precio próximamente",commercial_class:code==="FREE"?"free":"paid",capabilities:code==="FREE"?[]:["DATA_MIGRATION"]}));
+ const executor={query:async()=>({rows,rowCount:rows.length})};
+ const catalog=await readCommercialPlanCatalog(executor as never);
+ assert.deepEqual(catalog.map(plan=>plan.code),["FREE","SOCIAL","COMPLEX","CLUB"]);
+ assert.equal(catalog.find(plan=>plan.code==="COMPLEX")?.recommended,true);
+ assert.equal(catalog.find(plan=>plan.code==="FREE")?.migrationAvailable,false);
+ assert.equal(catalog.find(plan=>plan.code==="SOCIAL")?.migrationAvailable,true);
 });
