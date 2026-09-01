@@ -86,7 +86,6 @@ export type OnboardingActivityDraft = {
   status: "active" | "inactive";
 } & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; currencyCode: OperationalCurrency; clubSharePercentage: null }
   | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; currencyCode: null; clubSharePercentage: number });
-export interface PendingOnboardingImportReference { batchId: string }
 /** Complete, client-owned draft. No field in this object is persisted before completion. */
 export interface OnboardingDraft {
   contractVersion: typeof ONBOARDING_DRAFT_CONTRACT_VERSION;
@@ -96,10 +95,12 @@ export interface OnboardingDraft {
   sectors: OnboardingSectorDraft[];
   workers: OnboardingWorkerDraft[];
   activities: OnboardingActivityDraft[];
-  pendingImport: PendingOnboardingImportReference | null;
 }
 export interface CompleteOnboardingRequest { draft: OnboardingDraft; selectedPlanCode: CommercialPlanCode }
+export type OnboardingDestination = "MIGRATION" | "DASHBOARD";
 export interface CompleteOnboardingResult {
   state: OnboardingState;
+  recommendedDestination: OnboardingDestination;
+  capabilities: { DATA_MIGRATION: boolean };
   created: { openingBalanceBatchId: string; sectorIds: string[]; workerIds: string[]; activityIds: string[] };
 }

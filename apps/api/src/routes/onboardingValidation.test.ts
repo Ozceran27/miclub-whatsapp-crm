@@ -18,7 +18,7 @@ const completeRequest=():CompleteOnboardingRequest=>({selectedPlanCode:"FREE",dr
   contractVersion:2,idempotencyKey:"retry-complete-1",openingBalances:{currency:"ARS",cash:0,bank:0,usdCash:0},
   selectedPlanCode:"FREE",
   sectors:PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:"#2563EB",status:"active",capacityMode:"INCOME" as const,configuredCapacity:null})),
-  workers:[],activities:[],pendingImport:null,
+  workers:[],activities:[],
 }});
 test("permite finalizar sin altas opcionales y con los tres sectores provisionados",()=>{
   assert.equal(isCompleteOnboardingRequest(completeRequest()),true);
@@ -53,7 +53,7 @@ test("rechaza montos fijos negativos, infinitos y referencias de importación ma
   assert.equal(isCompleteOnboardingRequest(request),false);
   request.draft.workers[0].fixedCompensationAmount=Number.POSITIVE_INFINITY;
   assert.equal(isCompleteOnboardingRequest(request),false);
-  const imported=completeRequest();imported.draft.pendingImport={batchId:"bad id with spaces"};
+  const imported=completeRequest();(imported.draft as unknown as Record<string,unknown>).pendingImport={batchId:"batch-any"};
   assert.equal(isCompleteOnboardingRequest(imported),false);
 });
 
