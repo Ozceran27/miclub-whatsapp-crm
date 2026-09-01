@@ -73,7 +73,13 @@ export type OnboardingSectorDraft = OnboardingSectorDraftBase & (
   | { capacityMode: "ENROLLMENTS"; configuredCapacity: number }
   | { capacityMode: "INCOME"; configuredCapacity: null }
 );
-export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto { clientId: string }
+/** Opaque capability returned by the authenticated temporary-photo endpoint. */
+export type OnboardingPhotoFileId = string;
+export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto {
+  clientId: string;
+  /** Never contains image bytes, an object-store key, or a public URL. */
+  photoFileId?: OnboardingPhotoFileId | null;
+}
 export type ActivityFeeFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; instructorClientId: string | null; name: string; iconKey: string; color: string;
