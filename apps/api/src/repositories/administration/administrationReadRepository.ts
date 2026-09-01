@@ -67,6 +67,13 @@ export type AdministrationReadModel = {
 
 const toNumber = (value: string | number | null | undefined): number => Number(value ?? 0);
 
+export type AdministrationSectorCapacityRow = { sector_id:string; name:string; capacity_mode:"ENROLLMENTS"|"INCOME"; maximum_capacity:string|number|null; current_usage:string|number|null; utilization_percentage:string|number|null; idle_percentage:string|number|null; data_status:"AVAILABLE"|"NO_DATA"|"NOT_CONFIGURED" };
+/** Tenant-scoped entry point for all capacity consumers; formulas live in the canonical DB view. */
+export const getAdministrationSectorCapacities = async (clubId:string):Promise<AdministrationSectorCapacityRow[]> => {
+  const pool=await getPostgresPool();
+  return (await pool.query<AdministrationSectorCapacityRow>(`select c.sector_id,s.name,c.capacity_mode,c.maximum_capacity,c.current_usage,c.utilization_percentage,c.idle_percentage,c.data_status from miclub.v_sector_capacity_metrics c join miclub.sectors s on s.club_id=c.club_id and s.id=c.sector_id where c.club_id=$1 and s.archived_at is null order by s.name,s.id`,[clubId])).rows;
+};
+
 export const getAdministrationReadModel = async (clubId: string): Promise<AdministrationReadModel> => {
   const pool = await getPostgresPool();
   const [balanceResult, pendingResult, recentMovementsResult] = await Promise.all([

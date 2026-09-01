@@ -5,7 +5,7 @@ export const ONBOARDING_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"] a
 export type OnboardingStatus = typeof ONBOARDING_STATUSES[number];
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type OnboardingStepOutcome = "COMPLETED" | "SKIPPED";
-export const ONBOARDING_DRAFT_CONTRACT_VERSION = 1 as const;
+export const ONBOARDING_DRAFT_CONTRACT_VERSION = 2 as const;
 export type OnboardingStepRequirement = "WELCOME" | "OPENING_BALANCES" | "SECTORS" | "WORKERS" | "ACTIVITIES" | "MIGRATION" | "FINISH";
 
 /**
@@ -67,7 +67,12 @@ export const PROVISIONED_ONBOARDING_SECTORS = [
   { clientId: "system:areas-comunes", code: "areas-comunes", name: "Áreas Comunes", iconKey: "social-hall", isSystem: true },
 ] as const;
 export type ProvisionedOnboardingSectorCode = typeof PROVISIONED_ONBOARDING_SECTORS[number]["code"];
-export interface OnboardingSectorDraft { clientId: string; code: string; name: string; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean }
+type OnboardingSectorDraftBase = { clientId: string; code: string; name: string; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean };
+/** Capacity is deliberately discriminated so an income-based sector can never carry a stale enrollment limit. */
+export type OnboardingSectorDraft = OnboardingSectorDraftBase & (
+  | { capacityMode: "ENROLLMENTS"; configuredCapacity: number }
+  | { capacityMode: "INCOME"; configuredCapacity: null }
+);
 export interface OnboardingWorkerDraft extends AdministrationWorkerMutationDto { clientId: string }
 export type ActivityFeeFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 export type OnboardingActivityDraft = {

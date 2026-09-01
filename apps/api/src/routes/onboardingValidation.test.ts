@@ -15,9 +15,9 @@ test("rechaza importes negativos y campos adicionales",()=>{
 });
 
 const completeRequest=():CompleteOnboardingRequest=>({selectedPlanCode:"FREE",draft:{
-  contractVersion:1,idempotencyKey:"retry-complete-1",openingBalances:{currency:"ARS",cash:0,bank:0,usdCash:0},
+  contractVersion:2,idempotencyKey:"retry-complete-1",openingBalances:{currency:"ARS",cash:0,bank:0,usdCash:0},
   selectedPlanCode:"FREE",
-  sectors:PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:"#2563EB",status:"active"})),
+  sectors:PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:"#2563EB",status:"active",capacityMode:"INCOME" as const,configuredCapacity:null})),
   workers:[],activities:[],pendingImport:null,
 }});
 test("permite finalizar sin altas opcionales y con los tres sectores provisionados",()=>{
@@ -84,4 +84,11 @@ test("rechaza una cuota de inscripción silenciosa en el borrador canónico",()=
   const request=completeRequest();
   request.draft.activities=[{clientId:"activity:1",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",status:"active",settlementMode:"FIXED",fixedClubFee:100,fixedFeeFrequency:"MONTHLY",currencyCode:"ARS",clubSharePercentage:null,enrollmentFee:100} as never];
   assert.equal(isCompleteOnboardingRequest(request),false);
+});
+
+test("valida las ramas discriminadas de capacidad y rechaza propiedades inconsistentes",()=>{
+ const enrollments=completeRequest(); Object.assign(enrollments.draft.sectors[0],{capacityMode:"ENROLLMENTS",configuredCapacity:1}); assert.equal(isCompleteOnboardingRequest(enrollments),true);
+ for(const configuredCapacity of [0,-1,1.5,null]){const invalid=completeRequest();Object.assign(invalid.draft.sectors[0],{capacityMode:"ENROLLMENTS",configuredCapacity});assert.equal(isCompleteOnboardingRequest(invalid),false);}
+ const stale=completeRequest();Object.assign(stale.draft.sectors[0],{capacityMode:"INCOME",configuredCapacity:10});assert.equal(isCompleteOnboardingRequest(stale),false);
+ const unknown=completeRequest();Object.assign(unknown.draft.sectors[0],{unexpected:true});assert.equal(isCompleteOnboardingRequest(unknown),false);
 });

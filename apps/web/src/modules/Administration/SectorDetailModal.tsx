@@ -57,8 +57,9 @@ export function SectorDetailModal({ sector, onClose }: Props) {
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', onKeyDown); previouslyFocused?.focus(); };
   }, [onClose]);
 
-  const used = sector.currentOccupancy ?? sector.activeEnrollmentsCount ?? 0;
-  const capacity = sector.maxCapacity == null ? `${number.format(used)} ocupados · sin límite configurado` : `${number.format(used)} de ${number.format(sector.maxCapacity)}`;
+  const capacity = sector.capacityDataStatus !== 'AVAILABLE' || sector.maximumCapacity == null
+    ? 'Sin datos históricos'
+    : `${number.format(sector.currentUsage ?? 0)} de ${number.format(sector.maximumCapacity)}`;
 
   return (
     <div className="sector-modal__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -77,7 +78,7 @@ export function SectorDetailModal({ sector, onClose }: Props) {
           <div className="sector-modal__fact--wide"><dt>Notas</dt><dd>{sector.notes || 'Sin notas'}</dd></div>
         </dl></section>
 
-        <section aria-labelledby={`${titleId}-capacity`}><h3 id={`${titleId}-capacity`}>Capacidad</h3><div className="sector-modal__capacity"><strong>{sector.usesEnrollments ? capacity : 'Sin control de cupo'}</strong>{sector.occupancyRate != null && <span>{number.format(sector.occupancyRate)}% de ocupación</span>}<span>{number.format(sector.activeEnrollmentsCount ?? 0)} inscriptos activos</span></div></section>
+        <section aria-labelledby={`${titleId}-capacity`}><h3 id={`${titleId}-capacity`}>Capacidad · {sector.capacityMode === 'INCOME' ? 'Ingresos' : 'Espacio Disponible'}</h3><div className="sector-modal__capacity"><strong>{capacity}</strong>{sector.utilizationPercentage != null && <span>{number.format(sector.utilizationPercentage)}% de utilización{sector.utilizationPercentage > 100 ? ' · sobreocupación' : ''}</span>}{sector.idlePercentage != null && <span>{number.format(sector.idlePercentage)}% de capacidad ociosa</span>}<span>{number.format(sector.activeEnrollmentsCount ?? 0)} inscriptos activos</span></div></section>
 
         <section aria-labelledby={`${titleId}-activities`}><h3 id={`${titleId}-activities`}>Actividades <span>{activities.length}</span></h3>
           {loading ? <p role="status">Cargando actividades y movimientos…</p> : activities.length ? <ul className="sector-modal__items">{activities.map((activity) => <li key={activity.id}><div><strong>{activity.name}</strong><small>{activity.modality || 'Sin modalidad'} · {displayStatus(activity.status)}</small></div><span>{number.format(activity.currentEnrollments ?? 0)} / {activity.maxCapacity == null ? '∞' : number.format(activity.maxCapacity)}</span></li>)}</ul> : <p>No hay actividades relacionadas.</p>}

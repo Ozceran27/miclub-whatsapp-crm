@@ -11,6 +11,7 @@ import {
 
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const finiteNonNegative = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
+const positiveInteger = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
 const clientId = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9:_-]{1,128}$/.test(value);
 
 export const isOpeningBalancesRequest = (body: unknown): body is OpeningBalancesRequest => {
@@ -41,11 +42,13 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
 
   const requiredCodes = new Set<string>(PROVISIONED_ONBOARDING_SECTORS.map((sector) => sector.code));
   if (!draft.sectors.every((sector) =>
-    typeof sector.code === "string" && Boolean(sector.code.trim())
+    !Object.keys(sector).some((key) => !["clientId","code","name","iconKey","color","status","isSystem","capacityMode","configuredCapacity"].includes(key))
+    && typeof sector.code === "string" && Boolean(sector.code.trim())
     && typeof sector.isSystem === "boolean"
     && typeof sector.name === "string" && sector.name.trim().length > 0 && sector.name.length <= 120
     && isSectorIconKey(sector.iconKey)
     && typeof sector.color === "string" && /^#[0-9a-f]{6}$/i.test(sector.color)
+    && (sector.capacityMode === "ENROLLMENTS" ? positiveInteger(sector.configuredCapacity) : sector.capacityMode === "INCOME" && sector.configuredCapacity === null)
     && ["active", "inactive", "under_repair"].includes(String(sector.status)))) return false;
   const systemSectors = draft.sectors.filter((sector) => sector.isSystem);
   if (systemSectors.some((sector) => !requiredCodes.has(sector.code))
