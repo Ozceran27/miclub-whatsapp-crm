@@ -55,7 +55,7 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
       { id: "roles", label: "Roles", value: rows.entities.roles, tone: "neutral" },
       { id: "active-activities", label: "Actividades activas", value: rows.entities.active_activities, tone: "neutral" },
     ],
-    balance: { cutoffDate: null, liquidity: metric(0), cash: metric(0), bank: metric(0), dollars: metric(0) },
+    balance: { cutoffDate: null, valuationStatus: "INCOMPLETE_EXCHANGE_RATE", unvaluedAccountCount: 0, missingPairs: [], valuationMode: "LIVE_RECALCULATED", liquidity: metric(0), cash: metric(0), bank: metric(0), dollars: metric(0) },
     pending: { income: metric(0), expenses: metric(0), balance: metric(0), movements: metric(0) },
     totals: {
       sectors: metric(0),

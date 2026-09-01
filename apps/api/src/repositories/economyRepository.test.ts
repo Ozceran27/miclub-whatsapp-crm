@@ -62,9 +62,9 @@ test("Inicio y Economía consumen movimientos por cuenta como autoridad de liqui
     await getClubFinanceSummary(CLUB_A);
     const query = calls[0];
     assert.deepEqual(query.params, [CLUB_A]);
-    assert.match(query.sql, /from miclub\.v_financial_account_liquidity/);
+    assert.match(query.sql, /from miclub\.value_club_liquidity/);
     assert.doesNotMatch(query.sql, /operational_balances/);
-    assert.match(query.sql, /coalesce\(b\.liquidity, 0\)/);
+    assert.match(query.sql, /case when b\.valuation_status='COMPLETE' then b\.liquidity/);
     assert.match(query.sql, /coalesce\(d\.cuotas_a_cobrar, 0\)/);
     assert.match(query.sql, /coalesce\(d\.pending_net_balance, 0\)/);
   });

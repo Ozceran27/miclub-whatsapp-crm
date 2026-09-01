@@ -17,6 +17,11 @@ export interface AdminMovement {
 }
 
 export interface FinancialSummary {
+  valuationStatus: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  unvaluedAccountCount: number;
+  missingPairs: Array<{ baseCurrencyCode: string; quoteCurrencyCode: string }>;
+  /** Live metrics are recalculated; closed calculations persist exchange-rate usages. */
+  valuationMode: "LIVE_RECALCULATED" | "CLOSED_REPRODUCIBLE";
   liquidity: number;
   cash: number;
   bank: number;
@@ -25,6 +30,7 @@ export interface FinancialSummary {
   appliedRate: number | null;
   rateDate: string | null;
   rateSource: string | null;
+  rateDirection: "DIRECT" | "INVERSE" | "IDENTITY" | null;
   dollarsConverted: number;
 }
 

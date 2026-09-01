@@ -18,6 +18,7 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
+
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -67,6 +68,8 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608310001_exchange_rates.sql` | Persiste cotizaciones oficiales inmutables, estado de sincronización y referencias de valoración histórica. | `a5e28d12ea69810112bc480d07a7026a8ed323693452cee6559387efe38ba9f4` | Después de `202608140008_canonical_onboarding_and_opening_balances.sql`. |
 | `202608310002_sector_capacity_modes.sql` | Normaliza modos de capacidad y centraliza récord, utilización y ociosidad por sector y tenant. | `cfd830f3a2bc27f2010d237488de4ca24334792e812cb8cc7aa7243fa346827d` | Después de `202608210003_complete_product_category_catalog.sql` y `202608210004_sector_templates_and_lifecycle.sql` y `202608310001_exchange_rates.sql`. |
 | `202609010001_expand_activity_visual_catalog.sql` | Amplía idempotentemente el catálogo activo sin borrar claves históricas referenciadas. | `bc9ec90ae651e645c8ca2628d35d36675c463042ae78e000be46cff5cc0dd898` | Después de `202608280002_sync_activity_visual_catalog.sql`. |
+| `202609010002_canonical_liquidity_valuation.sql` | Centraliza valoración multimoneda, caducidad, faltantes y trazabilidad reproducible de cotizaciones. | `1828bb71377045bc480a88223253d0de443d4662b00117333a7d93616979440b` | Después de `202608310001_exchange_rates.sql`. |
+
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:

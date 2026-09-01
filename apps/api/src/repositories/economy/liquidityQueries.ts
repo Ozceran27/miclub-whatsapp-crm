@@ -7,42 +7,25 @@ import type { EconomyRow } from "./types.js";
 export const getClubFinanceSummary = async (clubId: string): Promise<EconomyRow[]> => {
   const pool = await getPostgresPool();
   return (await pool.query<EconomyRow>(`
-    with valued_accounts as (
-      select a.*, c.base_currency_code,
-        case when a.currency_code = c.base_currency_code then a.balance
-             when r.base_currency_code = a.currency_code then a.balance * r.rate
-             else a.balance / r.rate end as presented_balance,
-        r.id as exchange_rate_id, r.rate, r.rate_date, r.source
-      from miclub.v_financial_account_liquidity a join miclub.clubs c on c.id=a.club_id
-      left join lateral (select er.* from miclub.exchange_rates er
-        where ((er.base_currency_code=a.currency_code and er.quote_currency_code=c.base_currency_code)
-          or (er.base_currency_code=c.base_currency_code and er.quote_currency_code=a.currency_code))
-          and er.rate_type='official' and er.rate_date <= current_date
-        order by er.rate_date desc limit 1) r on a.currency_code <> c.base_currency_code
-    ), ledger_balance as (
-      select coalesce(sum(presented_balance), 0) as liquidity,
-        coalesce(sum(balance) filter (where code='CASH'), 0) as cash,
-        coalesce(sum(balance) filter (where code='BANK'), 0) as bank,
-        coalesce(sum(balance) filter (where currency_code='USD'), 0) as dollars,
-        coalesce(sum(presented_balance) filter (where currency_code='USD'), 0) as dollars_converted,
-        max(base_currency_code) as presentation_currency_code,
-        max(rate) filter (where currency_code='USD') as applied_rate,
-        max(rate_date) filter (where currency_code='USD') as rate_date,
-        max(source) filter (where currency_code='USD') as rate_source
-      from valued_accounts
-      where club_id = $1
+    with ledger_balance as (
+      select v.*, usd->>'rate' as applied_rate, usd->>'rateDate' as rate_date,
+        usd->>'source' as rate_source, usd->>'direction' as rate_direction
+      from miclub.value_club_liquidity($1,current_date) v
+      left join lateral (select x as usd from jsonb_array_elements(v.account_valuations) x
+        where x->>'currencyCode'='USD' limit 1) q on true
     )
     select d.*,
-      coalesce(b.liquidity, 0) as liquidity,
-      coalesce(b.cash, 0) as cash,
-      coalesce(b.bank, 0) as bank,
+      b.liquidity,
+      b.cash,
+      b.bank,
       coalesce(b.dollars, 0) as dollars,
-      coalesce(b.dollars_converted, 0) as dollars_converted,
-      b.presentation_currency_code, b.applied_rate, b.rate_date, b.rate_source,
-      coalesce(b.liquidity, 0)
+      b.dollars_converted,
+      b.presentation_currency_code, b.applied_rate, b.rate_date, b.rate_source,b.rate_direction,
+      b.valuation_status,b.unvalued_account_count,b.missing_pairs,b.account_valuations,
+      case when b.valuation_status='COMPLETE' then b.liquidity
         + coalesce(d.cuotas_a_cobrar, 0)
         - coalesce(d.saldos_a_pagar, 0)
-        + coalesce(d.pending_net_balance, 0) as projected_balance
+        + coalesce(d.pending_net_balance, 0) end as projected_balance
     from miclub.v_dashboard_basic d
     left join ledger_balance b on true
     where d.club_id = $1
