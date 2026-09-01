@@ -213,7 +213,7 @@ test('los modales secundarios atrapan foco, cierran con Escape y lo devuelven al
 
 test('la migración del onboarding es informativa y deriva la carga al módulo normal', () => {
   const source = readFileSync(new URL('./MigrationStep.tsx', import.meta.url), 'utf8');
-  for (const text of ['Plan Complex','Plan Club','ADMINISTRACIÓN','INSCRIPCIONES','Descargar','Adaptar','Dry-run','Confirmar','actividades, sectores y responsables','cero los tres saldos del paso 2']) assert.match(source, new RegExp(text));
+  for (const text of ['CommercialPlanCards','ADMINISTRACIÓN','INSCRIPCIONES','Descargar','Adaptar','Dry-run','Confirmar','cero los tres saldos del paso 2']) assert.match(source, new RegExp(text));
   assert.doesNotMatch(source, /type="file"|state\.run|onPendingImport|Aplicar este dry-run/);
 });
 
