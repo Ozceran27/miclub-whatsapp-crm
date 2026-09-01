@@ -14,6 +14,8 @@ import { EnrollmentCreateModal } from './Administration/EnrollmentCreateModal';
 import { useSession } from '../session';
 import { useState } from 'react';
 import { getAdministrationCapabilities, type AdministrationCapability } from '../administrationCapabilities';
+import { MoneyPresentation } from './shared/MoneyPresentation';
+import type { PresentationCurrencyCode } from '../utils';
 
 function UnavailableSurface({ capability, title }: { capability: AdministrationCapability; title: string }) {
   return <section className="section-panel" data-capability={capability}><p className="eyebrow">{title}</p><h3>Contenido no disponible</h3><p>Tu membresía no permite consultar este recurso. Si necesitás acceso, contactá a una persona administradora del club.</p></section>;
@@ -64,6 +66,11 @@ export default function AdministrationModule() {
       {dashboard.summary && dashboard.status === 'ready' && (
         <section className="home-dashboard-stack" aria-label="Tablero administrativo del club">
           <AdministrationHeaderCards summary={dashboard.summary} />
+          {dashboard.summary.balance.conversion && <MoneyPresentation
+            usdNominal={dashboard.summary.balance.conversion.usdNominal}
+            presentationCurrencyCode={dashboard.summary.balance.conversion.presentationCurrencyCode as PresentationCurrencyCode}
+            quote={{ appliedRate: dashboard.summary.balance.conversion.appliedRate, rateDate: dashboard.summary.balance.conversion.rateDate, source: dashboard.summary.balance.conversion.source, convertedValue: dashboard.summary.balance.conversion.appliedRate === null ? null : dashboard.summary.balance.conversion.convertedValue }}
+          />}
           <AdministrationActions onCreateMovement={()=>setMovementOpen(true)} onCreateEnrollment={()=>setEnrollmentOpen(true)} canCreateMovement={capabilities.createMovement} canCreateEnrollment={capabilities.createEnrollment}/>
         </section>
       )}

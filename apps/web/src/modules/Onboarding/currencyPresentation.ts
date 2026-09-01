@@ -1,4 +1,5 @@
 import { SUPPORTED_OPERATIONAL_CURRENCIES, type OperationalCurrency } from '@miclub/shared';
+import { formatMoney } from '../../utils';
 
 export interface CurrencyPresentation {
   code: OperationalCurrency;
@@ -33,8 +34,8 @@ export const getCurrencyPrefix = (code: string): string =>
 
 export const formatOnboardingMoney = (value: number, code: string): string => {
   const currency = getCurrencyPresentation(code);
-  if (!currency) return `${getCurrencyPrefix(code)} ${value.toLocaleString('es-AR')}`;
-  return new Intl.NumberFormat(currency.locale, { style: 'currency', currency: currency.code }).format(value);
+  if (!currency) return `Moneda no admitida (${code || '—'})`;
+  return formatMoney(value, currency.code);
 };
 
 export function getCurrencyAfterKey(currentCode: string, key: 'ArrowDown' | 'ArrowUp' | 'Home' | 'End'): OperationalCurrency {
