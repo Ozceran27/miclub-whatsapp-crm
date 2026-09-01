@@ -69,6 +69,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608310002_sector_capacity_modes.sql` | Normaliza modos de capacidad y centraliza récord, utilización y ociosidad por sector y tenant. | `cfd830f3a2bc27f2010d237488de4ca24334792e812cb8cc7aa7243fa346827d` | Después de `202608210003_complete_product_category_catalog.sql` y `202608210004_sector_templates_and_lifecycle.sql` y `202608310001_exchange_rates.sql`. |
 | `202609010001_expand_activity_visual_catalog.sql` | Amplía idempotentemente el catálogo activo sin borrar claves históricas referenciadas. | `bc9ec90ae651e645c8ca2628d35d36675c463042ae78e000be46cff5cc0dd898` | Después de `202608280002_sync_activity_visual_catalog.sql`. |
 | `202609010002_canonical_liquidity_valuation.sql` | Centraliza valoración multimoneda, caducidad, faltantes y trazabilidad reproducible de cotizaciones. | `1828bb71377045bc480a88223253d0de443d4662b00117333a7d93616979440b` | Después de `202608310001_exchange_rates.sql`. |
+| `202609010003_exchange_rate_usage_components.sql` | Persiste en orden todos los identificadores inmutables que componen una cotización cruzada. | `a1926ed98d679de4a6ce08587bfc34beaa8bb95a0169d2c27a2e944435d16dde` | Después de `202609010002_canonical_liquidity_valuation.sql`. |
 
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
