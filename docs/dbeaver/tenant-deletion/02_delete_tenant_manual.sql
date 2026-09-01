@@ -23,7 +23,7 @@ END $$;
 CREATE TEMP TABLE _expected_manifest(name text PRIMARY KEY,checksum text NOT NULL);
 INSERT INTO _expected_manifest(name,checksum) VALUES
 -- MIGRATION_MANIFEST_VALUES:START
-    ('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
+('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
     ('202606270001_align_existing_miclub_for_sheets_import.sql', '06a39926e25c5c743658a57fb33550129ed679d0659e55702bb4e77c2eefa155'),
     ('202606280001_add_operational_aggregation_views.sql', '710958884d6d31716c632c32d8683f9862f389b5be4cc9d426160a3adaa2023e'),
     ('202606280002_fix_existing_finance_metric_semantics.sql', 'd8aa64d8f82c563303ad3da0e3f747b4b19cc70811fe912923b0b11e9f85046d'),
@@ -91,15 +91,29 @@ INSERT INTO _expected_manifest(name,checksum) VALUES
     ('202608150004_runtime_roles_and_priority_rls.sql', '96cbec8d8c198beb34bfeef979f8f98b9bd58a99f96af924d065b8c8dc637ce4'),
     ('202608150005_prevent_split_settlement_movements.sql', 'ce170d44b2fab940e69ee0761350ea11f5c4c1c0911c7a8dcd98d6fa59948d28'),
     ('202608150006_remove_empty_bootstrap_legacy_club.sql', 'bb561df6444fa1a4680859f0ec1f262db6e0d51b5be95a72c82fda30d78c9488'),
-    ('202608160001_commercial_plan_taxonomy.sql', '5822085b878c63e49b4499f20671f1bd5b19d1ab8841c4238e8473e585462c8c'),
+    ('202608160001_commercial_plan_taxonomy.sql', '7e2292eb5bb569de5597d363b1a51ec6b7d67c63470b9cbdd537bacc548b0257'),
     ('202608180001_enrollment_operational_lifecycle.sql', '6e85099d6ac3932c598447b648c3c1dd06ad8e13afc0255aed02ae1587f3e119'),
     ('202608180002_restore_runtime_application_grants.sql', '65d5037ea1e47bcd7e5f8feaa56fbf9e0629a2a23fe8473c8017a72f4ca352ea'),
-    ('202608180003_fix_rls_login_membership_resolution.sql', '52aa5727fcd1f89b91b8c3e16896f04c43568f988873542040188ae29dcd0335'),
+    ('202608180003_fix_rls_login_membership_resolution.sql', '2d05b5f421cdceb22f6bfd161643cc705c6035bc111277d59be0d002100e0913'),
     ('202608180004_fix_authenticated_membership_resolution.sql', '98e78f0019a00a6c52396fb2009c0eff06719898a027ef9dda4abd21277abfce'),
     ('202608210001_operational_currency_opening_balances.sql', '309708c724168193a872ef6ba1b7b798f92835b6c9f3d2f6942e32e331566ea9'),
     ('202608210002_canonical_activity_financial_views.sql', '6c28a57110b032111f610d5922a2425727234100afd00a4db773ddab6a3caeac'),
     ('202608210003_complete_product_category_catalog.sql', '625d17b1d410fc475ac38efa5e97188002245fce402fd9340dfa76ba03903120'),
-    ('202608210004_sector_templates_and_lifecycle.sql', 'f55f8cd3c21adb53b7d9b33d7c92a5aee04a199603c1926e8b7003f5c9df5758')
+    ('202608210004_sector_templates_and_lifecycle.sql', 'f55f8cd3c21adb53b7d9b33d7c92a5aee04a199603c1926e8b7003f5c9df5758'),
+    ('202608270001_sector_visual_metadata.sql', '44e55cec7ee537044313038d6cfae0452e9bc3a1a0004c2a8402fb12600143cb'),
+    ('202608270002_employee_compensation_and_photos.sql', 'cb483602ba65cd9c6beab17258115ba2925d765573d63485b3034f68131e6a44'),
+    ('202608270003_activity_fee_frequencies.sql', '6e52f6d23967e423d7e2b2d4446078fb785db012f0146b61fc1b643544a66885'),
+    ('202608270004_atomic_onboarding_completion.sql', 'eda334def350c6cf78597a80c2bd4d7dc2f3f60e58ec62654060d1ae7a5c4f25'),
+    ('202608280001_separate_legacy_activity_enrollment_fee.sql', '2046914a6f164eecc79f0ecd81ab79a9ed48d15de172832896ee81fd0c768f64'),
+    ('202608280002_sync_activity_visual_catalog.sql', '3a1a53ea858c41c722b6ec21fc70ccd7351157145164e33ca9cf26641a112bd4'),
+    ('202608280003_compensation_and_activity_term_currencies.sql', 'eec48dafea3a924b9a2f2ef70e59814a09eb83020783994fac43d00b7c875e00'),
+    ('202608310001_exchange_rates.sql', 'a5e28d12ea69810112bc480d07a7026a8ed323693452cee6559387efe38ba9f4'),
+    ('202608310002_sector_capacity_modes.sql', 'cfd830f3a2bc27f2010d237488de4ca24334792e812cb8cc7aa7243fa346827d'),
+    ('202609010001_expand_activity_visual_catalog.sql', 'bc9ec90ae651e645c8ca2628d35d36675c463042ae78e000be46cff5cc0dd898'),
+    ('202609010002_canonical_liquidity_valuation.sql', '1828bb71377045bc480a88223253d0de443d4662b00117333a7d93616979440b'),
+    ('202609010003_exchange_rate_usage_components.sql', 'a1926ed98d679de4a6ce08587bfc34beaa8bb95a0169d2c27a2e944435d16dde'),
+    ('202609010004_explicit_billing_modes.sql', 'de380c5496d867d2852282188aed2293f323347a11b6663b5a6733016eae15ae'),
+    ('202609010005_commercial_plan_display_metadata.sql', 'c795246ed991ac92e3f3c530de1e50e28709343c0e1bddb7ca1d210b738dde87')
 -- MIGRATION_MANIFEST_VALUES:END
 ;
 DO $$ DECLARE v_mismatches bigint; BEGIN

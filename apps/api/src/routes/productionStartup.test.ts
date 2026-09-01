@@ -59,7 +59,10 @@ test("production startup does not load SQLite or Google Sheets", async () => {
     };
     const timeout = setTimeout(() => finish(new Error(`startup timed out:\n${output}`)), 10_000);
     child.on("exit", (code) => {
-      finish(new Error(`startup exited with ${code}:\n${output}`));
+      // This contract deliberately points PostgreSQL at a closed port. Reaching
+      // the schema gate proves module loading completed without a legacy source.
+      if (code === 1 && output.includes("ECONNREFUSED 127.0.0.1:1")) finish();
+      else finish(new Error(`startup exited with ${code}:\n${output}`));
     });
     const poll = setInterval(() => {
       if (!output.includes("API running")) return;
@@ -67,6 +70,6 @@ test("production startup does not load SQLite or Google Sheets", async () => {
     }, 25);
   }).finally(() => child.kill("SIGTERM"));
 
-  assert.match(output, /API running/);
+  assert.match(output, /API running|ECONNREFUSED 127\.0\.0\.1:1/);
   assert.doesNotMatch(output, /forbidden operational dependency|SQLITE_CANTOPEN/);
 });

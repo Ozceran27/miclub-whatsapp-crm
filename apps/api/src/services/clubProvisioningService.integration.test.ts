@@ -6,7 +6,7 @@ import { provisionClub, type TransactionClient } from "./clubProvisioningService
 
 const input = { firstName: "Ana", lastName: "Pérez", dni: "12345678", phone: "1155555555", email: "ana@example.com", club: { name: "Club Norte" } };
 
-type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; categories: string[]; employees: { membershipId: string; paymentMode: string; monthlyFixedAmount: null }[] };
+type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; categories: string[]; employees: { membershipId: string; hasFixedCompensation: boolean; fixedCompensationAmount: null }[] };
 const emptyState = (): State => ({ clubs: [], subscriptions: new Map(), roles: new Map(), onboarding: [], memberships: [], categories: [], employees: [] });
 
 /** Small transactional adapter: it verifies the cross-statement provisioning contract without requiring a developer database. */
@@ -29,8 +29,8 @@ const harness = (failAt = -1) => {
     if (sql.includes("miclub.people")) return { rows: [{ id: "person-id" }] };
     if (sql.includes("user_club_memberships")) { state.memberships.push(String(values?.[2])); return { rows: [{ id: "membership-id" }] }; }
     if (sql.includes("miclub.employees")) {
-      assert.match(sql, /payment_mode[\s\S]*monthly_fixed_amount[\s\S]*'VARIABLE', null/);
-      state.employees.push({ membershipId: String(values?.[3]), paymentMode: "VARIABLE", monthlyFixedAmount: null });
+      assert.match(sql, /has_fixed_compensation[\s\S]*fixed_compensation_amount[\s\S]*false, null, null/);
+      state.employees.push({ membershipId: String(values?.[3]), hasFixedCompensation: false, fixedCompensationAmount: null });
     }
     if (sql.includes("insert into miclub.movement_categories")) state.categories = JSON.parse(String(values?.[1])).map(({ code }: { code: string }) => code);
     return { rows: [] };
@@ -65,7 +65,7 @@ test("el provisioning permite crear después trabajadores e instructores con sus
   assert.deepEqual(integration.state().onboarding, ["club-id"]);
   assert.equal(integration.state().memberships[0], "director-id", "la membresía propietaria conserva DIRECTOR");
   assert.deepEqual(integration.state().employees[0], {
-    membershipId: "membership-id", paymentMode: "VARIABLE", monthlyFixedAmount: null,
+    membershipId: "membership-id", hasFixedCompensation: false, fixedCompensationAmount: null,
   }, "el Director conserva su membresía y una compensación inicial válida sin monto inventado");
   assert.deepEqual(integration.state().categories, MOVEMENT_CATEGORY_CATALOG.map(([code]) => code));
 });

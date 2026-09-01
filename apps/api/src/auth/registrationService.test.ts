@@ -50,7 +50,7 @@ test("bootstrap crea integralmente Director, persona, usuario, membresía, emple
   assert.match(sql, /miclub\.people/); assert.match(sql, /miclub\.users/);
   assert.match(sql, /miclub\.user_club_memberships/); assert.doesNotMatch(sql, /miclub\.club_memberships/);
   assert.match(sql, /miclub\.employees/);
-  assert.match(sql, /employment_start_date, payment_mode, monthly_fixed_amount[\s\S]*current_date, 'VARIABLE', null/);
+  assert.match(sql, /employment_start_date, has_fixed_compensation, fixed_compensation_amount, fixed_compensation_frequency[\s\S]*current_date, false, null, null/);
   assert.match(sql, /Administración/); assert.match(sql, /Tesorería/); assert.match(sql, /Áreas Comunes/); assert.match(sql, /is_system/);
   assert.match(sql, /miclub\.club_onboarding[\s\S]*NOT_STARTED/);
   assert.match(sql, /miclub\.club_subscriptions[\s\S]*code = 'FREE'[\s\S]*commercial_class = 'free'/);
