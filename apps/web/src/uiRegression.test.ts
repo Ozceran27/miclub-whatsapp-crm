@@ -83,7 +83,7 @@ test('la utilidad sr-only conserva los nombres accesibles de selectores visuales
   assert.match(styles, /\.sr-only\.sr-only-focusable:focus-within/);
 
   assert.match(sectors, /<span className="sr-only">\{icon\.name\}<\/span>/);
-  assert.match(sectors, /<span className="sr-only">\{color\.name\}, \{color\.hex\}<\/span>/);
+  assert.match(sectors, /<span className="sr-only">\{color\.name\}/);
   assert.match(activities, /<span className="sr-only">\{key\}<\/span>/);
 });
 
@@ -99,24 +99,29 @@ test('los catálogos de iconos son adaptables y no generan scroll horizontal', a
   assert.doesNotMatch(styles, /\.draft-icon-grid\s*\{[^}]*repeat\(\d+,/s, 'La cuadrícula no debe fijar columnas en escritorio ni móvil');
   assert.match(styles, /\.draft-icon-grid label\s*\{[^}]*aspect-ratio:\s*1[^}]*min-height:\s*44px[^}]*min-width:\s*44px/s);
   assert.match(styles, /\.draft-form fieldset\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*hidden/s);
-  assert.match(styles, /\.draft-icon-catalog,\.draft-sector-icons\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*hidden/s);
-  assert.match(activities, /className="draft-icon-catalog"/);
-  assert.match(activities, /categories\.map\(category=><section/);
+  assert.match(styles, /\.draft-icon-grid--catalog\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/s);
+  assert.match(styles, /\.draft-sector-icons\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*hidden/s);
+  assert.match(activities, /className="draft-icon-grid draft-icon-grid--catalog"/);
+  assert.match(activities, /ACTIVITY_VISUAL_CATALOG\.map/);
   assert.match(activities, /aria-label=\{`\$\{key\} · \$\{category\}`\}/);
 });
 
-test('los modales de borradores usan superficies y texto semánticos en ambos temas', async () => {
+test('los modales de borradores usan superficies opacas específicas en ambos temas', async () => {
   const styles = await readFile(new URL('./styles.css', import.meta.url), 'utf8');
   const expectedThemeTokens = {
     dark: {
       '--color-card': 'rgba(19, 31, 53, 0.88)',
       '--color-card-muted': 'rgba(9, 18, 34, 0.46)',
+      '--draft-modal-surface': '#132035',
+      '--draft-modal-surface-muted': '#0d192b',
       '--color-text': '#f0f4ff',
       '--color-text-strong': '#f4f8ff',
     },
     light: {
       '--color-card': 'rgba(255, 255, 255, 0.96)',
       '--color-card-muted': '#eef3f8',
+      '--draft-modal-surface': '#ffffff',
+      '--draft-modal-surface-muted': '#eef3f8',
       '--color-text': '#152033',
       '--color-text-strong': '#0b1220',
     },
@@ -137,7 +142,53 @@ test('los modales de borradores usan superficies y texto semánticos en ambos te
     assert.doesNotMatch(declarations, /background(?:-color)?\s*:\s*(?:#fff(?:fff)?\b|white\b|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))/i, `Fondo blanco hardcodeado en ${selector.trim()}`);
   }
 
-  assert.match(styles, /\.draft-modal\s*\{[^}]*background:\s*var\(--color-card\)[^}]*color:\s*var\(--color-text\)/s);
-  assert.match(styles, /\.draft-modal\s*>\s*header,\.draft-modal__footer\s*\{[^}]*background:\s*var\(--color-card\)/s);
-  assert.match(styles, /\.draft-modal__body\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/s);
+  const opaqueSelectors = [
+    '.draft-modal',
+    '.draft-modal > header,.draft-modal__footer',
+    '.draft-modal__body',
+    '.draft-form fieldset',
+    '.draft-modal :is(button,input,select),.draft-form input,.draft-form select',
+    '.draft-color-control',
+    '.draft-palette',
+    '.draft-icon-grid--catalog',
+    '.draft-sector-icons',
+    '.draft-photo',
+  ];
+  const rules = [...styles.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+  for (const selector of opaqueSelectors) {
+    const declarations = rules.find(([, candidate]) => candidate.trim() === selector)?.[2];
+    assert.ok(declarations, `Falta la superficie de ${selector}`);
+    assert.match(declarations, /background:\s*var\(--draft-modal-surface(?:-muted)?\)/);
+    assert.doesNotMatch(declarations, /color-mix\([^;]*transparent|\bopacity\s*:/, `La superficie de ${selector} no es opaca`);
+  }
+
+  assert.match(styles, /\.draft-modal-backdrop\s*\{[^}]*background:\s*color-mix\(in srgb,#000 58%,transparent\)/s);
+  assert.doesNotMatch(styles.match(/\.draft-modal\s*\{([^}]*)\}/)?.[1] ?? '', /\bopacity\s*:/);
+  assert.match(styles, /\.draft-modal__body\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto[^}]*overscroll-behavior:\s*contain/s);
+  assert.match(styles, /\.draft-modal\s*\{[^}]*grid-template-rows:\s*auto minmax\(0,1fr\) auto[^}]*overflow:\s*hidden/s);
+  assert.match(styles, /\.draft-modal\s*>\s*header,\.draft-modal__footer\s*\{[^}]*position:\s*relative[^}]*z-index:\s*1/s);
+});
+
+test('regresión visual: Sectores, Trabajadores y Actividades cubren temas y viewports contrastantes', async () => {
+  const [styles, modal, sectors, workers, activities] = await Promise.all([
+    readFile(new URL('./styles.css', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/DraftEditorModal.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/SectorDraftList.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/WorkerDraftList.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/Onboarding/editors/ActivityDraftList.tsx', import.meta.url), 'utf8'),
+  ]);
+  const scenarios = ['Sectores', 'Trabajadores', 'Actividades'].flatMap(dialog =>
+    ['dark', 'light'].flatMap(theme => ['desktop', 'mobile'].map(viewport => ({ dialog, theme, viewport }))),
+  );
+
+  assert.equal(scenarios.length, 12, 'La matriz visual debe cubrir 3 diálogos, 2 temas y 2 viewports');
+  assert.match(sectors, /title=\{editing \? 'Editar sector' : 'Agregar Nuevo Sector'\}/);
+  assert.match(workers, /title=\{editing\?'Editar trabajador o instructor':'Agregar Nuevo Trabajador\/Instructor'\}/);
+  assert.match(activities, /title=\{editing\?'Editar actividad':'Agregar Nueva Actividad'\}/);
+  assert.match(modal, /className="draft-modal-backdrop"/);
+  assert.match(modal, /className=\{`draft-modal draft-modal--\$\{size\}`\}/);
+  assert.match(modal, /className="draft-modal__body"/);
+  assert.match(modal, /className="draft-modal__footer"/);
+  assert.match(styles, /\.draft-modal-backdrop\s*\{[^}]*z-index:\s*1100/s, 'El diálogo debe apilarse sobre contenido contrastante');
+  assert.match(styles, /\.draft-modal-backdrop\s*\{\s*align-items:flex-end; padding:0;/s);
 });
