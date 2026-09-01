@@ -66,7 +66,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202608280002_sync_activity_visual_catalog.sql` | Sincroniza iconos de actividad con el contrato compartido, canoniza fútbol y conserva aliases para datos históricos. | `3a1a53ea858c41c722b6ec21fc70ccd7351157145164e33ca9cf26641a112bd4` | Después de `202608130001_version_activity_terms.sql`. |
 | `202608280003_compensation_and_activity_term_currencies.sql` | Explicita y valida la moneda de remuneraciones fijas y términos FIXED sin alterar versiones históricas. | `eec48dafea3a924b9a2f2ef70e59814a09eb83020783994fac43d00b7c875e00` | Después de `202608210001_operational_currency_opening_balances.sql` y `202608270002_employee_compensation_and_photos.sql` y `202608270003_activity_fee_frequencies.sql`. |
 | `202608310001_exchange_rates.sql` | Persiste cotizaciones oficiales inmutables, estado de sincronización y referencias de valoración histórica. | `a5e28d12ea69810112bc480d07a7026a8ed323693452cee6559387efe38ba9f4` | Después de `202608140008_canonical_onboarding_and_opening_balances.sql`. |
-| `202608310002_sector_capacity_modes.sql` | Normaliza modos de capacidad y centraliza récord, utilización y ociosidad por sector y tenant. | `331fc2f30d975e3901ee17724ca5ea6e06cdee4ebb023f963dc0cb67e0619954` | Después de `202608210004_sector_templates_and_lifecycle.sql` y `202608310001_exchange_rates.sql`. |
+| `202608310002_sector_capacity_modes.sql` | Normaliza modos de capacidad y centraliza récord, utilización y ociosidad por sector y tenant. | `a2884614d30c6e55bc2b5f6419d99d761f21d0c5152e3ba5818a1540a1fb8775` | Después de `202608210004_sector_templates_and_lifecycle.sql` y `202608310001_exchange_rates.sql`. |
 
 <!-- POST_ADMIN_MIGRATIONS:END -->
 

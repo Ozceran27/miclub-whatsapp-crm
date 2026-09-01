@@ -22,4 +22,6 @@ test("la vista canónica aísla tenant, convierte moneda y no suma meses con cot
   assert.match(sql,/m\.operational_status='COMPLETADO'/);
   assert.match(sql,/m\.movement_type='INGRESOS'/);
   assert.match(sql,/is_internal_transfer/);
+  assert.match(sql,/movement_categories mc ON mc\.id=m\.category_id AND mc\.club_id=m\.club_id/);
+  assert.doesNotMatch(sql,/m\.category\b/);
 });

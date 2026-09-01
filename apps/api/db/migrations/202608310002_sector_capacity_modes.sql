@@ -39,6 +39,7 @@ SELECT m.club_id, m.sector_id,
        count(*) FILTER (WHERE coalesce(m.currency_code,c.base_currency_code)<>c.base_currency_code AND er.id IS NULL)::integer AS missing_exchange_rate_count
 FROM miclub.movements m
 JOIN miclub.clubs c ON c.id=m.club_id
+LEFT JOIN miclub.movement_categories mc ON mc.id=m.category_id AND mc.club_id=m.club_id
 LEFT JOIN LATERAL (
   SELECT r.* FROM miclub.exchange_rates r
   WHERE r.rate_date<=m.movement_date::date AND r.rate_type='official'
@@ -50,7 +51,7 @@ WHERE m.sector_id IS NOT NULL AND m.movement_type='INGRESOS'
   AND m.operational_status='COMPLETADO'
   AND lower(coalesce(m.financial_status::text,'')) NOT IN ('pendiente','cancelado','anulado')
   AND coalesce(m.source_payload->>'is_internal_transfer','false') <> 'true'
-  AND upper(coalesce(m.category,'')) NOT IN ('CAPITAL INICIAL','TRANSFERENCIA INTERNA')
+  AND upper(coalesce(mc.code,mc.name,'')) NOT IN ('CAPITAL_INICIAL','CAPITAL INICIAL','TRANSFERENCIA_INTERNA','TRANSFERENCIA INTERNA')
 GROUP BY m.club_id,m.sector_id,date_trunc('month', m.movement_date::timestamp AT TIME ZONE coalesce(nullif(c.timezone,''),'America/Argentina/Buenos_Aires'));
 
 CREATE OR REPLACE VIEW miclub.v_sector_capacity_metrics AS
