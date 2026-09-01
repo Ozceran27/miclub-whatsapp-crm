@@ -24,6 +24,12 @@ npm run dev
 
 Configure en `.env` una conexión PostgreSQL, un `SESSION_SECRET` local de al menos 32 caracteres y los valores marcados como obligatorios en `.env.example`. `npm run db:migrate` carga ese mismo `.env`, pero requiere además la credencial administrativa independiente `ADMIN_DATABASE_URL` (o el bloque `PGADMIN*`); no utiliza la credencial runtime `DATABASE_URL` para ejecutar DDL. La API usa `http://localhost:4000` y Vite `http://localhost:5173`.
 
+`npm run dev` es el comando de desarrollo local y permite usar
+`BILLING_MODE=sandbox`. En cambio, `npm run start` ejecuta el artefacto de
+`dist` y por diseño aplica todas las validaciones de producción, aunque se lo
+ejecute desde una PC local. No use `sandbox` con ese comando salvo que sea un
+staging HTTPS expresamente autorizado.
+
 ## Validación y ejecución
 
 ```bash
@@ -34,6 +40,25 @@ npm run start
 ```
 
 `npm run start` sirve también `apps/web/dist`. Para un entorno desplegado use `NODE_ENV=production`, una `PUBLIC_APP_URL` HTTPS y autenticación habilitada; el validador de arranque falla de forma cerrada si falta esa configuración.
+
+### Modos de facturación y error de arranque
+
+Elija **una** configuración coherente:
+
+- Desarrollo local (`npm run dev`): `BILLING_MODE=sandbox` y
+  `DEPLOYMENT_ENV=local` permiten probar los planes pagos sin una pasarela.
+- Producción (`npm run start`): use `BILLING_MODE=disabled` para ofrecer sólo
+  FREE, o `BILLING_MODE=live` para dejar los planes pagos pendientes de una
+  confirmación real.
+- Staging compilado (`npm run start`): `BILLING_MODE=sandbox` sólo se admite
+  junto con `DEPLOYMENT_ENV=staging` y
+  `BILLING_SANDBOX_STAGING_AUTHORIZATION=<secreto-aleatorio-de-32+-caracteres>`.
+
+Si aparece `BILLING_MODE=sandbox requiere DEPLOYMENT_ENV=staging`, no elimine
+el validador. Para una ejecución local cambie a `npm run dev`; para producción
+cambie el modo a `disabled`/`live`; y sólo en un staging real configure la
+autorización anterior. Después de modificar `.env`, detenga y vuelva a iniciar
+el proceso. No es necesario recompilar porque `.env` se lee al arrancar.
 
 ## Importación XLSX
 

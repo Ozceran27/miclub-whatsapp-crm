@@ -68,6 +68,36 @@ test("producción acepta la configuración segura mínima", () => {
   }
 });
 
+test("producción rechaza billing sandbox fuera de un staging autorizado", () => {
+  const original = { ...process.env };
+  try {
+    Object.assign(process.env, {
+      AUTH_ENABLED: "true",
+      SESSION_SECRET: "x".repeat(32),
+      DATABASE_URL: "postgres://example.invalid/db",
+      DATA_SOURCE: "postgres",
+      CRM_SOURCE: "postgres",
+      PUBLIC_APP_URL: "https://gestion.meclub.com.ar",
+      BOOTSTRAP_DIRECTOR_ENABLED: "false",
+      BILLING_MODE: "sandbox",
+      DEPLOYMENT_ENV: "local",
+      BILLING_SANDBOX_STAGING_AUTHORIZATION: "",
+    });
+    assert.throws(
+      () => validateRuntimeConfig({ isProduction: true }),
+      /BILLING_MODE=sandbox requiere DEPLOYMENT_ENV=staging/,
+    );
+
+    Object.assign(process.env, {
+      DEPLOYMENT_ENV: "staging",
+      BILLING_SANDBOX_STAGING_AUTHORIZATION: "x".repeat(32),
+    });
+    assert.doesNotThrow(() => validateRuntimeConfig({ isProduction: true }));
+  } finally {
+    process.env = original;
+  }
+});
+
 test("producción exige PostgreSQL para paneles y CRM", () => {
   const original = { ...process.env };
   try {
