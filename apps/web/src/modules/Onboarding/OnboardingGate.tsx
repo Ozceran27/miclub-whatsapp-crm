@@ -11,7 +11,7 @@ export const createInitialOnboardingDraft = (): OnboardingDraft => ({
   contractVersion: ONBOARDING_DRAFT_CONTRACT_VERSION,
   idempotencyKey: crypto.randomUUID(), openingBalances: { currency: 'ARS', cash: 0, bank: 0, usdCash: 0 },
   selectedPlanCode: 'FREE',
-  sectors: PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:'#2563EB',status:'active'})), workers: [], activities: [], pendingImport: null,
+  sectors: PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:'#2563EB',status:'active',capacityMode:'INCOME' as const,configuredCapacity:null})), workers: [], activities: [], pendingImport: null,
 });
 
 export function OnboardingGate({ children }: { children: ReactNode }) {

@@ -19,7 +19,7 @@ export type SectorUpdate = Partial<{
   icon: string | null;
   color: string;
   managerPersonId: string | null;
-  capacityMode: "none" | "fixed" | "unlimited";
+  capacityMode: "ENROLLMENTS" | "INCOME";
   configuredCapacity: number | null;
   status: "active" | "inactive" | "under_repair";
 }>;

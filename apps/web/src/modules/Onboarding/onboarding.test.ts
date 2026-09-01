@@ -9,7 +9,7 @@ import { getOnboardingSteps, isSkippableStep } from './steps';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
 import { CurrencyFlag } from './CurrencyFlag';
 import { CURRENCY_PRESENTATIONS, formatCurrencyLabel, getCurrencyAfterKey, getCurrencyPrefix } from './currencyPresentation';
-const draft={contractVersion:1 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
+const draft={contractVersion:2 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[],pendingImport:null};
 const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
 
 test('define siete pasos y solo permite omitir los pasos opcionales', () => {
@@ -58,7 +58,7 @@ test('al completar oculta el modal antes de refrescar el dashboard y reemplazar 
 test('cada montaje empieza en paso 1 y crea un borrador temporal nuevo', () => {
   const gate = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const firstMount = createInitialOnboardingDraft();
-  firstMount.sectors.push({clientId:'temporary',code:'temporal',name:'Temporal',iconKey:'other',color:'#000000',status:'active',isSystem:false});
+  firstMount.sectors.push({clientId:'temporary',code:'temporal',name:'Temporal',iconKey:'other',color:'#000000',status:'active',isSystem:false,capacityMode:'INCOME',configuredCapacity:null});
   const secondMount = createInitialOnboardingDraft();
   assert.notEqual(secondMount.idempotencyKey, firstMount.idempotencyKey);
   assert.deepEqual(secondMount.sectors.map(({code,isSystem})=>({code,isSystem})), [

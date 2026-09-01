@@ -42,7 +42,10 @@ const listDefinitions = {
     sectorColumn: "s.id",
     clubColumn: "s.club_id",
     select: `s.id, s.manager_person_id, s.code, s.name, s.icon_key, s.color, s.opening_time, s.closing_time,
-      s.max_capacity, s.municipal_status, s.financial_status, s.operational_status,
+      s.max_capacity, s.capacity_mode, s.configured_capacity,
+      capacity.maximum_capacity, capacity.current_usage, capacity.utilization_percentage,
+      capacity.idle_percentage, capacity.data_status as capacity_data_status,
+      s.municipal_status, s.financial_status, s.operational_status,
       s.uses_enrollments, s.uses_activities, s.notes, s.created_at, s.updated_at,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name,
       (select count(*)::integer from miclub.activities a
@@ -53,7 +56,7 @@ const listDefinitions = {
         where e.club_id = s.club_id and a.sector_id = s.id
           and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as active_enrollments_count,
       true as is_system`,
-    from: "miclub.sectors s left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id",
+    from: "miclub.sectors s left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id left join miclub.v_sector_capacity_metrics capacity on capacity.club_id=s.club_id and capacity.sector_id=s.id",
     orderBy: "s.name asc, s.id asc",
     filters: {
       search: textSearch(["s.code", "s.name", "s.notes"]),

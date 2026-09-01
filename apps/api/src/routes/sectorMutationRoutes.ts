@@ -46,8 +46,10 @@ router.patch("/sectors/:id", requirePermission(PERMISSIONS.SECTORS_EDIT), requir
     if (body[field] !== undefined && body[field] !== null && typeof body[field] !== "string") return fail(res, 400, "VALIDATION_ERROR", `${field} debe ser texto.`);
   }
   if (body.managerPersonId !== undefined && body.managerPersonId !== null && (typeof body.managerPersonId !== "string" || !UUID.test(body.managerPersonId))) return fail(res, 400, "VALIDATION_ERROR", "managerPersonId inválido.");
-  if (body.capacityMode !== undefined && (typeof body.capacityMode !== "string" || !["none", "fixed", "unlimited"].includes(body.capacityMode))) return fail(res, 400, "VALIDATION_ERROR", "capacityMode inválido.");
-  if (body.configuredCapacity !== undefined && body.configuredCapacity !== null && (!Number.isInteger(body.configuredCapacity) || Number(body.configuredCapacity) < 0)) return fail(res, 400, "VALIDATION_ERROR", "configuredCapacity debe ser un entero no negativo.");
+  const changesCapacity = body.capacityMode !== undefined || body.configuredCapacity !== undefined;
+  if (changesCapacity && !(body.capacityMode === "INCOME" && body.configuredCapacity === null)
+    && !(body.capacityMode === "ENROLLMENTS" && Number.isSafeInteger(body.configuredCapacity) && Number(body.configuredCapacity) >= 1))
+    return fail(res, 400, "VALIDATION_ERROR", "La capacidad debe ser INCOME con configuredCapacity null o ENROLLMENTS con un entero mayor o igual a 1.");
   const input = { ...body, name: body.name.trim() } as SectorUpdate;
   delete (input as Record<string, unknown>).updatedAt;
   return respond(res, await updateSector(actor(req), id, version, input));

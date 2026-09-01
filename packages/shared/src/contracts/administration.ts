@@ -50,6 +50,10 @@ export interface AdministrationCapacity {
   occupied: number;
   available: number;
   occupancyRate: number;
+  /** Average of per-sector canonical utilization; null when no sector has data. */
+  sectorUtilizationAverage: number | null;
+  sectorsWithData: number;
+  sectorsWithoutData: number;
   sectors: AdministrationCapacityItem[];
   activities: AdministrationCapacityItem[];
 }
@@ -61,6 +65,11 @@ export interface AdministrationCapacityItem {
   occupied: number;
   available: number | null;
   occupancyRate: number | null;
+  capacityMode?: "ENROLLMENTS" | "INCOME" | null;
+  currentUsage?: number | null;
+  utilizationPercentage?: number | null;
+  idlePercentage?: number | null;
+  dataStatus?: "AVAILABLE" | "NO_DATA" | "NOT_CONFIGURED";
 }
 
 export interface AdministrationRankingItem {
@@ -146,6 +155,13 @@ export interface AdministrationSectorDto {
   openingTime?: string | null;
   closingTime?: string | null;
   maxCapacity?: number | null;
+  capacityMode?: "ENROLLMENTS" | "INCOME" | null;
+  configuredCapacity?: number | null;
+  maximumCapacity?: number | null;
+  currentUsage?: number | null;
+  utilizationPercentage?: number | null;
+  idlePercentage?: number | null;
+  capacityDataStatus?: "AVAILABLE" | "NO_DATA" | "NOT_CONFIGURED";
   currentOccupancy?: number | null;
   occupancyRate?: number | null;
   activitiesCount?: number;

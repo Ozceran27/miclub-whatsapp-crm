@@ -12,18 +12,15 @@ const statusLabel = (sector: AdministrationSectorDto) => {
   return status.charAt(0).toUpperCase() + status.slice(1).toLocaleLowerCase('es-AR').replaceAll('_', ' ');
 };
 
-const capacityType = ({ maxCapacity, usesEnrollments }: AdministrationSectorDto) => {
-  if (!usesEnrollments) return 'Sin control de cupo';
-  return maxCapacity == null ? 'Ilimitada' : 'Cupo máximo';
-};
+const capacityType = ({ capacityMode }: AdministrationSectorDto) => capacityMode === 'INCOME' ? 'Ingresos' : capacityMode === 'ENROLLMENTS' ? 'Espacio Disponible' : 'Sin configurar';
 
 const schedule = ({ openingTime, closingTime }: AdministrationSectorDto) =>
   openingTime && closingTime ? `${openingTime.slice(0, 5)}–${closingTime.slice(0, 5)}` : 'Sin horario';
 
-const usedCapacity = ({ currentOccupancy, activeEnrollmentsCount, maxCapacity }: AdministrationSectorDto) => {
-  const used = currentOccupancy ?? activeEnrollmentsCount ?? 0;
-  return maxCapacity == null ? integer.format(used) : `${integer.format(used)} / ${integer.format(maxCapacity)}`;
-};
+const usedCapacity = ({ capacityDataStatus, currentUsage, maximumCapacity, utilizationPercentage }: AdministrationSectorDto) =>
+  capacityDataStatus !== 'AVAILABLE' || maximumCapacity == null || utilizationPercentage == null
+    ? 'Sin datos'
+    : `${integer.format(currentUsage ?? 0)} / ${integer.format(maximumCapacity)} · ${integer.format(utilizationPercentage)}%`;
 
 export function SectorList() {
   const [response, setResponse] = useState<AdministrationSectorsResponse | null>(null);

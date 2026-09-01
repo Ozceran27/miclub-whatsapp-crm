@@ -49,9 +49,9 @@ export function AdministrationHeaderCards({ summary }: Props) {
     {
       label: 'Capacidad operativa',
       icon: '🏟️',
-      subtitle: summary.capacity ? `${formatInteger(summary.capacity.occupied)} ocupados / ${formatInteger(summary.capacity.totalCapacity)} cupos` : 'Cupos operativos',
-      value: formatPercent(summary.capacity?.occupancyRate),
-      detail: summary.capacity ? `${formatInteger(summary.capacity.available)} disponibles` : 'Sin capacidad configurada',
+      subtitle: summary.capacity?.sectorsWithData ? `${summary.capacity.sectorsWithData} sectores con datos` : 'Capacidad por ingresos o espacio',
+      value: formatPercent(summary.capacity?.sectorUtilizationAverage),
+      detail: summary.capacity?.sectors.length && !summary.capacity.sectorsWithData ? 'Sin historial suficiente' : `${summary.capacity?.sectorsWithoutData ?? 0} sectores sin datos`,
       variant: 'projected'
     },
     {

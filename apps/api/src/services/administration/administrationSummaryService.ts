@@ -1,10 +1,28 @@
 import type { AdministrationMetricComparison, AdministrationSummaryResponse, AdministrationTrendDirection } from "@miclub/shared";
 import { getAdministrationSummaryRows } from "../../repositories/administration/administrationSummaryRepository.js";
+import { getAdministrationSectorCapacities } from "../../repositories/administration/administrationReadRepository.js";
 import { getLastCompleteMonthWindows } from "../economyDomain.js";
 
 const toNumber = (value: string | number | null | undefined): number => Number(value ?? 0);
 
 const metric = (value: number, comparison: AdministrationMetricComparison | null = null) => ({ value, comparison });
+
+export type SectorCapacityInput =
+  | { capacityMode: "ENROLLMENTS"; configuredCapacity: number; activeEnrollments: number }
+  | { capacityMode: "INCOME"; historicalClosedMonthlyIncome: readonly number[]; currentMonthIncome: number };
+
+/** Mirrors the canonical SQL read model. A missing/zero income record is unknown,
+ * while enrollment overcapacity intentionally keeps utilization above 100%. */
+export const calculateSectorCapacity = (input: SectorCapacityInput) => {
+  const maximumCapacity = input.capacityMode === "ENROLLMENTS"
+    ? input.configuredCapacity
+    : input.historicalClosedMonthlyIncome.length ? Math.max(...input.historicalClosedMonthlyIncome) : null;
+  if (maximumCapacity == null || !Number.isFinite(maximumCapacity) || maximumCapacity <= 0)
+    return { maximumCapacity: null, currentUsage: null, utilizationPercentage: null, idlePercentage: null, dataStatus: "NO_DATA" as const };
+  const currentUsage = input.capacityMode === "ENROLLMENTS" ? input.activeEnrollments : input.currentMonthIncome;
+  const utilizationPercentage = currentUsage * 100 / maximumCapacity;
+  return { maximumCapacity, currentUsage, utilizationPercentage, idlePercentage: Math.max(0, 100 - utilizationPercentage), dataStatus: "AVAILABLE" as const };
+};
 
 const comparison = (current: number, previous: number | null): AdministrationMetricComparison => {
   const absoluteChange = previous === null ? null : current - previous;
@@ -15,13 +33,15 @@ const comparison = (current: number, previous: number | null): AdministrationMet
 
 export const getAdministrationSummary = async (clubId: string): Promise<AdministrationSummaryResponse> => {
   const months = getLastCompleteMonthWindows();
-  const rows = await getAdministrationSummaryRows(clubId, months.previousStart, months.currentStart, months.currentEnd);
+  const [rows, sectorCapacityRows] = await Promise.all([getAdministrationSummaryRows(clubId, months.previousStart, months.currentStart, months.currentEnd),getAdministrationSectorCapacities(clubId)]);
   const previousGrowth = rows.growth[0];
   const currentGrowth = rows.growth[1];
   const totalCapacity = toNumber(rows.capacity.total_capacity);
   const occupied = toNumber(rows.capacity.occupied);
   const available = Math.max(totalCapacity - occupied, 0);
   const occupancyRate = totalCapacity > 0 ? (occupied / totalCapacity) * 100 : 0;
+  const sectorUtilizations = sectorCapacityRows.flatMap(row => row.data_status === "AVAILABLE" && row.utilization_percentage != null ? [Number(row.utilization_percentage)] : []);
+  const sectorUtilizationAverage = sectorUtilizations.length ? sectorUtilizations.reduce((sum,value)=>sum+value,0)/sectorUtilizations.length : null;
 
   return {
     cards: [
@@ -30,7 +50,6 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
       { id: "new-enrollments", label: "Nuevas", value: rows.enrollments.new_enrollments, tone: "neutral" },
       { id: "owing-enrollments", label: "Adeudando", value: rows.enrollments.owing, tone: "warning" },
       { id: "abandoned-enrollments", label: "Abandonadas", value: rows.enrollments.abandoned, tone: "negative" },
-      { id: "operational-capacity", label: "Capacidad operativa", value: occupancyRate, formattedValue: `${occupancyRate.toFixed(1)}%`, helperText: `${occupied}/${totalCapacity}`, tone: "info" },
       { id: "workers", label: "Trabajadores", value: rows.entities.workers, tone: "neutral" },
       { id: "users", label: "Usuarios", value: rows.entities.users, tone: "neutral" },
       { id: "roles", label: "Roles", value: rows.entities.roles, tone: "neutral" },
@@ -47,7 +66,7 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
       movements: metric(toNumber(currentGrowth?.movements), comparison(toNumber(currentGrowth?.movements), toNumber(previousGrowth?.movements))),
       enrollments: metric(rows.enrollments.active, comparison(toNumber(currentGrowth?.enrollments), toNumber(previousGrowth?.enrollments))),
     },
-    capacity: { totalCapacity, occupied, available, occupancyRate, sectors: [], activities: [] },
+    capacity: { totalCapacity, occupied, available, occupancyRate, sectorUtilizationAverage, sectorsWithData:sectorUtilizations.length,sectorsWithoutData:sectorCapacityRows.length-sectorUtilizations.length, sectors: sectorCapacityRows.map(row=>({id:row.sector_id,name:row.name,capacity:row.maximum_capacity==null?null:Number(row.maximum_capacity),occupied:Number(row.current_usage??0),available:null,occupancyRate:row.utilization_percentage==null?null:Number(row.utilization_percentage),capacityMode:row.capacity_mode,currentUsage:row.current_usage==null?null:Number(row.current_usage),utilizationPercentage:row.utilization_percentage==null?null:Number(row.utilization_percentage),idlePercentage:row.idle_percentage==null?null:Number(row.idle_percentage),dataStatus:row.data_status})), activities: [] },
     rankings: {
       sectorsByBalance: [],
       sectorsByMovements: [],
