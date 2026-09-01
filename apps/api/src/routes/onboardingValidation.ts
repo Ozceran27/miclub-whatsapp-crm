@@ -56,7 +56,9 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     || draft.sectors.some((sector) => !sector.isSystem && requiredCodes.has(sector.code))) return false;
 
   if (!draft.workers.every((worker) =>
-    typeof worker.firstName === "string" && Boolean(worker.firstName.trim())
+    !Object.keys(worker).some((key) => !["clientId","firstName","lastName","dni","phone","email","password","role","sectorId","hasFixedCompensation","fixedCompensationAmount","fixedCompensationFrequency","currencyCode","employmentStartDate","notes","photoFileId"].includes(key))
+    && (worker.photoFileId == null || clientId(worker.photoFileId))
+    && typeof worker.firstName === "string" && Boolean(worker.firstName.trim())
     && typeof worker.lastName === "string" && Boolean(worker.lastName.trim())
     && typeof worker.dni === "string" && /^\d{7,9}$/.test(worker.dni)
     && typeof worker.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(worker.email)

@@ -32,5 +32,8 @@ export const withTenantTransaction = async <T>(
 ): Promise<T> => withTransaction(async (executor) => {
   // set_config with true is SET LOCAL while keeping the value parameterized.
   await executor.query("SELECT set_config('app.club_id', $1, true)", [clubId]);
+  // New private-file policies use the explicit name while legacy tenant tables
+  // still read app.club_id. Keep both transaction-local settings in sync.
+  await executor.query("SELECT set_config('app.current_club_id', $1, true)", [clubId]);
   return callback(executor);
 }, pool);
