@@ -40,6 +40,8 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
   const occupied = toNumber(rows.capacity.occupied);
   const available = Math.max(totalCapacity - occupied, 0);
   const occupancyRate = totalCapacity > 0 ? (occupied / totalCapacity) * 100 : 0;
+  const sectorUtilizations = sectorCapacityRows.flatMap(row => row.data_status === "AVAILABLE" && row.utilization_percentage != null ? [Number(row.utilization_percentage)] : []);
+  const sectorUtilizationAverage = sectorUtilizations.length ? sectorUtilizations.reduce((sum,value)=>sum+value,0)/sectorUtilizations.length : null;
 
   return {
     cards: [
@@ -48,7 +50,6 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
       { id: "new-enrollments", label: "Nuevas", value: rows.enrollments.new_enrollments, tone: "neutral" },
       { id: "owing-enrollments", label: "Adeudando", value: rows.enrollments.owing, tone: "warning" },
       { id: "abandoned-enrollments", label: "Abandonadas", value: rows.enrollments.abandoned, tone: "negative" },
-      { id: "operational-capacity", label: "Capacidad operativa", value: occupancyRate, formattedValue: `${occupancyRate.toFixed(1)}%`, helperText: `${occupied}/${totalCapacity}`, tone: "info" },
       { id: "workers", label: "Trabajadores", value: rows.entities.workers, tone: "neutral" },
       { id: "users", label: "Usuarios", value: rows.entities.users, tone: "neutral" },
       { id: "roles", label: "Roles", value: rows.entities.roles, tone: "neutral" },
@@ -65,7 +66,7 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
       movements: metric(toNumber(currentGrowth?.movements), comparison(toNumber(currentGrowth?.movements), toNumber(previousGrowth?.movements))),
       enrollments: metric(rows.enrollments.active, comparison(toNumber(currentGrowth?.enrollments), toNumber(previousGrowth?.enrollments))),
     },
-    capacity: { totalCapacity, occupied, available, occupancyRate, sectors: sectorCapacityRows.map(row=>({id:row.sector_id,name:row.name,capacity:row.maximum_capacity==null?null:Number(row.maximum_capacity),occupied:Number(row.current_usage??0),available:null,occupancyRate:row.utilization_percentage==null?null:Number(row.utilization_percentage),capacityMode:row.capacity_mode,currentUsage:row.current_usage==null?null:Number(row.current_usage),utilizationPercentage:row.utilization_percentage==null?null:Number(row.utilization_percentage),idlePercentage:row.idle_percentage==null?null:Number(row.idle_percentage),dataStatus:row.data_status})), activities: [] },
+    capacity: { totalCapacity, occupied, available, occupancyRate, sectorUtilizationAverage, sectorsWithData:sectorUtilizations.length,sectorsWithoutData:sectorCapacityRows.length-sectorUtilizations.length, sectors: sectorCapacityRows.map(row=>({id:row.sector_id,name:row.name,capacity:row.maximum_capacity==null?null:Number(row.maximum_capacity),occupied:Number(row.current_usage??0),available:null,occupancyRate:row.utilization_percentage==null?null:Number(row.utilization_percentage),capacityMode:row.capacity_mode,currentUsage:row.current_usage==null?null:Number(row.current_usage),utilizationPercentage:row.utilization_percentage==null?null:Number(row.utilization_percentage),idlePercentage:row.idle_percentage==null?null:Number(row.idle_percentage),dataStatus:row.data_status})), activities: [] },
     rankings: {
       sectorsByBalance: [],
       sectorsByMovements: [],

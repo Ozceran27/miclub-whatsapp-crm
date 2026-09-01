@@ -50,6 +50,10 @@ export interface AdministrationCapacity {
   occupied: number;
   available: number;
   occupancyRate: number;
+  /** Average of per-sector canonical utilization; null when no sector has data. */
+  sectorUtilizationAverage: number | null;
+  sectorsWithData: number;
+  sectorsWithoutData: number;
   sectors: AdministrationCapacityItem[];
   activities: AdministrationCapacityItem[];
 }

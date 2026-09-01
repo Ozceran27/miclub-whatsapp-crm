@@ -36,9 +36,6 @@ const summarizeActivities = (summary: AdministrationSummaryResponse) => {
 export function AdministrationHeaderCards({ summary }: Props) {
   const enrollmentsComparison = summary.totals?.enrollments?.comparison;
   const growthPoint = summary.trends?.points?.at(-1);
-  const capacities = summary.capacity?.sectors ?? [];
-  const capacityWithData = capacities.filter(item => item.dataStatus === 'AVAILABLE' && item.utilizationPercentage != null);
-  const capacityUtilization = capacityWithData.length ? capacityWithData.reduce((sum,item)=>sum+(item.utilizationPercentage ?? 0),0)/capacityWithData.length : undefined;
   const cards: Card[] = [
     {
       label: 'Inscriptos',
@@ -52,9 +49,9 @@ export function AdministrationHeaderCards({ summary }: Props) {
     {
       label: 'Capacidad operativa',
       icon: '🏟️',
-      subtitle: capacityWithData.length ? `${capacityWithData.length} sectores con datos` : 'Capacidad por ingresos o espacio',
-      value: formatPercent(capacityUtilization),
-      detail: capacities.length && !capacityWithData.length ? 'Sin historial suficiente' : `${capacities.length-capacityWithData.length} sectores sin datos`,
+      subtitle: summary.capacity?.sectorsWithData ? `${summary.capacity.sectorsWithData} sectores con datos` : 'Capacidad por ingresos o espacio',
+      value: formatPercent(summary.capacity?.sectorUtilizationAverage),
+      detail: summary.capacity?.sectors.length && !summary.capacity.sectorsWithData ? 'Sin historial suficiente' : `${summary.capacity?.sectorsWithoutData ?? 0} sectores sin datos`,
       variant: 'projected'
     },
     {

@@ -12,6 +12,10 @@ WHERE capacity_mode IN ('none', 'unlimited') AND configured_capacity IS NULL;
 ALTER TABLE miclub.sectors DROP CONSTRAINT IF EXISTS sectors_capacity_mode_allowed_check;
 ALTER TABLE miclub.sectors DROP CONSTRAINT IF EXISTS sectors_capacity_mode_capacity_consistency_check;
 ALTER TABLE miclub.sectors DROP CONSTRAINT IF EXISTS sectors_configured_capacity_nonnegative_check;
+-- The manual DBeaver path creates these names too. Dropping every target makes
+-- the tracked migration safe to run afterwards (the whole block is atomic).
+ALTER TABLE miclub.sectors DROP CONSTRAINT IF EXISTS sectors_enrollment_capacity_check;
+ALTER TABLE miclub.sectors DROP CONSTRAINT IF EXISTS sectors_income_capacity_check;
 ALTER TABLE miclub.sectors
   ADD CONSTRAINT sectors_capacity_mode_allowed_check CHECK (capacity_mode IS NULL OR capacity_mode IN ('ENROLLMENTS','INCOME')),
   ADD CONSTRAINT sectors_enrollment_capacity_check CHECK (capacity_mode IS DISTINCT FROM 'ENROLLMENTS' OR configured_capacity > 0),
@@ -27,11 +31,12 @@ COMMENT ON COLUMN miclub.sectors.configured_capacity IS 'Límite entero positivo
 CREATE OR REPLACE VIEW miclub.v_sector_monthly_completed_income AS
 SELECT m.club_id, m.sector_id,
        date_trunc('month', m.movement_date::timestamp AT TIME ZONE coalesce(nullif(c.timezone,''),'America/Argentina/Buenos_Aires'))::date AS month,
-       sum(CASE
+       CASE WHEN count(*) FILTER (WHERE coalesce(m.currency_code,c.base_currency_code)<>c.base_currency_code AND er.id IS NULL)>0 THEN NULL ELSE sum(CASE
          WHEN coalesce(m.currency_code,c.base_currency_code)=c.base_currency_code THEN m.amount
          WHEN er.base_currency_code=m.currency_code AND er.quote_currency_code=c.base_currency_code THEN m.amount*er.rate
          WHEN er.quote_currency_code=m.currency_code AND er.base_currency_code=c.base_currency_code THEN m.amount/er.rate
-       END) AS income
+       END) END AS income,
+       count(*) FILTER (WHERE coalesce(m.currency_code,c.base_currency_code)<>c.base_currency_code AND er.id IS NULL)::integer AS missing_exchange_rate_count
 FROM miclub.movements m
 JOIN miclub.clubs c ON c.id=m.club_id
 LEFT JOIN LATERAL (
@@ -80,5 +85,11 @@ SELECT s.club_id,s.id AS sector_id,s.capacity_mode,s.configured_capacity,
       WHEN s.capacity_mode IN ('INCOME','ENROLLMENTS') THEN 'AVAILABLE' ELSE 'NOT_CONFIGURED' END AS data_status
 FROM miclub.sectors s LEFT JOIN enrollment_counts e ON e.club_id=s.club_id AND e.sector_id=s.id
 LEFT JOIN income_rollup r ON r.club_id=s.club_id AND r.sector_id=s.id;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='miclub_runtime') THEN
+    GRANT SELECT ON miclub.v_sector_monthly_completed_income, miclub.v_sector_capacity_metrics TO miclub_runtime;
+  END IF;
+END $$;
 
 COMMIT;
