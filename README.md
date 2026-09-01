@@ -39,6 +39,21 @@ npm run start
 
 La vía soportada es el importador XLSX autenticado. Ejecute siempre dry-run y conserve el hash y reporte del lote antes de confirmar. Google Sheets y SQLite están fuera del runtime productivo; consulte el [runbook XLSX](docs/import-xlsx.md).
 
+## Sincronización de cotizaciones
+
+El conjunto predeterminado `USD/ARS,USD/BRL,USD/EUR` usa respectivamente las
+fuentes oficiales BCRA A 3500, BCB SGS 1 y BCE EXR. Ejecute todos los pares o uno
+solo mediante la variable de ambiente:
+
+```bash
+npm run sync:exchange-rates -w @miclub/api
+EXCHANGE_RATE_SYNC_PAIRS=USD/ARS npm run sync:exchange-rates -w @miclub/api -- 2026-08-28
+```
+
+Las cotizaciones se almacenan siempre como ARS, BRL o EUR por USD; el adaptador
+del BCE invierte su dato USD por EUR. Para URLs, ventanas, reintentos y diagnóstico
+de `miclub.exchange_rate_sync_state`, consulte el [runbook de cotizaciones](docs/exchange-rates.md).
+
 ## Documentación operativa
 
 - [Readiness canónico previo al reset](docs/pre-reset-readiness.md)
@@ -47,6 +62,7 @@ La vía soportada es el importador XLSX autenticado. Ejecute siempre dry-run y c
 - [Tenant canónico](docs/tenant.md)
 - [Onboarding canónico](docs/onboarding.md)
 - [Economía canónica](docs/economy.md)
+- [Cotizaciones oficiales](docs/exchange-rates.md)
 - [Despliegue](docs/deployment-runbook.md)
 - [Runbook de corte PostgreSQL](docs/postgres-cutover-runbook.md)
 - [Archivo histórico (no usar para despliegues nuevos)](docs/history/README.md)
