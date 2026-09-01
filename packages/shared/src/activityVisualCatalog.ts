@@ -12,6 +12,12 @@ export const ACTIVITY_VISUAL_CATALOG: readonly ActivityVisualCatalogItem[] = [
   {key:"sales",glyph:"🛍️",name:"Ventas",category:"Comercio"},{key:"gastronomy",glyph:"🍽️",name:"Gastronomía",category:"Comercio"},{key:"services",glyph:"🛠️",name:"Servicios",category:"Servicios"},{key:"health",glyph:"🩺",name:"Salud",category:"Bienestar"},
   {key:"fitness",glyph:"💪",name:"Fitness",category:"Bienestar"},{key:"meditation",glyph:"🌿",name:"Meditación",category:"Bienestar"},{key:"music",glyph:"🎵",name:"Música",category:"Cultura"},{key:"theater",glyph:"🎭",name:"Teatro",category:"Cultura"},
   {key:"education",glyph:"📚",name:"Educación",category:"Cultura"},{key:"children",glyph:"🧒",name:"Infancias",category:"Comunidad"},{key:"social",glyph:"🤝",name:"Social",category:"Comunidad"},{key:"other",glyph:"✨",name:"Otra actividad",category:"Otros"},
+  {key:"baseball",glyph:"⚾",name:"Béisbol",category:"Deportes"},{key:"softball",glyph:"🥎",name:"Sóftbol",category:"Deportes"},{key:"golf",glyph:"⛳",name:"Golf",category:"Deportes"},{key:"cricket",glyph:"🏏",name:"Críquet",category:"Deportes"},
+  {key:"surfing",glyph:"🏄",name:"Surf",category:"Deportes"},{key:"rowing",glyph:"🚣",name:"Remo",category:"Deportes"},{key:"climbing",glyph:"🧗",name:"Escalada",category:"Deportes"},{key:"skiing",glyph:"⛷️",name:"Esquí",category:"Deportes"},
+  {key:"pilates",glyph:"🤸‍♀️",name:"Pilates",category:"Bienestar"},{key:"spa",glyph:"💆",name:"Spa",category:"Bienestar"},{key:"nutrition",glyph:"🥗",name:"Nutrición",category:"Bienestar"},{key:"therapy",glyph:"🧠",name:"Terapia",category:"Bienestar"},
+  {key:"store",glyph:"🏪",name:"Tienda",category:"Comercio"},{key:"market",glyph:"🛒",name:"Mercado",category:"Comercio"},{key:"cafeteria",glyph:"☕",name:"Cafetería",category:"Comercio"},{key:"tickets",glyph:"🎟️",name:"Entradas",category:"Comercio"},
+  {key:"maintenance",glyph:"🔧",name:"Mantenimiento",category:"Servicios"},{key:"transport",glyph:"🚌",name:"Transporte",category:"Servicios"},{key:"childcare",glyph:"🧸",name:"Cuidado infantil",category:"Servicios"},{key:"consulting",glyph:"💼",name:"Consultoría",category:"Servicios"},
+  {key:"painting",glyph:"🎨",name:"Pintura",category:"Cultura"},{key:"photography",glyph:"📷",name:"Fotografía",category:"Cultura"},{key:"cinema",glyph:"🎬",name:"Cine",category:"Cultura"},{key:"writing",glyph:"✍️",name:"Escritura",category:"Cultura"},
 ] as const;
 
 export const ACTIVITY_ICON_KEY_ALIASES: Readonly<Record<string, string>> = { soccer: "football" };
