@@ -6,7 +6,7 @@ test("el catálogo visual ofrece claves semánticas estables y cobertura mínima
   assert.ok(SECTOR_ICON_CATALOG.length >= 30);
   assert.equal(new Set(SECTOR_ICON_CATALOG.map(icon => icon.key)).size, SECTOR_ICON_CATALOG.length);
   assert.ok(SECTOR_ICON_CATALOG.every(icon => /^[a-z][a-z0-9-]*$/.test(icon.key) && icon.name && icon.glyph));
-  assert.equal(new Set(SECTOR_ICON_CATALOG.map(icon => icon.category)).size, 9);
+  assert.equal(new Set(SECTOR_ICON_CATALOG.map(icon => icon.category)).size, 11);
 });
 
 test("la paleta tiene doce colores nombrados, incluido dorado y plateado", () => {

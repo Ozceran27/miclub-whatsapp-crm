@@ -55,6 +55,7 @@ test("withTenantTransaction configura app.club_id local y parametrizado", async 
   assert.deepEqual(queries, [
     { sql: "BEGIN", params: undefined },
     { sql: "SELECT set_config('app.club_id', $1, true)", params: ["11111111-1111-4111-8111-111111111111"] },
+    { sql: "SELECT set_config('app.current_club_id', $1, true)", params: ["11111111-1111-4111-8111-111111111111"] },
     { sql: "SELECT id FROM miclub.people", params: undefined },
     { sql: "COMMIT", params: undefined },
   ]);

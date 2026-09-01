@@ -69,7 +69,8 @@ test("auditService vincula app.club_id al auditar fuera de una transacción", as
   assert.deepEqual(statements.map(({ sql, params }) => ({ sql: sql.trim().split("\n")[0], params })), [
     { sql: "BEGIN", params: [] },
     { sql: "SELECT set_config('app.club_id', $1, true)", params: ["22222222-2222-4222-8222-222222222222"] },
-    { sql: "INSERT INTO miclub.audit_log (", params: statements[2].params },
+    { sql: "SELECT set_config('app.current_club_id', $1, true)", params: ["22222222-2222-4222-8222-222222222222"] },
+    { sql: "INSERT INTO miclub.audit_log (", params: statements[3].params },
     { sql: "COMMIT", params: [] },
   ]);
 });

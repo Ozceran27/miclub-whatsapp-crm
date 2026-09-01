@@ -1906,6 +1906,46 @@
         "validation",
         "success"
       ],
+      "permission": "onboarding.write",
+      "mutability": "write",
+      "id": "POST /api/onboarding/photos",
+      "method": "POST",
+      "path": "/api/onboarding/photos",
+      "idempotency": "non-idempotent"
+    },
+    {
+      "source": "apps/api/src/routes/onboardingRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "permission": "onboarding.write",
+      "mutability": "write",
+      "id": "DELETE /api/onboarding/photos/:fileId",
+      "method": "DELETE",
+      "path": "/api/onboarding/photos/:fileId",
+      "idempotency": "idempotent"
+    },
+    {
+      "source": "apps/api/src/routes/onboardingRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
       "id": "POST /api/onboarding/complete",
       "method": "POST",
       "path": "/api/onboarding/complete",
