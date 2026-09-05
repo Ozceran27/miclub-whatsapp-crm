@@ -5,11 +5,14 @@ import {
   getAnnualEvolution,
   getClubFinanceSummary,
   getMonthlySummary,
+  getYearlyBreakdownRows,
   getPendingMovements,
   getRankingBySector,
   getRecentMovements,
   getSectorTrends,
 } from "./economyRepository.js";
+import { buildYearlyBreakdown } from "../services/economyService.js";
+import { getRollingInterannualMonthWindow } from "../services/economyDomain.js";
 
 const CLUB_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CLUB_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -128,4 +131,31 @@ test("rankings y trends respetan club, límite, año y joins tenant", async () =
     assert.match(calls[1].sql, /partition by month order by balance desc, income desc/);
     assert.match(calls[1].sql, /rank <= \$2::integer/);
   });
+});
+
+test("la consulta anual acumula un egreso CMV exclusivamente como NON_OPERATING", async () => {
+  const calls: QueryCall[] = [];
+  setPostgresPoolForTests({
+    query: async <T>(sql: string, params: unknown[] = []) => {
+      calls.push({ sql, params });
+      return { rows: [{ year: 2026, month: 9, category_code: "CMV", classification: "NON_OPERATIONAL", category_label: "CMV", movement_type: "EGRESOS", amount: 725, movements: 1 }] as T[] };
+    },
+    connect: async () => { throw new Error("connect no esperado"); },
+    end: async () => undefined,
+  });
+  try {
+    const window = getRollingInterannualMonthWindow(new Date("2026-09-05T12:00:00Z"));
+    const rows = await getYearlyBreakdownRows(new Date(window.fromMonth), new Date(window.toExclusive), CLUB_A);
+    const result = buildYearlyBreakdown(window, rows) as any;
+    const groups = new Map((result.expensesByType as any[]).map((item) => [item.key, item.values]));
+    const septemberIndex = window.months.findIndex(({ key }) => key === "2026-09");
+
+    assert.match(calls[0].sql, /cc\.classification/);
+    assert.match(calls[0].sql, /cc\.id = c\.catalog_id/);
+    assert.equal((groups.get("NON_OPERATING") as number[])[septemberIndex], 725);
+    assert.equal((groups.get("OPERATING") as number[])[septemberIndex], 0);
+    assert.equal(result.operatingIncomeByCategory.length, 0);
+  } finally {
+    setPostgresPoolForTests(undefined);
+  }
 });
