@@ -68,7 +68,7 @@ test("producción acepta la configuración segura mínima", () => {
   }
 });
 
-test("producción rechaza billing sandbox fuera de un staging autorizado", () => {
+test("producción admite cualquier etiqueta de billing durante la etapa pre-billing", () => {
   const original = { ...process.env };
   try {
     Object.assign(process.env, {
@@ -82,15 +82,6 @@ test("producción rechaza billing sandbox fuera de un staging autorizado", () =>
       BILLING_MODE: "sandbox",
       DEPLOYMENT_ENV: "local",
       BILLING_SANDBOX_STAGING_AUTHORIZATION: "",
-    });
-    assert.throws(
-      () => validateRuntimeConfig({ isProduction: true }),
-      /BILLING_MODE=sandbox requiere DEPLOYMENT_ENV=staging/,
-    );
-
-    Object.assign(process.env, {
-      DEPLOYMENT_ENV: "staging",
-      BILLING_SANDBOX_STAGING_AUTHORIZATION: "x".repeat(32),
     });
     assert.doesNotThrow(() => validateRuntimeConfig({ isProduction: true }));
   } finally {

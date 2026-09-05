@@ -116,8 +116,8 @@ de lectura efímeras, y (e) auditoría de cambios sensibles. Archivos no se hace
 públicos ni se confía en nombre, MIME o extensión enviados por el cliente.
 
 Probar rollback en cada punto de fallo, dos solicitudes concurrentes con la
-misma clave, rechazo de una clave reutilizada con otro payload, y ausencia de
-capacidades para planes pendientes de pago.
+misma clave, rechazo de una clave reutilizada con otro payload, y activación inmediata, sin pago, de los cuatro planes comerciales. La futura
+frontera de pago no forma parte del recorrido actual.
 
 **Gate de salida:** no hay escrituras parciales ni duplicadas; autorización de
 archivos y auditoría pasan pruebas entre tenants; métricas permiten distinguir
@@ -172,10 +172,8 @@ accesibilidad, cero escapes entre tenants y evidencia adjunta por viewport.
 
 1. Crear backup y ejecutar primero el diagnóstico read-only.
 2. Aplicar migraciones y ejecutar los install gates y el diagnóstico posterior.
-3. Desplegar contratos/backend con ambos flags apagados.
-4. Activar gradualmente `ONBOARDING_PAID_PLAN_SELECTION_ENABLED` para selección
-   libre de planes. La selección paga conserva `pending_payment` hasta una
-   activación real y no concede capabilities anticipadamente.
+3. Desplegar contratos/backend y comprobar que la taxonomía comercial sea sólo informativa.
+4. Validar `FREE`, `SOCIAL`, `COMPLEX` y `CLUB`: todos deben quedar `active` de inmediato, con origen `pre_billing_onboarding` y sin tarjeta, comprobante, secreto de pasarela ni flag de habilitación. `BILLING_MODE` no modifica esta política transitoria.
 5. Introducir un flag independiente para subida de fotos, apagado por defecto;
    activarlo sólo después de comprobar bucket privado, autorización, límites,
    borrado y observabilidad.
