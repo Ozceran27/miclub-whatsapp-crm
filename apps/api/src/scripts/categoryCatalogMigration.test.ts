@@ -69,7 +69,8 @@ test("la migración forward corrige catálogo y categorías tenant sin tocar mov
   const sql = await readFile(cmvForwardMigrationPath, "utf8");
   assert.match(sql, /update miclub\.category_catalog[\s\S]*classification = 'NON_OPERATIONAL'[\s\S]*code = 'CMV'/);
   assert.match(sql, /mc\.catalog_id = cmv_catalog\.id/);
-  assert.match(sql, /mc\.catalog_id is null[\s\S]*coalesce\(mc\.code[\s\S]*= 'CMV'[\s\S]*trim\(mc\.name\)[\s\S]*= 'CMV'/);
+  assert.match(sql, /mc\.catalog_id is null[\s\S]*trim\(mc\.name\)[\s\S]*= 'CMV'/);
+  assert.match(sql, /information_schema\.columns[\s\S]*column_name = 'code'[\s\S]*execute \$cmv_code\$[\s\S]*coalesce\(mc\.code/);
   assert.match(sql, /direction = 'EGRESOS'::miclub\.movement_type/);
   assert.doesNotMatch(sql, /(?:update|delete from|insert into) miclub\.movements\b/i);
 });
