@@ -10,4 +10,4 @@
 
 ## Selección y cobro
 
-`SOCIAL`, `COMPLEX` y `CLUB` son códigos canónicos persistidos; no son nombres de `GROWTH`, `PROFESSIONAL` o `ENTERPRISE`. No conviven ambas taxonomías. La selección paga libre se limita a `NODE_ENV=test`. En producción se rechaza salvo `ONBOARDING_PAID_PLAN_SELECTION_ENABLED=true`; aun con esa señal explícita se crea como `pending_payment` y no concede capacidades hasta que una futura pasarela la active. No existen precios, modal de tarjeta ni cobros simulados.
+`FREE`, `SOCIAL`, `COMPLEX` y `CLUB` son los códigos canónicos persistidos; no son nombres de `GROWTH`, `PROFESSIONAL` o `ENTERPRISE`. La taxonomía comercial es informativa durante esta etapa: cualquiera de los cuatro planes crea inmediatamente una suscripción `active`, sin importar si `BILLING_MODE` vale `disabled`, `sandbox` o `live`. La selección se registra como `pre_billing_onboarding` para dejar inequívoco que no hubo cobro. No se solicitan tarjetas, comprobantes ni secretos de pasarela; una futura confirmación de pago estará desacoplada de este flujo.

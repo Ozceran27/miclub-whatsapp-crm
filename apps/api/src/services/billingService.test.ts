@@ -5,12 +5,15 @@ import { billingService, confirmLivePayment } from "./billingService.js";
 
 const withEnv=(values:Record<string,string|undefined>,run:()=>void)=>{const saved=Object.fromEntries(Object.keys(values).map(key=>[key,process.env[key]]));try{for(const [key,value] of Object.entries(values))if(value===undefined)delete process.env[key];else process.env[key]=value;run();}finally{for(const [key,value] of Object.entries(saved))if(value===undefined)delete process.env[key];else process.env[key]=value;}};
 
-test("FREE queda activo sin depender del modo",()=>withEnv({BILLING_MODE:"disabled"},()=>assert.deepEqual(billingService.prepareOnboardingSelection("FREE"),{status:"active",mode:"disabled",source:"free"})));
-test("sandbox activa los tres planes pagos y marca la simulación",()=>withEnv({NODE_ENV:"development",BILLING_MODE:"sandbox"},()=>{for(const code of ["SOCIAL","COMPLEX","CLUB"] as const)assert.deepEqual(billingService.prepareOnboardingSelection(code),{status:"active",mode:"sandbox",source:"sandbox_onboarding"});}));
-test("live no concede capacidades antes del pago",()=>withEnv({BILLING_MODE:"live"},()=>assert.deepEqual(billingService.prepareOnboardingSelection("CLUB"),{status:"pending_payment",mode:"live",source:"future_gateway"})));
-test("disabled rechaza planes pagos",()=>withEnv({BILLING_MODE:"disabled"},()=>assert.throws(()=>billingService.prepareOnboardingSelection("SOCIAL"),{code:"PAID_PLAN_SELECTION_DISABLED"})));
-test("producción rechaza sandbox excepto staging con autorización fuerte",()=>withEnv({NODE_ENV:"production",BILLING_MODE:"sandbox",DEPLOYMENT_ENV:undefined,BILLING_SANDBOX_STAGING_AUTHORIZATION:undefined},()=>assert.throws(()=>billingService.prepareOnboardingSelection("COMPLEX"),{code:"BILLING_SANDBOX_FORBIDDEN"})));
-test("staging de producción explícitamente autorizado admite sandbox",()=>withEnv({NODE_ENV:"production",BILLING_MODE:"sandbox",DEPLOYMENT_ENV:"staging",BILLING_SANDBOX_STAGING_AUTHORIZATION:"authorization-value-at-least-32-characters"},()=>assert.equal(billingService.prepareOnboardingSelection("SOCIAL").status,"active")));
+test("los cuatro planes quedan activos y sin pago en todos los modos configurables",()=>{
+ for(const mode of ["disabled","sandbox","live"] as const)withEnv({BILLING_MODE:mode},()=>{
+  for(const code of ["FREE","SOCIAL","COMPLEX","CLUB"] as const)assert.deepEqual(
+   billingService.prepareOnboardingSelection(code),
+   {status:"active",mode,source:"pre_billing_onboarding"},
+  );
+ });
+});
+test("la selección pre-billing tampoco requiere excepciones de producción",()=>withEnv({NODE_ENV:"production",BILLING_MODE:"sandbox",DEPLOYMENT_ENV:undefined,BILLING_SANDBOX_STAGING_AUTHORIZATION:undefined},()=>assert.deepEqual(billingService.prepareOnboardingSelection("COMPLEX"),{status:"active",mode:"sandbox",source:"pre_billing_onboarding"})));
 
 test("confirmación futura exige autenticación y activa una sola vez por evento",async()=>{
  const calls:{sql:string;values?:readonly unknown[]}[]=[];let delivery=0;

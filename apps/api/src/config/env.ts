@@ -102,7 +102,6 @@ export const validateRuntimeConfig = ({ isProduction }: { isProduction: boolean 
   if (process.env.BOOTSTRAP_DIRECTOR_ENABLED === "true") errors.push("BOOTSTRAP_DIRECTOR_ENABLED debe estar deshabilitado");
   if (normalize(process.env.DATA_SOURCE) !== "postgres") errors.push("DATA_SOURCE debe ser postgres");
   if (normalize(process.env.CRM_SOURCE) !== "postgres") errors.push("CRM_SOURCE debe ser postgres");
-  if (normalize(process.env.BILLING_MODE) === "sandbox" && (process.env.DEPLOYMENT_ENV !== "staging" || (process.env.BILLING_SANDBOX_STAGING_AUTHORIZATION?.trim().length ?? 0) < 32)) errors.push("BILLING_MODE=sandbox requiere DEPLOYMENT_ENV=staging y una autorización segura de staging");
   errors.push(...validatePostgresEnv());
   const publicUrl = readOptional("PUBLIC_APP_URL");
   if (!publicUrl || !publicUrl.startsWith("https://")) errors.push("PUBLIC_APP_URL debe ser una URL HTTPS");

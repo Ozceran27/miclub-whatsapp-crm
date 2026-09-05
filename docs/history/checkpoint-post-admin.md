@@ -18,7 +18,6 @@ Las tarjetas de acciones aún no implementadas muestran una indicación de próx
 La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `npm run db:migrations:check` falla si una migración post-admin nueva no tiene finalidad o si este contenido diverge del manifiesto. No editar sus filas manualmente. Las migraciones deben aplicarse, en el orden del manifiesto, con `npm run db:migrate`:
 
 <!-- POST_ADMIN_MIGRATIONS:START -->
-
 | Migración | Finalidad | Checksum SHA-256 esperado | Dependencia operativa |
 | --- | --- | --- | --- |
 | `202608060001_activity_mutation_model.sql` | Añade archivo, actor, índice activo e invariantes para mutaciones de actividades. | `a4949d36c3a9dad62e9d776bf951a94104f006c1d9179daf707982829f73284b` | Después de `202607240003_add_nullable_club_id_to_tenant_scoped_tables.sql`. |
@@ -72,7 +71,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202609010003_exchange_rate_usage_components.sql` | Persiste en orden todos los identificadores inmutables que componen una cotización cruzada. | `a1926ed98d679de4a6ce08587bfc34beaa8bb95a0169d2c27a2e944435d16dde` | Después de `202609010002_canonical_liquidity_valuation.sql`. |
 | `202609010004_explicit_billing_modes.sql` | Persiste modo y origen de billing, y prepara confirmaciones de pasarela autenticadas e idempotentes sin conceder entitlements pendientes. | `de380c5496d867d2852282188aed2293f323347a11b6663b5a6733016eae15ae` | Después de `202608160001_commercial_plan_taxonomy.sql`. |
 | `202609010005_commercial_plan_display_metadata.sql` | Centraliza en la base canónica la descripción, público, prestaciones, orden, recomendación, CTA y etiqueta de precio no definitivo de cada plan comercial. | `c795246ed991ac92e3f3c530de1e50e28709343c0e1bddb7ca1d210b738dde87` | Después de `202608160001_commercial_plan_taxonomy.sql`. |
-
+| `202609050001_pre_billing_onboarding_selection.sql` | Valida el origen pre-billing que activa cualquier plan de onboarding inmediatamente y sin cobro. | `773480aed275d07dd64d73c9ce64e4dc6ec5703bae0f1fbf43e6be067409e91e` | Después de `202609010004_explicit_billing_modes.sql`. |
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:

@@ -2,7 +2,7 @@ import type { CommercialPlanCode } from "@miclub/shared";
 import type { QueryExecutor } from "../db/postgres.js";
 
 export type BillingMode="disabled"|"sandbox"|"live";
-export type BillingSelection={status:"active"|"pending_payment";mode:BillingMode;source:"free"|"sandbox_onboarding"|"future_gateway"};
+export type BillingSelection={status:"active";mode:BillingMode;source:"pre_billing_onboarding"};
 export interface BillingService { prepareOnboardingSelection(planCode:CommercialPlanCode):BillingSelection }
 
 const configurationError=(message:string,code:string)=>Object.assign(new Error(message),{code});
@@ -12,20 +12,12 @@ export const billingMode=():BillingMode=>{
  return value;
 };
 
-const assertSandboxAllowed=()=>{
- if(process.env.NODE_ENV!=="production")return;
- const authorization=process.env.BILLING_SANDBOX_STAGING_AUTHORIZATION?.trim()??"";
- if(process.env.DEPLOYMENT_ENV!=="staging"||authorization.length<32)throw configurationError("Billing sandbox está prohibido en producción salvo autorización segura de staging.","BILLING_SANDBOX_FORBIDDEN");
-};
-
-/** Selection boundary: sandbox is an explicit simulation, while live only
- * reserves a subscription. No card or gateway secret is accepted here. */
+/** Temporary pre-billing boundary. Commercial plan codes are informative and
+ * every onboarding selection is activated without collecting or confirming a payment. */
 export const billingService:BillingService={prepareOnboardingSelection(planCode){
  const mode=billingMode();
- if(planCode==="FREE")return {status:"active",mode,source:"free"};
- if(mode==="disabled")throw configurationError("Los planes pagos están deshabilitados. Podés continuar con Free.","PAID_PLAN_SELECTION_DISABLED");
- if(mode==="sandbox"){assertSandboxAllowed();return {status:"active",mode,source:"sandbox_onboarding"};}
- return {status:"pending_payment",mode,source:"future_gateway"};
+ void planCode;
+ return {status:"active",mode,source:"pre_billing_onboarding"};
 }};
 
 export type PaymentConfirmation={clubId:string;subscriptionId:string;gatewayEventId:string;authenticated:boolean};
