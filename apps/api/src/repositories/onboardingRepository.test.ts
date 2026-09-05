@@ -17,3 +17,13 @@ test("la finalización sólo persiste el término económico y no inventa una cu
 });
 
 test("asocia el identificador opaco de foto al empleado dentro de la finalización",async()=>{const source=await readFile(new URL("./onboardingRepository.ts",import.meta.url),"utf8");const phase=source.slice(source.indexOf("async function finalizeFileAssociations"),source.indexOf("/** One transaction"));assert.match(phase,/worker\.photoFileId/);assert.match(phase,/employee_id=\$3,status='active',expires_at=null/);assert.match(phase,/club_id=\$2 and status='temporary' and expires_at>now\(\)/);assert.doesNotMatch(phase,/base64|public_url|data:/i);});
+
+test("los errores PostgreSQL de saldos iniciales se traducen sin filtrar detalles internos", async () => {
+  const { translateOpeningBalancesError } = await import("./openingBalancesError.js");
+  const internal = Object.assign(new Error('invalid input value for enum miclub.financial_status: "cobrado"'), { code: "22P02", detail: "SQL interno" });
+  const translated = translateOpeningBalancesError(internal) as Error & { code?: string; status?: number; expose?: boolean };
+  assert.equal(translated.code, "OPENING_BALANCES_PERSISTENCE_ERROR");
+  assert.equal(translated.status, 422);
+  assert.equal(translated.expose, true);
+  assert.doesNotMatch(translated.message, /cobrado|financial_status|PostgreSQL|SQL interno/i);
+});

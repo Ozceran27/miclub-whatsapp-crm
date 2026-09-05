@@ -156,6 +156,34 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
     assert.ok(Number(persistedEntities.rows[0].workers) >= 2);
     assert.equal(Number(persistedEntities.rows[0].activities), 1);
 
+    // Contrato PostgreSQL real de saldos iniciales: enum, CAPITAL, idempotencia y reemplazo con reversión.
+    const financialStatuses = (await database.query<{ statuses: string[] }>(
+      "select enum_range(NULL::miclub.financial_status)::text[] statuses",
+    )).rows[0].statuses;
+    assert.ok(financialStatuses.includes("pagado"));
+    assert.ok(!financialStatuses.includes("cobrado"), "el alias incompatible no debe agregarse al enum");
+    const owner = (await database.query<{ club_id: string; user_id: string }>(`select c.id::text club_id,u.id::text user_id
+      from miclub.clubs c join miclub.users u on lower(u.email::text)=lower($2) where c.name=$1`, [registration.club.name, registration.email])).rows[0];
+    const firstKey=`opening:first:${databaseName}`;
+    const firstBatch=(await database.query<{ id: string }>("select miclub.replace_opening_balances($1,'ARS',100,200,30,$2,$3) id",[owner.club_id,firstKey,owner.user_id])).rows[0].id;
+    const repeatedBatch=(await database.query<{ id: string }>("select miclub.replace_opening_balances($1,'ARS',100,200,30,$2,$3) id",[owner.club_id,firstKey,owner.user_id])).rows[0].id;
+    assert.equal(repeatedBatch,firstBatch,"la misma clave debe devolver el lote existente");
+    const firstMovements=await database.query<{ movement_type: string; financial_status: string; operation: string }>(`select m.movement_type::text,m.financial_status::text,m.source_payload->>'operation' operation
+      from miclub.opening_balance_movements obm join miclub.movements m on m.id=obm.movement_id where obm.batch_id=$1`,[firstBatch]);
+    assert.equal(firstMovements.rows.length,3);
+    assert.ok(firstMovements.rows.every(row=>row.movement_type==="CAPITAL"&&row.financial_status==="pagado"&&row.operation==="REPLACE"));
+
+    const secondBatch=(await database.query<{ id: string }>("select miclub.replace_opening_balances($1,'EUR',150,250,35,$2,$3) id",[owner.club_id,`opening:replacement:${databaseName}`,owner.user_id])).rows[0].id;
+    const replacement=await database.query<{ operation: string; reverses_movement_id: string | null; financial_status: string }>(`select m.source_payload->>'operation' operation,obm.reverses_movement_id::text,m.financial_status::text
+      from miclub.opening_balance_movements obm join miclub.movements m on m.id=obm.movement_id where obm.batch_id=$1`,[secondBatch]);
+    assert.equal(replacement.rows.length,6,"el reemplazo debe trazar tres reversas y tres saldos nuevos");
+    assert.equal(replacement.rows.filter(row=>row.operation==="REVERSE"&&row.reverses_movement_id!==null).length,3);
+    assert.equal(replacement.rows.filter(row=>row.operation==="REPLACE"&&row.reverses_movement_id===null).length,3);
+    assert.ok(replacement.rows.every(row=>row.financial_status==="pagado"));
+    const reconciliation=await database.query<{ account_code: string; is_consistent: boolean }>("select account_code,is_consistent from miclub.v_opening_balance_reconciliation where batch_id=$1",[secondBatch]);
+    assert.deepEqual(new Set(reconciliation.rows.map(row=>row.account_code)),new Set(["CASH","BANK","USD_CASH"]));
+    assert.ok(reconciliation.rows.every(row=>row.is_consistent));
+
     const logout = await request("/auth/logout", json({}), cookie);
     assert.equal(logout.response.status, 200);
     assert.equal(logout.body.authenticated, false);
