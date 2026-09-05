@@ -289,6 +289,14 @@ test("expense classifier is exclusive and prioritizes specific groups", async ()
   assert.equal(classifyExpenseCategory("categoría fantasma"), "UNCLASSIFIED");
 });
 
+test("CMV siempre se clasifica no operativo por código, nombre normalizado y metadata de catálogo", async () => {
+  const { classifyExpenseCategory } = await import("./economyDomain.js");
+  assert.equal(classifyExpenseCategory("CMV"), "NON_OPERATING");
+  assert.equal(classifyExpenseCategory("  cmv... "), "NON_OPERATING");
+  assert.equal(classifyExpenseCategory({ classification: "NON_OPERATIONAL" }), "NON_OPERATING");
+  assert.notEqual(classifyExpenseCategory("CMV"), "OPERATING");
+});
+
 test("yearly breakdown returns thirteen interannual positions and does not merge same months across years", async () => {
   const { buildYearlyBreakdown } = await import("./economyService.js");
   const { getRollingInterannualMonthWindow } = await import("./economyDomain.js");
@@ -324,6 +332,7 @@ test("yearly breakdown returns thirteen interannual positions and does not merge
   for (const values of expenses.values()) assert.equal((values as number[]).length, 13);
   assert.equal((expenses.get("OPERATING") as number[])[8], 300);
   assert.equal((expenses.get("NON_OPERATING") as number[])[10], 200);
+  assert.equal((expenses.get("OPERATING") as number[])[10], 0);
   assert.equal((expenses.get("DEBT") as number[])[11], -300);
   assert.equal((expenses.get("SERVICES") as number[])[12], 350);
   assert.equal((expenses.get("TAXES") as number[])[1], 600);
