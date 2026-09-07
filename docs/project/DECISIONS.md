@@ -101,3 +101,29 @@ Codex genera scripts; no ejecuta destructivo sobre DB real sin autorización exp
 **Status:** Accepted
 
 `AGENTS.md`, `docs/project/`, docs canónicas y Git son la memoria técnica compartida.
+
+---
+
+## DEC-014 — Selección pre-billing existente
+
+**Status:** Implemented; reconciliado por bootstrap aprobado, no nueva decisión de cobro.
+
+FREE/SOCIAL/COMPLEX/CLUB se activan sin pago al finalizar onboarding, con origen pre_billing_onboarding e independientemente de BILLING_MODE. Evidencia: billingService.ts, onboardingRepository.ts, migración 202609050001 y commit 7f38030. No implica gateway/billing real.
+
+## DEC-015 — Corrección documental de categorías y vocabulario
+
+**Status:** Confirmed by approved bootstrap.
+
+CMV es NON_OPERATIONAL/EGRESOS; la descripción previa como operativo estaba desactualizada (shared movementCategoryCatalog, migración 202609050003, ff0a88b). Los tipos técnicos son INGRESOS/EGRESOS/CAPITAL y OPERATIONAL/NON_OPERATIONAL. No cambiar fórmulas financieras por esta corrección de documentación.
+
+## Decisiones pendientes (sin aceptación implícita)
+
+| ID | Decisión por resolver | Implementación observada |
+| --- | --- | --- |
+| C01 | Ciclo de creación, cálculo y cierre de liquidaciones | Tablas/vistas presentes; no hay creador runtime encontrado; lectura FIXED desalineada |
+| C02 | Entrega/aceptación de invitaciones y lifecycle Instructor | Token sólo hasheado; entrega no encontrada; caminos de alta/actualización divergen |
+| C03 | Persistencia intermedia de onboarding | Finalización persistente; draft/avance temporal, F5 reinicia; promesa previa no retirada por esta auditoría |
+| C04 | Significado/signo del saldo proyectado | Suma saldo positivo adeudado al responsable |
+| C05 | Retiro/reconciliación de clasificación fallback | economyDomain conserva listas distintas del catálogo |
+
+B01–B07 en CURRENT_STATE son defectos/brechas a corregir, no ADRs aceptados. Las decisiones DEC-001–013 y los ejemplos financieros permanecen vigentes.

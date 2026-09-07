@@ -1,52 +1,27 @@
 # Roadmap
 
-## Milestone actual — Contexto de ingeniería asistida
+## Checkpoint actual
 
-- Project ChatGPT configurado.
-- Project Codex configurado.
-- `AGENTS.md` creado.
-- `docs/project/` preparado.
-- Bootstrap audit de Codex debe reconciliar checkout local.
+Bootstrap del repositorio completado sobre 42b81a3; documentación docs/project sincronizada con el informe aprobado. No se corrigieron código ni SQL. Evidencia y bugs en CURRENT_STATE.
 
-## Próximo — Database Reset Readiness
+## Prioridad inmediata — instalación y operación real aislada
 
-- migration ledger;
-- manifest;
-- schema limpio;
-- zero-tenant startup;
-- precheck/reset/postcheck SQL manual DBeaver;
-- preservar catálogos globales.
+1. Resolver B01: instalación autocontenida desde schema vacío, sin depender de DDL manual histórico no versionado.
+2. Resolver B02: contexto RLS en operaciones runtime; probar tanto operaciones válidas como aislamiento A/B.
+3. Corregir B03/B04/B05/B06: FIXED, ANULADO importado, sectores system y revocación de invitaciones.
+4. Definir/materializar ciclo de liquidación e invitaciones (C01/C02), decidir persistencia intermedia y signo proyectado (C03/C04), reconciliar clasificación duplicada (C05).
+5. Recuperar gates locales; distinguir fallos de tooling/fixtures de bugs operativos.
 
-## Siguiente — First Clean Club E2E
+## First Clean Club E2E
 
-Desde DB tenant limpia:
+En PostgreSQL descartable: registro/rollback → login → onboarding/saldos/sectores/workers/actividad/plan → finalización → Inicio → XLSX dry-run/apply → Economía/Administración/CRM → logout. Validar paridad financiera y ausencia de cruces tenant.
 
-- registro;
-- club;
-- login;
-- onboarding;
-- saldos;
-- sectores;
-- worker/instructor;
-- activity;
-- XLSX;
-- import;
-- Inicio;
-- Economía;
-- Administración;
-- CRM.
+## Database reset readiness
 
-## Después — Public Product Polish
+Después de certificar lo anterior: backup/restauración, ledger/schema/grants, scripts manuales vigentes y evidencia de entorno/commit. B07 (manifiesto de tenant-deletion incompleto) requiere corrección SQL separada. No ejecutar reset para descubrir si la instalación funciona.
 
-UX, errores, observabilidad, permisos, planes, performance y hardening.
+## Posterior
 
-## Billing real
+UX, accesibilidad visual real, permisos, observabilidad, performance y hardening. Billing real sólo con requerimiento separado; selección actual es pre-billing sin cobro.
 
-Sólo después de certificar flujo de club nuevo y separar RBAC de entitlements.
-
-## Fuera de alcance inmediato
-
-- reparar datos legacy que serán eliminados;
-- reintroducir Google Sheets;
-- mega-refactor sin evidencia;
-- SQL destructivo automático sobre DB real.
+Fuera de alcance: reintroducir Sheets, mega-refactor, reparar historia sin necesidad y SQL destructivo automático contra DB real.

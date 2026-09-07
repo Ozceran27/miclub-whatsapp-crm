@@ -1,126 +1,59 @@
 # Domain Model
 
-Este documento describe el modelo conceptual observado/esperado. Los nombres exactos de tablas y columnas se validan contra migrations y PostgreSQL.
+## Identidad y ownership
 
-## Club
+- Club: raíz tenant, configuración, onboarding y subscription.
+- User (users): identidad autenticable global.
+- Person (people): perfil dentro de un club, opcionalmente vinculado a User; DNI no es PK.
+- user_club_memberships: acceso User↔Club, rol, permisos, estado y sector_ids.
+- club_memberships: relación Person↔Club; no es la membership de autorización.
+- Role: roles tenant DIRECTOR, TRABAJADOR e INSTRUCTOR, con definiciones/permisos shared.
 
-Tenant principal. Mantiene identidad, settings, subscription y onboarding.
+## Configuración y operación
 
-## User
+Sector es tenant, con UUID, metadata visual, capacidad ENROLLMENTS/INCOME, estado y archivo. Administración/administracion, Tesorería/tesoreria y Áreas Comunes/areas-comunes son system. sector_templates es catálogo global de 30 plantillas. Alta desde plantilla en Administración y draft libre en onboarding son caminos diferentes.
 
-Identidad autenticable. Accede a clubes mediante Membership.
+Employee/Worker relaciona Person, User y membership. Tiene remuneración fija opcional (has_fixed_compensation, amount, frequency, currency), no un porcentaje VARIABLE personal. Instructor tiene relación propia con Person; las actividades lo referencian. Invitaciones de 72 horas para identidades existentes se modelan aparte; entrega/sincronización pendientes (C02).
 
-## Person
+Activity relaciona club, sector e instructor/responsable según estado/validación. Activity Terms versiona VARIABLE (share del club) o FIXED (monto, frecuencia, moneda), con vigencia y continuidad. monthly_fee/comisiones antiguas no son autoridad de liquidación moderna.
 
-Perfil humano reutilizable por User, Employee, Instructor y Enrollment.
+Movement es hecho financiero con categoría, sector/actividad, persona/contraparte, medio de pago, origen y estados operacional/financiero. Enrollment relaciona Person con Activity; sector/instructor se derivan. Conserva estado, fee, fechas, override, UUID y secuencia tenant. Receivable, Payment y payment_allocations son objetos diferentes; las rutas de pagos inspeccionadas son lecturas.
 
-## Membership
+Activity Settlement requiere actividad, término y período; Allocation relaciona pagos/anticipos/ajustes explícitos. Modelado DB presente, ciclo runtime incompleto (C01/B03).
 
-```text
-User ↔ Club
-```
+## Configuración comercial, saldos y trazabilidad
 
-Define role, permisos, status y posible scope sectorial.
+Plan/Feature/Entitlement son globales; Subscription y capability override son tenant. FREE inicial; cuatro planes activables sin cobro durante onboarding.
 
-## Role
+Financial Account, Opening Balance Batch/Movement integran capital inicial y conciliación. Exchange Rate y Sync State son globales; usages/components registran valoración tenant.
 
-El provisioning actual crea roles por club a partir de definiciones compartidas.
+Club Onboarding persiste finalización; Onboarding Operation conserva clave idempotente y resultado. Draft v2 es temporal. Employee Photo almacena metadata tenant y referencia privada, inicialmente temporal.
 
-## Permission
+Task y Approval Request son operación administrativa. Import Batch/Error/XLSX Row conservan trazabilidad. Audit Log registra acciones sanitizadas.
 
-Capability de autorización. Código y DB deben permanecer reconciliados.
+## Autoridad por dominio
 
-## Club Subscription
+Rutas relativas a apps/api/src salvo shared/web indicados.
 
-Relaciona Club con Plan. El provisioning observado asigna `FREE`.
+| Dominio | Service / repository real | Contrato y consumidores | Tests |
+| --- | --- | --- | --- |
+| Auth/registro | auth/loginService, registrationService, sessionService, userRepository; clubProvisioningService | shared contracts/auth; web session, LoginPage, RegisterPage | auth, registration, provisioning |
+| Onboarding | onboardingService / onboardingRepository | shared contracts/onboarding; web modules/Onboarding | onboarding, atomicity, billing, photos |
+| Sectores | ruta → sectorsRepository; catalog/readOnlyRepository | tipos locales y shared administration; SectorList/SetupForms | sectors, sectorCapacity |
+| Workers | administration/workersService, workerMutationService / workersRepository | AdministrationWorkerMutationDto; WorkerDraftList/Administración | workersService, workerMutationService |
+| Actividades | ruta → activitiesRepository; readOnlyRepository | shared contracts/activities, ActivityInput local; ActivityDraftList | activitiesRepository, activityTermsMigration |
+| Liquidaciones | vistas SQL → postgresDashboard/implementation; calculador TS aislado | activity_settlements/allocations; Inicio/Economía indirectos | activitySettlementService, SQL estático |
+| Movimientos | financeService / movementsRepository | MovementInput local, respuestas genéricas; Administración | financeRoutes, predicates, readOnly |
+| Inscripciones | ruta → enrollmentsRepository, lifecycle SQL | EnrollmentInput local; Administración/CRM | enrollmentsRepository, lifecycle |
+| Pagos/deudas | financeService / paymentsRepository, receivablesRepository | queries locales; consumidores financieros | financeRoutes; sin gate DB ejecutado |
+| Categorías | shared movementCategoryCatalog; catalogRepository/provisioning | category_catalog/aliases/movement_categories; formularios/Economía | categoryCatalogMigration, economy |
+| Inicio | dashboardService, postgresDashboardService y postgresDashboard/* | shared legacy; HomeModule | dashboard/balances |
+| Economía | economyService, economyDomain, economyClubService / economyRepository y economy/* | shared contracts/economy; EconomyModule | characterization/domain/repository |
+| Administración | administration Read/Summary services y repositories | shared contracts/administration; AdministrationModule | metrics/capacity/read |
+| CRM | crmService/messages / crmRepository | shared legacy/members; CrmModule | crm/messages/prepareMessages |
+| XLSX | xlsxMigration validator/referenceResolver/workbook | shared contracts/xlsxImport; DataMigrationModule | workbook/validator/references |
+| Planes | clubCapabilityService, planCommercialCatalog, billingService (SQL en services) | shared commercialPlans/capabilities; MigrationStep/nav | capability/billing/catalog |
+| Tareas/solicitudes | rutas → tasksRepository/requestsRepository | shared tasks/requests; Administración | repository tests |
+| FX | exchangeRateService, providers y SQL de valoración | tablas FX; saldos/presentación | exchange/valuation tests |
 
-## Plan / Feature
-
-Códigos observados/documentados:
-
-- FREE
-- SOCIAL
-- COMPLEX
-- CLUB
-
-`DATA_MIGRATION` es capability del importador.
-
-## Club Onboarding
-
-Estado persistente con status, current step y progreso completado/omitido.
-
-## Sector
-
-Entidad tenant. Tres sectores system iniciales:
-
-- Administración
-- Tesorería
-- Áreas Comunes
-
-## Sector Template
-
-Catálogo global sugerido cuando exista en schema. No confundir con Sector tenant.
-
-## Employee / Worker
-
-Relación laboral de Person con Club. El Director se aprovisiona como employee.
-
-## Instructor
-
-Relación/rol especializado para responsables de actividades. No debe duplicar Person.
-
-## Activity
-
-Relaciona Club, Sector, Responsible/Instructor y Activity Terms.
-
-## Activity Terms
-
-Configuración económica con vigencia temporal: mode, porcentaje/fee, effective dates.
-
-## Movement
-
-Hecho financiero. Puede relacionar club, category, sector, activity, payment method, counterparty, source y status.
-
-## Category Catalog
-
-Catálogo global canónico.
-
-## Movement Category
-
-Asociación/configuración tenant derivada del catálogo global.
-
-## Payment Method
-
-Método de pago del club. Provisioning observado: Efectivo y Transferencia.
-
-## Enrollment
-
-Inscripción de Person a Activity dentro del tenant.
-
-## Receivable / Payment
-
-Dominio de deuda/cobro según implementación vigente.
-
-## Activity Settlement
-
-Liquidación de actividad/responsable basada en términos históricos.
-
-## Settlement Allocation
-
-Relaciona PAYMENT/ADVANCE con settlement; no fracciona un movimiento entre allocations activas.
-
-## Task
-
-Tarea administrativa tenant.
-
-## Approval Request
-
-Solicitud controlada por handlers validados.
-
-## Import Batch / Import Error
-
-Trazabilidad de importación XLSX.
-
-## Audit Log
-
-Registro de acciones relevantes sin secretos.
+No existe un repository o DTO dedicado para cada dominio. Ver CURRENT_STATE para bugs; no duplicar implementaciones para rellenar esta tabla.

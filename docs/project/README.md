@@ -58,3 +58,9 @@ Consultar especialmente:
 Este paquete fue preparado el **2026-09-07** tomando como referencia el repositorio `Ozceran27/miclub-whatsapp-crm` en `main`, la documentación disponible allí y el contexto de dirección del proyecto.
 
 Si existen cambios locales no pusheados posteriores, **Codex debe auditar el checkout local y actualizar `CURRENT_STATE.md` antes de tratar estos documentos como snapshot exacto**.
+
+El bootstrap local fue realizado sobre `42b81a363c4eee04dd4d3bbaceaff116d7c26891` y esta carpeta se sincronizó con su informe aprobado. CURRENT_STATE conserva resultados y conflictos; no se modificaron código ni SQL ni se inspeccionó DB real.
+
+La precedencia de implementación no convierte un bug en regla de negocio. Los conflictos C01–C05 siguen abiertos y las fórmulas aceptadas se conservan. PROJECT_CONTEXT sigue siendo propósito de producto, no certificación funcional.
+
+Drift especializado pendiente fuera de esta carpeta: runtime-boundaries describe carga dinámica SQLite y ruta XLSX obsoletas; los SQL tenant-deletion tienen un manifiesto incompleto. Ver ARCHITECTURE/DATA_MODEL antes de usarlos. Esta actualización no modifica aquellos archivos.

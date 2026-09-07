@@ -11,3 +11,4 @@ build/
 *.tsbuildinfo
 #.local-evidence/
 !apps/api/data/.gitkeep
+.env.codex.local

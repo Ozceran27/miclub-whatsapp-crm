@@ -1,170 +1,51 @@
 # Architecture
 
-## Vista general
+## Alcance y autoridad
 
-miClub Gestión es un monorepo npm.
+Sincronizado con el bootstrap aprobado del commit 42b81a3 (2026-09-07). Código runtime y migraciones son autoridad de implementación; [CURRENT_STATE.md](CURRENT_STATE.md) distingue bugs de comportamiento aceptado. No certifica PostgreSQL desplegado.
 
-```text
-miclub-whatsapp-crm/
-├── apps/
-│   ├── api/
-│   └── web/
-├── packages/
-│   └── shared/
-├── docs/
-├── scripts/
-└── package.json
-```
+## Monorepo y runtime
 
-## Stack observado
+- npm workspaces apps/* y packages/*.
+- apps/api: Node, Express, TypeScript, pg y tsx; entrypoint src/index.ts.
+- apps/web: React 18, Vite, TypeScript, Recharts; router propio (src/router.tsx).
+- packages/shared: contratos HTTP/dominio, permisos, catálogos visuales y categorías, normalización monetaria/estados.
+- docs y scripts: documentación y herramientas operativas, no parte del runtime ordinario.
 
-### API
+Browser → React → Express → auth/membership/permisos → servicios/repositorios → PostgreSQL.
 
-- Node.js
-- Express
-- TypeScript
-- PostgreSQL (`pg`)
-- `tsx` para desarrollo/tests/scripts
+La separación por capas es heterogénea: activities, movements, enrollments, tasks y requests tienen rutas que llaman directamente a repositories. Worker mutation, provisioning, billing y parte de dashboards contienen SQL en services. No crear services/repositorios paralelos suponiendo una capa ausente.
 
-### Web
+## Frontend
 
-- React 18
-- Vite
-- TypeScript
-- Recharts
+SessionProvider rehidrata /auth/me, cambia membership y propaga logout entre pestañas. apiFetch centraliza transporte y expiración. serverState/client.ts implementa QueryClient/useServerQuery propios: no hay TanStack React Query. queryKeys incluye club, recurso, filtros, paginación y versión; TenantCacheBoundary cancela/retira cache al cambiar club.
 
-### Shared
+Módulos: Inicio, Economía, Administración, CRM, Migración y Onboarding. Conviven DTO compartidos, respuestas normalizadas genéricas y contratos legacy. Ver DOMAIN_MODEL para consumidores.
 
-- TypeScript
-- contratos y tipos compartidos
+## PostgreSQL y tenancy
 
-## Runtime productivo
+db/postgres.ts separa pool runtime (SET ROLE miclub_runtime) y administrativo (migraciones/jobs). db/transaction.ts proporciona withTransaction y withTenantTransaction; el segundo establece app.club_id y app.current_club_id con alcance local a transacción.
 
-```text
-Browser
-  ↓
-React/Vite
-  ↓
-Express API
-  ↓
-Auth + Membership + Tenant Context
-  ↓
-Services / Repositories
-  ↓
-PostgreSQL
-```
+El tenant HTTP deriva de User → membership activa → club. Predicados SQL y FKs compuestas son necesarios además de RLS. RLS se fuerza en tablas prioritarias; no hay cobertura universal. B02: múltiples repositorios todavía usan pool/withTransaction sin el contexto requerido. No describir el aislamiento como certificado.
 
-En producción:
+Startup valida configuración productiva y schema onboarding; diagnostica permisos. Producción exige AUTH_ENABLED, secreto de sesión, DATA_SOURCE/CRM_SOURCE postgres y PUBLIC_APP_URL HTTPS. No hace seed ni provisioning automático de clubes.
 
-- autenticación obligatoria;
-- `DATA_SOURCE=postgres`;
-- `CRM_SOURCE=postgres`;
-- `PUBLIC_APP_URL` HTTPS;
-- ausencia de fallback silencioso a fuentes legacy.
+## Migraciones
 
-## Tenant resolution
+migrationManifest.ts define las 94 entradas y orden raíz/multitenant. runMigrations verifica inventario, hashes LF y dependencias; migrationCompatibility transforma dos migraciones históricas al instalarlas. Ledger: public.miclub_schema_migrations.
 
-La regla vigente es:
+La secuencia no crea todos los objetos requeridos desde vacío: existen prerrequisitos históricos/manuales (B01). La coincidencia de hashes no certifica instalación limpia. Ver DATA_MODEL y TESTING.
 
-```text
-authenticated user
-→ active membership
-→ club
-```
+## Fuentes y compatibilidad
 
-Las rutas tenant-scoped deben rechazar un `clubId` enviado por cliente como fuente de autoridad.
+PostgreSQL es la única fuente operacional. dataSourceService y crmService devuelven postgres. googleapis no es dependencia; sqlite3 permanece aislado en legacy/sqlite, sin fallback CRM runtime.
 
-## Capas backend
+Rutas raíz /members, /debtors, /summary y otras, así como endpoints CRM, mantienen contratos consumidos por frontend sobre PostgreSQL. Coexisten lecturas /api en español/inglés, dashboardService y postgresDashboard/*; no asumir que todo es código muerto.
 
-El repo actual separa, con variaciones por dominio:
+Candidatos: LoginScreen.tsx, EconomyComparisonCards.tsx, JS en docs/legacy-generated-js, completeOnboarding antiguo, fallback workers sin employees y calculador TS de settlement sin consumidor runtime. No eliminados.
 
-```text
-Route
-→ validation / permission
-→ Service
-→ Repository / PostgreSQL
-```
+## Límites pendientes
 
-El objetivo arquitectónico es impedir que:
+Además de B01/B02: escritura FIXED versus lectura SQL antigua, ciclo de liquidaciones incompleto y catálogos de clasificación duplicados. docs/runtime-boundaries.md aún describe carga dinámica SQLite y una ruta XLSX obsoletas; no usar esos pasajes para reconstruir runtime.
 
-- routes acumulen lógica de dominio compleja;
-- frontend calcule reglas financieras centrales;
-- repositories decidan reglas HTTP;
-- existan dos servicios autoritativos para el mismo cálculo.
-
-## Superficies principales observadas
-
-- Auth
-- DB health
-- Modules/navigation
-- Catalogs
-- Sectors
-- Activities
-- Tasks
-- Requests
-- People
-- Finance
-- Movements
-- Enrollments
-- Economy
-- Administration
-- Onboarding
-- Commercial plans
-- Dashboard
-- Migration XLSX
-- CRM
-- Legacy compatibility temporal
-
-## Legacy compatibility
-
-El inventario de rutas documenta algunos endpoints `legacy-compat` que siguen sirviendo contratos de frontend pero cuyos datos ya provienen de PostgreSQL.
-
-Estos adaptadores no deben convertirse nuevamente en una segunda arquitectura.
-
-Consultar:
-
-- `docs/api-route-inventory.md`
-- `docs/legacy-compat-audit.md`
-
-## Fuentes de verdad
-
-| Dominio | Fuente |
-|---|---|
-| Identidad | PostgreSQL |
-| Clubes | PostgreSQL |
-| Memberships/RBAC | PostgreSQL + contratos shared |
-| Sectores | PostgreSQL |
-| Actividades | PostgreSQL |
-| Términos económicos | PostgreSQL |
-| Movimientos | PostgreSQL |
-| Inscripciones | PostgreSQL |
-| Categorías | catálogo global + asociación tenant según modelo |
-| CRM | PostgreSQL |
-| Importación | XLSX → PostgreSQL |
-| Economía | datos PostgreSQL + lógica backend |
-| Migration order | `migrationManifest` |
-
-## Migration architecture
-
-El manifiesto de migraciones es la secuencia ejecutable canónica.
-
-Reglas principales:
-
-- no ordenar migrations por nombre fuera del manifest;
-- no renombrar/modificar una migration aplicada sin transición explícita;
-- timestamps nuevos globalmente únicos;
-- nuevas migrations al final;
-- `dependsOn`, `provides` y `requires` expresan dependencias;
-- drift entre ledger, manifest y schema bloquea readiness.
-
-Consultar `docs/migration-manifest-policy.md`.
-
-## Runtime legacy
-
-Google Sheets fue retirado del runtime según la documentación actual.
-
-SQLite permanece como artefacto de compatibilidad/testing y no debe utilizarse como fallback de producción.
-
-## Nota para agentes
-
-Este documento resume arquitectura. Para decisiones detalladas, inspeccionar código y documentación especializada antes de modificar.
+Fuentes: apps/api/src/index.ts, db/*, routes/*, services/crmService.ts, services/dataSourceService.ts; apps/web/src/session.tsx, router.tsx, serverState/*; package.json de los tres workspaces.

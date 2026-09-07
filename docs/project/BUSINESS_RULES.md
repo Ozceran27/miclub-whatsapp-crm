@@ -1,5 +1,7 @@
 # Business Rules
 
+Sincronización del bootstrap aprobado (42b81a3, 2026-09-07). Se corrigen nombres técnicos y catálogo demostrados por código/migraciones. Los conflictos abiertos al final no autorizan cambios de reglas.
+
 ## 1. Multi-tenancy
 
 Todo dato operativo tenant debe pertenecer inequívocamente a un club.
@@ -53,11 +55,11 @@ DNI/email/teléfono pueden servir para validación o matching según dominio, pe
 
 Tipos principales:
 
-- INGRESO
-- EGRESO
+- INGRESOS
+- EGRESOS
 - CAPITAL
 
-Los cálculos financieros ordinarios usan movimientos con estado `COMPLETADO`, salvo una regla explícita de otro dominio.
+Estos son los valores técnicos del enum PostgreSQL; ingreso/egreso siguen siendo conceptos de negocio. Los cálculos financieros ordinarios usan `operational_status = 'COMPLETADO'`, salvo una regla explícita de otro dominio. `financial_status` es un eje distinto.
 
 Ejemplo:
 
@@ -74,27 +76,11 @@ La arquitectura observada utiliza:
 
 No duplicar listas canónicas en frontend, backend y SQL.
 
-### Operativas
+La lista anterior no coincidía con el catálogo activo. La fuente enumerada es `packages/shared/src/movementCategoryCatalog.ts`, asociada a PostgreSQL mediante provisioning y migraciones; no mantener aquí otra lista independiente.
 
-INSCRIPCIÓN, CUOTA, TURNOS, COMISIÓN, ALQUILER, EVENTOS, VENTAS, CLASES, CURSOS, ENTRADAS, ABONOS, RESERVAS, PARTIDO, SALARIOS, KIOSCO, BEBIDAS, COMIDAS, CMV.
+Valores técnicos: `OPERATIONAL`, `NON_OPERATIONAL`, `TAX`, `SERVICE`, `LIABILITY` (no `OPERATIVE`/`NON_OPERATIVE`).
 
-### No operativas
-
-PUBLICIDAD, DEPÓSITOS, EXTRACCIONES, DÓLARES, REPARACIONES, MANTENIM., VIÁTICOS, GANANCIA, PÉRDIDA, SEGUROS, LIMPIEZA, LIBRERÍA.
-
-### Impuestos
-
-TASAS, FIRMAS, IMPUESTOS.
-
-### Servicios
-
-LUZ, AGUA, INTERNET, GAS, TELEFONÍA.
-
-### Pasivos
-
-DEUDA.
-
-Cualquier cambio en esta clasificación debe reconciliarse con el catálogo real y los cálculos existentes.
+**Corrección probada:** CMV es `NON_OPERATIONAL`, dirección `EGRESOS`, desde `202609050003_classify_cmv_as_non_operational.sql` y el commit `ff0a88b`. Este documento decía operativo erróneamente. SALARIOS sigue `OPERATIONAL` en el catálogo shared; su clasificación fallback distinta en economyDomain es conflicto abierto C05, no cambio de regla.
 
 ## 7. Actividades
 
@@ -210,3 +196,14 @@ Preferir void/cancel/archive antes que delete físico para datos con historia.
 El provisioning observado crea clubes con `America/Argentina/Buenos_Aires`.
 
 Los cálculos deben respetar timezone del club cuando el modelo permita personalizarlo.
+
+## 19. Conflictos abiertos: no son reglas aceptadas
+
+- B02: falta contexto transaccional RLS en consumidores; no relaja aislamiento tenant.
+- B03/C01: lectura FIXED usa campo antiguo y no hay creación runtime de liquidaciones encontrada; se conservan las fórmulas y ambos ejemplos de la sección 11.
+- B04: importar ANULADO como COMPLETADO es un bug; no habilita su conteo.
+- C03: finalización onboarding persiste, pero draft/avance son temporales. Resolver explícitamente la promesa anterior de progreso persistido; no darla por eliminada.
+- C04: aclarar significado/signo del saldo proyectado antes de cambiar la suma implementada.
+- C02/C05: resolver lifecycle de Instructor/invitaciones y clasificación duplicada sin crear autoridades paralelas.
+
+Detalles y fuentes en CURRENT_STATE, ONBOARDING, FINANCIAL_MODEL y TENANCY_AND_RBAC. Esta sincronización no implementa correcciones ni decisiones pendientes.

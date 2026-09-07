@@ -2,6 +2,8 @@
 
 Resumen. El inventario detallado canónico es `docs/api-route-inventory.md`.
 
+Auditado sobre 42b81a3. Una ruta presente no implica flujo E2E certificado. Ver CURRENT_STATE para bugs RLS y revocación en invitaciones.
+
 ## Acceso
 
 - Pública: sin sesión.
@@ -30,12 +32,18 @@ Resumen. El inventario detallado canónico es `docs/api-route-inventory.md`.
 - `DELETE /api/onboarding/photos/:fileId`
 - `POST /api/onboarding/complete`
 
+`advance` es compatibilidad de lectura, sin progreso persistido. `complete` consume draft v2 y selección de plan consistente; persiste todo en una operación idempotente. Opening-balances y photos son endpoints separados; la UI no guarda entidades en cada avance.
+
+`GET /api/commercial-plans` requiere ONBOARDING_READ y devuelve catálogo para el paso 6.
+
 ## Migration XLSX
 
 - `GET /api/migration/template`
 - `POST /api/migration/uploads`
 
 Requieren auth, tenant, permiso y capability comercial.
+
+Versión efectiva v2. Apply exige dry-run equivalente; no prometer reversal independiente sólo porque la ruta acepte esa etiqueta. Ver IMPORT_SYSTEM.
 
 ## Catálogos
 
@@ -57,6 +65,8 @@ Ejemplos:
 - `/api/operational-balances`
 - `/api/sector-settlements`
 
+Las superficies anteriores son GET de lectura en financeRoutes. No implican CRUD de payments/settlements ni materialización de liquidaciones. Las mutaciones de movimientos están en movementMutationRoutes; inscripciones se crean en POST /api/inscripciones y cambian estado en PATCH /api/inscripciones/:id/estado.
+
 ## Economy
 
 Bajo `/api/economy`: summary, evolution, by-sector, rankings, categories, payment methods, recent, pending, annual, comparison e insights.
@@ -75,6 +85,8 @@ El inventario vigente documenta:
 
 - `updatedAt` en mutaciones con control optimista;
 - `Idempotency-Key` al crear movimientos.
+
+No uniformar nombres sin revisar el handler: inscripciones usa expectedUpdatedAt; tareas/sectores usan updatedAt; onboarding usa clave dentro del draft. Parte de los DTO permanece local a repositories; otras respuestas son registros normalizados genéricos.
 
 ## Errores
 

@@ -1,84 +1,57 @@
 # Onboarding
 
-## Propósito
+## Contrato actual
 
-Configurar un club nuevo sin depender de datos históricos o Google Sheets.
+Siete pantallas implementadas; shared contracts/onboarding.ts define ONBOARDING_DRAFT_CONTRACT_VERSION=2 y la política compartida:
 
-## Backend observado
+| Paso | Contenido | Obligatorio |
+| --- | --- | --- |
+| 1 | Bienvenida | Sí |
+| 2 | Saldos iniciales | Sí |
+| 3 | Sectores | No |
+| 4 | Trabajadores/Instructores | No |
+| 5 | Actividades | No |
+| 6 | Plan y guía de migración | No |
+| 7 | Revisión/finalización | Sí |
 
-Existe `club_onboarding`; el provisioning crea `NOT_STARTED`, current step 1 y arrays de progreso.
+Saldos exige currency, cash, bank, usdCash no negativos; cero es válido. Monedas: ARS/USD/BRL/EUR. Los sectores system ya existen por provisioning. El draft permite configurar sectores, trabajadores e instructores nuevos y actividades con términos FIXED/VARIABLE.
 
-Existen endpoints para read, advance, opening balances, fotos y complete. El draft tiene versión compartida.
+## Persistencia y visibilidad
 
-## Flujo de producto objetivo
+club_onboarding nace NOT_STARTED. COMPLETED/completed_at impide volver a mostrar el asistente, incluso sin movimientos/inscripciones. La visibilidad no depende sólo de conteos.
 
-Walkthrough de 7 pantallas:
+El borrador y navegación son temporales en el montaje web. F5 vuelve al paso 1 y descarta el borrador. current_step/completed_steps/skipped_steps son snapshots legacy; PATCH advance es compatibilidad sin persistencia de avance.
 
-1. Bienvenida.
-2. Cargar Saldos.
-3. Configurar Sectores.
-4. Configurar Trabajadores/Instructores.
-5. Configurar Actividades.
-6. Importación y Migración.
-7. Configuración Finalizada.
+**C03 pendiente:** la documentación anterior prometía progreso persistido/F5 seguro. Describir el comportamiento temporal no aprueba retirar aquel requisito. La persistencia de finalización sí está implementada.
 
-## Regla de aparición
+## Finalización
 
-Club nuevo/vacío puede iniciar onboarding, pero `COMPLETED` impide loop aunque siga sin movimientos/inscripciones.
+POST /api/onboarding/complete recibe draft v2 y selección de plan consistente. onboardingService valida workers; completeOnboardingDraft realiza en withTenantTransaction:
 
-## Paso 1 — Bienvenida
+1. Advisory lock y consulta/registro de operación idempotente.
+2. Validación de catálogo, plan e iconos.
+3. Subscription, opening balances, sectores, workers y actividades/términos.
+4. Asociación de fotos temporales.
+5. COMPLETED, auditoría y resultado guardado.
 
-No omisible. Explica la app y las configuraciones iniciales.
+Repetir la misma clave devuelve resultado; otra clave tras operación completada da conflicto. Fallo revierte escrituras DB. Las fotos pueden haber sido cargadas previamente: la atomicidad final no significa ausencia de archivos temporales anteriores.
 
-## Paso 2 — Saldos
+POST opening-balances permanece como endpoint separado; no es el mecanismo de guardado de cada pantalla del draft actual. completeOnboarding antiguo permanece en repository sin ser la ruta moderna.
 
-No omisible. Requiere moneda, efectivo, cuenta corriente y USD/dólares según contrato vigente. Cero es válido.
+## Workers, actividades y fotos
 
-Debe integrarse al ledger/movimientos auditables.
+Director inicial proviene del provisioning. Remuneración personal: fija opcional con monto/frecuencia/moneda; no porcentaje VARIABLE. El porcentaje de club pertenece a Activity Terms.
 
-## Paso 3 — Sectores
+finalizeWorkers exige identidad nueva; si email ya existe rechaza. Administración posee flujo distinto de invitaciones (C02). No prometer reutilización/invitación dentro del draft.
 
-Siempre existen system sectors:
+Actividad referencia sector del draft e instructor; las escrituras económicas modernas no corrigen automáticamente la lectura FIXED antigua (B03).
 
-- Administración
-- Tesorería
-- Áreas Comunes
+Fotos: fileId opaco tenant, JPG/PNG/WebP hasta 5 MB y 4096 px; temporales 24 h. PRIVATE_UPLOAD_ROOT debe ser persistente si se conservan fotos activas; el default es tmpdir.
 
-Permite agregar sectores tenant desde catálogo/template cuando aplique.
+## Plan y migración
 
-## Paso 4 — Trabajadores/Instructores
+FREE/SOCIAL/COMPLEX/CLUB: selección validada en catálogo y activada sin cobro con origen pre_billing_onboarding, independientemente de BILLING_MODE disabled/sandbox/live. No hay tarjeta ni gateway operativo.
 
-Muestra Director inicial.
+Migración se ejecuta después en su módulo, según permiso/entitlement efectivo. Completion devuelve destino MIGRATION o DASHBOARD. Evitar doble contabilización de opening balances e historia que ya contiene CAPITAL inicial; esta advertencia no sustituye una política de conciliación.
 
-El objetivo de producto requiere crear person/user/membership/role/worker/instructor según elección, con compensación FIXED o VARIABLE.
-
-El repo observado también contiene worker invitations: auditar el checkout local para confirmar el flujo final y evitar dos implementaciones paralelas.
-
-## Paso 5 — Actividades
-
-Configura icono, nombre, responsable, sector y términos económicos. Nested relations mismo tenant.
-
-## Paso 6 — Migración
-
-Informativa. La carga real se realiza luego en el módulo Migración si el plan lo habilita.
-
-Advertir sobre doble contabilización entre opening balances y un historial que ya incluya CAPITAL inicial.
-
-## Paso 7 — Finalización
-
-Marca onboarding COMPLETED, refresca/invalida datos y habilita operación normal.
-
-## Planes
-
-La documentación actual maneja FREE, SOCIAL, COMPLEX y CLUB y también selección de plan durante onboarding.
-
-Reconciliar localmente cómo encaja esa selección dentro de las siete pantallas sin inventar una octava etapa.
-
-## Resiliencia
-
-- progreso persistido;
-- F5 seguro;
-- reintentos idempotentes;
-- errores locales;
-- draft versionado;
-- completar no duplica datos.
+Fuentes: shared contracts/onboarding.ts; web modules/Onboarding/steps.tsx, OnboardingGate.tsx; API onboardingService, onboardingRepository, onboardingPhotoStore y billingService.
