@@ -650,3 +650,18 @@ priorizar:
 4. historial antiguo solo como referencia.
 
 No reconstruir lógica obsoleta por accidente.
+
+## Local PostgreSQL audit access
+
+A local PostgreSQL read-only audit connection may be available through:
+
+`AUDIT_DATABASE_URL`
+
+This connection is intended exclusively for inspection of the real local
+development database.
+
+Before querying it, verify:
+
+```sql
+SELECT current_user;
+SHOW transaction_read_only;
