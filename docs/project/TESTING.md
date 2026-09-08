@@ -57,3 +57,19 @@ Los tests del calculador TS no certifican las vistas runtime FIXED.
 E2E objetivo: Register → Login → Onboarding → Saldos/Sectores/Workers/Activity/Plan → Finish → Dashboard → XLSX dry-run/apply → Economy/Admin/CRM.
 
 No ejecutar contra DB real sin autorización. Readiness exige evidencia del entorno, commit y fecha; los gates rojos no se resuelven cambiando documentación.
+# Regresión de saldos RC — 2026-09-08
+
+Prueba nueva: `apps/api/integration/openingBalancesRegression.test.ts`.
+Requiere `MIGRATION_GATE_DATABASE_URL` explícita y un servidor aislado con
+`miclub.test_cluster=release_candidate_isolated`. Se verifica la marca antes de
+crear o borrar la base temporal. Ejecución desde la raíz:
+
+```text
+node --import tsx --test apps/api/integration/openingBalancesRegression.test.ts
+```
+
+El resultado verificado fue 5 PASS/0 FAIL en PostgreSQL 18 local aislado. Abarca
+HTTP y SQL, no inspección visual. Los gates de registro y aislamiento sólo limpian
+una base después de haberla creado; rechazar un destino no habilita su limpieza.
+El gate de instalación devuelve fallo si no se aporta un backup para probar restore.
+Estado integral y pendientes: [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md).

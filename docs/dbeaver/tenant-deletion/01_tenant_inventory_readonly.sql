@@ -88,7 +88,7 @@ SELECT to_regclass('public.miclub_schema_migrations') AS ledger_relation,
             ELSE 'Revisar comparación: continuar sólo con gate_status=PASS' END AS next_action;
 WITH expected(name,checksum) AS (VALUES
 -- MIGRATION_MANIFEST_VALUES:START
-('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
+    ('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
     ('202606270001_align_existing_miclub_for_sheets_import.sql', '06a39926e25c5c743658a57fb33550129ed679d0659e55702bb4e77c2eefa155'),
     ('202606280001_add_operational_aggregation_views.sql', '710958884d6d31716c632c32d8683f9862f389b5be4cc9d426160a3adaa2023e'),
     ('202606280002_fix_existing_finance_metric_semantics.sql', 'd8aa64d8f82c563303ad3da0e3f747b4b19cc70811fe912923b0b11e9f85046d'),
@@ -178,7 +178,13 @@ WITH expected(name,checksum) AS (VALUES
     ('202609010002_canonical_liquidity_valuation.sql', '1828bb71377045bc480a88223253d0de443d4662b00117333a7d93616979440b'),
     ('202609010003_exchange_rate_usage_components.sql', 'a1926ed98d679de4a6ce08587bfc34beaa8bb95a0169d2c27a2e944435d16dde'),
     ('202609010004_explicit_billing_modes.sql', 'de380c5496d867d2852282188aed2293f323347a11b6663b5a6733016eae15ae'),
-    ('202609010005_commercial_plan_display_metadata.sql', 'c795246ed991ac92e3f3c530de1e50e28709343c0e1bddb7ca1d210b738dde87')
+    ('202609010005_commercial_plan_display_metadata.sql', 'c795246ed991ac92e3f3c530de1e50e28709343c0e1bddb7ca1d210b738dde87'),
+    ('202609050001_pre_billing_onboarding_selection.sql', '773480aed275d07dd64d73c9ce64e4dc6ec5703bae0f1fbf43e6be067409e91e'),
+    ('202609050002_fix_opening_balance_financial_status.sql', 'c475a1512c6ca4222cdc4b2ebb994a3f2d8520178c174f1aa9018bd053e6ff20'),
+    ('202609050003_classify_cmv_as_non_operational.sql', 'c63d9555e9d0b62ff93b07d46b048b8e2d4e7d2c7e70fa3650c82ff6637fdd3c'),
+    ('202609080002_fix_opening_balance_sequences.sql', 'd8ed9e60cad1e4f0a96117da50993f0b927fabbe3b8378d3bd2f192b9bb85ce4'),
+    ('202609080003_retire_required_legacy_worker_payment.sql', '280357a33c84e52a1b0665b8348951077d778fa8b55768f13ec214b29a7c03ea'),
+    ('202609080004_allow_seven_onboarding_steps.sql', 'e7aec4cbf6ba38f5eb97efd027ed9e011536cdc4f01db92d2c1b644fcb690c85')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL
@@ -199,7 +205,7 @@ ORDER BY migration;
 -- Resumen obligatorio: debe devolver exactamente mismatches=0 y ledger_rows=manifest_rows.
 WITH expected(name,checksum) AS (VALUES
 -- MIGRATION_MANIFEST_VALUES:START
-('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
+    ('202606260001_create_miclub_import_schema.sql', '6722dcbef45869c85ee70d67f00aeea65593a48eaf11b5df4c03d2f833d0d908'),
     ('202606270001_align_existing_miclub_for_sheets_import.sql', '06a39926e25c5c743658a57fb33550129ed679d0659e55702bb4e77c2eefa155'),
     ('202606280001_add_operational_aggregation_views.sql', '710958884d6d31716c632c32d8683f9862f389b5be4cc9d426160a3adaa2023e'),
     ('202606280002_fix_existing_finance_metric_semantics.sql', 'd8aa64d8f82c563303ad3da0e3f747b4b19cc70811fe912923b0b11e9f85046d'),
@@ -289,7 +295,13 @@ WITH expected(name,checksum) AS (VALUES
     ('202609010002_canonical_liquidity_valuation.sql', '1828bb71377045bc480a88223253d0de443d4662b00117333a7d93616979440b'),
     ('202609010003_exchange_rate_usage_components.sql', 'a1926ed98d679de4a6ce08587bfc34beaa8bb95a0169d2c27a2e944435d16dde'),
     ('202609010004_explicit_billing_modes.sql', 'de380c5496d867d2852282188aed2293f323347a11b6663b5a6733016eae15ae'),
-    ('202609010005_commercial_plan_display_metadata.sql', 'c795246ed991ac92e3f3c530de1e50e28709343c0e1bddb7ca1d210b738dde87')
+    ('202609010005_commercial_plan_display_metadata.sql', 'c795246ed991ac92e3f3c530de1e50e28709343c0e1bddb7ca1d210b738dde87'),
+    ('202609050001_pre_billing_onboarding_selection.sql', '773480aed275d07dd64d73c9ce64e4dc6ec5703bae0f1fbf43e6be067409e91e'),
+    ('202609050002_fix_opening_balance_financial_status.sql', 'c475a1512c6ca4222cdc4b2ebb994a3f2d8520178c174f1aa9018bd053e6ff20'),
+    ('202609050003_classify_cmv_as_non_operational.sql', 'c63d9555e9d0b62ff93b07d46b048b8e2d4e7d2c7e70fa3650c82ff6637fdd3c'),
+    ('202609080002_fix_opening_balance_sequences.sql', 'd8ed9e60cad1e4f0a96117da50993f0b927fabbe3b8378d3bd2f192b9bb85ce4'),
+    ('202609080003_retire_required_legacy_worker_payment.sql', '280357a33c84e52a1b0665b8348951077d778fa8b55768f13ec214b29a7c03ea'),
+    ('202609080004_allow_seven_onboarding_steps.sql', 'e7aec4cbf6ba38f5eb97efd027ed9e011536cdc4f01db92d2c1b644fcb690c85')
 -- MIGRATION_MANIFEST_VALUES:END
 ), ledger_document AS (
  SELECT CASE WHEN to_regclass('public.miclub_schema_migrations') IS NULL

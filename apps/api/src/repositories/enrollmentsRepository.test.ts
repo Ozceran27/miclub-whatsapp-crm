@@ -27,7 +27,7 @@ const installPool = (fixture: ActivityFixture) => {
   const client: PgClient = {
     query: <T>(sql: string, params?: unknown[]) => {
       queries.push({ sql, params });
-      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return Promise.resolve({ rows: [] });
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql) || sql.includes("set_config")) return Promise.resolve({ rows: [] });
       if (sql.includes("from miclub.people p")) {
         const eligible = fixture.personClubId === params?.[0]
           && fixture.clubId === fixture.personClubId

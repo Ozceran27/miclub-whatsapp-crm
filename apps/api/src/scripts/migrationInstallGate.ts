@@ -6,12 +6,12 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { migrationManifest } from "./migrationManifest.js";
+import { installationManifest } from "./migrationManifest.js";
+import { assertIsolatedTestCluster } from '../db/testClusterGuard.js';
 
 const execute = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const provisioningPath = path.join(root, "apps/api/db/provision/202608150001_runtime_roles.sql");
-const defaultBackup = path.join(root, "apps/api/data/db/dump-miclub_gestion-202608151942.txt");
 const controlUrl = process.env.MIGRATION_GATE_DATABASE_URL;
 
 if (!controlUrl) {
@@ -49,7 +49,7 @@ async function assertCatalog(url: string): Promise<void> {
     );
     assert.deepEqual(
       new Map(ledger.rows.map((row) => [row.name, row.checksum])),
-      new Map(migrationManifest.map((entry) => [path.basename(entry.path), entry.sha256])),
+      new Map(installationManifest(ledger.rows).map((entry) => [path.basename(entry.path), entry.sha256])),
       "el ledger debe coincidir exactamente con migrationManifest",
     );
 
@@ -94,11 +94,17 @@ async function scenario(kind: "empty" | "restore", backup?: string): Promise<voi
 }
 
 try {
+  await assertIsolatedTestCluster(control);
   await runSqlFile(controlUrl, provisioningPath);
   await scenario("empty");
-  const backup = process.env.MIGRATION_GATE_BACKUP ?? defaultBackup;
-  await access(backup);
-  await scenario("restore", backup);
+  // A repository dump is not an adopted ledger. Restoration must use an explicit
+  // previously certified backup, never synthesize historical ledger entries.
+  const backup = process.env.MIGRATION_GATE_BACKUP;
+  if (backup) { await access(backup); await scenario("restore", backup); }
+  else {
+    process.stderr.write('RESTORE NOT VERIFIED: MIGRATION_GATE_BACKUP not supplied\n');
+    process.exitCode = 1;
+  }
 } finally {
   await control.end();
 }

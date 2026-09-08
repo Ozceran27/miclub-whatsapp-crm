@@ -7,12 +7,19 @@ import { billingService } from "../services/billingService.js";
 import { readCommercialPlanCatalog } from "../services/planCommercialCatalog.js";
 import { storedEntityStatus } from "./entityStatusRepository.js";
 import { translateOpeningBalancesError } from "./openingBalancesError.js";
+import { logger } from '../lib/logger.js';
 
 export type OnboardingActor = { userId:string; membershipId:string; clubId:string; requestId?:string; ip?:string; userAgent?:string };
 
 const replaceOpeningBalances=async(db:QueryExecutor,actor:OnboardingActor,currency:string,cash:number,bank:number,usdCash:number,idempotencyKey:string)=>{
  try{return (await db.query<{batch_id:string}>("select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6,$7) batch_id",[actor.clubId,currency,cash,bank,usdCash,idempotencyKey,actor.userId])).rows[0].batch_id;}
- catch(error){throw translateOpeningBalancesError(error);}
+ catch(error){
+  const failure=error as {code?:unknown;column?:unknown;constraint?:unknown};
+  // Whitelist metadata only: PostgreSQL detail/query can contain personal data.
+  const identifier=(v:unknown)=>typeof v==='string'&&/^[a-zA-Z0-9_]{1,128}$/.test(v)?v:undefined;
+  logger.warn('opening balances persistence failed',{requestId:actor.requestId,sqlState:identifier(failure?.code),column:identifier(failure?.column),constraint:identifier(failure?.constraint)});
+  throw translateOpeningBalancesError(error);
+ }
 };
 type Row = { club_id:string; status:OnboardingStatus; current_step:number; completed_steps:number[]; skipped_steps:number[]; started_at:Date|string|null; completed_at:Date|string|null; created_at:Date|string; updated_at:Date|string; movement_count:string|number; enrollment_count:string|number; migration_available:boolean };
 const iso=(v:Date|string|null)=>v==null?null:new Date(v).toISOString();

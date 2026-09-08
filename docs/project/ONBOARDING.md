@@ -1,5 +1,33 @@
 # Onboarding
 
+## Corrección verificada el 2026-09-08
+
+El error recuperable de saldos se reprodujo como PostgreSQL `23502`: la función
+`replace_opening_balances` insertaba movimientos sin `sequence_number` obligatorio.
+La inspección de la base real fue exclusivamente de lectura (`miclub_audit`,
+`transaction_read_only=on`). También confirmó `employees.payment_mode` obligatorio
+y el CHECK de pasos completados limitado a 1–6, incompatibles con las escrituras actuales.
+
+Las migraciones `202609080002`–`202609080004` asignan secuencias también a
+reversiones, protegen los importes negativos mediante relaciones explícitas,
+permiten nuevas altas sin el campo laboral legacy y admiten el paso 7.
+Se conserva el historial y las restricciones de remuneración canónica.
+El script [manual DBeaver](../dbeaver/2026-09-08-onboarding-correction.sql) contiene
+las tres correcciones en una transacción y registra sólo esas ejecuciones en el
+ledger existente. No crea un ledger ni infiere migraciones históricas.
+
+Antes de ejecutarlo, verificar el destino y conservar backup/definiciones anteriores.
+Ejecutar el archivo completo con un usuario propietario del schema; ante error,
+`ROLLBACK`. Después de aplicar, reintentar Finalizar conservando el borrador abierto.
+Esta tarea no ejecutó modificaciones sobre la base real.
+
+`openingBalancesRegression.test.ts` verifica instalación limpia, registro/login HTTP,
+finalización SOCIAL con saldos y sectores obligatorios, replay sin duplicados,
+reemplazo/reversión, rechazo de negativos falsificados y rollback de una fase posterior.
+La prueba usa PostgreSQL 18 aislado y el rol runtime para operaciones de saldos.
+No certifica altas de actividades, fotos, invitaciones ni el recorrido visual móvil.
+La persistencia de borradores al refrescar continúa pendiente en el plan RC.
+
 ## Contrato actual
 
 Siete pantallas implementadas; shared contracts/onboarding.ts define ONBOARDING_DRAFT_CONTRACT_VERSION=2 y la política compartida:

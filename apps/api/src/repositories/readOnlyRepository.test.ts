@@ -9,12 +9,14 @@ void test("las listas aplican paginación, filtros y tenant en datos y total", a
   const calls: Array<{ sql: string; params: unknown[] }> = [];
   const pool: PgPool = {
     query: <T>(sql: string, params: unknown[] = []) => {
+      if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('set_config')) return Promise.resolve({rows:[]});
       calls.push({ sql, params });
       return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "37" }] : [{ id: "movement-1" }]) as T[] });
     },
     connect: () => Promise.reject(new Error("connect no esperado")),
     end: () => Promise.resolve(),
   };
+  pool.connect = () => Promise.resolve({query:pool.query,release:()=>undefined});
   setPostgresPoolForTests(pool);
 
   const page = await getReadOnlyPage("movimientos", {
@@ -39,12 +41,14 @@ void test("el contador de sectores incluye sólo actividades canónicamente acti
   const calls: string[] = [];
   const pool: PgPool = {
     query: <T>(sql: string) => {
+      if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('set_config')) return Promise.resolve({rows:[]});
       calls.push(sql);
       return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "0" }] : []) as T[] });
     },
     connect: () => Promise.reject(new Error("connect no esperado")),
     end: () => Promise.resolve(),
   };
+  pool.connect = () => Promise.resolve({query:pool.query,release:()=>undefined});
   setPostgresPoolForTests(pool);
 
   await getReadOnlyPage("sectores", { clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", limit: 20, offset: 0, filters: {} });

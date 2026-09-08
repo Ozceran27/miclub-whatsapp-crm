@@ -20,7 +20,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
   const client = {
     query: async (sql: string, params?: unknown[]) => {
       queries.push({ sql, params });
-      if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return { rows: [] };
+      if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
       if (sql.includes('miclub_schema_migrations')) return { rows: [{ '?column?': 1 }] };
       if (sql.includes('from miclub.activities') && sql.includes('for update')) {
         const sectors = params?.[3] as string[];
@@ -50,7 +50,7 @@ const createPool = (settlement: ActivityInput['settlement'], failAudit = false) 
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = { query: async (sql: string, params?: unknown[]) => {
     queries.push({ sql, params });
-    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return { rows: [] };
+    if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
     if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
     if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true }] };
     if (sql.includes('insert into miclub.activities')) return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] };

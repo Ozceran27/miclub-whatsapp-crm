@@ -35,7 +35,7 @@ const workspace = (files, project, extra = {}) => ({
 });
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/coverage/**", "node_modules/**", "apps/api/data/**"] },
+  { ignores: ["**/dist/**", "**/coverage/**", "node_modules/**", "apps/api/data/**", ".local-evidence/**"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({ ...config, files: sourceFiles })),
   workspace(["apps/api/**/*.ts"], "apps/api/tsconfig.json"),

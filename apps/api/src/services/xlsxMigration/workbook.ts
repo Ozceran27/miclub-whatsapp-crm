@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isEconomyOperationalStatus } from '@miclub/shared';
 import { withTenantTransaction } from "../../db/transaction.js";
 import type { QueryExecutor } from "../../db/postgres.js";
 import { auditService } from "../auditService.js";
@@ -29,7 +30,11 @@ export async function dryRunWorkbook(input:WorkbookInput,deps:Dependencies=defau
 
 const enrollmentStatus=(value:unknown)=>{const key=String(value??"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"_"); return ({activa:"al_dia",al_dia:"al_dia",nuevo_inscripto:"nuevo_inscripto",adeudando:"adeudando",abandonado:"abandonado",cancelada:"cancelado"} as Record<string,string>)[key]??"otro";};
 const movementType=(value:unknown)=>{const key=String(value??"").trim().toUpperCase(); return key.startsWith("ING")?"INGRESOS":key.startsWith("EGR")?"EGRESOS":"CAPITAL";};
-const movementStatus=(value:unknown)=>{const key=String(value??"").trim().toUpperCase(); return key.includes("PEND")?"PENDIENTE":key.includes("CANCEL")?"CANCELADO":"COMPLETADO";};
+const movementStatus=(value:unknown)=>{
+  const key=typeof value==='string'?value.trim().toUpperCase():'';
+  if(!isEconomyOperationalStatus(key)) throw error('INVALID_MOVEMENT_STATUS','Estado operacional no reconocido.');
+  return key;
+};
 
 export async function applyWorkbook(input:WorkbookInput,deps:Dependencies=defaults){
   if(input.errors.some((item)=>item.severity==="error")) throw error("WORKBOOK_HAS_ERRORS","No se puede aplicar un libro con errores.");

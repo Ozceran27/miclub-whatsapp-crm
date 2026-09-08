@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { basename, relative, resolve } from "node:path";
 import { getPostgresAdminPool, closePostgresAdminPool } from "../db/postgres.js";
-import { migrationManifest } from "./migrationManifest.js";
+import { installationManifest } from "./migrationManifest.js";
 
 type LedgerRow = { name: string; checksum: string; applied_at: Date | string };
 
@@ -39,6 +39,7 @@ try {
   const result = await pool.query<LedgerRow>(
     "select name, checksum, applied_at from public.miclub_schema_migrations order by applied_at, name",
   );
+  const migrationManifest = installationManifest(result.rows);
   const observed = new Map(result.rows.map((row) => [row.name, row]));
   const expectedNames = new Set(migrationManifest.map((entry) => basename(entry.path)));
   const anomalies: string[] = [];

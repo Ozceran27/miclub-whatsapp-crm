@@ -1,6 +1,6 @@
 import { normalizeComparableText } from "../importers/normalizers.js";
 import { getPostgresPool } from "../db/postgres.js";
-import { withTransaction } from "../db/transaction.js";
+import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 import type { ActivitySettlementMutation } from "@miclub/shared";
 import { storedEntityStatus } from "./entityStatusRepository.js";
@@ -31,7 +31,7 @@ const activityColumns = `id, club_id, sector_id, manager_person_id, instructor_i
   monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, archived_at, created_at, updated_at`;
 
 const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean> => {
-  const result = await executor.query("select 1 from public.miclub_schema_migrations where name=$1", [ACTIVITY_MUTATION_MODEL_MIGRATION]);
+  const result = await executor.query("select 1 from public.miclub_schema_migrations where name=$1 or name='202609080001_clean_install.sql'", [ACTIVITY_MUTATION_MODEL_MIGRATION]);
   return Boolean(result.rows[0]);
 };
 
@@ -61,7 +61,7 @@ const auditTerms = (actor: ActivityActor, action: string, activityId: string, be
 
 export const createActivity = async (actor: ActivityActor, input: ActivityInput): Promise<ActivityMutationResult> => {
   const pool = await getPostgresPool();
-  try { return await withTransaction(async (executor) => {
+  try { return await withTenantTransaction(actor.clubId, async (executor) => {
     if (!await modelApplied(executor)) return { kind: "model_not_applied" };
     const invalid = await validReferences(executor, actor, input);
     if (invalid) return { kind: invalid };
@@ -86,7 +86,7 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
 
 const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedAt: string, operation: "update" | "status" | "archive", input?: ActivityInput | { status: "active" | "inactive" }): Promise<ActivityMutationResult> => {
   const pool = await getPostgresPool();
-  try { return await withTransaction(async (executor) => {
+  try { return await withTenantTransaction(actor.clubId, async (executor) => {
     if (!await modelApplied(executor)) return { kind: "model_not_applied" };
     const current = await executor.query<ActivityRow>(`select ${activityColumns} from miclub.activities
       where club_id=$1 and id=$2 and ($3::boolean or sector_id = any($4::uuid[])) for update`,

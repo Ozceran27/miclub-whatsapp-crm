@@ -7,7 +7,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { migrationManifest } from "../src/scripts/migrationManifest.js";
+import { installationManifest } from "../src/scripts/migrationManifest.js";
+import { assertIsolatedTestCluster } from '../src/db/testClusterGuard.js';
 
 const execute = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -42,6 +43,7 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
   };
 
   try {
+    await assertIsolatedTestCluster(control);
     await control.query(`create database ${databaseName}`);
     await execute(process.env.PSQL ?? "psql", ["--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--dbname", disposableUrl, "--file", "apps/api/db/provision/202608150001_runtime_roles.sql"], { cwd: root });
     await execute(process.execPath, ["node_modules/tsx/dist/cli.mjs", "apps/api/src/scripts/runMigrations.ts"], {
@@ -52,8 +54,9 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
 
     database = new pg.Pool({ connectionString: disposableUrl });
     const ledger = await database.query<{ name: string; checksum: string }>("select name, checksum from public.miclub_schema_migrations order by applied_at, name");
-    assert.equal(ledger.rows.length, migrationManifest.length, "el ledger debe registrar todo el manifiesto real");
-    assert.deepEqual(new Set(ledger.rows.map(({ name }) => name)), new Set(migrationManifest.map(({ path: entryPath }) => path.basename(entryPath))));
+    const installed = installationManifest(ledger.rows);
+    assert.equal(ledger.rows.length, installed.length, "el ledger debe registrar sólo el SQL ejecutado");
+    assert.deepEqual(new Set(ledger.rows.map(({ name }) => name)), new Set(installed.map(({ path: entryPath }) => path.basename(entryPath))));
     assert.ok(ledger.rows.every(({ checksum }) => /^[a-f0-9]{64}$/.test(checksum)), "cada migración debe conservar su checksum");
 
     const initial = (await database.query<Record<string, string>>(`select
@@ -67,7 +70,7 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
 
     const globals = (await database.query<Record<string, string>>(`select
       (select count(*) from miclub.category_catalog where is_active)::text categories,
-      (select count(*) from miclub.roles where club_id is null)::text roles,
+      (select count(*) from miclub.plans where catalog_status='catalog')::text plans,
       (select count(*) from miclub.sector_templates where is_active)::text templates`)).rows[0];
     assert.ok(Object.values(globals).every((count) => Number(count) > 0), "los catálogos globales deben quedar disponibles sin crear tenants");
 

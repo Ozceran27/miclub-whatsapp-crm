@@ -72,3 +72,11 @@ Otros riesgos: PGSSL desactiva verificación de certificado; trust proxy=true re
 4. Sólo después preparar readiness de reset real con backup/restauración, ledger y SQL manual revisado.
 
 La existencia de scripts no prueba ejecución. Rige docs/pre-reset-readiness.md; el reset real no es el próximo paso automático.
+# Verificación RC — 2026-09-08
+
+Trabajo sin commit sobre `bec17e642b3a6f151aaab62a51b179926a7da5bb`.
+La implementación del plan RC está **parcial**, no certificada. El inventario
+de tareas y límites se mantiene en [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md).
+La corrección del error de saldos fue reproducida y validada en PostgreSQL aislado;
+requiere SQL manual en la base real, detallado en [ONBOARDING.md](ONBOARDING.md).
+No se ejecutó reset ni SQL modificador en la base real.

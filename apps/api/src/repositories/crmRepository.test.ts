@@ -36,11 +36,13 @@ test("insertHistory deja que PostgreSQL genere legacy_sqlite_id para mensajes nu
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const pool = {
     query: async (sql: string, params?: unknown[]) => {
+      if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('set_config')) return {rows:[]};
       queries.push({ sql, params });
       if (queries.length === 1) return { rows: [{ ready: true }] };
       return { rows: [historyRow(42)] };
     },
   } as PgPool;
+  pool.connect = () => Promise.resolve({query:pool.query,release:()=>undefined});
   setPostgresPoolForTests(pool);
 
   const created = await insertHistory("club-1", history);
@@ -55,11 +57,13 @@ test("insertHistory conserva el id legacy y el upsert idempotente durante migrac
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const pool = {
     query: async (sql: string, params?: unknown[]) => {
+      if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('set_config')) return {rows:[]};
       queries.push({ sql, params });
       if (queries.length === 1) return { rows: [{ ready: true }] };
       return { rows: [historyRow(99)] };
     },
   } as PgPool;
+  pool.connect = () => Promise.resolve({query:pool.query,release:()=>undefined});
   setPostgresPoolForTests(pool);
 
   const created = await insertHistory("club-1", { ...history, legacySqliteId: 99 });

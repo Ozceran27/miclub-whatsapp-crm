@@ -118,9 +118,38 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202609050001_pre_billing_onboarding_selection.sql", sha256: "773480aed275d07dd64d73c9ce64e4dc6ec5703bae0f1fbf43e6be067409e91e", dependsOn: ["202609010004_explicit_billing_modes.sql"], requires: ["miclub.table.club_subscriptions"], checkpointPurpose: "Valida el origen pre-billing que activa cualquier plan de onboarding inmediatamente y sin cobro." },
   { path: "202609050002_fix_opening_balance_financial_status.sql", sha256: "c475a1512c6ca4222cdc4b2ebb994a3f2d8520178c174f1aa9018bd053e6ff20", dependsOn: ["202608210001_operational_currency_opening_balances.sql"], provides: ["miclub.function.replace_opening_balances"], checkpointPurpose: "Corrige los movimientos de saldos iniciales para usar el estado financiero canónico pagado sin ampliar el enum." },
   { path: "202609050003_classify_cmv_as_non_operational.sql", sha256: "c63d9555e9d0b62ff93b07d46b048b8e2d4e7d2c7e70fa3650c82ff6637fdd3c", dependsOn: ["202608210003_complete_product_category_catalog.sql"], requires: ["miclub.table.category_catalog", "miclub.table.category_import_aliases"], checkpointPurpose: "Clasifica CMV como egreso no operativo y repara sus vínculos tenant sin alterar movimientos ni importes históricos." },
+  { path: "202609080002_fix_opening_balance_sequences.sql", sha256: "d8ed9e60cad1e4f0a96117da50993f0b927fabbe3b8378d3bd2f192b9bb85ce4", dependsOn: ["202609050002_fix_opening_balance_financial_status.sql", "202608130006_tenant_entity_sequences.sql"], checkpointPurpose: "Asigna secuencias tenant a saldos iniciales y protege sus reversiones explícitas sin permitir egresos negativos ordinarios." },
+  { path: "202609080003_retire_required_legacy_worker_payment.sql", sha256: "280357a33c84e52a1b0665b8348951077d778fa8b55768f13ec214b29a7c03ea", dependsOn: ["202608280003_compensation_and_activity_term_currencies.sql"], checkpointPurpose: "Retira la obligatoriedad del campo laboral legacy y conserva las restricciones de remuneración canónica." },
+  { path: "202609080004_allow_seven_onboarding_steps.sql", sha256: "e7aec4cbf6ba38f5eb97efd027ed9e011536cdc4f01db92d2c1b644fcb690c85", checkpointPurpose: "Permite persistir el séptimo paso de finalización del onboarding." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";
+
+/** Alternative fresh-install history. Never manufacture the 94 legacy ledger rows. */
+export const cleanInstallBaseline: MigrationManifestEntry = {
+  path: "../baselines/202609080001_clean_install.sql",
+  sha256: "a1dfe8bee4e06a9aaddc97803e618443b0d069625f6755173df9bc1d2a6b46b5",
+};
+export const BASELINE_LEGACY_COUNT = 94;
+export type MigrationLedgerEntry = { name: string; checksum: string };
+export function installationManifest(ledger: readonly MigrationLedgerEntry[]): readonly MigrationManifestEntry[] {
+  const baselineName = pathBasename(cleanInstallBaseline.path);
+  const usesBaseline = ledger.length === 0 || ledger.some(row => row.name === baselineName);
+  const expected = usesBaseline
+    ? [cleanInstallBaseline, ...migrationManifest.slice(BASELINE_LEGACY_COUNT)]
+    : migrationManifest;
+  const known = new Map(expected.map(entry => [pathBasename(entry.path), entry.sha256]));
+  for (const row of ledger) {
+    if (known.get(row.name) !== row.checksum) throw new Error(`Ledger desconocido o checksum incompatible: ${row.name}`);
+  }
+  const applied = new Set(ledger.map(row => row.name));
+  let gap = false;
+  for (const entry of expected) {
+    if (!applied.has(pathBasename(entry.path))) gap = true;
+    else if (gap) throw new Error('Ledger parcial no contiguo; requiere reconciliación manual');
+  }
+  return expected;
+}
 
 /** Canonical SQL rows embedded in the DBeaver tenant-deletion ledger gates. */
 export function renderTenantDeletionManifestValues(

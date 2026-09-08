@@ -1,5 +1,5 @@
 import { getPostgresPool } from "../db/postgres.js";
-import { withTransaction } from "../db/transaction.js";
+import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 
 export type EnrollmentActor = { userId: string; membershipId: string; clubId: string; requestId?: string; ip?: string; userAgent?: string };
@@ -12,7 +12,7 @@ const columns = "id, club_id, sequence_number, external_id, person_id, activity_
 /** Audits the tenant-owned person, activity and existing enrollment before inserting anything. */
 export const createEnrollment = async (actor: EnrollmentActor, input: EnrollmentInput): Promise<EnrollmentResult> => {
   const pool = await getPostgresPool();
-  return withTransaction(async (db) => {
+  return withTenantTransaction(actor.clubId, async (db) => {
     const references = await db.query<{ person_id: string; activity_id: string }>(`
       select p.id person_id, a.id activity_id
       from miclub.people p
@@ -49,7 +49,7 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
 /** Sets or clears the explicit override without disabling the automatic lifecycle globally. */
 export const setEnrollmentStatus = async (actor: EnrollmentActor, id: string, status: string, override: boolean, expectedUpdatedAt: string): Promise<EnrollmentStatusResult> => {
   const pool = await getPostgresPool();
-  return withTransaction(async (db) => {
+  return withTenantTransaction(actor.clubId, async (db) => {
     const before = await db.query<Record<string, unknown>>(`select ${columns} from miclub.enrollments where club_id=$1 and id=$2 for update`, [actor.clubId,id]);
     if (!before.rows[0]) return {kind:"missing"};
     if (new Date(String(before.rows[0].updated_at)).toISOString() !== new Date(expectedUpdatedAt).toISOString()) return {kind:"conflict"};

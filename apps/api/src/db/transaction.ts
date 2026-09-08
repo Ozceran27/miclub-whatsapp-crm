@@ -37,3 +37,10 @@ export const withTenantTransaction = async <T>(
   await executor.query("SELECT set_config('app.current_club_id', $1, true)", [clubId]);
   return callback(executor);
 }, pool);
+
+/** Single-statement tenant reads. Multi-statement mutations must use
+ * withTenantTransaction and pass its executor through the complete operation. */
+export const tenantExecutor = (clubId: string): QueryExecutor => ({
+  query: <T = Record<string, unknown>>(sql: string, params?: unknown[]) =>
+    withTenantTransaction(clubId, db => db.query<T>(sql, params)),
+});

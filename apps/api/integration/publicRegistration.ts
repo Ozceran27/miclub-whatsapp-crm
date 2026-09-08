@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { CLUB_ROLE_DEFINITIONS } from "@miclub/shared";
+import { assertIsolatedTestCluster } from '../src/db/testClusterGuard.js';
 
 const execute = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -46,8 +47,11 @@ const tenantCounts = async () => (await database!.query<Record<string, string>>(
     (select count(*) from miclub.sectors)::text sectors
 `)).rows[0];
 
+let createdDatabase = false;
 const main = async () => {
+  await assertIsolatedTestCluster(control);
   await control.query(`create database ${databaseName}`);
+  createdDatabase = true;
   await execute(process.env.PSQL ?? "psql", ["--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--dbname", controlUrl, "--file", "apps/api/db/provision/202608150001_runtime_roles.sql"], { cwd: root });
   await execute(process.execPath, ["node_modules/tsx/dist/cli.mjs", "apps/api/src/scripts/runMigrations.ts"], {
     cwd: root, env: { ...process.env, ADMIN_DATABASE_URL: disposableUrl, PGADMINROLE: "" }, maxBuffer: 32 * 1024 * 1024,
@@ -116,7 +120,7 @@ finally {
   const { closePostgresPool, closePostgresAdminPool } = await import("../src/db/postgres.js");
   await closePostgresPool().catch(() => undefined); await closePostgresAdminPool().catch(() => undefined);
   await database?.end().catch(() => undefined);
-  await control.query("select pg_terminate_backend(pid) from pg_stat_activity where datname=$1 and pid<>pg_backend_pid()", [databaseName]).catch(() => undefined);
-  await control.query(`drop database if exists ${databaseName}`).catch(() => undefined);
+  if (createdDatabase) await control.query("select pg_terminate_backend(pid) from pg_stat_activity where datname=$1 and pid<>pg_backend_pid()", [databaseName]).catch(() => undefined);
+  if (createdDatabase) await control.query(`drop database if exists ${databaseName}`).catch(() => undefined);
   await control.end();
 }

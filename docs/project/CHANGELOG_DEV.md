@@ -32,3 +32,13 @@ El proyecto ya había evolucionado hacia PostgreSQL, multi-tenancy, registro pú
 ## Checkpoints anteriores
 
 Consultar Git history, `docs/history/` y documentación canónica. No reconstruir todos los prompts históricos aquí.
+# 2026-09-08 — Corrección de finalización y revisión RC parcial
+
+- Reproducido el fallo de saldos por `sequence_number` omitido; migración nueva
+  con secuencias tenant, reversión explícita y protección de negativos falsificados.
+- Corregidos prerrequisitos de alta moderna de trabajadores y persistencia del paso 7.
+- SQL manual DBeaver transaccional con ledger de ejecuciones reales, sin reset.
+- Error de schema pendiente responde como actualización requerida; logs de errores
+  del servidor no imprimen filas PostgreSQL ni secretos.
+- Regresión real de saldos: 5 PASS. Build/typecheck y manifiesto pasan; suite global,
+  lint, deadcode y certificación integral siguen pendientes. No es checkpoint RC.

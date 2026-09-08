@@ -96,6 +96,11 @@ router.post("/worker-invitations/:decision", asyncHandler(async (req, res) => {
   const session = getSession(req);
   const decision = req.params.decision;
   if (!session?.userId) return res.status(401).json({ error: true, code: "AUTHENTICATION_REQUIRED", message: "Sesión requerida" });
+  const membership = session.membershipId ? await getActiveMembershipContext(session.userId, session.membershipId) : null;
+  if (!membership || isSessionRevoked(session, membership.session_revoked_before)) {
+    clearSessionCookie(req, res);
+    return res.status(401).json({ error: true, code: 'SESSION_REVOKED', message: 'Iniciá sesión nuevamente.' });
+  }
   if (decision !== "accept" && decision !== "reject") return res.status(404).json({ error: true, code: "NOT_FOUND", message: "Recurso inexistente" });
   const token = typeof req.body?.token === "string" ? req.body.token : "";
   try {

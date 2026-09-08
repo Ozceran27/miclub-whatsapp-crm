@@ -1,5 +1,5 @@
 import { getPostgresPool } from "../db/postgres.js";
-import { withTransaction } from "../db/transaction.js";
+import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 
 export type MovementRow = Record<string, unknown>;
@@ -46,7 +46,7 @@ const audit = (actor: MovementActor, action: string, before: MovementRow | null,
 
 export const createMovement = async (actor: MovementActor, input: MovementInput, idempotencyKey: string): Promise<MovementMutationResult> => {
   const pool = await getPostgresPool();
-  return withTransaction(async (db) => {
+  return withTenantTransaction(actor.clubId, async (db) => {
     const replay = await db.query<MovementRow>(`select ${movementColumns} from miclub.movements where club_id=$1 and idempotency_key=$2`,[actor.clubId,idempotencyKey]);
     if(replay.rows[0]) return {kind:"replayed",movement:replay.rows[0]};
     const result = await db.query<MovementRow>(`insert into miclub.movements
@@ -71,13 +71,13 @@ const lockMovement = async (db: Parameters<typeof auditService.movement>[1] & { 
 };
 
 export const updateMovement = async (actor: MovementActor,id:string,expected:string,input:MovementInput):Promise<MovementMutationResult> => {
-  const pool=await getPostgresPool(); return withTransaction(async(db)=>{ const locked=await lockMovement(db,actor,id,expected); if(locked.kind!=="ok")return locked;
+  const pool=await getPostgresPool(); return withTenantTransaction(actor.clubId, async(db)=>{ const locked=await lockMovement(db,actor,id,expected); if(locked.kind!=="ok")return locked;
     const result=await db.query<MovementRow>(`update miclub.movements set movement_date=$3,movement_type=$4,category_id=$5,sector_id=$6,concept=$7,person_id=$8,counterparty_text=$9,amount=$10,taxes=$11,payment_method_id=$12,financial_status=$13,operational_status=$14,updated_at=now() where club_id=$1 and id=$2 and voided_at is null returning ${movementColumns}`,
       [actor.clubId,id,input.movementDate,input.movementType,input.categoryId??null,input.sectorId??null,input.concept,input.personId??null,input.counterpartyText??null,input.amount,input.taxes??0,input.paymentMethodId??null,input.financialStatus??"otro",input.operationalStatus??"COMPLETADO"]);
     if(!result.rows[0])return {kind:"conflict"}; await audit(actor,"movement.update",locked.row,result.rows[0],db); return {kind:"updated",movement:result.rows[0]}; },pool);
 };
 
 /** Financial facts are never deleted: deletion semantics are an auditable annulment. */
-export const voidMovement = async(actor:MovementActor,id:string,expected:string,reason:string):Promise<MovementMutationResult>=>{const pool=await getPostgresPool();return withTransaction(async(db)=>{const locked=await lockMovement(db,actor,id,expected);if(locked.kind!=="ok")return locked;
+export const voidMovement = async(actor:MovementActor,id:string,expected:string,reason:string):Promise<MovementMutationResult>=>{const pool=await getPostgresPool();return withTenantTransaction(actor.clubId, async(db)=>{const locked=await lockMovement(db,actor,id,expected);if(locked.kind!=="ok")return locked;
   const result=await db.query<MovementRow>(`update miclub.movements set operational_status='ANULADO',voided_at=now(),voided_by=$3,void_reason=$4,updated_at=now() where club_id=$1 and id=$2 and voided_at is null returning ${movementColumns}`,[actor.clubId,id,actor.userId,reason]);
   if(!result.rows[0])return {kind:"conflict"};await audit(actor,"movement.void",locked.row,result.rows[0],db);return {kind:"updated",movement:result.rows[0]};},pool)};

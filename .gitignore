@@ -12,3 +12,4 @@ build/
 #.local-evidence/
 !apps/api/data/.gitkeep
 .env.codex.local
+.local-evidence/

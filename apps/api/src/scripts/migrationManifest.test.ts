@@ -19,7 +19,7 @@ test("el checkpoint post-admin archivado se genera desde las entradas correspond
   assert.ok(end > start, `falta ${endMarker}`);
   const documentedTable = checkpoint.slice(start + startMarker.length, end).trim();
 
-  assert.equal(documentedTable, renderPostAdminMigrationTable());
+  assert.equal(canonicalizeMigrationSql(documentedTable), renderPostAdminMigrationTable());
 });
 
 test("el manifiesto incluye exactamente una vez cada SQL versionado y conserva sus checksums", async () => {

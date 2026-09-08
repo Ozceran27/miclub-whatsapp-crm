@@ -24,3 +24,12 @@ test("un fallo en una fila intermedia revierte el lote y audita el fallo",async(
 test("un reintento posterior a rollback puede completar",async()=>{const failed=harness({failMovement:true});await assert.rejects(applyWorkbook(input(),failed.deps));const retry=harness();assert.equal((await applyWorkbook(input(),retry.deps)).status,"completed");});
 test("un lote exacto ya completado se rechaza sin escribir filas",async()=>{const h=harness({duplicate:true});await assert.rejects(applyWorkbook(input(),h.deps),(error:any)=>error.code==="BATCH_ALREADY_EXECUTED");assert.ok(!h.queries.some(({sql})=>sql.includes("insert into miclub.movements")));});
 test("dos clubes mantienen club_id independiente en todas las escrituras",async()=>{for(const club of ["club-a","club-b"]){const h=harness();await applyWorkbook(input(club),h.deps);for(const query of h.queries.filter(({sql})=>/insert into miclub\.(?:movements|xlsx_import_rows)/.test(sql))) assert.equal(query.params[0],club);}});
+
+test('ANULADO conserva el estado y un estado desconocido revierte el lote',async()=>{
+  const value=input(); value.rows[0].values.status='ANULADO';
+  const h=harness(); await applyWorkbook(value,h.deps);
+  assert.equal(h.queries.find(q=>q.sql.includes('insert into miclub.movements'))?.params[12],'ANULADO');
+  value.rows[0].values.status='UNKNOWN'; const invalid=harness();
+  await assert.rejects(applyWorkbook(value,invalid.deps), /Estado operacional/);
+  assert.equal(invalid.rollbacks,1);
+});

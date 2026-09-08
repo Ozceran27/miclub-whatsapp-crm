@@ -21,8 +21,10 @@ export const errorHandler: ErrorRequestHandler = (error: HttpError, req, res, _n
   const message = status >= 500 && !error.expose ? "Error interno del servidor." : error.message;
 
   if (status >= 500) {
-    if (process.env.NODE_ENV === "production") console.error({ message: error.message, requestId: req.requestId, status });
-    else console.error(error);
+    // pg errors include failing rows and SQL parameters even in development.
+    // Never log the raw error/cause/detail: they may contain hashes or PII.
+    console.error({ requestId: req.requestId, status,
+      code: typeof error.code==='string' && /^[A-Z0-9_]{1,80}$/.test(error.code) ? error.code : 'UNEXPECTED' });
   }
 
   const code = (error.code
