@@ -33,3 +33,13 @@ test('ANULADO conserva el estado y un estado desconocido revierte el lote',async
   await assert.rejects(applyWorkbook(value,invalid.deps), /Estado operacional/);
   assert.equal(invalid.rollbacks,1);
 });
+
+test('apply conserva actividad explícita y permite movimientos generales',async()=>{
+  for(const activityId of ['activity',null]) {
+    const value=input();value.resolvedRows[0].activityId=activityId;
+    const h=harness();await applyWorkbook(value,h.deps);
+    const write=h.queries.find(q=>q.sql.includes('insert into miclub.movements'))!;
+    assert.match(write.sql,/source_payload,activity_id/);
+    assert.equal(write.params[14],activityId);
+  }
+});

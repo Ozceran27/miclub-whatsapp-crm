@@ -14,6 +14,12 @@ Valoración multimoneda: currencies, exchange_rates, sync_state, usages/componen
 
 ## Reglas de liquidación conservadas
 
+Definiciones de dirección 2026-09-09: todos los cobros los recibe el club y se
+atribuyen al mes de cobro, incluidas cuotas atrasadas y señas. Saldo negativo FIXED
+representa deuda del responsable: 60000 − 85000 = -25000. El calculador conserva
+el signo y tiene regresión; el arrastre/cobro operativo se integra en la próxima
+etapa de cierre y ajustes. No se certifica esa integración por este test.
+
 VARIABLE: club_share_percentage pertenece al club; responsable recibe 100 menos ese porcentaje.
 
 completed operational income × responsible share − settlements paid.
@@ -49,6 +55,6 @@ Hay cálculos JS con Number/redondeo y SQL numeric; no prometer aritmética deci
 
 ## Otros riesgos
 
-B04: XLSX transforma ANULADO en COMPLETADO al aplicar. Mantener excluidos anulados sigue siendo la regla; documentar el bug no lo autoriza.
+B04 corregido en workbook.ts: ANULADO se conserva y estados desconocidos se rechazan.
 
 Fuentes: movementPredicates.ts, operationalBalancesCalculator.ts, activitySettlementService.ts, postgresDashboard/implementation.ts; migrations 202608210002, 202608270003, 202608280003, 202608310001, 202609010002/3 y 202609050002/3.

@@ -6,7 +6,7 @@ import { useSession } from '../../session';
 import { completeOnboarding, getOnboarding } from '../../services/api/onboardingApi';
 import { getPreviousStep, OnboardingDialog } from './OnboardingDialog';
 import { loadHomeDashboardResources } from '../Home/homeDashboardApi';
-import { getNavigation } from '../../services/api/navigationApi';
+import { getNavigation, type BackendNavigation } from '../../services/api/navigationApi';
 
 const completionStorageKey=(clubId:string)=>`miclub:onboarding-completed:${clubId}`;
 
@@ -17,7 +17,7 @@ export const createInitialOnboardingDraft = (): OnboardingDraft => ({
   sectors: PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:'#2563EB',status:'active',capacityMode:'INCOME' as const,configuredCapacity:null})), workers: [], activities: [],
 });
 
-export function OnboardingGate({ children }: { children: ReactNode }) {
+export function OnboardingGate({ children, onNavigationReady }: { children: ReactNode; onNavigationReady?: (navigation: BackendNavigation) => void }) {
   const { status, clubId, permissions } = useSession(); const { navigate } = useRouter();
   const [state, setState] = useState<OnboardingState>(); const [loading, setLoading] = useState(false); const [error, setError] = useState('');
   const [completionConfirmed,setCompletionConfirmed]=useState(false);
@@ -31,7 +31,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
   useEffect(() => { if (status !== 'authenticated' || !clubId || !canRead) return; const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [canRead, clubId, load, status]);
   useEffect(() => { if (!state?.shouldShow) return; setVisibleStep(1); setDirection('forward'); }, [clubId,state?.shouldShow]);
   const updateDraft=<K extends keyof OnboardingDraft>(key:K,value:OnboardingDraft[K])=>setDraft(current=>({...current,[key]:value}));
-  const complete = async () => { if(loading)return; setLoading(true); setError(''); try { const result = await completeOnboarding(draft);const navigation=await getNavigation();const effectiveDestination:OnboardingDestination=permissions.includes('imports.run')&&hasClubCapability(navigation.capabilities,CLUB_CAPABILITIES.DATA_MIGRATION)?'MIGRATION':'DASHBOARD';setDestination(effectiveDestination);if(clubId)sessionStorage.setItem(completionStorageKey(clubId),effectiveDestination);setState({...result.state,status:'COMPLETED',shouldShow:true,migrationAvailable:effectiveDestination==='MIGRATION'});setCompletionConfirmed(true);invalidateTenantQueries(clubId);await loadHomeDashboardResources(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo completar el onboarding o verificar sus capacidades. Reintentá para recuperar el resultado.'); } finally { setLoading(false); } };
+  const complete = async () => { if(loading)return; setLoading(true); setError(''); try { const result = await completeOnboarding(draft);const navigation=await getNavigation();onNavigationReady?.(navigation);const effectiveDestination:OnboardingDestination=permissions.includes('imports.run')&&hasClubCapability(navigation.capabilities,CLUB_CAPABILITIES.DATA_MIGRATION)?'MIGRATION':'DASHBOARD';setDestination(effectiveDestination);if(clubId)sessionStorage.setItem(completionStorageKey(clubId),effectiveDestination);setState({...result.state,status:'COMPLETED',shouldShow:true,migrationAvailable:effectiveDestination==='MIGRATION'});setCompletionConfirmed(true);invalidateTenantQueries(clubId);await loadHomeDashboardResources(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo completar el onboarding o verificar sus capacidades. Reintentá para recuperar el resultado.'); } finally { setLoading(false); } };
   const continueToDestination=()=>{if(clubId)sessionStorage.removeItem(completionStorageKey(clubId));setState(current=>current?{...current,shouldShow:false}:current);navigate(destination==='MIGRATION'?'/app/migration':'/app',{replace:true});};
   if (canRead && !state && loading) return <div className="onboarding-gate-status" role="status">Preparando la configuración de tu club…</div>;
   if (canRead && !state && error) return <div className="onboarding-gate-status" role="alert"><p>{error}</p><button className="primary-btn" onClick={() => void load()}>Reintentar</button></div>;

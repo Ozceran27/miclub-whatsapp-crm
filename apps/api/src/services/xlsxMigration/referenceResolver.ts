@@ -37,7 +37,7 @@ export function resolveReferenceRows(rows:ReferenceRow[], catalog:ReferenceCatal
     const personKey=normalizeComparableText(row.document);
     const person=(catalog.people??[]).find((candidate)=>keys(candidate).includes(personKey));
     if (sector&&activity&&activity.sectorId!==sector.id) errors.push({error_code:"ACTIVITY_SECTOR_MISMATCH",message:"La actividad no pertenece al sector de la fila.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"activity",value_normalized:normalizeComparableText(row.activity)});
-    if (activity&&!activity.instructorId) errors.push({error_code:"ACTIVITY_WITHOUT_INSTRUCTOR",message:"La actividad debe tener un instructor vigente antes de importar inscripciones.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"activity",value_normalized:normalizeComparableText(row.activity)});
+    if (row.sheet==="INSCRIPCIONES"&&activity&&!activity.instructorId) errors.push({error_code:"ACTIVITY_WITHOUT_INSTRUCTOR",message:"La actividad debe tener un instructor vigente antes de importar inscripciones.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"activity",value_normalized:normalizeComparableText(row.activity)});
     if (instructor&&activity&&activity.instructorId!==instructor.id) errors.push({error_code:"ACTIVITY_INSTRUCTOR_MISMATCH",message:"El instructor no es el instructor vigente de la actividad.",severity:"error",sheet:row.sheet,row_number:row.rowNumber,field:"instructor",value_normalized:normalizeComparableText(row.instructor)});
     const externalReference=(typeof row.externalReference==="string"||typeof row.externalReference==="number" ? String(row.externalReference).trim() : "")||null;
     const rowFingerprint=createHash("sha256").update(JSON.stringify(row.values.map((value)=>normalizeComparableText(value)))).digest("hex");
@@ -51,7 +51,7 @@ export async function loadReferenceCatalog(clubId:string):Promise<ReferenceCatal
     const [sectors,activities,instructors,categories,paymentMethods,people]=await Promise.all([
       db.query<ImportReference>(`select id,name,code from miclub.sectors where club_id=$1`,[clubId]),
       db.query<{id:string;name:string;code:string|null;sector_id:string;instructor_id:string|null;modality:string|null}>(`select id,name,code,sector_id,instructor_id,modality from miclub.activities where club_id=$1 and archived_at is null`,[clubId]),
-      db.query<ImportReference>(`select id,display_name as name,code from miclub.instructors where club_id=$1 and is_active=true`,[clubId]),
+      db.query<ImportReference>(`select id,display_name as name,null::text as code from miclub.instructors where club_id=$1 and status='activa'`,[clubId]),
       db.query<ImportReference>(`select mc.id,mc.name,cc.code,coalesce(array_agg(cia.normalized_alias) filter (where cia.normalized_alias is not null),'{}') as aliases from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id left join miclub.category_import_aliases cia on cia.catalog_id=cc.id where mc.club_id=$1 and mc.is_active=true and cc.is_active=true group by mc.id,mc.name,cc.code`,[clubId]),
       db.query<ImportReference>(`select id,name,null::text as code from miclub.payment_methods where club_id=$1 and is_active=true`,[clubId]),
       db.query<ImportReference>(`select id,dni as name,dni as code from miclub.people where club_id=$1 and dni is not null`,[clubId]),

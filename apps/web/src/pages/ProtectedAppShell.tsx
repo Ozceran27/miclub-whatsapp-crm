@@ -25,7 +25,7 @@ export default function ProtectedAppShell() {
   const [logoutError, setLogoutError] = useState('');
   const { theme, toggleTheme } = useTheme();
 
-  useEffect(() => { const controller = new AbortController(); getNavigation(controller.signal).then(setNavigation).catch(() => undefined); return () => controller.abort(); }, [clubId]);
+  useEffect(() => { const controller = new AbortController(); getNavigation(controller.signal).then(result => { if (!controller.signal.aborted) setNavigation(result); }).catch(() => undefined); return () => controller.abort(); }, [clubId, path]);
   const modules = useMemo(() => visibleModules([
     ...navigation.modules.map((id) => ({ id, label: CORE_LABELS[id] })),
     ...navigation.sectors.map((sector) => ({ id: `sector:${sector.id}` as const, label: sector.name.toLocaleUpperCase('es-AR') })),
@@ -45,5 +45,5 @@ export default function ProtectedAppShell() {
     if (currentModule === 'dataMigration') return <DataMigrationModule />;
     return <PlaceholderModule title={sector?.name ?? 'Sector'} description="Sector configurado para este club desde el catálogo persistido." futureItems={['Actividades.', 'Inscriptos.', 'Movimientos.', 'Liquidaciones.']} />;
   };
-  return <OnboardingGate><div className="container app-shell"><header className="app-header"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" /><div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div><div className="app-header__actions"><button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>{theme === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}</button><button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}</button></div></header>{logoutError && <p className="login-error" role="alert">{logoutError}</p>}<ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} /><div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div></div></OnboardingGate>;
+  return <OnboardingGate onNavigationReady={setNavigation}><div className="container app-shell"><header className="app-header"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" /><div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div><div className="app-header__actions"><button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>{theme === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}</button><button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}</button></div></header>{logoutError && <p className="login-error" role="alert">{logoutError}</p>}<ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} /><div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div></div></OnboardingGate>;
 }

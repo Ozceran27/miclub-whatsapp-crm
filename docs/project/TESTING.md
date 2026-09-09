@@ -1,5 +1,27 @@
 # Testing
 
+## Verificación de esta etapa — 2026-09-09
+
+- Regresiones focalizadas de capacidades, XLSX y onboarding: 66 PASS.
+- Suite local completa: 475 tests, 470 PASS, 5 FAIL. Persisten los fallos RC:
+  startup productivo Windows, comparación documental de activity terms,
+  fixture de último Director y dos assertions visuales sr-only/iconos.
+- Integración `openingBalancesRegression.test.ts`: 7 PASS, 0 FAIL en PostgreSQL
+  18 aislado marcado, incluyendo registro/login, onboarding CLUB y replay,
+  navegación/descarga para FREE/SOCIAL/COMPLEX/CLUB, override/expiración,
+  instalación/replay del SQL manual de categorías, dry-run/apply de actividad,
+  sector e inscripción, referencias cambiadas y rechazo tenant A/B sin escrituras.
+- Manifiesto: 15 PASS. Migraciones históricas intactas; delta nuevo registrado.
+- Typecheck y build PASS en los tres workspaces. Bundle web ~813 kB: advertencia
+  de tamaño pendiente. Lint global FAIL: 281 errores y 586 warnings en la ejecución
+  de esta etapa; no se deshabilitaron reglas.
+- Plantilla XLSX v3 renderizada y validada por el lector runtime. No se ejecutó
+  E2E visual de navegador ni SQL sobre la base real.
+
+Comandos reales: `npm run typecheck`, `npm run build`, `npm run lint`,
+`npm run db:migrations:check`; tests con `node --import tsx --test`.
+En Windows, tsx necesitó ejecución fuera del sandbox por `uv_os_get_passwd ENOMEM`.
+
 ## Evidencia del bootstrap — 2026-09-07
 
 Commit 42b81a363c4eee04dd4d3bbaceaff116d7c26891. Resultados históricos de esta auditoría; la sincronización documental no los convierte en certificación nueva.

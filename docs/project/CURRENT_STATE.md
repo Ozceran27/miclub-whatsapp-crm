@@ -1,5 +1,32 @@
 # Current State
 
+## Actualización operativa — 2026-09-09
+
+Esta sección prevalece sobre los hallazgos históricos inferiores para los cambios
+que enumera; no certifica una release integral ni el despliegue real.
+
+- Corregido acceso a Migración por plan: navegación y autorización comparten
+  resolución efectiva. Menú actualizado al completar onboarding y cambiar ruta;
+  endpoint sin caché HTTP. RBAC y overrides siguen aplicándose.
+- XLSX v3 agrega Actividad en AA de ADMINISTRACIÓN y persiste activity_id; deriva
+  sector si falta, bloquea discordancias y referencias ambiguas/ajenas al club.
+  Concepto no infiere relaciones. Plantilla v2 exige conversión manual a v3.
+- Validador compatible con XML estándar prefijado y celdas vacías; corregida
+  consulta de instructores. Hash del dry-run incluye referencias resueltas.
+  retry/reversal se rechazan, sin prometer reversión implementada.
+- Catálogo incorpora Reservas/Señas como ingresos operativos. Economía deriva
+  su lista de ingresos operativos del catálogo shared. Nueva migración aditiva,
+  con SQL manual [DBeaver](../dbeaver/2026-09-09-reservas-senas.sql); no ejecutado
+  sobre la base real. No hay nuevas tablas ni columnas.
+- Reglas financieras confirmadas en BUSINESS_RULES y DECISIONS. El test de FIXED
+  conserva -25000 para 60000 de ingreso menos 85000 de fijo; no certifica arrastre
+  ni cierre operativo. Esas integraciones siguen pendientes.
+
+Resultados de esta etapa: ver TESTING. Próxima definición: devoluciones,
+cierre/ajustes, cambios de responsable, proyecciones y conciliación de importación
+con saldos. La ampliación restante del catálogo y la corrección integral del
+circuito de liquidaciones continúan abiertas.
+
 ## Checkpoint auditado — 2026-09-07
 
 Bootstrap aprobado, basado en código, migraciones y tests locales. No se conectó a PostgreSQL real. Describe el repositorio, no certifica el entorno desplegado.

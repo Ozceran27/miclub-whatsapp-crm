@@ -2,14 +2,27 @@
 
 ## Contrato efectivo
 
-XLSX → PostgreSQL; sin Google Sheets. MICLUB_XLSX_IMPORT_VERSION es v2, aunque el identificador XLSX_IMPORT_V1_SCHEMA y docs/migration/xlsx-v1.md mantienen nombre histórico.
+XLSX → PostgreSQL; sin Google Sheets. MICLUB_XLSX_IMPORT_VERSION es v3 desde 2026-09-09. El identificador XLSX_IMPORT_V1_SCHEMA conserva su nombre por compatibilidad de código.
 
 Archivo: apps/api/data/db/Modelo_Import_miClub.xlsx. Hojas exactas (orden no contractual), headers fila 1, datos desde fila 2:
 
-- ADMINISTRACIÓN A:Z: Fecha, Tipo, Categoría, Concepto, Contra-parte, Sector, Monto, Impuestos, Estado, M.P.
+- ADMINISTRACIÓN A:AA: Fecha, Tipo, Categoría, Concepto, Contra-parte, Sector, Monto, Impuestos, Estado, M.P., Actividad (AA).
 - INSCRIPCIONES A:U: Fecha, Nombre, Apellido, D.N.I., Telefono, Actividad, Modalidad, Cuota, Estado.
 
-Separadores vacíos son parte de la firma. No interpretar A:Y ni renombrar el archivo/columnas sin transición contractual. Sector e instructor de inscripción se derivan de actividad.
+Separadores vacíos son parte de la firma. Sector e instructor de inscripción se derivan de actividad.
+
+En movimientos, Actividad acepta nombre o código exacto normalizado del club.
+Si Sector está vacío, se deriva de la actividad; si se informan ambos, deben
+coincidir. Sin Actividad se conserva un movimiento general, sin participación
+automática en liquidaciones de actividad. Concepto es descripción, nunca matching
+automático. Una referencia inexistente o ambigua bloquea importación.
+
+Transición v2 → v3: descargar la plantilla nueva, copiar valores en las columnas
+conservadas y completar AA para los movimientos de actividades. Revisar manualmente
+las asociaciones de conceptos históricos; no se implementa inferencia automática.
+La firma antigua se rechaza y exige la cabecera Actividad. Los lotes v2 ya importados
+se conservan; no volver a cargar esa historia como v3, cuya deduplicación entre
+versiones/archivos todavía no está certificada.
 
 ## Acceso y pipeline
 
@@ -31,10 +44,15 @@ shared contracts/xlsxImport.ts; migrationUploadRoutes.ts; xlsxMigration/policy, 
 
 ## Brechas abiertas
 
-- B04: contrato admite ANULADO, pero movementStatus en workbook.ts lo transforma en COMPLETADO. No aplicar esta conducta como regla.
-- La ruta acepta etiquetas retry/reversal, pero dirige las operaciones no dry_run a applyWorkbook; no hay semántica independiente de reversión certificada.
+- B04 corregido: ANULADO se conserva; estado desconocido bloquea y revierte apply.
+- Sólo se aceptan dry_run y apply. retry/reversal se rechazan hasta definir su semántica.
 - projectedWrites cuenta filas de negocio; persistedWrites suma entidad y trazabilidad y no todos los upserts de personas. No comparar ambos como conteo idéntico de escrituras físicas.
-- Import real/E2E con PostgreSQL aislado no ejecutado en bootstrap.
+- Regresión 2026-09-09: importación HTTP real en PostgreSQL aislado de movimiento con actividad/sector e inscripción, rechazo de replay y de cambio de sector después del dry-run. El hash de referencias incluye las relaciones resueltas, no una constante. Se corrigió la consulta de instructores para usar status='activa', sin columnas inexistentes code/is_active.
+- El lector admite prefijos XML estándar y celdas vacías autocerradas. La plantilla distribuida se valida con el mismo lector runtime.
+- Los errores se guardan en las columnas canónicas source_table/source_row,
+  error_message/raw_payload y metadata de referencia. Se corrigió el fallo 500
+  por columnas inexistentes; el recorrido A/B prueba ACTIVITY_NOT_FOUND con 422
+  y ningún movimiento creado en el segundo club.
 - Historia con CAPITAL inicial y opening balances puede duplicar capital; revisar conciliación.
 
 La importación ocurre después del onboarding según permisos/plan. FREE no incluye DATA_MIGRATION; SOCIAL/COMPLEX/CLUB activos sí, salvo override efectivo.

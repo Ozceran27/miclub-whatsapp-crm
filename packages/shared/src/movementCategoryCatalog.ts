@@ -24,6 +24,8 @@ export const MOVEMENT_CATEGORY_CATALOG = [
   ["AGUA", "Agua", "SERVICE", "EGRESOS"], ["INTERNET", "Internet", "SERVICE", "EGRESOS"],
   ["DEUDAS", "Deudas", "LIABILITY", "EGRESOS"], ["SERVICIOS", "Servicios", "SERVICE", "EGRESOS"],
   ["CAPITAL_INICIAL", "Capital inicial", "NON_OPERATIONAL", "INGRESOS"],
+  ["RESERVAS", "Reservas", "OPERATIONAL", "INGRESOS"],
+  ["SENAS", "Señas", "OPERATIONAL", "INGRESOS"],
 ] as const satisfies readonly (readonly [string, string, MovementCategoryClassification, MovementCategoryDirection])[];
 
 export const ACTIVE_MOVEMENT_CATEGORY_CODES = MOVEMENT_CATEGORY_CATALOG.map(([code]) => code);

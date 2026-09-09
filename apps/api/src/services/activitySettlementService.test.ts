@@ -10,6 +10,9 @@ const calculate = (terms: ActivityTerm[], income: number, paid: number, extras: 
 })[0];
 
 test("Arte VARIABLE: 100.000 / club 40 / responsable 60 / pagado 20.000 = 40.000", () => assert.equal(calculate([term()], 100_000, 20_000).responsibleBalance, 40_000));
+test('fijo 85.000 con cobros 60.000 conserva deuda del responsable de 25.000',()=>{
+  assert.equal(calculate([term({mode:'FIXED',clubSharePercentage:null,fixedFeeFrequency:'MONTHLY',fixedClubFee:85_000})],60_000,0).responsibleBalance,-25_000);
+});
 test("Karate FIXED: 500.000 - fijo 150.000 - pagado 30.000 = 320.000", () => assert.equal(calculate([term({ mode: "FIXED", clubSharePercentage: null, fixedFeeFrequency: "MONTHLY", fixedClubFee: 150_000 })], 500_000, 30_000).responsibleBalance, 320_000));
 test("excluye pendientes, cancelados y anulados", () => {
   assert.equal(calculate([term()], 100_000, 20_000, { income: { status: "PENDIENTE" } }).responsibleBalance, -20_000);

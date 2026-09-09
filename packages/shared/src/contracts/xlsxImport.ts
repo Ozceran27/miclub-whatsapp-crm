@@ -1,5 +1,5 @@
 /** Contract describing the established miClub import workbook without changing it. */
-export const MICLUB_XLSX_IMPORT_VERSION = "v2" as const;
+export const MICLUB_XLSX_IMPORT_VERSION = "v3" as const;
 
 export type XlsxImportColumn = Readonly<{
   key: string;
@@ -26,7 +26,7 @@ const administrationPhysicalColumns = [
   ["J", null], ["K", null], ["L", null], ["M", null], ["N", "Contra-parte", "counterparty"],
   ["O", null], ["P", null], ["Q", "Sector", "sector"], ["R", null], ["S", "Monto", "amount"],
   ["T", null], ["U", null], ["V", "Impuestos", "taxes"], ["W", null], ["X", "Estado", "status"],
-  ["Y", null], ["Z", "M.P.", "paymentMethod"],
+  ["Y", null], ["Z", "M.P.", "paymentMethod"], ["AA", "Actividad", "activity"],
 ] as const;
 
 const enrollmentPhysicalColumns = [
@@ -62,6 +62,7 @@ export const XLSX_IMPORT_V1_SCHEMA = {
         { key: "taxes", header: "Impuestos", headerCell: "V1", dataCell: "V2", type: "decimal", required: false },
         { key: "status", header: "Estado", headerCell: "X1", dataCell: "X2", type: "enum", enumValues: ["COMPLETADO", "PENDIENTE", "CANCELADO", "ANULADO"], required: true },
         { key: "paymentMethod", header: "M.P.", headerCell: "Z1", dataCell: "Z2", type: "string", required: false },
+        { key: "activity", header: "Actividad", headerCell: "AA1", dataCell: "AA2", type: "string", required: false },
       ] satisfies readonly XlsxImportColumn[],
     },
     enrollments: {
@@ -94,7 +95,7 @@ export function detectMiclubXlsxImportVersion(workbook: XlsxWorkbookSignature): 
       const value = cells[`${column}${sheet.headerRow}`];
       return (typeof value === "string" ? value : "") !== (header ?? "");
     })) {
-      throw new Error(`Formato XLSX desconocido: la firma de ${sheet.name} no corresponde a v2.`);
+      throw new Error(`Formato XLSX desconocido: la firma de ${sheet.name} no corresponde a v3. Descargá la plantilla con Actividad en AA.`);
     }
   }
   return MICLUB_XLSX_IMPORT_VERSION;

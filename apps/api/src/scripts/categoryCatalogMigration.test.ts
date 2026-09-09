@@ -42,6 +42,9 @@ test("el manifiesto activo coincide exactamente con el catálogo de producto y c
   assert.ok(catalogInsert);
   const rows = [...catalogInsert[1].matchAll(/\('([A-Z0-9_]+)','[^']*','(OPERATIONAL|NON_OPERATIONAL|TAX|SERVICE|LIABILITY)',true,(\d+)\)/g)]
     .map((match) => ({ code: match[1], classification: match[2], order: Number(match[3]) }));
+  const delta = await readFile(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db/migrations/202609090001_reservations_and_deposits_categories.sql'), 'utf8');
+  rows.push(...[...delta.matchAll(/\('([A-Z0-9_]+)','[^']*','(OPERATIONAL)',(\d+)\)/g)]
+    .map(match => ({code:match[1],classification:match[2],order:Number(match[3])})));
   assert.deepEqual(rows.map(({ code }) => code), ACTIVE_MOVEMENT_CATEGORY_CODES);
   const effectiveClassifications = rows.map(({ code, classification }) => code === "CMV" ? "NON_OPERATIONAL" : classification);
   assert.deepEqual(effectiveClassifications, MOVEMENT_CATEGORY_CATALOG.map(([, , classification]) => classification));

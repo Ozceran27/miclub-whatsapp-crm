@@ -118,6 +118,12 @@ CMV es NON_OPERATIONAL/EGRESOS; la descripción previa como operativo estaba des
 
 ## Decisiones pendientes (sin aceptación implícita)
 
+DEC-016 — Confirmado por dirección 2026-09-09: liquidación por mes del cobro,
+señas incluidas al cobrar, recaudación siempre recibida por el club y déficit
+FIXED como deuda del responsable. Nueva importación v3 con Actividad explícita;
+conceptos históricos requieren asociación revisada. Ver BUSINESS_RULES e
+IMPORT_SYSTEM para alcance implementado y decisiones financieras pendientes.
+
 | ID | Decisión por resolver | Implementación observada |
 | --- | --- | --- |
 | C01 | Ciclo de creación, cálculo y cierre de liquidaciones | Tablas/vistas presentes; no hay creador runtime encontrado; lectura FIXED desalineada |

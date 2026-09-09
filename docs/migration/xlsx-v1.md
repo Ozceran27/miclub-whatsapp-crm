@@ -1,5 +1,9 @@
 # Contrato de importación de `Modelo_Import_miClub.xlsx`
 
+Versión vigente: **v3** (2026-09-09). El nombre de esta guía se conserva para
+mantener enlaces. Descargar la nueva plantilla y completar Actividad en AA;
+los archivos v2 sin esa cabecera requieren conversión y un nuevo dry-run.
+
 ## Acceso desde onboarding
 
 La guía se presenta en secciones progresivas para poder consultar primero la estructura y luego el flujo sin scroll excesivo. `FREE` no permite importar. Una suscripción activa `SOCIAL`, `COMPLEX` o `CLUB` habilita el módulo **Migración** después de terminar el onboarding; la carga nunca ocurre dentro del asistente. El cobro aún no está implementado y no se recopilan datos de tarjeta.
@@ -10,7 +14,7 @@ La fuente inspeccionada es `apps/api/data/db/Modelo_Import_miClub.xlsx`. El libr
 
 La plantilla usa columnas vacías como separadores visuales (no son campos disponibles). También son parte de la firma: deben conservar la cabecera vacía. Una referencia escrita en una columna separadora no se interpreta ni se desplaza a un campo vecino.
 
-## `ADMINISTRACIÓN` (A:Z)
+## `ADMINISTRACIÓN` (A:AA)
 
 | Columna | Cabecera / función | Campo | Tipo | Referencia o derivación |
 |---|---|---|---|---|
@@ -33,8 +37,14 @@ La plantilla usa columnas vacías como separadores visuales (no son campos dispo
 | X | `Estado` | `status` | enum, obligatorio | — |
 | Y | vacía | separador | — | — |
 | Z | `M.P.` | `paymentMethod` | string, opcional | medio de pago activo del tenant |
+| AA | `Actividad` | `activity` | string, opcional para movimientos generales | nombre o código exacto normalizado de actividad del tenant |
 
-No hay cabeceras de actividad, trabajador/instructor ni referencia externa en esta hoja. No se derivan esas referencias desde el concepto. `Contra-parte` puede enlazarse por documento a una persona del tenant, pero no bloquea la creación/upsert de personas de este mismo lote.
+Actividad se guarda en el movimiento; Sector vacío se deriva de ella. Si se
+informan ambos, deben coincidir. Concepto conserva la descripción y no asigna
+actividad automáticamente. Revisar manualmente los conceptos históricos al
+completar AA. No hay columna de trabajador/instructor ni referencia externa.
+`Contra-parte` puede enlazarse por documento a una persona del tenant, pero no
+bloquea la creación/upsert de personas de este mismo lote.
 
 ## `INSCRIPCIONES` (A:U)
 

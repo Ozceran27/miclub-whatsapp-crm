@@ -199,6 +199,21 @@ Los cálculos deben respetar timezone del club cuando el modelo permita personal
 
 ## 19. Conflictos abiertos: no son reglas aceptadas
 
+### Definiciones confirmadas 2026-09-09
+
+- Todos los cobros de actividades ingresan al club.
+- Se asignan al mes de cobro, incluso si la cuota corresponde a otro mes.
+- Las señas participan en la distribución cuando se cobran. Al cobrar el saldo
+  de una reserva se registra sólo el remanente, para no volver a contar la seña.
+- FIXED puede arrojar saldo negativo: cobrado 60000 menos fijo 85000 = -25000,
+  deuda del responsable al club. No truncar a cero; debe conservarse para su
+  compensación/cobro futuro, cuyo flujo se definirá con cierre y ajustes.
+- Reservas y Señas se incorporan como ingresos OPERATIONAL al catálogo canónico.
+
+Estas reglas no certifican el circuito runtime de liquidaciones. La siguiente
+etapa debe definir devoluciones, cierre/ajustes, cambios de responsable,
+proyecciones y conciliación de historia con saldos iniciales antes de integrarlo.
+
 - B02: falta contexto transaccional RLS en consumidores; no relaja aislamiento tenant.
 - B03/C01: lectura FIXED usa campo antiguo y no hay creación runtime de liquidaciones encontrada; se conservan las fórmulas y ambos ejemplos de la sección 11.
 - B04: importar ANULADO como COMPLETADO es un bug; no habilita su conteo.

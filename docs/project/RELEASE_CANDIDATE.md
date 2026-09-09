@@ -1,5 +1,12 @@
 # Release candidate — ejecución
 
+Actualización 2026-09-09: C1 tiene regresión HTTP de los cuatro planes y overrides;
+C2 tiene recorrido HTTP dry-run/apply v3 con actividad explícita. Reservas/Señas
+y lista de ingresos operativos canónica incorporadas. Esto no cierra C1/C2/C5
+completos ni cambia el estado global parcial. Detalle y resultados: CURRENT_STATE,
+IMPORT_SYSTEM, PLANS_AND_FEATURES y TESTING. Las nuevas reglas confirmadas de
+liquidación quedan en BUSINESS_RULES; cierre y arrastre operativo siguen abiertos.
+
 Baseline de partida: `bec17e642b3a6f151aaab62a51b179926a7da5bb`, main, 2026-09-08.
 Plan aprobado en la conversación. Este documento registra ejecución, no certifica
 una release por la mera existencia de tareas o scripts.

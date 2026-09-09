@@ -12,6 +12,12 @@ hasFeature en clubCapabilityService: override vigente más reciente (incluido di
 
 RBAC es separado: import exige imports:run, operador opcional y feature efectiva; seleccionar plan no concede permiso al usuario.
 
+Corrección 2026-09-09: navegación y autorización usan la misma resolución efectiva.
+Antes, el menú sólo recibía overrides manuales y ocultaba Migración aun con CLUB.
+La respuesta de navegación usa `private, no-store`; onboarding entrega las nuevas
+capacidades al menú, que además refresca al cambiar de ruta. La regresión HTTP
+aislada cubre los cuatro planes, override deshabilitado y expiración.
+
 ## Pre-billing
 
 billingService.prepareOnboardingSelection activa cualquiera de los cuatro planes sin pago, independientemente de BILLING_MODE disabled/sandbox/live. Origen pre_billing_onboarding; misma transacción de finalización del draft y auditoría. No se piden tarjetas/comprobantes.

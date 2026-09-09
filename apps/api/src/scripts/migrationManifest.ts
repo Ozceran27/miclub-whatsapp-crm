@@ -121,6 +121,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202609080002_fix_opening_balance_sequences.sql", sha256: "d8ed9e60cad1e4f0a96117da50993f0b927fabbe3b8378d3bd2f192b9bb85ce4", dependsOn: ["202609050002_fix_opening_balance_financial_status.sql", "202608130006_tenant_entity_sequences.sql"], checkpointPurpose: "Asigna secuencias tenant a saldos iniciales y protege sus reversiones explícitas sin permitir egresos negativos ordinarios." },
   { path: "202609080003_retire_required_legacy_worker_payment.sql", sha256: "280357a33c84e52a1b0665b8348951077d778fa8b55768f13ec214b29a7c03ea", dependsOn: ["202608280003_compensation_and_activity_term_currencies.sql"], checkpointPurpose: "Retira la obligatoriedad del campo laboral legacy y conserva las restricciones de remuneración canónica." },
   { path: "202609080004_allow_seven_onboarding_steps.sql", sha256: "e7aec4cbf6ba38f5eb97efd027ed9e011536cdc4f01db92d2c1b644fcb690c85", checkpointPurpose: "Permite persistir el séptimo paso de finalización del onboarding." },
+  { path: "202609090001_reservations_and_deposits_categories.sql", sha256: "d04f7a3cd5fccdf50f21c4a08411bb09e06f796c8f093e41e9baaf4a212f588b", dependsOn: ["202609050003_classify_cmv_as_non_operational.sql"], checkpointPurpose: "Agrega Reservas y Señas operativas sin reclasificar historia." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

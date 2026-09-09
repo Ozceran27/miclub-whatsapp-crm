@@ -1,10 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from 'node:fs';
 import { maliciousZipFixture, referenceWorkbookFixtures, workbookFixture } from "./fixtures/workbookFixtures.js";
 import { resolveReferenceRows, type ReferenceCatalog } from "./referenceResolver.js";
 import { validateWorkbook } from "./validator.js";
 
 const validate=(buffer:Buffer)=>validateWorkbook(buffer,"import.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+test('plantilla distribuida v3 es válida y vacía',()=>{
+  const result=validate(readFileSync(new URL('../../../data/db/Modelo_Import_miClub.xlsx',import.meta.url)));
+  assert.deepEqual(result.errors,[]);assert.equal(result.rows.length,0);
+});
+
+test('extrae Actividad de AA',()=>{
+  const result=validate(workbookFixture({movementValues:{activity:'Yoga'}}));
+  assert.deepEqual(result.errors,[]);
+  assert.equal(result.referenceRows[0].activity,'Yoga');
+});
 
 test("lee inline strings y procesa la fila firstDataRow (fila 2)",()=>{
   const result=validate(workbookFixture());

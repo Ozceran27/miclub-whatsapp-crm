@@ -43,7 +43,9 @@ Auditado sobre 42b81a3. Una ruta presente no implica flujo E2E certificado. Ver 
 
 Requieren auth, tenant, permiso y capability comercial.
 
-Versión efectiva v2. Apply exige dry-run equivalente; no prometer reversal independiente sólo porque la ruta acepte esa etiqueta. Ver IMPORT_SYSTEM.
+Versión efectiva v3: Actividad explícita en AA de ADMINISTRACIÓN. Apply exige
+dry-run equivalente, incluidas las referencias resueltas. Sólo dry_run/apply;
+retry/reversal se rechazan. Ver IMPORT_SYSTEM para transición desde v2.
 
 ## Catálogos
 

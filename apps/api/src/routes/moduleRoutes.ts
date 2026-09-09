@@ -16,7 +16,7 @@ router.get("/navigation", requirePermission(PERMISSIONS.DASHBOARD_READ), asyncHa
     listNavigableSectors(req.auth!.clubId, pool),
     resolveClubCapabilities(req.auth!.clubId, pool),
   ]);
-  res.set("Cache-Control", "private, max-age=60");
+  res.set("Cache-Control", "private, no-store");
   res.vary("Cookie");
   res.json({
     modules: ["home", "economy", "crm", "administration", "dataMigration"],

@@ -1,3 +1,4 @@
+import { MOVEMENT_CATEGORY_CATALOG } from '@miclub/shared';
 import {
   ARGENTINA_TIME_ZONE,
   argentinaDayStart,
@@ -26,19 +27,9 @@ export type CategoryClassification = (typeof CATEGORY_CLASSIFICATIONS)[number];
 
 // Stable codes are compatibility identifiers, never presentation labels. Runtime
 // queries receive classification from miclub.category_catalog.
-export const OPERATING_CATEGORIES = [
-  "INSCRIPCION",
-  "CUOTA",
-  "TURNOS",
-  "COMISION",
-  "ALQUILER",
-  "EVENTOS",
-  "VENTAS",
-  "CLASES",
-  "CURSOS",
-  "KIOSCO",
-  "BEBIDAS",
-] as const;
+export const OPERATING_CATEGORIES = MOVEMENT_CATEGORY_CATALOG
+  .filter(([, , classification, direction]) => classification === 'OPERATIONAL' && direction === 'INGRESOS')
+  .map(([code]) => code);
 export const OPERATING_PROFIT_CATEGORIES = OPERATING_CATEGORIES;
 export const NON_OPERATING_EXPENSE_CATEGORIES = [
   "PUBLICIDAD",

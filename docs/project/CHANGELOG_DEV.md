@@ -42,3 +42,14 @@ Consultar Git history, `docs/history/` y documentación canónica. No reconstrui
   del servidor no imprimen filas PostgreSQL ni secretos.
 - Regresión real de saldos: 5 PASS. Build/typecheck y manifiesto pasan; suite global,
   lint, deadcode y certificación integral siguen pendientes. No es checkpoint RC.
+# 2026-09-09 — Migración por plan, XLSX con actividad y categorías
+
+- Navegación/guard comparten resolución efectiva de features, sin caché HTTP;
+  onboarding propaga capacidades al menú.
+- Plantilla v3 agrega AA Actividad, validación tenant/sector y persistencia en
+  movements.activity_id. Referencias forman parte del hash del dry-run.
+- Correcciones del lector XML/celdas vacías e instructores; descarga independiente
+  del directorio de ejecución. retry/reversal rechazados hasta definirlos.
+- Reservas/Señas en catálogo shared y migración aditiva; lista de ingresos de
+  Economía derivada del catálogo. SQL real manual con ledger y pre/postchecks.
+- Se documentan reglas acordadas de liquidación sin certificar cierre/arrastre.

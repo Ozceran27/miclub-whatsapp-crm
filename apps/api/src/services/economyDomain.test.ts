@@ -120,6 +120,8 @@ test("canonical operating profitability categories keep UI accents and normalize
     "CURSOS",
     "KIOSCO",
     "BEBIDAS",
+    "RESERVAS",
+    "SENAS",
   ]);
   assert.equal(normalizeCategory(" comisión "), "COMISION");
   assert.equal(isOperatingCategory("inscripcion"), true);

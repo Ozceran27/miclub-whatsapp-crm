@@ -15,6 +15,23 @@ const catalog:ReferenceCatalog={
 };
 const row=(overrides:Record<string,unknown>={})=>({sheet:"INSCRIPCIONES",rowNumber:3,sector:" FUTBOL ",activity:"infantíles",modality:"mensual",instructor:"MARIA NUÑEZ",values:["x"],...overrides});
 
+test('movimientos v3 resuelven actividad y derivan sector sin inferir concepto',()=>{
+  const resolved=resolveReferenceRows([row({sheet:'ADMINISTRACIÓN',sector:undefined,instructor:undefined})],catalog);
+  assert.deepEqual(resolved.errors,[]);
+  assert.equal(resolved.resolved[0].activityId,'a1');
+  assert.equal(resolved.resolved[0].sectorId,'s1');
+  const general=resolveReferenceRows([row({sheet:'ADMINISTRACIÓN',activity:undefined,instructor:undefined})],catalog);
+  assert.equal(general.resolved[0].activityId,null);
+  assert.equal(general.resolved[0].sectorId,'s1');
+});
+
+test('movimientos v3 bloquean actividad ambigua, ajena y sector incompatible',()=>{
+  const movement=row({sheet:'ADMINISTRACIÓN',instructor:undefined});
+  assert.ok(resolveReferenceRows([movement],{...catalog,activities:[]}).errors.some(e=>e.error_code==='ACTIVITY_NOT_FOUND'));
+  assert.ok(resolveReferenceRows([movement],{...catalog,activities:[...catalog.activities,{...catalog.activities[0],id:'a2'}]}).errors.some(e=>e.error_code==='REFERENCE_AMBIGUOUS'));
+  assert.ok(resolveReferenceRows([{...movement,sector:'Tenis'}],catalog).errors.some(e=>e.error_code==='ACTIVITY_SECTOR_MISMATCH'));
+});
+
 test("resuelve relaciones normalizadas y conserva referencia/fingerprint sin deduplicar",()=>{
   const result=resolveReferenceRows([row({externalReference:" ERP-42 "}),row({rowNumber:4,externalReference:"ERP-43"})],catalog);
   assert.deepEqual(result.errors,[]); assert.equal(result.resolved[0].externalReference,"ERP-42");

@@ -1,7 +1,15 @@
 import { XLSX_IMPORT_V1_SCHEMA, type XlsxImportColumn } from "@miclub/shared";
 import { XLSX_POLICY } from "./policy.js";
 import type { ReferenceRow } from "./referenceResolver.js";
-import { inspectZip, readEntry, type ZipEntry } from "./zipInspector.js";
+import { inspectZip, readEntry as readZipEntry, type ZipEntry } from "./zipInspector.js";
+
+// Excel producers may use a namespace prefix instead of a default namespace.
+function readEntry(buffer: Buffer, entry: ZipEntry): string {
+  let xml = readZipEntry(buffer, entry);
+  const prefixes = [...xml.matchAll(/xmlns:([A-Za-z_][\w.-]*)="http:\/\/schemas\.openxmlformats\.org\/(?:spreadsheetml\/2006\/main|package\/2006\/relationships)"/g)];
+  for (const [, prefix] of prefixes) xml = xml.replace(new RegExp(`(<\\/?)${prefix.replace(/\./g, '\\.')}:`, 'g'), '$1');
+  return xml;
+}
 
 export type MigrationIssue = { error_code: string; message: string; severity: "error"|"warning"; sheet?: string; row_number?: number; entity_type?: string; field?: string; value_original?: unknown; value_normalized?: string };
 export type ParsedWorkbookRow = { sheet:string; rowNumber:number; values:Record<string,string|number|null>; sourceValues:unknown[] };
@@ -18,9 +26,10 @@ function sharedStringTable(xml:string):string[] {
 }
 
 function cells(body:string, strings:string[]):Map<string,string> {
-  return new Map([...body.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].map((cell) => {
+  return new Map([...body.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)].map((cell) => {
     const coordinate=cell[1].match(/\br="([A-Z]+\d+)"/)?.[1]??"";
-    const raw=cell[2].match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/)?.[1] ?? cell[2].match(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/)?.[1] ?? "";
+    const content=cell[2]??"";
+    const raw=content.match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/)?.[1] ?? content.match(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/)?.[1] ?? "";
     return [coordinate, /\bt="s"/.test(cell[1]) ? strings[Number(raw)]??"" : decodeXml(raw)] as const;
   }));
 }
