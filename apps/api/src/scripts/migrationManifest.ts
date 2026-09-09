@@ -122,6 +122,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202609080003_retire_required_legacy_worker_payment.sql", sha256: "280357a33c84e52a1b0665b8348951077d778fa8b55768f13ec214b29a7c03ea", dependsOn: ["202608280003_compensation_and_activity_term_currencies.sql"], checkpointPurpose: "Retira la obligatoriedad del campo laboral legacy y conserva las restricciones de remuneración canónica." },
   { path: "202609080004_allow_seven_onboarding_steps.sql", sha256: "e7aec4cbf6ba38f5eb97efd027ed9e011536cdc4f01db92d2c1b644fcb690c85", checkpointPurpose: "Permite persistir el séptimo paso de finalización del onboarding." },
   { path: "202609090001_reservations_and_deposits_categories.sql", sha256: "d04f7a3cd5fccdf50f21c4a08411bb09e06f796c8f093e41e9baaf4a212f588b", dependsOn: ["202609050003_classify_cmv_as_non_operational.sql"], checkpointPurpose: "Agrega Reservas y Señas operativas sin reclasificar historia." },
+  { path: "202609090002_financial_operating_circuit.sql", sha256: "8ca524bc9c99e85e1118f7df828c98c8f12e572d29c6dabf32e8f7a0fcfdbfdd", dependsOn: ["202609090001_reservations_and_deposits_categories.sql"], checkpointPurpose: "Historia financiera, revisiones, devoluciones, compensaciones y conciliación inicial DEC-017." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

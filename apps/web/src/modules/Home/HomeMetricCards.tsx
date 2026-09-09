@@ -23,20 +23,9 @@ const renderFinanceLines = (lines: FinancialLine[]) => (
   </div>
 );
 
-export function HomeMetricCards({ financialSummaryLines, operationalBalanceLines, incomeBySectorLines, expenseBySectorLines, financeError, financeSummary }: Props) {
+export function HomeMetricCards({ incomeBySectorLines, expenseBySectorLines, financeError, financeSummary }: Props) {
   return (
     <div className="home-dashboard-row home-dashboard-row--secondary">
-      <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--summary">
-        <div className="home-card-heading finance-card__header"><h4>📊 Resumen financiero</h4><p>Indicadores económicos actuales</p></div>
-        {renderFinanceLines(financialSummaryLines)}
-        {financeSummary?.valuationStatus === 'INCOMPLETE_EXCHANGE_RATE' && <small className="integration-note" role="alert"><strong>Valoración bloqueada:</strong> faltan cotizaciones vigentes para {financeSummary.unvaluedAccountCount} cuenta(s). No se muestran liquidez ni saldo proyectado.</small>}
-        {financeError && <small className="integration-note">{financeError}</small>}
-      </article>
-      <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--balance">
-        <div className="home-card-heading finance-card__header"><h4>🏦 Saldos operativos</h4><p>Saldos y proyección operativa</p></div>
-        {renderFinanceLines(operationalBalanceLines)}
-        {financeError && <small className="integration-note">Pendiente de integración</small>}
-      </article>
       <article className="card home-kpi-card home-kpi-card--compact finance-card finance-card--income">
         <div className="home-card-heading finance-card__header"><h4>📥 Ingresos por sector</h4><p>Sector · monto</p></div>
         {renderFinanceLines(incomeBySectorLines)}

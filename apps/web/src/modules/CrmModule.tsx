@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FinancialCircuitPanel } from './Finance/FinancialCircuitPanel';
 import type { PreparedMessage } from '@miclub/shared';
 import { crmApi } from '../services/api/crmApi';
 import { CrmSummaryCards } from './CRM/CrmSummaryCards';
@@ -109,6 +110,7 @@ export default function CrmModule() {
   const canPrepare = filters.selected.length > 0 && message.trim().length > 0 && !preparing;
 
   return <main className="module-content crm-module">
+    <FinancialCircuitPanel summaryOnly />
     <header className="module-hero module-hero--compact"><div><p className="eyebrow">Módulo CRM</p><h2>miClub WhatsApp CRM</h2><p>Gestión de cobranzas y mensajes por WhatsApp.</p></div></header>
     <button className="icon-btn" onClick={() => void sync()} disabled={syncing}><Icon label="↻" />{syncing ? 'Sincronizando...' : 'Sincronizar'}</button>
     {error && <p className="error-msg">Error: {error}</p>}

@@ -12,6 +12,7 @@ import { EconomyYearlyBreakdownCharts } from './Economy/EconomyYearlyBreakdownCh
 import { PendingMovementsPanel } from './Economy/PendingMovementsPanel';
 import { RecentMovementsPanel } from './Economy/RecentMovementsPanel';
 import { useEconomyDashboard } from './Economy/useEconomyDashboard';
+import { FinancialCircuitPanel } from './Finance/FinancialCircuitPanel';
 
 export default function EconomyModule() {
   const dashboard = useEconomyDashboard();
@@ -19,6 +20,7 @@ export default function EconomyModule() {
 
   return (
     <main className="module-content">
+      <FinancialCircuitPanel />
       <section className="module-hero home-hero economy-module-hero">
         <div className="home-hero__copy">
           <p className="eyebrow">Economía Club</p>

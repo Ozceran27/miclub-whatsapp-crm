@@ -53,6 +53,10 @@ export const PERMISSIONS = {
   ENROLLMENTS_EDIT: "enrollments.edit",
   ENROLLMENTS_CANCEL: "enrollments.cancel",
   FINANCE_WRITE: "finance:write",
+  FINANCE_REVIEW: "finance.review",
+  FINANCE_PAY: "finance.pay",
+  FINANCE_CORRECT: "finance.correct",
+  FINANCE_RECONCILE: "finance.reconcile",
   ONBOARDING_READ: "onboarding.read",
   ONBOARDING_WRITE: "onboarding.write",
 } as const;

@@ -51,3 +51,23 @@ export interface FinancialProjection {
   complete: boolean;
   assumptions: string[];
 }
+
+export interface PersistedSettlement extends MonthlySettlementLine {
+  id: string;
+  revision: number;
+  reviewState: SettlementReviewState;
+  closedAt: string | null;
+  personName: string;
+  activityName: string;
+}
+export interface FinanceDiagnostic { activityId: string; message: string }
+export interface FinancialCircuit {
+  month: string;
+  today: string;
+  settlements: PersistedSettlement[];
+  diagnostics: FinanceDiagnostic[];
+  projection: FinancialProjection;
+  accounts: { id: string; name: string; currencyCode: string }[];
+  people: { id: string; name: string }[];
+  terms: { id: string; activityId: string; activityName: string; personId: string | null; revision: number; mode: string; effectiveFrom: string; effectiveTo: string | null; fixedClubFee: number | null; partialMonthPolicy: PartialMonthPolicy | null }[];
+}

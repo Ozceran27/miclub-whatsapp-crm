@@ -1,4 +1,5 @@
 import { AdministrationActions } from './Administration/AdministrationActions';
+import { FinancialCircuitPanel } from './Finance/FinancialCircuitPanel';
 import { AdministrationHeaderCards } from './Administration/AdministrationHeaderCards';
 import { useAdministrationSummary } from './Administration/useAdministrationSummary';
 import { SectorList } from './Administration/SectorList';

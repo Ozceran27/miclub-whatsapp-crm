@@ -4,6 +4,7 @@ import { HomeMetricCards } from './Home/HomeMetricCards';
 import { RecentMovements } from './Home/RecentMovements';
 import { SectorDistribution } from './Home/SectorDistribution';
 import { useHomeDashboard } from './Home/useHomeDashboard';
+import { FinancialCircuitPanel } from './Finance/FinancialCircuitPanel';
 
 type HomeModuleProps = {
   onOpenModule: (moduleId: ModuleId) => void;
@@ -26,6 +27,7 @@ export default function HomeModule({ onOpenModule }: HomeModuleProps) {
       </section>
 
       <HomeAlerts error={dashboard.error} loading={dashboard.loading} />
+      <FinancialCircuitPanel summaryOnly />
 
       <section className="home-dashboard-stack" aria-label="Resumen operativo del club">
         <HomeMetricCards
