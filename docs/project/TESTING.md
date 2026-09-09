@@ -1,5 +1,21 @@
 # Testing
 
+## DEC-017 — bloque de cálculo mensual y proyecciones (2026-09-09)
+
+- Suite local: 493 tests, 488 aprobados, 5 fallidos. Los cinco coinciden con
+  los anteriores: frontera runtime SQLite/Sheets en Windows, diagnóstico de
+  backfill, último Director, sr-only y scroll de catálogos visuales.
+- 18 regresiones nuevas de cálculo aprobadas: ejemplos VARIABLE/FIXED, deuda
+  12000, receptor histórico, devolución FIXED, límites, prorrateo/centavos,
+  distribución única, compensación por persona/moneda, fechas/IDs inválidos,
+  timezone, proyectado neto, cuotas/obligaciones repetidas y FX faltante.
+- Typecheck y build aprobados; persiste advertencia de bundle web >500 kB.
+- Lint global: 281 errores preexistentes; la primera corrida sumó 18 warnings
+  por promesas de los tests nuevos, corregidos con `void test`. Los archivos
+  funcionales nuevos/modificados no introdujeron errores de lint.
+- Sin cambios SQL ni pruebas de DB/UI en este bloque. Estas pruebas unitarias
+  no certifican RLS, concurrencia, persistencia ni circuito integrado.
+
 ## Verificación de esta etapa — 2026-09-09
 
 - Regresiones focalizadas de capacidades, XLSX y onboarding: 66 PASS.

@@ -116,6 +116,20 @@ FREE/SOCIAL/COMPLEX/CLUB se activan sin pago al finalizar onboarding, con origen
 
 CMV es NON_OPERATIONAL/EGRESOS; la descripción previa como operativo estaba desactualizada (shared movementCategoryCatalog, migración 202609050003, ff0a88b). Los tipos técnicos son INGRESOS/EGRESOS/CAPITAL y OPERATIONAL/NON_OPERATIONAL. No cambiar fórmulas financieras por esta corrección de documentación.
 
+## DEC-017 — Circuito financiero mensual aprobado (2026-09-09)
+
+**Estado: aprobado para implementación; no equivale a circuito desplegado.**
+
+Dirección aprobó las etapas A–E: historia y permisos; cobros/correcciones y
+devoluciones; liquidación mensual por persona; proyecciones compartidas;
+arranque e importación conciliada. Las reglas completas están en FINANCIAL_MODEL.
+Esta decisión resuelve C01 y C04 como definición de producto; sus brechas de
+implementación siguen abiertas hasta verificar los recorridos integrados.
+
+No se deduce el receptor histórico desde el instructor actual. No se borra un
+pago cuando se corrige el ingreso. El exceso pagado queda como deuda de su
+receptor (60000 pagados − 48000 de derecho corregido = 12000 de deuda).
+
 ## Decisiones pendientes (sin aceptación implícita)
 
 DEC-016 — Confirmado por dirección 2026-09-09: liquidación por mes del cobro,
@@ -126,10 +140,10 @@ IMPORT_SYSTEM para alcance implementado y decisiones financieras pendientes.
 
 | ID | Decisión por resolver | Implementación observada |
 | --- | --- | --- |
-| C01 | Ciclo de creación, cálculo y cierre de liquidaciones | Tablas/vistas presentes; no hay creador runtime encontrado; lectura FIXED desalineada |
+| C01 | Definido en DEC-017; integración pendiente | Tablas/vistas presentes; nuevo cálculo mensual unitario sin conexión runtime; lectura FIXED desalineada |
 | C02 | Entrega/aceptación de invitaciones y lifecycle Instructor | Token sólo hasheado; entrega no encontrada; caminos de alta/actualización divergen |
 | C03 | Persistencia intermedia de onboarding | Finalización persistente; draft/avance temporal, F5 reinicia; promesa previa no retirada por esta auditoría |
-| C04 | Significado/signo del saldo proyectado | Suma saldo positivo adeudado al responsable |
+| C04 | Definido en DEC-017; integración pendiente | Nuevo cálculo por obligación resta liquidaciones; consumidores legacy todavía pendientes de sustitución |
 | C05 | Retiro/reconciliación de clasificación fallback | economyDomain conserva listas distintas del catálogo |
 
 B01–B07 en CURRENT_STATE son defectos/brechas a corregir, no ADRs aceptados. Las decisiones DEC-001–013 y los ejemplos financieros permanecen vigentes.

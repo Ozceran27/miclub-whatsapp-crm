@@ -1,5 +1,53 @@
 # Financial Model
 
+## Circuito aprobado — DEC-017
+
+Estas reglas prevalecen sobre las descripciones del runtime histórico inferiores.
+Su aprobación no certifica implementación ni despliegue.
+
+- Primera versión mensual, por calendario y zona horaria del club. Frecuencias
+  distintas se conservan y requieren revisión explícita antes de liquidar.
+- El club recibe todos los cobros. Se atribuyen al responsable y término vigentes
+  el día del cobro, incluyendo cuotas atrasadas y señas. VARIABLE reparte el bruto
+  sin restar automáticamente impuestos/gastos.
+- FIXED admite prorrateo por días calendario de vigencia o mes completo, elegido
+  expresamente. Un cambio de responsable con mes completo exige distribuir un
+  único fijo mensual. Cambios ordinarios del importe rigen el primer día del mes.
+- Saldos por persona/club, desglosados por actividad y moneda. La deuda permanece
+  con el receptor; se compensa entre sus actividades, primero la más antigua,
+  sin caja. Entre monedas se exige conversión explícita y cotización registrada.
+- Borrador, aprobado y requiere revisión son estados de revisión. Pendiente,
+  parcial y saldado se derivan de importes. Aprobar, pagar y cerrar son distintos.
+  Se permiten pagos parciales/a cuenta revisados, hasta el neto disponible.
+- Correcciones históricas autorizadas conservan anterior, actor, fecha y motivo;
+  UUID, tenant y origen son inmutables. Recalculan los períodos afectados sin
+  borrar pagos. Invalidan revisión/conciliación conservando su evidencia anterior.
+- Devolución real: egreso vinculado al cobro, parcial y limitado al remanente.
+  VARIABLE revierte reparto y receptor originales; FIXED reduce el derecho por
+  todo lo devuelto sin modificar el fijo. Cancela la obligación proporcional del
+  alumno; no reabre deuda ni afecta el remanente no devuelto.
+- Abandono exige conservar/perdonar deuda y motivo; detiene cuotas futuras y
+  excluye la inscripción de Estimación Futura.
+- Saldo proyectado = liquidez + cobros pendientes − pagos pendientes −
+  liquidaciones pendientes y previstas. Cobro previsto 10000 al 50% aporta 5000.
+- Estimación Futura = proyectado + participación del club en cuotas impagas aún
+  no incluidas. FIXED agrega cero; su deuda se muestra separada. Deduplicación
+  por obligación explícita, nunca por importe/fecha. Mostrar componentes, fecha,
+  supuestos y total incompleto si falta cotización. Sin fecha de cobro prevista,
+  usar acuerdo vigente a la fecha de cálculo y declarar ese supuesto.
+- Arranque persistente: reconstrucción desde saldo previo y movimientos completos,
+  o corte con saldos aprobados al cierre y operaciones posteriores. Obligaciones
+  iniciales de alumnos, responsables, empleados/proveedores no simulan caja.
+  Historia anterior al corte es consultable; corregirla exige conciliación y
+  ajuste explícito, no altera automáticamente el saldo inicial.
+- Importación versionada con IDs de origen, revisión de coincidencias y comparación
+  esperado/importado/diferencia antes de aprobar. No duplicar capital, cuotas,
+  pagos o saldos entre lotes. SQL real sólo manual por DBeaver.
+
+Permisos separados: revisar liquidaciones, pagarlas, corregir historia y conciliar.
+Director los recibe por defecto y puede delegarlos. Mutaciones requieren versión,
+idempotencia, transacción y comprobación de referencias dentro del tenant.
+
 ## Fuente y estados
 
 PostgreSQL es autoridad. Tipos técnicos INGRESOS/EGRESOS/CAPITAL; operational_status gobierna agregados ordinarios con COMPLETADO, no financial_status (pagado, pendiente, etc.). PENDIENTE tiene agregados específicos. Anulados no deben volver a participar.

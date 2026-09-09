@@ -1,5 +1,37 @@
 # Current State
 
+## Circuito financiero DEC-017 — implementación parcial
+
+Las definiciones de devoluciones, responsables, correcciones, proyecciones y
+arranque fueron aprobadas. FINANCIAL_MODEL contiene las reglas; no quedan
+pendientes de decisión C01/C04, pero sí de integración.
+
+Implementado en este bloque: contratos compartidos de liquidación/proyección;
+cálculo mensual explícito por responsable/término, devoluciones al receptor
+original, deuda por sobrepago, prorrateo, distribución única del fijo,
+compensación FIFO en la misma moneda y cálculo de proyección por obligación.
+Los cálculos nuevos están probados de forma unitaria. **Todavía no son los
+consumidos por las rutas/pantallas.** El calculador anterior conserva su contrato
+legacy; no se migran consumidores sin obtener primero relaciones históricas
+verificables desde PostgreSQL.
+
+Pendiente para completar el plan:
+
+- A: persistencia de responsables/versiones, políticas, permisos delegables,
+  diagnósticos, idempotencia y controles concurrentes.
+- B: transacciones coordinadas de movimientos/pagos/cuotas, auditoría de edición,
+  devoluciones reales y baja con elección de deuda.
+- C: repositorio/runtime mensual, aprobación/cierre/versiones, pagos y
+  compensaciones persistidas, cobro de deuda y agrupación de movimientos.
+- D: consumir el nuevo cálculo con datos/FX trazables, desglose HTTP/UI y retirar
+  lecturas incompatibles. La función legacy aún mantiene su fórmula anterior.
+- E: ambos modos de arranque, obligaciones iniciales, conciliación e importación
+  versionada con trazabilidad.
+- SQL manual DBeaver, integraciones PostgreSQL A/B, concurrencia y recorrido visual.
+
+Este bloque no cambia schema ni ejecuta SQL real. No certifica estabilidad
+integral ni habilita pagos usando únicamente el cálculo en memoria.
+
 ## Actualización operativa — 2026-09-09
 
 Esta sección prevalece sobre los hallazgos históricos inferiores para los cambios

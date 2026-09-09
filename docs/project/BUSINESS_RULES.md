@@ -218,7 +218,9 @@ proyecciones y conciliación de historia con saldos iniciales antes de integrarl
 - B03/C01: lectura FIXED usa campo antiguo y no hay creación runtime de liquidaciones encontrada; se conservan las fórmulas y ambos ejemplos de la sección 11.
 - B04: importar ANULADO como COMPLETADO es un bug; no habilita su conteo.
 - C03: finalización onboarding persiste, pero draft/avance son temporales. Resolver explícitamente la promesa anterior de progreso persistido; no darla por eliminada.
-- C04: aclarar significado/signo del saldo proyectado antes de cambiar la suma implementada.
+- C04: resuelto por DEC-017: restar obligaciones al responsable, incluyendo las
+  derivadas de cobros previstos. Ver FINANCIAL_MODEL para reglas aprobadas;
+  la unificación de los consumidores runtime continúa pendiente.
 - C02/C05: resolver lifecycle de Instructor/invitaciones y clasificación duplicada sin crear autoridades paralelas.
 
 Detalles y fuentes en CURRENT_STATE, ONBOARDING, FINANCIAL_MODEL y TENANCY_AND_RBAC. Esta sincronización no implementa correcciones ni decisiones pendientes.
