@@ -1,5 +1,23 @@
 # Financial Model
 
+## Integración operativa — 2026-09-11
+
+`financialCircuitService` aplica el calculador mensual al runtime PostgreSQL;
+`financialMovementService` coordina movimiento, pago, aplicaciones y devolución;
+`financialStartupService` concilia arranque y obligaciones iniciales. El frontend
+consume `/api/finance/circuit` y no calcula repartos. Aprobaciones conservan
+snapshot y revisión; corregir un ingreso no borra el pago. Las devoluciones nuevas
+registran las aplicaciones canceladas para permitir su corrección sin duplicación.
+
+Las proyecciones excluyen historia y cuotas anteriores al corte ya conciliado,
+exceptuando las obligaciones iniciales explícitas. Los saldos iniciales de
+empleados/proveedores pendientes se descuentan de la proyección. Los saldos
+importados DRAFT no entran al circuito hasta aprobación. La actualización de
+estructura faltante se comunica como error explícito, nunca como saldo cero.
+
+Instalación y límites de verificación: CURRENT_STATE y
+[guía manual](../dbeaver/GUIA-CIRCUITO-FINANCIERO.md).
+
 ## Circuito aprobado — DEC-017
 
 Estas reglas prevalecen sobre las descripciones del runtime histórico inferiores.

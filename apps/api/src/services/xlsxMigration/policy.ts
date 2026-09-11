@@ -7,7 +7,7 @@ export const XLSX_POLICY = {
   maxCompressionRatio: 40,
   maxEntries: 128,
   maxRowsPerSheet: 10_000,
-  sheets: ["ADMINISTRACIÓN", "INSCRIPCIONES"] as const,
+  sheets: ["ADMINISTRACIÓN", "INSCRIPCIONES", "SALDOS_INICIALES"] as const,
   mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 export const TEMPLATE_FILENAME = "Modelo_Import_miClub.xlsx";

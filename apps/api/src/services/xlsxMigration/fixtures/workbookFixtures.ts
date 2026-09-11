@@ -1,6 +1,6 @@
 import { XLSX_IMPORT_V1_SCHEMA } from "@miclub/shared";
 
-type FixtureOptions={swappedHeaders?:boolean;missingRequiredCell?:boolean;formula?:boolean;sharedHeaders?:boolean;reverseSheets?:boolean;movementValues?:Record<string,string>;enrollmentValues?:Record<string,string>};
+type FixtureOptions={swappedHeaders?:boolean;missingRequiredCell?:boolean;formula?:boolean;sharedHeaders?:boolean;reverseSheets?:boolean;movementValues?:Record<string,string>;enrollmentValues?:Record<string,string>;openingValues?:Record<string,string>};
 const xml=(value:string)=>value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const cell=(coordinate:string,value:string,type="inlineStr")=>`<c r="${coordinate}" t="${type}">${type==="inlineStr"?`<is><t>${xml(value)}</t></is>`:`<v>${value}</v>`}</c>`;
 
@@ -27,9 +27,9 @@ export function workbookFixture(options:FixtureOptions={}):Buffer {
       return cell(column.headerCell,header);
     }).join("");
     const values:Record<string,string>=sheetIndex===0
-      ? {date:"2026-08-14",type:"INGRESOS",category:"Cuotas",concept:"Mensual",amount:"1234.50",status:"COMPLETADO"}
-      : {date:"2026-08-14",firstName:"Ana",lastName:"Pérez",document:"123",activity:"Tenis",fee:"10,50",status:"ACTIVA"};
-    if(sheetIndex===0)Object.assign(values,options.movementValues); else Object.assign(values,options.enrollmentValues);
+      ? {externalReference:"movement-1",account:"CASH",date:"2026-08-14",type:"INGRESOS",category:"Cuotas",concept:"Mensual",amount:"1234.50",status:"COMPLETADO"}
+      : sheetIndex===1 ? {externalReference:"enrollment-1",date:"2026-08-14",firstName:"Ana",lastName:"Pérez",document:"123",activity:"Tenis",fee:"10,50",status:"ACTIVA"} : {};
+    if(sheetIndex===0)Object.assign(values,options.movementValues); else if(sheetIndex===1) Object.assign(values,options.enrollmentValues); else Object.assign(values,options.openingValues);
     const data=schema.columns.map((column)=>{
       if(options.missingRequiredCell&&sheetIndex===0&&column.key==="concept") return "";
       const value=values[column.key]; if(value===undefined)return "";

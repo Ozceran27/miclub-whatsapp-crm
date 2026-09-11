@@ -14,6 +14,7 @@ import { getArgentinaMonthWindow } from "../../domain/argentinaTime.js";
 import { calculateDynamicSettlementBalance, calculateOperationalBalances } from "../operationalBalancesCalculator.js";
 import { normalizeOperationalStatus } from "../../importers/normalizers.js";
 import { getClubFinanceSummary } from "../../repositories/economyRepository.js";
+import { readFinancialCircuit } from '../financialCircuitService.js';
 
 const SHEETS: SourceSheet[] = [
   "FITNESS",
@@ -522,8 +523,6 @@ export const getPostgresClubFinanceSummary =
       amount: pickNumber(sector, ["settlement_balance", "amount"]),
     })));
     const sectorBalances = dynamicSettlements.sectors.map(({ sectorName: sector, amount }) => ({ sector, amount }));
-    // Positive source balances are liabilities to responsibles, hence negative in the projection.
-    const derivedSettlementBalance = money(dynamicSettlements.total * -1);
     const breakdown = (rows: Record<string, unknown>[]) =>
       rows.map((item) => ({
         name: pickString(item, ["name"], "Sin datos"),
@@ -537,8 +536,6 @@ export const getPostgresClubFinanceSummary =
     const totalExpenseCategories = totalBreakdownItems(expenseByCategory.rows);
     const remainingBreakdownItems = (total: number) =>
       Math.max(total - MOVEMENT_BREAKDOWN_LIMIT, 0);
-    const dashboardSaldosAPagar = pickNumber(row, ["saldos_a_pagar"]);
-    const effectiveSettlementBalance = derivedSettlementBalance || money(dashboardSaldosAPagar * -1);
     const liquidity = pickNumber(row, [
       "liquidity",
       "cash_balance",
@@ -577,16 +574,8 @@ export const getPostgresClubFinanceSummary =
     const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
     const pendingExpenses = pickNumber(pendingFallbackRow, ["pending_expenses"]) || pickNumber(row, ["pending_expenses"]);
     const pendingNetBalance = pickNumber(pendingFallbackRow, ["pending_net_balance"]) || pickNumber(row, ["pending_net_balance"]);
-    // Regla autoritativa de saldos operativos:
-    // Saldo proyectado = Liquidez + Cuotas a Cobrar + Saldos a Liquidar + Saldos Pendientes.
-    // Saldos a Liquidar ya llega con signo negativo, por eso se suma y no se vuelve a restar.
-    const calculatedOperationalBalances = calculateOperationalBalances({
-      liquidity,
-      feesToCollect: cuotasACobrar,
-      settlementBalance: effectiveSettlementBalance,
-      pendingBalance: pendingNetBalance,
-    });
-    const effectiveProjectedBalance = calculatedOperationalBalances.projectedBalance;
+    const circuit = await readFinancialCircuit({ clubId, permissions: ['sectors:any'], sectorIds: [] });
+    const effectiveProjectedBalance = circuit.projection.projectedBalance;
     return {
       metadata: {
         coverage: "complete",
@@ -615,8 +604,8 @@ export const getPostgresClubFinanceSummary =
       cuotasAdeudadas: cuotasACobrar,
       cuotasACobrar,
       futureReceivableFeesUntilMonthEnd: fallbackFutureReceivables,
-      settlementBalance: calculatedOperationalBalances.settlementBalance,
-      saldosAPagar: calculatedOperationalBalances.settlementBalance,
+      settlementBalance: -circuit.projection.pendingSettlements,
+      saldosAPagar: -circuit.projection.pendingSettlements,
       projectedBalance: effectiveProjectedBalance,
       sectorBalances,
       incomeBySector: breakdown(incomeBySector.rows),

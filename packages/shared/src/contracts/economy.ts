@@ -313,7 +313,7 @@ export interface ClubOperationsSummary extends FinancialSummary {
   settlementBalance: number;
   /** @deprecated Usar settlementBalance; se conserva temporalmente como alias compatible. */
   saldosAPagar: number;
-  projectedBalance: number;
+  projectedBalance: number | null;
   sectorBalances: SectorBalance[];
   incomeBySector: SectorAmountBreakdown[];
   expenseBySector: SectorAmountBreakdown[];

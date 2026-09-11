@@ -1,5 +1,6 @@
 import { getPostgresPool } from "../db/postgres.js";
-import { calculateDynamicSettlementBalance, calculateOperationalBalances } from "./operationalBalancesCalculator.js";
+import { calculateDynamicSettlementBalance } from "./operationalBalancesCalculator.js";
+import { readFinancialCircuit } from './financialCircuitService.js';
 import { getPostgresClubFinanceSummary } from "./postgresDashboardService.js";
 
 const toNumber = (value: unknown): number => Number(value ?? 0) || 0;
@@ -42,14 +43,11 @@ export const runPostgresAudit = async (clubId: string) => {
   const canonicalSettlements = calculateDynamicSettlementBalance(settlements.rows.map((row) => ({
     sectorId: String(row.sector_id), sectorName: String(row.sector_name), amount: toNumber(row.settlement_balance),
   })));
-  const projected = calculateOperationalBalances({
-    liquidity: finance.liquidity,
-    feesToCollect: finance.cuotasACobrar,
-    settlementBalance: finance.settlementBalance,
-    pendingBalance: finance.pendingNetBalance,
-  });
+  const { projection } = await readFinancialCircuit({ clubId, permissions: ['sectors:any'], sectorIds: [] });
+  const expectedProjection = projection.complete ? Math.round((projection.liquidity! + projection.pendingCollections - projection.pendingPayments - projection.pendingSettlements - projection.expectedSettlements) * 100) / 100 : null;
+  const projectionDifference = expectedProjection === null || finance.projectedBalance === null ? null : diff(expectedProjection, finance.projectedBalance);
   return {
-    ok: Math.abs(diff(projected.projectedBalance, finance.projectedBalance)) < 0.01,
+    ok: projectionDifference !== null && Math.abs(projectionDifference) < 0.01,
     operationalBalances: {
       liquidity: finance.liquidity,
       feesToCollect: {
@@ -66,13 +64,13 @@ export const runPostgresAudit = async (clubId: string) => {
         excludedNonIncomeExpense: toNumber(pending.rows[0]?.excluded_non_income_expense),
       },
       projectedBalance: finance.projectedBalance,
-      formula: "liquidity + feesToCollect + settlementBalance + pendingBalance",
+      formula: "liquidity + pendingCollections - pendingPayments - pendingSettlements - expectedSettlements",
     },
     checks: {
       projectedBalance: {
-        expected: projected.projectedBalance,
+        expected: expectedProjection,
         calculated: finance.projectedBalance,
-        difference: diff(projected.projectedBalance, finance.projectedBalance),
+        difference: projectionDifference,
       },
       canonicalSettlementDifference: diff(-canonicalSettlements.total, finance.settlementBalance),
     },

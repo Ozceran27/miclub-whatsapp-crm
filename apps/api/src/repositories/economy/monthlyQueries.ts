@@ -204,7 +204,7 @@ export const getYearlyBreakdownRows = async (from: Date, to: Date, clubId: strin
       and m.club_id = $3
       and m.operational_status = 'COMPLETADO'
       and m.movement_type in ('INGRESOS', 'EGRESOS')
-    group by 1, 2, 3, 4, 5
+    group by 1, 2, 3, 4, 5, 6
     order by 1, 2, 3, 5
   `, [from, to, clubId]);
   return result.rows;

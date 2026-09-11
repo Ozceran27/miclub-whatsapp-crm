@@ -53,6 +53,7 @@ export interface FinancialProjection {
 }
 
 export interface PersistedSettlement extends MonthlySettlementLine {
+  initialObligationId?: string;
   id: string;
   revision: number;
   reviewState: SettlementReviewState;

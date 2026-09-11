@@ -123,6 +123,7 @@ export const migrationManifest: readonly MigrationManifestEntry[] = [
   { path: "202609080004_allow_seven_onboarding_steps.sql", sha256: "e7aec4cbf6ba38f5eb97efd027ed9e011536cdc4f01db92d2c1b644fcb690c85", checkpointPurpose: "Permite persistir el séptimo paso de finalización del onboarding." },
   { path: "202609090001_reservations_and_deposits_categories.sql", sha256: "d04f7a3cd5fccdf50f21c4a08411bb09e06f796c8f093e41e9baaf4a212f588b", dependsOn: ["202609050003_classify_cmv_as_non_operational.sql"], checkpointPurpose: "Agrega Reservas y Señas operativas sin reclasificar historia." },
   { path: "202609090002_financial_operating_circuit.sql", sha256: "8ca524bc9c99e85e1118f7df828c98c8f12e572d29c6dabf32e8f7a0fcfdbfdd", dependsOn: ["202609090001_reservations_and_deposits_categories.sql"], checkpointPurpose: "Historia financiera, revisiones, devoluciones, compensaciones y conciliación inicial DEC-017." },
+  { path: "202609090003_initial_obligation_applications.sql", sha256: "b7e6f505f03e11c9cb1a7539c2585cb05feb81f400c9195e0c7c9da02ede458d", dependsOn: ["202609090002_financial_operating_circuit.sql"], checkpointPurpose: "Historia financiera, revisiones, devoluciones, compensaciones y conciliación inicial DEC-017." },
 ];
 
 export const POST_ADMIN_MIGRATIONS_START = "202608060001";

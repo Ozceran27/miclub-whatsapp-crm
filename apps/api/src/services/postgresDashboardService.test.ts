@@ -165,21 +165,24 @@ test("los cinco dashboards PostgreSQL aíslan dos clubes por club_id", async () 
   const tenantQueries: Array<{ text: string; params?: unknown[] }> = [];
   const pool = {
     query: async <T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: T[] }> => {
+      if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(text) || text.includes('set_config(')) return { rows: [] };
       let rows: Record<string, unknown>[] = [];
       if (text.includes("information_schema.columns")) rows = [{ exists: false }];
+      if (text.includes("to_regprocedure('miclub.finance_lock(uuid)')")) rows = [{ ready: true }];
       if (text.includes("to_regclass('miclub.v_enrollment_receivable_fees')")) {
         rows = [{ hasEnrollmentReceivableFeesView: true, hasNormalizeMembershipFeeAmountFunction: true }];
       }
       if (rows.length === 0) {
         tenantQueries.push({ text, params });
       }
+      if (text.includes('from miclub.clubs where id=$1')) rows = [{ timezone: 'America/Argentina/Buenos_Aires', currency: 'ARS', today: '2026-09-09' }];
       if (rows.length === 0 && text.includes("v_current_enrollments")) {
         const clubId = params?.[0];
         rows = [{ id: `${clubId}-member`, first_name: clubId === clubA ? "Ana" : "Bea", status: clubId === clubA ? "adeudando" : "al_dia", fee_amount: 10_000, source_sheet: "FITNESS" }];
       }
       return { rows: rows as T[] };
     },
-    connect: async () => { throw new Error("connect no esperado"); },
+    connect: () => Promise.resolve({ query: pool.query, release: () => undefined }),
     end: async () => undefined,
   };
   setPostgresPoolForTests(pool);
@@ -203,7 +206,7 @@ test("los cinco dashboards PostgreSQL aíslan dos clubes por club_id", async () 
 
     assert.ok(tenantQueries.length > 0);
     for (const query of tenantQueries) {
-      assert.match(query.text, /club_id\s*=\s*\$1|where [ems]\.club_id = \$1/);
+      assert.match(query.text, /club_id\s*=\s*\$1|where [ems]\.club_id = \$1|from miclub\.clubs where id=\$1|miclub\.(?:finance_lock|value_club_liquidity)\(\$1/);
       assert.ok(query.params?.[0] === clubA || query.params?.[0] === clubB);
     }
   } finally {

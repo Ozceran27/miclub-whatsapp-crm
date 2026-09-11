@@ -39,7 +39,7 @@ test('tenant, archivo e historia quedan protegidos también en base de datos', a
 test('el diagnóstico precede al backfill y excluye los casos de revisión manual', async () => {
   const sql = await migration();
   const diagnosis = sql.indexOf('INSERT INTO miclub.activity_terms_migration_diagnostic');
-  const backfill = sql.indexOf('INSERT INTO miclub.activity_terms\n');
+  const backfill = sql.replace(/\r\n/g, '\n').indexOf('INSERT INTO miclub.activity_terms\n');
   assert.ok(diagnosis >= 0 && backfill > diagnosis);
   assert.match(sql, /WHERE d\.diagnosis='READY'/);
   assert.match(sql, /MANUAL_REVIEW/);

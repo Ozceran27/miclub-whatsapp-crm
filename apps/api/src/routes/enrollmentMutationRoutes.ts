@@ -23,6 +23,7 @@ router.post("/inscripciones", requireAuthorizationCapability("ENROLLMENTS_CREATE
 router.patch("/inscripciones/:id/estado", requireAuthorizationCapability("ENROLLMENTS_EDIT"), asyncHandler(async(req,res)=>{
   const body=req.body as Record<string,unknown>, id=String(req.params.id);
   const status=String(body.status), expected=String(body.expectedUpdatedAt);
+  if (['abandonado','cancelado'].includes(status)) return fail(res,409,'FINANCIAL_WORKFLOW_REQUIRED','Registre la baja en Economía eligiendo conservar o perdonar la deuda y su motivo.');
   if(!UUID.test(id)||!['al_dia','nuevo_inscripto','adeudando','abandonado','cancelado'].includes(status)||typeof body.override!=="boolean"||Number.isNaN(new Date(expected).valueOf())) return fail(res,400,"VALIDATION_ERROR","Estado, override y versión esperada son obligatorios.");
   const result=await setEnrollmentStatus(actor(req),id,status,body.override,expected);
   if(result.kind==="missing")return fail(res,404,"ENROLLMENT_NOT_FOUND","No se encontró la inscripción.");

@@ -1,5 +1,32 @@
 # Testing
 
+## Verificación del circuito — 2026-09-11
+
+- Suite de `*.test.ts`/`*.test.tsx` de api/src, web/src y shared/src con
+  `node --import tsx --test --test-concurrency=1`: **493 PASS, 0 FAIL**.
+- `financialCircuitRegression.test.ts` y `openingBalancesRegression.test.ts`
+  ejecutados secuencialmente en PostgreSQL 18 aislado: **19 PASS, 0 FAIL**.
+- `npm run typecheck`: PASS en los tres workspaces.
+- `npm run build`: PASS; Vite conserva advertencia de tamaño de bundle.
+- `npm run lint`: **280 errores, 577 advertencias** en el repositorio. Este gate
+  no está aprobado y no se certifica una release integral libre de deuda técnica.
+- `git diff --check`: sin errores de whitespace.
+- Comprobación visual local con cuenta descartable: Inicio y Economía cargan
+  las tarjetas, liquidaciones, herramientas y gráficos. Se reprodujo el fallo
+  de GROUP BY y se verificó que Economía carga después de la corrección.
+
+La integración prueba recuperación de estructura parcial sin ledger, repetición
+del script manual, rechazo de deriva estructural, respuesta 503 por schema faltante,
+deuda por sobrepago, devoluciones corregidas/anuladas con cuotas sincronizadas,
+concurrencia e idempotencia, compensación de deuda inicial, pagos de proveedores,
+aislamiento A/B, acceso a Migración según plan y override, importación XLSX v4 con
+saldo inicial DRAFT, y todos los recursos consumidos por Economía.
+
+Las pruebas crean y eliminan únicamente bases descartables después de verificar
+`miclub.test_cluster=release_candidate_isolated`. No se ejecutó SQL modificador
+contra la base real. La instalación real se explica en
+[la guía DBeaver](../dbeaver/GUIA-CIRCUITO-FINANCIERO.md).
+
 ## DEC-017 — bloque de cálculo mensual y proyecciones (2026-09-09)
 
 - Suite local: 493 tests, 488 aprobados, 5 fallidos. Los cinco coinciden con

@@ -4,8 +4,8 @@ import { PERMISSIONS } from '@miclub/shared';
 import { financialDate, financialError, financialMoney, loadCircuit, localDay } from './financialCircuitService.js';
 
 type CashInput = { movementDate: string; movementType: 'INGRESOS' | 'EGRESOS'; accountId: string; categoryId: string; sectorId: string; activityId?: string | null; personId?: string | null; paymentMethodId?: string | null; concept: string; counterpartyText: string; amount: number; taxes?: number; operationalStatus?: 'COMPLETADO' | 'PENDIENTE' | 'ANULADO'; receivableId?: string | null };
-type Movement = { id: string; revision: number; amount: number; currency_code: string; activity_id: string | null; person_id: string | null; sector_id: string; payment_method_id: string | null; movement_date: Date; operational_status: string; movement_type: string; account_id: string; receivable_id: string | null };
-const movementSelect = 'id,revision,amount::float8 amount,currency_code,activity_id,person_id,sector_id,payment_method_id,movement_date,operational_status::text,movement_type::text,account_id,receivable_id';
+type Movement = { id: string; revision: number; amount: number; currency_code: string; activity_id: string | null; person_id: string | null; sector_id: string; payment_method_id: string | null; movement_date: Date; operational_status: string; movement_type: string; account_id: string; receivable_id: string | null; initial_obligation_id: string | null };
+const movementSelect = 'id,revision,amount::float8 amount,currency_code,activity_id,person_id,sector_id,payment_method_id,movement_date,operational_status::text,movement_type::text,account_id,receivable_id,initial_obligation_id';
 
 async function movement(db: QueryExecutor, auth: RequestAuthContext, id: string): Promise<Movement> {
   const row = (await db.query<Movement>(`select ${movementSelect} from miclub.movements where club_id=$1 and id=$2 and ($3::uuid[] is null or sector_id=any($3)) for update`, [auth.clubId, id, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : auth.sectorIds])).rows[0];
@@ -45,7 +45,7 @@ export async function correctFinancialMovement(db: QueryExecutor, auth: RequestA
   if (before.revision !== revision) throw financialError('El movimiento cambió; revise su versión actual.');
   const reference = await validateCash(db, auth, input);
   const refund = (await db.query('select id from miclub.movement_refunds where club_id=$1 and refund_movement_id=$2', [auth.clubId, id])).rows[0];
-  if (refund) throw financialError('Corrija la devolución desde su operación vinculada para conservar la cancelación de cuotas.');
+  if (refund) return correctRefund(db, auth, before, input, reference, applications);
   const refundSum = (await db.query<{ amount: number }>(`select coalesce(sum(m.amount),0)::float8 amount from miclub.movement_refunds r join miclub.movements m on m.club_id=r.club_id and m.id=r.refund_movement_id where r.club_id=$1 and r.original_movement_id=$2 and m.operational_status='COMPLETADO' and m.voided_at is null`, [auth.clubId, id])).rows[0].amount;
   if (refundSum > 0 && (input.amount < refundSum || input.movementType !== 'INGRESOS' || input.operationalStatus === 'ANULADO' || input.operationalStatus === 'PENDIENTE' || input.activityId !== before.activity_id || input.personId !== before.person_id || reference.currency !== before.currency_code)) throw financialError('La corrección no puede invalidar devoluciones ya realizadas.');
   await db.query(`update miclub.movements set movement_date=$3::date at time zone $4,movement_type=$5,account_id=$6,currency_code=$7,category_id=$8,sector_id=$9,activity_id=$10,person_id=$11,payment_method_id=$12,concept=$13,counterparty_text=$14,amount=$15,taxes=$16,operational_status=$17::text::miclub.movement_status,receivable_id=$18,
@@ -56,6 +56,11 @@ export async function correctFinancialMovement(db: QueryExecutor, auth: RequestA
     if (input.activityId !== before.activity_id || input.personId !== before.person_id || input.movementType !== before.movement_type || reference.currency !== before.currency_code) throw financialError('Un pago de liquidación conserva receptor, actividad y moneda; corrija importe, fecha o estado.');
     await db.query("update miclub.activity_settlement_allocations set amount=$3,status=case when $4='COMPLETADO' then 'COMPLETADO' when $4='ANULADO' then 'CANCELADO' else 'PENDIENTE' end where club_id=$1 and movement_id=$2", [auth.clubId, id, input.amount, input.operationalStatus ?? 'COMPLETADO']);
     await db.query("update miclub.activity_settlements set review_state='REQUIRES_REVIEW',revision=revision+1 where club_id=$1 and id=any($2::uuid[])", [auth.clubId, allocations.map(a => a.settlement_id)]);
+  } else if (before.initial_obligation_id) {
+    if ((input.activityId ?? null) !== before.activity_id || (input.personId ?? null) !== before.person_id || input.movementType !== before.movement_type || reference.currency !== before.currency_code || input.receivableId || applications?.length) throw financialError('La aplicación inicial conserva persona, actividad, tipo y moneda.');
+    const oldApplied = before.operational_status === 'COMPLETADO' ? before.amount : 0;
+    const newApplied = (input.operationalStatus ?? 'COMPLETADO') === 'COMPLETADO' ? input.amount : 0;
+    await db.query('update miclub.initial_obligations set settled_amount=settled_amount+$3 where club_id=$1 and id=$2', [auth.clubId, before.initial_obligation_id, (newApplied - oldApplied) * (before.movement_type === 'EGRESOS' ? 1 : -1)]);
   } else await synchronizePayment(db, auth, await movement(db, auth, id), applications);
   await db.query(`update miclub.finance_startups set status='REQUIRES_REVIEW',revision=revision+1 where club_id=$1 and status='APPROVED' and ($2::date<=cutoff_date or $3::date<=cutoff_date)`, [auth.clubId, localDay(before.movement_date, reference.timezone), input.movementDate]);
   await loadCircuit(db, auth);
@@ -107,6 +112,7 @@ export async function refundCollection(db: QueryExecutor, auth: RequestAuthConte
   const original = await movement(db, auth, id);
   if (original.revision !== revision) throw financialError('El cobro cambió; revise la versión actual.');
   if (original.movement_type !== 'INGRESOS' || original.operational_status !== 'COMPLETADO' || amount <= 0) throw financialError('La devolución requiere un cobro completado e importe positivo.');
+  if (original.initial_obligation_id || (await db.query('select id from miclub.activity_settlement_allocations where club_id=$1 and movement_id=$2', [auth.clubId, id])).rows.length) throw financialError('El cobro de una deuda del responsable se corrige mediante su aplicación financiera.');
   const circuit = await loadCircuit(db, auth);
   const account = circuit.accounts.find(a => a.id === accountId && a.currencyCode === original.currency_code);
   if (!account) throw financialError('Cuenta incompatible con la moneda del cobro.', 404);
@@ -120,18 +126,57 @@ export async function refundCollection(db: QueryExecutor, auth: RequestAuthConte
   const responsible = !term ? 0 : term.mode === 'FIXED' ? amount : Math.round((previous.amount + amount) * (100 - term.share)) / 100 - previous.responsible;
   const refundId = (await db.query<{ id: string }>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,sector_id,activity_id,person_id,concept,counterparty_text,amount,currency_code,account_id,operational_status,financial_status,source)
     values($1,miclub.next_tenant_sequence($1,'movement'),'refund:'||gen_random_uuid(),$2::date at time zone $3,'EGRESOS',$4,$5,$6,'Devolución de cobro','Devolución',$7,$8,$9,'COMPLETADO','pagado','finance_circuit') returning id`, [auth.clubId, date, club.timezone, original.sector_id, original.activity_id, original.person_id, amount, original.currency_code, accountId])).rows[0].id;
-  await db.query('insert into miclub.movement_refunds(club_id,original_movement_id,refund_movement_id,original_term_id,responsible_amount) values($1,$2,$3,$4,$5)', [auth.clubId, id, refundId, term?.id ?? null, Math.round(responsible * 100) / 100]);
+  await db.query('insert into miclub.movement_refunds(club_id,original_movement_id,refund_movement_id,original_term_id,responsible_amount,applications_tracked) values($1,$2,$3,$4,$5,true)', [auth.clubId, id, refundId, term?.id ?? null, Math.round(responsible * 100) / 100]);
   const allocations = (await db.query<{ id: string; receivable_id: string; amount: number }>(`select a.id,a.receivable_id,a.amount::float8 amount from miclub.payment_allocations a join miclub.payments p on p.id=a.payment_id and p.club_id=a.club_id where p.club_id=$1 and p.movement_id=$2 order by a.created_at,a.id`, [auth.clubId, id])).rows;
   let cancel = amount;
   for (const a of allocations) {
     const part = Math.min(cancel, a.amount); if (part <= 0) continue;
     await db.query('update miclub.payment_allocations set amount=amount-$3 where club_id=$1 and id=$2', [auth.clubId, a.id, part]);
     await db.query('update miclub.receivables set cancelled_amount=cancelled_amount+$3 where club_id=$1 and id=$2', [auth.clubId, a.receivable_id, part]);
+    await db.query('insert into miclub.refund_obligation_applications(club_id,refund_movement_id,payment_allocation_id,receivable_id,amount) values($1,$2,$3,$4,$5)', [auth.clubId, refundId, a.id, a.receivable_id, part]);
     cancel = Math.round((cancel - part) * 100) / 100;
   }
   await synchronizePayment(db, auth, original);
   await loadCircuit(db, auth);
   return { id: refundId, amount, responsibleAmount: responsible, cancelledStudentAmount: amount - cancel };
+}
+
+async function correctRefund(db: QueryExecutor, auth: RequestAuthContext, before: Movement, input: CashInput, reference: { currency: string; timezone: string }, applications?: { receivableId: string; amount: number }[]) {
+  const link = (await db.query<{ original_movement_id: string; original_term_id: string | null; applications_tracked: boolean }>('select original_movement_id,original_term_id,applications_tracked from miclub.movement_refunds where club_id=$1 and refund_movement_id=$2', [auth.clubId, before.id])).rows[0];
+  if (!link.applications_tracked) throw financialError('Esta devolución histórica no tiene detalle de cuotas canceladas. Requiere conciliación explícita antes de corregirse.');
+  const original = await movement(db, auth, link.original_movement_id);
+  if (input.movementType !== 'EGRESOS' || (input.personId ?? null) !== before.person_id || (input.activityId ?? null) !== before.activity_id || reference.currency !== before.currency_code || input.receivableId || applications?.length || input.operationalStatus === 'PENDIENTE') throw financialError('La devolución conserva su cobro, persona, actividad y moneda; puede corregirse o anularse.');
+  if (input.movementDate < localDay(original.movement_date, reference.timezone)) throw financialError('La devolución no puede preceder al cobro.');
+  const effectiveAmount = input.operationalStatus === 'ANULADO' ? 0 : input.amount;
+  const other = (await db.query<{ amount: number; responsible: number }>(`select coalesce(sum(m.amount),0)::float8 amount,coalesce(sum(r.responsible_amount),0)::float8 responsible from miclub.movement_refunds r join miclub.movements m on m.id=r.refund_movement_id and m.club_id=r.club_id where r.club_id=$1 and r.original_movement_id=$2 and m.id<>$3 and m.operational_status='COMPLETADO' and m.voided_at is null`, [auth.clubId, original.id, before.id])).rows[0];
+  if (Math.round((effectiveAmount + other.amount) * 100) > Math.round(original.amount * 100)) throw financialError('La corrección excede el importe disponible para devolver.');
+  const tracked = (await db.query<{ payment_allocation_id: string; receivable_id: string; amount: number }>('select payment_allocation_id,receivable_id,amount::float8 amount from miclub.refund_obligation_applications where club_id=$1 and refund_movement_id=$2', [auth.clubId, before.id])).rows;
+  // Restore the receipt's available payment before restoring its applications;
+  // PostgreSQL enforces the allocation ceiling after each statement.
+  await db.query('update miclub.payments set amount=$3 where club_id=$1 and movement_id=$2', [auth.clubId, original.id, original.amount - other.amount]);
+  for (const a of tracked) {
+    await db.query('update miclub.receivables set cancelled_amount=cancelled_amount-$3 where club_id=$1 and id=$2 and cancelled_amount>=$3', [auth.clubId, a.receivable_id, a.amount]);
+    await db.query('update miclub.payment_allocations set amount=amount+$3 where club_id=$1 and id=$2', [auth.clubId, a.payment_allocation_id, a.amount]);
+  }
+  await db.query('update miclub.refund_obligation_applications set amount=0 where club_id=$1 and refund_movement_id=$2', [auth.clubId, before.id]);
+  const term = link.original_term_id ? (await db.query<{ mode: string; share: number }>('select mode,club_share_percentage::float8 share from miclub.activity_terms where club_id=$1 and id=$2', [auth.clubId, link.original_term_id])).rows[0] : null;
+  const responsible = !term || !effectiveAmount ? 0 : term.mode === 'FIXED' ? effectiveAmount : Math.round((other.amount + effectiveAmount) * (100 - term.share)) / 100 - other.responsible;
+  if (responsible < 0) throw financialError('La atribución original requiere revisar el acuerdo histórico.');
+  await db.query(`update miclub.movements set movement_date=$3::date at time zone $4,amount=$5,account_id=$6,category_id=$7,payment_method_id=$8,concept=$9,counterparty_text=$10,taxes=$11,operational_status=$12::text::miclub.movement_status,voided_at=case when $12='ANULADO' then now() else null end,voided_by=case when $12='ANULADO' then nullif(current_setting('app.finance_actor',true),'')::uuid else null end,void_reason=case when $12='ANULADO' then current_setting('app.finance_reason') else null end,updated_at=now() where club_id=$1 and id=$2`, [auth.clubId, before.id, input.movementDate, reference.timezone, input.amount, input.accountId, input.categoryId, input.paymentMethodId ?? null, input.concept, input.counterpartyText, input.taxes ?? 0, input.operationalStatus ?? 'COMPLETADO']);
+  await db.query('update miclub.movement_refunds set responsible_amount=$3 where club_id=$1 and refund_movement_id=$2', [auth.clubId, before.id, Math.round(responsible * 100) / 100]);
+  const allocations = (await db.query<{ id: string; receivable_id: string; amount: number }>(`select a.id,a.receivable_id,a.amount::float8 amount from miclub.payment_allocations a join miclub.payments p on p.id=a.payment_id and p.club_id=a.club_id where p.club_id=$1 and p.movement_id=$2 order by a.created_at,a.id`, [auth.clubId, original.id])).rows;
+  let remaining = effectiveAmount;
+  for (const a of allocations) {
+    const part = Math.min(remaining, a.amount); if (part <= 0) continue;
+    await db.query('update miclub.payment_allocations set amount=amount-$3 where club_id=$1 and id=$2', [auth.clubId, a.id, part]);
+    await db.query('update miclub.receivables set cancelled_amount=cancelled_amount+$3 where club_id=$1 and id=$2', [auth.clubId, a.receivable_id, part]);
+    await db.query('insert into miclub.refund_obligation_applications(club_id,refund_movement_id,payment_allocation_id,receivable_id,amount) values($1,$2,$3,$4,$5) on conflict(club_id,refund_movement_id,payment_allocation_id) do update set amount=excluded.amount', [auth.clubId, before.id, a.id, a.receivable_id, part]);
+    remaining = Math.round((remaining - part) * 100) / 100;
+  }
+  await synchronizePayment(db, auth, original);
+  await db.query("update miclub.finance_startups set status='REQUIRES_REVIEW',revision=revision+1 where club_id=$1 and approved_snapshot is not null and ($2::date<=cutoff_date or $3::date<=cutoff_date)", [auth.clubId, localDay(before.movement_date, reference.timezone), input.movementDate]);
+  await loadCircuit(db, auth);
+  return { id: before.id, cancelledStudentAmount: effectiveAmount - remaining };
 }
 
 export async function abandonEnrollment(db: QueryExecutor, auth: RequestAuthContext, id: string, decision: 'KEEP' | 'FORGIVE', reason: string) {

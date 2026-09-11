@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+import { pathToFileURL } from 'node:url';
 
 test("startup commands never invoke the director repair script", () => {
   const repoRoot = path.resolve(import.meta.dirname, "../../../..");
@@ -18,7 +19,7 @@ test("production startup does not load SQLite or Google Sheets", async () => {
   const loader = path.join(import.meta.dirname, "../testFixtures/forbidOperationalDependencies.mjs");
   const child = spawn(process.execPath, [
     "--import", "tsx",
-    "--experimental-loader", loader,
+    "--experimental-loader", pathToFileURL(loader).href,
     "--input-type=module",
     "--eval", "const { startServer } = await import('./apps/api/src/index.ts'); await startServer();",
   ], {

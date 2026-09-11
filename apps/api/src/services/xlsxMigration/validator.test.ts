@@ -58,7 +58,7 @@ test("rechaza fórmulas aunque tengan un valor almacenado",()=>assert.ok(validat
 test("convierte un ZIP con ruta maliciosa en un error de validación",()=>assert.equal(validate(maliciousZipFixture()).errors[0]?.error_code,"UNSAFE_ZIP_PATH"));
 
 test("fixtures XLSX cubren referencias exactas, normalizadas, inexistentes y ambiguas",()=>{
-  const base:ReferenceCatalog={sectors:[{id:"s1",name:"Fútbol"}],activities:[{id:"a1",name:"Infantiles",sectorId:"s1",instructorId:"i1"}],instructors:[{id:"i1",name:"Responsable"}],categories:[{id:"c1",name:"Cuotas"}]};
+  const base:ReferenceCatalog={sectors:[{id:"s1",name:"Fútbol"}],activities:[{id:"a1",name:"Infantiles",sectorId:"s1",instructorId:"i1"}],instructors:[{id:"i1",name:"Responsable"}],categories:[{id:"c1",name:"Cuotas"}],accounts:[{id:"account",name:"Caja",code:"CASH",currencyCode:"ARS"}]};
   for(const fixture of [referenceWorkbookFixtures.exact,referenceWorkbookFixtures.normalized]) {
     const parsed=validate(fixture()); assert.deepEqual(parsed.errors,[]); assert.deepEqual(resolveReferenceRows(parsed.referenceRows,base).errors,[]);
   }
@@ -70,6 +70,6 @@ test("fixtures XLSX cubren referencias exactas, normalizadas, inexistentes y amb
 
 test("fixture XLSX conserva el instructor responsable derivado aunque exista otro instructor",()=>{
   const parsed=validate(referenceWorkbookFixtures.wrongInstructor());
-  const result=resolveReferenceRows(parsed.referenceRows,{sectors:[],activities:[{id:"a1",name:"Infantiles",sectorId:"s1",instructorId:"responsable"}],instructors:[{id:"responsable",name:"Ana"},{id:"otro",name:"Bruno"}],categories:[{id:"c1",name:"Cuotas"}]});
+  const result=resolveReferenceRows(parsed.referenceRows,{sectors:[],activities:[{id:"a1",name:"Infantiles",sectorId:"s1",instructorId:"responsable"}],instructors:[{id:"responsable",name:"Ana"},{id:"otro",name:"Bruno"}],categories:[{id:"c1",name:"Cuotas"}],accounts:[{id:"account",name:"Caja",code:"CASH",currencyCode:"ARS"}]});
   assert.equal(result.resolved.find(({sheet})=>sheet==="INSCRIPCIONES")?.instructorId,"responsable");
 });

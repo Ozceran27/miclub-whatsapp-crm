@@ -9,7 +9,7 @@ const signature = Object.fromEntries(Object.values(XLSX_IMPORT_V1_SCHEMA.sheets)
 ]));
 
 void test("detects v3 from the explicit activity workbook signature", () => {
-  assert.equal(detectMiclubXlsxImportVersion(signature), "v3");
+  assert.equal(detectMiclubXlsxImportVersion(signature), "v4");
 });
 
 void test("rejects missing, moved and unknown headers", () => {
@@ -26,8 +26,8 @@ void test("derives enrollment sector instead of requiring a redundant cell", () 
 });
 
 void test("documents every physical column and makes sheet order non-contractual", () => {
-  assert.deepEqual(XLSX_IMPORT_V1_SCHEMA.sheets.movements.physicalColumns.map(({column}) => column), [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), "AA"]);
-  assert.deepEqual(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.physicalColumns.map(({column}) => column), "ABCDEFGHIJKLMNOPQRSTU".split(""));
+  assert.deepEqual(XLSX_IMPORT_V1_SCHEMA.sheets.movements.physicalColumns.map(({column}) => column), [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), "AA", "AB", "AC"]);
+  assert.deepEqual(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.physicalColumns.map(({column}) => column), "ABCDEFGHIJKLMNOPQRSTUV".split(""));
   assert.equal(XLSX_IMPORT_V1_SCHEMA.sheetOrderContractual, false);
   assert.equal(XLSX_IMPORT_V1_SCHEMA.sheets.enrollments.physicalColumns.find(({column}) => column === "U")?.kind, "spacer");
 });

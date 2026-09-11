@@ -50,7 +50,7 @@ export const createExchangeRateService = (provider: OfficialExchangeRateProvider
         union all
         select id,base_currency_code,quote_currency_code,rate,rate_date,rate_type,source,2 from miclub.exchange_rates
         where base_currency_code=$2 and quote_currency_code=$1 and rate_date <= $3 and rate_type=$4
-      ) select * from candidates order by rate_date desc,priority limit 1`, [base, quote, valuationDate, options.rateType ?? "official"]);
+      ) select id,base_currency_code,quote_currency_code,rate,rate_date::text,rate_type,source,priority from candidates order by rate_date desc,priority limit 1`, [base, quote, valuationDate, options.rateType ?? "official"]);
     const row = result.rows[0];
     if (row) {
       const age = (Date.parse(`${valuationDate}T00:00:00Z`) - Date.parse(`${row.rate_date}T00:00:00Z`)) / 86400000;

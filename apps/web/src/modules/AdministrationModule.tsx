@@ -29,6 +29,7 @@ export default function AdministrationModule() {
 
   return (
     <main className="module-content">
+      <FinancialCircuitPanel summaryOnly />
       <section className="module-hero home-hero economy-module-hero">
         <div className="home-hero__copy">
           <p className="eyebrow">Administración</p>

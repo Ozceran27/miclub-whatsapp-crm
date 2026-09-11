@@ -15,7 +15,7 @@ const iso = (value: Date | string): string => value instanceof Date ? value.toIS
 export async function resolveClubCapabilities(
   clubId: string,
   executor?: QueryExecutor,
-  now = new Date(),
+  now?: Date,
 ): Promise<ClubCapability[]> {
   const results = await Promise.all(Object.values(CLUB_CAPABILITIES).map(code => resolveFeature(clubId, code, executor, now)));
   return results.filter((row): row is CapabilityRow & { enabled: boolean } => row?.enabled === true).map((row) => ({
@@ -35,15 +35,15 @@ async function resolveFeature(
   clubId: string,
   featureCode: ClubCapabilityCode,
   executor?: QueryExecutor,
-  now = new Date(),
+  now?: Date,
 ): Promise<(CapabilityRow & { enabled: boolean }) | undefined> {
   const db = executor ?? await getPostgresPool();
   const result = await db.query<CapabilityRow & { enabled: boolean }>(
     `with current_override as (
        select enabled, source, effective_from, effective_until, actor
          from miclub.club_capabilities
-        where club_id=$1 and capability=$2 and effective_from <= $3
-          and (effective_until is null or effective_until > $3)
+        where club_id=$1 and capability=$2 and effective_from <= coalesce($3::timestamptz,statement_timestamp())
+          and (effective_until is null or effective_until > coalesce($3::timestamptz,statement_timestamp()))
         order by effective_from desc, created_at desc
         limit 1
      ), entitled as (
@@ -52,8 +52,8 @@ async function resolveFeature(
          from miclub.club_subscriptions subscription
          join miclub.plan_entitlements entitlement on entitlement.plan_code=subscription.plan_code
         where subscription.club_id=$1 and entitlement.feature_code=$2
-          and subscription.effective_from <= $3
-          and (subscription.effective_until is null or subscription.effective_until > $3)
+          and subscription.effective_from <= coalesce($3::timestamptz,statement_timestamp())
+          and (subscription.effective_until is null or subscription.effective_until > coalesce($3::timestamptz,statement_timestamp()))
           and subscription.billing_status='active'
         order by subscription.effective_from desc, subscription.id desc
         limit 1
@@ -71,7 +71,7 @@ async function resolveFeature(
   return result.rows[0];
 }
 
-export async function hasFeature(clubId: string, featureCode: ClubCapabilityCode, executor?: QueryExecutor, now = new Date()): Promise<boolean> {
+export async function hasFeature(clubId: string, featureCode: ClubCapabilityCode, executor?: QueryExecutor, now?: Date): Promise<boolean> {
   return (await resolveFeature(clubId, featureCode, executor, now))?.enabled === true;
 }
 

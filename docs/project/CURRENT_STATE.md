@@ -1,36 +1,36 @@
 # Current State
 
-## Circuito financiero DEC-017 — implementación parcial
+## Circuito financiero DEC-017 — entrega 2026-09-11
 
-Las definiciones de devoluciones, responsables, correcciones, proyecciones y
-arranque fueron aprobadas. FINANCIAL_MODEL contiene las reglas; no quedan
-pendientes de decisión C01/C04, pero sí de integración.
+El runtime /api/finance conecta cuentas, movimientos, pagos y aplicaciones a cuotas
+en transacciones tenant. Incluye historial de correcciones, devoluciones parciales
+y su edición/anulación, liquidaciones mensuales persistidas, versiones aprobadas,
+pagos parciales, cierre independiente y compensaciones FIFO. Corregir ingresos
+conserva pagos realizados y genera deuda cuando existe sobrepago.
 
-Implementado en este bloque: contratos compartidos de liquidación/proyección;
-cálculo mensual explícito por responsable/término, devoluciones al receptor
-original, deuda por sobrepago, prorrateo, distribución única del fijo,
-compensación FIFO en la misma moneda y cálculo de proyección por obligación.
-Los cálculos nuevos están probados de forma unitaria. **Todavía no son los
-consumidos por las rutas/pantallas.** El calculador anterior conserva su contrato
-legacy; no se migran consumidores sin obtener primero relaciones históricas
-verificables desde PostgreSQL.
+Economía contiene las herramientas; Inicio, Administración y CRM consumen su
+resumen compartido. Las proyecciones incompletas conservan null y explican sus
+supuestos. Se respetan fecha de caja, zona del club, corte y cotizaciones persistidas.
+Las escrituras legacy de movimientos remiten al flujo coordinado.
 
-Pendiente para completar el plan:
+XLSX v4 incluye cuentas, identificadores de origen y SALDOS_INICIALES. Los saldos
+importados quedan DRAFT hasta conciliación explícita. Hay pagos parciales de saldos
+iniciales de empleados/proveedores y compensación de deudas del responsable.
+Importar historia anterior al corte exige revisar el arranque, sin alterar caja.
 
-- A: persistencia de responsables/versiones, políticas, permisos delegables,
-  diagnósticos, idempotencia y controles concurrentes.
-- B: transacciones coordinadas de movimientos/pagos/cuotas, auditoría de edición,
-  devoluciones reales y baja con elección de deuda.
-- C: repositorio/runtime mensual, aprobación/cierre/versiones, pagos y
-  compensaciones persistidas, cobro de deuda y agrupación de movimientos.
-- D: consumir el nuevo cálculo con datos/FX trazables, desglose HTTP/UI y retirar
-  lecturas incompatibles. La función legacy aún mantiene su fórmula anterior.
-- E: ambos modos de arranque, obligaciones iniciales, conciliación e importación
-  versionada con trazabilidad.
-- SQL manual DBeaver, integraciones PostgreSQL A/B, concurrencia y recorrido visual.
+Corregidos: recuperación SQL de columnas existentes; columna review_state ausente;
+restricción de hojas de importación; GROUP BY del desglose anual; diferencia de reloj
+entre menú y autorización de Migración. Una estructura financiera incompleta ahora
+se informa con 503 y una instrucción de actualización, sin saldos ficticios.
 
-Este bloque no cambia schema ni ejecuta SQL real. No certifica estabilidad
-integral ni habilita pagos usando únicamente el cálculo en memoria.
+**La instalación real requiere ejecución manual.** La [guía SQL](../dbeaver/GUIA-CIRCUITO-FINANCIERO.md)
+explica el orden. El script acumulativo incluye 002 y 003; no ejecutarlas aparte.
+No se modificó la base real. El rol de auditoría sólo permitió inspeccionar schema,
+no el ledger. Ver TESTING para resultados en PostgreSQL aislado y controles locales.
+
+La deuda general de lint y las lecturas legacy señaladas en las auditorías siguen
+visibles. No se certifica ausencia absoluta de errores en toda la app ni el despliegue
+real. Las secciones siguientes son antecedentes y no sustituyen este estado.
 
 ## Actualización operativa — 2026-09-09
 

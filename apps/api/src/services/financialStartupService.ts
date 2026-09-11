@@ -53,9 +53,16 @@ export async function approveStartup(db: QueryExecutor, auth: RequestAuthContext
   const preview = row.expected_balances;
   if (preview.sourceHash !== await sourceHash(db, auth.clubId, preview.cutoffDate)) throw financialError('Cambió la historia importada; vuelva a comparar antes de aprobar.');
   if (!acceptDifferences && preview.differences.some(d => d.difference !== 0)) throw financialError('Hay diferencias; requieren aceptación explícita con motivo.');
+  const existingOrigins = (await db.query<{ source_key: string }>('select source_key from miclub.initial_obligations where club_id=$1', [auth.clubId])).rows;
+  if (existingOrigins.some(o => !preview.obligations.some(p => p.sourceKey === o.source_key))) throw financialError('La comparación omite obligaciones ya conciliadas. Inclúyalas expresamente; no se eliminan saldos históricos al aprobar un arranque.');
   for (const o of preview.obligations) {
-    const prior = (await db.query<{ id: string; person_id: string; kind: string; currency_code: string; settled_amount: number; receivable_id: string | null }>('select id,person_id,kind,currency_code,settled_amount::float8 settled_amount,receivable_id from miclub.initial_obligations where club_id=$1 and source_key=$2', [auth.clubId, o.sourceKey])).rows[0];
-    if (prior && (prior.person_id !== o.personId || prior.kind !== o.kind || prior.currency_code !== o.currencyCode || prior.settled_amount !== 0)) throw financialError('El origen ya tiene otra identidad o aplicaciones; requiere ajuste individual.');
+    const prior = (await db.query<{ id: string; person_id: string; activity_id: string | null; kind: string; currency_code: string; amount: number; settled_amount: number; receivable_id: string | null }>('select id,person_id,activity_id,kind,currency_code,amount::float8 amount,settled_amount::float8 settled_amount,receivable_id from miclub.initial_obligations where club_id=$1 and source_key=$2', [auth.clubId, o.sourceKey])).rows[0];
+    if (prior && (prior.person_id !== o.personId || prior.activity_id !== (o.activityId ?? null) || prior.kind !== o.kind || prior.currency_code !== o.currencyCode || (prior.settled_amount !== 0 && prior.amount !== o.amount))) throw financialError('El origen ya tiene otra identidad o aplicaciones; requiere ajuste individual.');
+    if (prior && prior.amount !== o.amount && (await db.query('select id from miclub.settlement_compensations where club_id=$1 and (debt_initial_obligation_id=$2 or credit_initial_obligation_id=$2) limit 1', [auth.clubId, prior.id])).rows.length) throw financialError('El saldo inicial ya participó de una compensación; conserve el origen y registre un ajuste separado.');
+    if (prior?.receivable_id) {
+      const applied = (await db.query<{ amount: number }>('select coalesce(sum(amount),0)::float8 amount from miclub.payment_allocations where club_id=$1 and receivable_id=$2', [auth.clubId, prior.receivable_id])).rows[0].amount;
+      if (applied > 0 && prior.amount !== o.amount) throw financialError('La deuda inicial del alumno ya tiene pagos; corrija su obligación mediante un ajuste auditado.');
+    }
     let receivableId = prior?.receivable_id ?? null;
     if (o.kind === 'STUDENT') {
       receivableId = (await db.query<{ id: string }>(`insert into miclub.receivables(club_id,person_id,activity_id,enrollment_id,concept,amount,due_date,currency_code,source_key)
@@ -63,7 +70,7 @@ export async function approveStartup(db: QueryExecutor, auth: RequestAuthContext
         do update set amount=excluded.amount returning id`, [auth.clubId, o.personId, o.activityId ?? null, o.enrollmentId ?? null, o.amount, o.dueDate, o.currencyCode, `opening:${o.sourceKey}`])).rows[0].id;
     }
     await db.query(`insert into miclub.initial_obligations(club_id,person_id,activity_id,kind,currency_code,amount,source_key,due_date,receivable_id)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(club_id,source_key) do update set amount=excluded.amount,due_date=excluded.due_date`, [auth.clubId, o.personId, o.activityId ?? null, o.kind, o.currencyCode, o.amount, o.sourceKey, o.dueDate, receivableId]);
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(club_id,source_key) do update set amount=excluded.amount,due_date=excluded.due_date,receivable_id=excluded.receivable_id,review_state='APPROVED'`, [auth.clubId, o.personId, o.activityId ?? null, o.kind, o.currencyCode, o.amount, o.sourceKey, o.dueDate, receivableId]);
   }
   await db.query('insert into miclub.finance_history(club_id,entity_type,entity_id,before_data,after_data,actor_id,reason) values($1,\'finance_startups\',$1,$2,$3,$4,current_setting(\'app.finance_reason\'))', [auth.clubId, JSON.stringify(row.approved_snapshot), JSON.stringify(preview), auth.userId]);
   await db.query("update miclub.finance_startups set mode=$2,cutoff_date=$3,status='APPROVED',approved_snapshot=$4,approved_by=$5,approved_at=now() where club_id=$1", [auth.clubId, preview.mode, preview.cutoffDate, JSON.stringify(preview), auth.userId]);
@@ -75,4 +82,17 @@ export async function reconcileMovement(db: QueryExecutor, auth: RequestAuthCont
     and ($4::uuid[] is null or sector_id=any($4)) returning id,revision,reconciled_at`, [auth.clubId, id, revision, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : auth.sectorIds])).rows[0];
   if (!row) throw financialError('Movimiento cambiado, sin cuenta o no completado.');
   return row;
+}
+
+export async function payInitialObligation(db: QueryExecutor, auth: RequestAuthContext, id: string, accountId: string, amount: number, date: string) {
+  financialMoney(amount); financialDate(date);
+  const row = (await db.query<{ balance: number; person_id: string; activity_id: string | null; currency_code: string; timezone: string; today: string }>(`select (o.amount-o.settled_amount)::float8 balance,o.person_id,o.activity_id,o.currency_code,coalesce(c.timezone,'America/Argentina/Buenos_Aires') timezone,(now() at time zone coalesce(c.timezone,'America/Argentina/Buenos_Aires'))::date::text today
+    from miclub.initial_obligations o join miclub.clubs c on c.id=o.club_id join miclub.financial_accounts a on a.club_id=o.club_id and a.id=$3 and a.currency_code=o.currency_code and a.status='ACTIVE'
+    where o.club_id=$1 and o.id=$2 and o.kind in ('EMPLOYEE','SUPPLIER') and o.review_state='APPROVED' and exists(select 1 from miclub.finance_startups s where s.club_id=o.club_id and s.approved_snapshot is not null) for update of o`, [auth.clubId, id, accountId])).rows[0];
+  if (!row) throw financialError('Obligación inicial aprobada o cuenta compatible no disponible.', 404);
+  if (amount <= 0 || amount > row.balance || date > row.today) throw financialError('Importe superior al saldo, no positivo o fecha futura.');
+  const created = (await db.query<{id:string}>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,sector_id,activity_id,person_id,concept,counterparty_text,amount,currency_code,account_id,operational_status,financial_status,source,initial_obligation_id)
+    values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,'EGRESOS',(select sector_id from miclub.activities where club_id=$1 and id=$4),$4,$5,'Pago de obligación inicial','Empleado / proveedor',$6,$7,$8,'COMPLETADO','pagado','finance_circuit',$9) returning id`, [auth.clubId,date,row.timezone,row.activity_id,row.person_id,amount,row.currency_code,accountId,id])).rows[0];
+  await db.query('update miclub.initial_obligations set settled_amount=settled_amount+$3 where club_id=$1 and id=$2', [auth.clubId,id,amount]);
+  return { id: created.id, amount, remaining: Math.round((row.balance-amount)*100)/100 };
 }

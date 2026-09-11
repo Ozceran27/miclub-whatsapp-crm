@@ -2,12 +2,13 @@
 
 ## Contrato efectivo
 
-XLSX → PostgreSQL; sin Google Sheets. MICLUB_XLSX_IMPORT_VERSION es v3 desde 2026-09-09. El identificador XLSX_IMPORT_V1_SCHEMA conserva su nombre por compatibilidad de código.
+XLSX → PostgreSQL; sin Google Sheets. MICLUB_XLSX_IMPORT_VERSION es v4 desde 2026-09-11. El identificador XLSX_IMPORT_V1_SCHEMA conserva su nombre por compatibilidad de código.
 
 Archivo: apps/api/data/db/Modelo_Import_miClub.xlsx. Hojas exactas (orden no contractual), headers fila 1, datos desde fila 2:
 
-- ADMINISTRACIÓN A:AA: Fecha, Tipo, Categoría, Concepto, Contra-parte, Sector, Monto, Impuestos, Estado, M.P., Actividad (AA).
-- INSCRIPCIONES A:U: Fecha, Nombre, Apellido, D.N.I., Telefono, Actividad, Modalidad, Cuota, Estado.
+- ADMINISTRACIÓN A:AC: Fecha, Tipo, Categoría, Concepto, Contra-parte, Sector, Monto, Impuestos, Estado, M.P., Actividad (AA), Identificador de origen (AB), Cuenta (AC).
+- INSCRIPCIONES A:V: Fecha, Nombre, Apellido, D.N.I., Telefono, Actividad, Modalidad, Cuota, Estado, Identificador de origen (V).
+- SALDOS_INICIALES A:G: Identificador de origen, D.N.I., Actividad, Tipo, Moneda, Monto, Fecha de vencimiento.
 
 Separadores vacíos son parte de la firma. Sector e instructor de inscripción se derivan de actividad.
 
@@ -56,3 +57,13 @@ shared contracts/xlsxImport.ts; migrationUploadRoutes.ts; xlsxMigration/policy, 
 - Historia con CAPITAL inicial y opening balances puede duplicar capital; revisar conciliación.
 
 La importación ocurre después del onboarding según permisos/plan. FREE no incluye DATA_MIGRATION; SOCIAL/COMPLEX/CLUB activos sí, salvo override efectivo.
+
+## Conciliación v4 — 2026-09-11
+
+SALDOS_INICIALES admite STUDENT, RESPONSIBLE, EMPLOYEE y SUPPLIER. Reutiliza Person
+del club o del lote de inscripciones. Queda DRAFT, sin caja ficticia ni obligaciones
+activas hasta aprobar el arranque. PostgreSQL admite la tercera hoja en xlsx_import_rows.
+Se revisan orígenes y huellas completas contra lotes anteriores; importe y fecha no
+son una clave de deduplicación. Las cuentas se resuelven dentro del tenant y fijan
+la moneda. La fecha de caja usa la zona del club. Historia anterior al corte
+aprobado exige conciliación y no modifica automáticamente el saldo inicial.

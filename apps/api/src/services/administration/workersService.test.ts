@@ -13,7 +13,7 @@ test("el último Director activo no puede perder su rol", async () => {
       return { rows: [{
         id: "employee-1", club_id: "club-1", person_id: "person-1", code: null,
         first_name: "Ada", last_name: "Lovelace", display_name: "Ada Lovelace", dni: null,
-        phone: null, email: null, role: "Director", sector: null, salary: null, status: "active",
+        phone: null, email: null, role: "DIRECTOR", sector: null, salary: null, status: "active",
         system_access: true, employment_start_date: null, employment_end_date: null, notes: null,
         permissions: [], sector_ids: [], activities: [], active_director_count: "1",
         created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", total_count: "1",

@@ -84,7 +84,7 @@ test('la utilidad sr-only conserva los nombres accesibles de selectores visuales
 
   assert.match(sectors, /<span className="sr-only">\{icon\.name\}<\/span>/);
   assert.match(sectors, /<span className="sr-only">\{color\.name\}/);
-  assert.match(activities, /<span className="sr-only">\{key\}<\/span>/);
+  assert.match(activities, /<span className="sr-only">\{item\.name\} · \{item\.category\}<\/span>/);
 });
 
 test('los catálogos de iconos son adaptables y no generan scroll horizontal', async () => {
@@ -103,7 +103,7 @@ test('los catálogos de iconos son adaptables y no generan scroll horizontal', a
   assert.match(styles, /\.draft-sector-icons\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*hidden/s);
   assert.match(activities, /className="draft-icon-grid draft-icon-grid--catalog"/);
   assert.match(activities, /ACTIVITY_VISUAL_CATALOG\.map/);
-  assert.match(activities, /aria-label=\{`\$\{key\} · \$\{category\}`\}/);
+  assert.match(activities, /aria-label=\{`\$\{item\.name\} · \$\{item\.category\}`\}/);
 });
 
 test('los modales de borradores usan superficies opacas específicas en ambos temas', async () => {

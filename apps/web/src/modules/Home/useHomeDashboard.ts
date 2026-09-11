@@ -121,7 +121,7 @@ export function useHomeDashboard() {
     const weightedAverageFee = calculateWeightedAverageFee(members);
     const unavailableLabel = financeError ? 'No disponible' : '—';
     const estimatedDebt = financeSummary?.cuotasACobrar ?? financeSummary?.cuotasAdeudadas ?? summary?.totalEstimatedDebt;
-    const formatFinanceMoney = (value: number | undefined) => financeSummary && isFiniteNumber(value) ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: financeSummary.presentationCurrencyCode }).format(value) : unavailableLabel;
+    const formatFinanceMoney = (value: number | null | undefined) => financeSummary && isFiniteNumber(value) ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: financeSummary.presentationCurrencyCode }).format(value) : unavailableLabel;
     const formatUsd = (value: number | undefined) => financeSummary && isFiniteNumber(value) ? `USD ${Math.round(value).toLocaleString('es-AR')}` : unavailableLabel;
     const conversionDetail = financeSummary?.appliedRate ? ` → ${formatFinanceMoney(financeSummary.dollarsConverted)} (tasa ${financeSummary.appliedRate}, ${financeSummary.rateDate}, ${financeSummary.rateSource})` : '';
     const incompleteValuation = financeSummary?.valuationStatus === 'INCOMPLETE_EXCHANGE_RATE';

@@ -1,5 +1,5 @@
 /** Contract describing the established miClub import workbook without changing it. */
-export const MICLUB_XLSX_IMPORT_VERSION = "v3" as const;
+export const MICLUB_XLSX_IMPORT_VERSION = "v4" as const;
 
 export type XlsxImportColumn = Readonly<{
   key: string;
@@ -27,6 +27,7 @@ const administrationPhysicalColumns = [
   ["O", null], ["P", null], ["Q", "Sector", "sector"], ["R", null], ["S", "Monto", "amount"],
   ["T", null], ["U", null], ["V", "Impuestos", "taxes"], ["W", null], ["X", "Estado", "status"],
   ["Y", null], ["Z", "M.P.", "paymentMethod"], ["AA", "Actividad", "activity"],
+  ["AB", "Identificador de origen", "externalReference"], ["AC", "Cuenta", "account"],
 ] as const;
 
 const enrollmentPhysicalColumns = [
@@ -35,6 +36,7 @@ const enrollmentPhysicalColumns = [
   ["J", null], ["K", "Telefono", "phone"], ["L", null], ["M", "Actividad", "activity"],
   ["N", null], ["O", "Modalidad", "modality"], ["P", null], ["Q", "Cuota", "fee"],
   ["R", null], ["S", "Estado", "status"], ["T", null], ["U", null],
+  ["V", "Identificador de origen", "externalReference"],
 ] as const;
 
 const physicalColumns = (items: readonly (readonly [string, string | null, string?])[]): readonly XlsxImportPhysicalColumn[] =>
@@ -63,6 +65,8 @@ export const XLSX_IMPORT_V1_SCHEMA = {
         { key: "status", header: "Estado", headerCell: "X1", dataCell: "X2", type: "enum", enumValues: ["COMPLETADO", "PENDIENTE", "CANCELADO", "ANULADO"], required: true },
         { key: "paymentMethod", header: "M.P.", headerCell: "Z1", dataCell: "Z2", type: "string", required: false },
         { key: "activity", header: "Actividad", headerCell: "AA1", dataCell: "AA2", type: "string", required: false },
+        { key: "externalReference", header: "Identificador de origen", headerCell: "AB1", dataCell: "AB2", type: "string", required: true },
+        { key: "account", header: "Cuenta", headerCell: "AC1", dataCell: "AC2", type: "string", required: true },
       ] satisfies readonly XlsxImportColumn[],
     },
     enrollments: {
@@ -80,8 +84,22 @@ export const XLSX_IMPORT_V1_SCHEMA = {
         { key: "modality", header: "Modalidad", headerCell: "O1", dataCell: "O2", type: "string", required: false },
         { key: "fee", header: "Cuota", headerCell: "Q1", dataCell: "Q2", type: "decimal", required: true },
         { key: "status", header: "Estado", headerCell: "S1", dataCell: "S2", type: "enum", enumValues: ["ACTIVA", "AL DÍA", "NUEVO INSCRIPTO", "ADEUDANDO", "ABANDONADO", "CANCELADA"], required: true },
+        { key: "externalReference", header: "Identificador de origen", headerCell: "V1", dataCell: "V2", type: "string", required: true },
       ] satisfies readonly XlsxImportColumn[],
       derived: { sector: "activity.sector", instructor: "activity.instructor" },
+    },
+    opening: {
+      name: 'SALDOS_INICIALES', headerRow: 1, firstDataRow: 2,
+      physicalColumns: physicalColumns([['A','Identificador de origen','externalReference'],['B','D.N.I.','document'],['C','Actividad','activity'],['D','Tipo','kind'],['E','Moneda','currency'],['F','Saldo','amount'],['G','Vencimiento','date']]),
+      columns: [
+        { key: 'externalReference', header: 'Identificador de origen', headerCell: 'A1', dataCell: 'A2', type: 'string', required: true },
+        { key: 'document', header: 'D.N.I.', headerCell: 'B1', dataCell: 'B2', type: 'string', required: true },
+        { key: 'activity', header: 'Actividad', headerCell: 'C1', dataCell: 'C2', type: 'string', required: false },
+        { key: 'kind', header: 'Tipo', headerCell: 'D1', dataCell: 'D2', type: 'enum', enumValues: ['STUDENT','RESPONSIBLE','EMPLOYEE','SUPPLIER'], required: true },
+        { key: 'currency', header: 'Moneda', headerCell: 'E1', dataCell: 'E2', type: 'enum', enumValues: ['ARS','USD','EUR','BRL'], required: true },
+        { key: 'amount', header: 'Saldo', headerCell: 'F1', dataCell: 'F2', type: 'decimal', required: true },
+        { key: 'date', header: 'Vencimiento', headerCell: 'G1', dataCell: 'G2', type: 'date', required: true },
+      ] satisfies readonly XlsxImportColumn[],
     },
   },
 } as const;
@@ -95,7 +113,7 @@ export function detectMiclubXlsxImportVersion(workbook: XlsxWorkbookSignature): 
       const value = cells[`${column}${sheet.headerRow}`];
       return (typeof value === "string" ? value : "") !== (header ?? "");
     })) {
-      throw new Error(`Formato XLSX desconocido: la firma de ${sheet.name} no corresponde a v3. Descargá la plantilla con Actividad en AA.`);
+      throw new Error(`Formato XLSX desconocido: la firma de ${sheet.name} no corresponde a v4. Descargá la plantilla con Actividad, Cuenta, Identificador de origen y SALDOS_INICIALES.`);
     }
   }
   return MICLUB_XLSX_IMPORT_VERSION;

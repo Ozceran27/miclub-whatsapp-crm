@@ -99,12 +99,12 @@ export const getSummary = async (clubId: string): Promise<JsonRecord> => {
   const expenses = toNumber(row.expenses);
   return {
     month: { label: month.label, income, expenses, balance: toNumber(row.balance) },
-    current: { liquidity: toNumber(financeRow.liquidity), projectedBalance: toNumber(financeRow.projectedBalance) },
+    current: { liquidity: toNumber(financeRow.liquidity), projectedBalance: financeRow.projectedBalance },
     income,
     expenses,
     balance: toNumber(row.balance),
     liquidity: toNumber(financeRow.liquidity),
-    projectedBalance: toNumber(financeRow.projectedBalance),
+    projectedBalance: financeRow.projectedBalance,
     pendingBalance: toNumber(row.pendingBalance),
     completedMovements: toInteger(row.completedMovements),
     totalMovements: toInteger(row.totalMovements),

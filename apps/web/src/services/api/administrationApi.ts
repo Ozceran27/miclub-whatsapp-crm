@@ -90,13 +90,13 @@ export const getAdministrationEnrollments = (page: number, filters: Administrati
 
 export type MovementCatalogItem = { id: string; code?: string; name: string; displayName?: string; classification?: 'OPERATIONAL'|'NON_OPERATIONAL'|'TAX'|'SERVICE'|'LIABILITY'; displayOrder?: number; sectorId?: string; direction?: 'INGRESOS'|'EGRESOS'; isActive?: boolean };
 export const getMovementFormCatalogs = async (signal?: AbortSignal) => {
-  const [categories,sectors,activities,paymentMethods]=await Promise.all([
+  const [categories,sectors,activities,paymentMethods,accounts]=await Promise.all([
     apiJson<MovementCatalogItem[]>('/api/movement-categories',{signal}), apiJson<MovementCatalogItem[]>('/api/sectors',{signal}),
-    apiJson<MovementCatalogItem[]>('/api/activities',{signal}), apiJson<MovementCatalogItem[]>('/api/payment-methods',{signal})
-  ]); return {categories,sectors,activities,paymentMethods};
+    apiJson<MovementCatalogItem[]>('/api/activities',{signal}), apiJson<MovementCatalogItem[]>('/api/payment-methods',{signal}), apiJson<MovementCatalogItem[]>('/api/finance/accounts',{signal})
+  ]); return {categories,sectors,activities,paymentMethods,accounts};
 };
 export const createAdministrationMovement = (input: Record<string,unknown>, idempotencyKey: string) =>
-  apiJson<Record<string,unknown>>('/api/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify(input)});
+  apiJson<Record<string,unknown>>('/api/finance/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify({ movement: input, reason: 'Registro de movimiento desde Administración' })});
 
 export type EnrollmentCatalogItem={id:string;name:string;status?:string;generatesEnrollments?:boolean};
 export const getEnrollmentFormCatalogs=async(signal?:AbortSignal)=>{const [peopleResponse,activitiesResponse]=await Promise.all([

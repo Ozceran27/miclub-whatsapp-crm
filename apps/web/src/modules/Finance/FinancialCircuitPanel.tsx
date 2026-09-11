@@ -1,28 +1,36 @@
-import { useCallback, useState, type FormEvent } from 'react';
+import { useCallback, useRef, useState, type FormEvent } from 'react';
 import { PERMISSIONS, type FinancialCircuit } from '@miclub/shared';
-import { apiJson } from '../../../api';
-import { useSession } from '../../../session';
-import { useServerQuery } from '../../../serverState/client';
-import { queryKey } from '../../../serverState/queryKeys';
-import { policies } from '../../../serverState/policies';
-import { invalidateTenantQueries } from '../../../serverState/invalidation';
+import { apiJson } from '../../api';
+import { useSession } from '../../session';
+import { useServerQuery } from '../../serverState/client';
+import { queryKey } from '../../serverState/queryKeys';
+import { policies } from '../../serverState/policies';
+import { invalidateTenantQueries } from '../../serverState/invalidation';
 import './financialCircuit.css';
 
 type Option = { id: string; name: string };
+type OpeningObligation = { id?: string; reviewState?: string; balance?: number; sourceKey: string; personId: string; activityId: string; kind: string; currencyCode: string; amount: number; dueDate: string };
+const formText = (form: FormData, key: string): string => { const value = form.get(key); return typeof value === 'string' ? value : ''; };
 type Cash = { movementDate: string; movementType: string; accountId: string | null; categoryId: string | null; sectorId: string; activityId: string | null; personId: string | null; paymentMethodId: string | null; concept: string; counterpartyText: string; amount: number; taxes: number; operationalStatus: string; receivableId: string | null };
-type Workbench = { movements: (Cash & { id: string; revision: number; reconciledAt: string | null })[]; categories: (Option & { direction: string })[]; sectors: Option[]; methods: Option[]; activities: (Option & { sectorId: string })[]; enrollments: Option[]; receivables: { id: string; personId: string; activityId: string; concept: string; balance: number; currencyCode: string }[]; startup: { revision: number; status: string; mode: string; cutoffDate: string; preview: { differences: { accountId: string; expected: number; imported: number; difference: number }[] } } | null };
+type Workbench = { initialObligations: OpeningObligation[]; movements: (Cash & { id: string; revision: number; reconciledAt: string | null })[]; categories: (Option & { direction: string })[]; sectors: Option[]; methods: Option[]; activities: (Option & { sectorId: string })[]; enrollments: Option[]; receivables: { id: string; personId: string; activityId: string; concept: string; balance: number; currencyCode: string }[]; startup: { revision: number; status: string; mode: string; cutoffDate: string; preview: { accounts?: { accountId: string; amount: number }[]; obligations?: OpeningObligation[]; differences: { accountId: string; expected: number; imported: number; difference: number }[] } } | null };
 const money = (value: number | null, currency: string) => value === null ? 'Pendiente de valoración' : new Intl.NumberFormat('es-AR', { style: 'currency', currency }).format(value);
 const select = (name: string, label: string, options: Option[], required = true, value = '') => <label>{label}<select name={name} required={required} defaultValue={value}><option value="">Seleccionar…</option>{options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>;
 
 export function FinancialCircuitPanel({ summaryOnly = false }: { summaryOnly?: boolean }) {
+  const { permissions } = useSession();
+  return permissions.includes(PERMISSIONS.FINANCE_READ) ? <FinancialCircuitContent summaryOnly={summaryOnly} /> : null;
+}
+
+function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolean }) {
   const { clubId, permissions } = useSession();
   const [month, setMonth] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [selected, setSelected] = useState<string>('');
-  const fetchCircuit = useCallback(({ signal }: { signal: AbortSignal }) => apiJson<FinancialCircuit>(`/api/finance/circuit${month ? `?month=${month}` : ''}`, { signal }), [month, clubId]);
+  const operationKeys = useRef(new Map<string, string>());
+  const fetchCircuit = useCallback(({ signal }: { signal: AbortSignal }) => apiJson<FinancialCircuit>(`/api/finance/circuit${month ? `?month=${month}` : ''}`, { signal }), [month]);
   const circuit = useServerQuery({ key: queryKey({ clubId, resource: 'financial-circuit', filters: { month } }), queryFn: fetchCircuit, policy: policies.dashboard });
-  const fetchWorkbench = useCallback(({ signal }: { signal: AbortSignal }) => summaryOnly ? Promise.resolve(null) : apiJson<Workbench>('/api/finance/workbench', { signal }), [clubId, summaryOnly]);
+  const fetchWorkbench = useCallback(({ signal }: { signal: AbortSignal }) => summaryOnly ? Promise.resolve(null) : apiJson<Workbench>('/api/finance/workbench', { signal }), [summaryOnly]);
   const workbench = useServerQuery({ key: queryKey({ clubId, resource: 'financial-workbench', filters: { summaryOnly } }), queryFn: fetchWorkbench, policy: policies.paginated });
   const data = circuit.data;
   const wb = workbench.data;
@@ -30,15 +38,19 @@ export function FinancialCircuitPanel({ summaryOnly = false }: { summaryOnly?: b
   const mutate = async (path: `/${string}`, body: unknown) => {
     if (busy) return;
     setBusy(true); setMessage('');
+    const fingerprint = JSON.stringify({ clubId, path, body });
+    const operationKey = operationKeys.current.get(fingerprint) ?? crypto.randomUUID();
+    operationKeys.current.set(fingerprint, operationKey);
     try {
-      await apiJson(path, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(body) });
+      await apiJson(path, { method: 'POST', headers: { 'idempotency-key': operationKey }, body: JSON.stringify(body) });
+      operationKeys.current.delete(fingerprint);
       invalidateTenantQueries(clubId); await Promise.all([circuit.refetch(), workbench.refetch()]); setMessage('Operación registrada. Saldos actualizados.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo registrar la operación.'); }
     finally { setBusy(false); }
   };
   const submit = (event: FormEvent<HTMLFormElement>, action: (form: FormData) => Promise<void>) => { event.preventDefault(); void action(new FormData(event.currentTarget)); };
   if (!can(PERMISSIONS.FINANCE_READ)) return null;
-  if (circuit.error) return <section className="finance-circuit" role="alert">No se pudo consultar el circuito financiero. <button onClick={() => void circuit.refetch()}>Reintentar</button></section>;
+  if (circuit.error) return <section className="finance-circuit" role="alert"><p>No se pudo consultar el circuito financiero.</p><p>{circuit.error instanceof Error ? circuit.error.message : 'Compruebe la conexión e intente nuevamente.'}</p><button onClick={() => void circuit.refetch().catch(() => undefined)}>Reintentar</button></section>;
   if (!data) return <p role="status">Consultando saldos financieros…</p>;
   const p = data.projection;
   const edit = wb?.movements.find(m => m.id === selected);
@@ -61,12 +73,12 @@ export function FinancialCircuitPanel({ summaryOnly = false }: { summaryOnly?: b
       {data.diagnostics.length > 0 && <details open><summary>Acuerdos que requieren revisión ({data.diagnostics.length})</summary>{data.diagnostics.map((d, i) => <p key={`${d.activityId}-${i}`}>{d.message}</p>)}</details>}
       <div className="finance-table"><table><thead><tr><th>Período / actividad</th><th>Responsable</th><th>Ingresos</th><th>Devoluciones</th><th>Fijo</th><th>Pagado</th><th>Saldo</th><th>Revisión / cierre</th></tr></thead><tbody>
         {data.settlements.map(s => <tr key={s.id}><td>{s.month}<br />{s.activityName}</td><td>{s.personName}</td><td>{money(s.income, s.currencyCode)}</td><td>{money(s.refunds, s.currencyCode)}</td><td>{money(s.fixedClubFee, s.currencyCode)}</td><td>{money(s.payments, s.currencyCode)}</td><td>{money(s.balance, s.currencyCode)}<br />{s.balance < 0 ? 'Deuda del responsable' : s.paymentState === 'SETTLED' ? 'Saldado' : 'Pendiente'}</td><td>{({ DRAFT: 'Borrador', APPROVED: 'Aprobado', REQUIRES_REVIEW: 'Requiere revisión' })[s.reviewState]}{s.closedAt && ' · Cerrado'}
-          {can(PERMISSIONS.FINANCE_REVIEW) && <form onSubmit={e => submit(e, f => mutate(`/api/finance/settlements/${s.id}/${String(f.get('action'))}`, { revision: s.revision, reason: String(f.get('reason')) }))}>
+          {can(PERMISSIONS.FINANCE_REVIEW) && !s.initialObligationId && <form onSubmit={e => submit(e, f => mutate(`/api/finance/settlements/${s.id}/${formText(f, 'action')}`, { revision: s.revision, reason: formText(f, 'reason') }))}>
             <input aria-label={`Motivo de revisión ${s.activityName} ${s.month}`} name="reason" placeholder="Motivo de revisión" required /><select name="action" aria-label="Operación de liquidación"><option value="approve">Aprobar versión</option><option value="close" disabled={s.reviewState !== 'APPROVED' || s.month >= data.today.slice(0, 7)}>Cerrar mes</option></select><button disabled={busy}>Registrar</button>
           </form>}
         </td></tr>)}
       </tbody></table></div>
-      {can(PERMISSIONS.FINANCE_PAY) && can(PERMISSIONS.SECTORS_ANY) && <details><summary>Pagar al responsable o cobrar su deuda</summary><form className="finance-form" onSubmit={e => submit(e, f => mutate(`/api/finance/responsibles/${String(f.get('personId'))}/pay`, { accountId: f.get('accountId'), amount: Number(f.get('amount')), date: f.get('date'), debtCollection: f.get('kind') === 'debt', reason: f.get('reason') }))}>
+      {can(PERMISSIONS.FINANCE_PAY) && can(PERMISSIONS.SECTORS_ANY) && <details><summary>Pagar al responsable o cobrar su deuda</summary><form className="finance-form" onSubmit={e => submit(e, f => mutate(`/api/finance/responsibles/${formText(f, 'personId')}/pay`, { accountId: f.get('accountId'), amount: Number(f.get('amount')), date: f.get('date'), debtCollection: f.get('kind') === 'debt', reason: f.get('reason') }))}>
         {select('personId', 'Responsable', data.people)}{select('accountId', 'Cuenta', data.accounts.map(a => ({ id: a.id, name: `${a.name} (${a.currencyCode})` })))}
         <label>Operación<select name="kind"><option value="pay">Pagar saldo disponible</option><option value="debt">Cobrar deuda del responsable</option></select></label>
         <label>Importe<input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Fecha<input name="date" type="date" defaultValue={data.today} required /></label><label>Motivo<input name="reason" required /></label><button disabled={busy}>Registrar con compensación automática</button>
@@ -77,6 +89,10 @@ export function FinancialCircuitPanel({ summaryOnly = false }: { summaryOnly?: b
         <label>Motivo<input name="reason" required /></label><button disabled={busy}>Guardar definición</button>
       </form>)}</details>}
       {wb && <>
+        {can(PERMISSIONS.FINANCE_PAY) && can(PERMISSIONS.SECTORS_ANY) && <details><summary>Pagar saldos iniciales de empleados y proveedores</summary><form className="finance-form" onSubmit={e => submit(e,f => mutate(`/api/finance/initial-obligations/${formText(f,'obligationId')}/pay`,{ accountId:f.get('accountId'),amount:Number(f.get('amount')),date:f.get('date'),reason:f.get('reason') }))}>
+          {select('obligationId','Obligación aprobada',wb.initialObligations.filter(o => o.id && o.reviewState==='APPROVED' && ['EMPLOYEE','SUPPLIER'].includes(o.kind) && (o.balance??0)>0).map(o => ({id:o.id!,name:`${data.people.find(p=>p.id===o.personId)?.name ?? o.sourceKey} · ${money(o.balance??0,o.currencyCode)}`})))}
+          {select('accountId','Cuenta financiera',data.accounts)}<label>Importe<input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Fecha<input name="date" type="date" defaultValue={data.today} max={data.today} required /></label><label>Motivo<input name="reason" required /></label><button disabled={busy}>Registrar pago</button>
+        </form></details>}
         <details><summary>Registrar o corregir un movimiento</summary>
           <label>Movimiento<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Nuevo movimiento</option>{wb.movements.map(m => <option key={m.id} value={m.id}>{m.movementDate} · {m.concept} · {m.amount}</option>)}</select></label>
           {(edit ? can(PERMISSIONS.FINANCE_CORRECT) : can(PERMISSIONS.MOVEMENTS_CREATE)) && <form key={`${selected}-${edit?.revision ?? 0}`} className="finance-form" onSubmit={e => submit(e, f => {
@@ -94,7 +110,7 @@ export function FinancialCircuitPanel({ summaryOnly = false }: { summaryOnly?: b
         </details>
         <details><summary>Cuotas y baja de inscripciones</summary>
           {can(PERMISSIONS.ENROLLMENTS_CREATE) && <form className="finance-form" onSubmit={e => submit(e, f => mutate('/api/finance/receivables/generate', { month: f.get('month'), reason: f.get('reason') }))}><label>Mes<input name="month" type="month" defaultValue={data.month} required /></label><label>Motivo<input name="reason" required /></label><button disabled={busy}>Generar cuotas del mes</button></form>}
-          {can(PERMISSIONS.ENROLLMENTS_CANCEL) && <form className="finance-form" onSubmit={e => submit(e, f => mutate(`/api/finance/enrollments/${String(f.get('enrollmentId'))}/abandon`, { decision: f.get('decision'), reason: f.get('reason') }))}>{select('enrollmentId', 'Inscripción', wb.enrollments)}<label>Deuda existente<select name="decision" required defaultValue=""><option value="">Elegir…</option><option value="KEEP">Conservar deuda</option><option value="FORGIVE">Perdonar deuda</option></select></label><label>Motivo<input name="reason" required /></label><button disabled={busy}>Registrar abandono</button></form>}
+          {can(PERMISSIONS.ENROLLMENTS_CANCEL) && <form className="finance-form" onSubmit={e => submit(e, f => mutate(`/api/finance/enrollments/${formText(f, 'enrollmentId')}/abandon`, { decision: f.get('decision'), reason: f.get('reason') }))}>{select('enrollmentId', 'Inscripción', wb.enrollments)}<label>Deuda existente<select name="decision" required defaultValue=""><option value="">Elegir…</option><option value="KEEP">Conservar deuda</option><option value="FORGIVE">Perdonar deuda</option></select></label><label>Motivo<input name="reason" required /></label><button disabled={busy}>Registrar abandono</button></form>}
         </details>
         {can(PERMISSIONS.FINANCE_RECONCILE) && can(PERMISSIONS.SECTORS_ANY) && <StartupForm data={data} workbench={wb} busy={busy} mutate={mutate} />}
       </>}
@@ -103,11 +119,11 @@ export function FinancialCircuitPanel({ summaryOnly = false }: { summaryOnly?: b
 }
 
 function StartupForm({ data, workbench, busy, mutate }: { data: FinancialCircuit; workbench: Workbench; busy: boolean; mutate: (path: `/${string}`, body: unknown) => Promise<void> }) {
-  const [obligations, setObligations] = useState<{ sourceKey: string; personId: string; activityId: string; kind: string; currencyCode: string; amount: number; dueDate: string }[]>([]);
+  const [obligations, setObligations] = useState<OpeningObligation[]>(() => workbench.initialObligations.length ? workbench.initialObligations : workbench.startup?.preview.obligations ?? []);
   return <details><summary>Arranque e importación conciliada</summary><p>Reconstrucción: saldo anterior y movimientos completos posteriores. Fecha de corte: saldos al cierre y sólo operaciones posteriores. La historia anterior permanece consultable.</p>
     <form className="finance-form" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); void mutate('/api/finance/startup/preview', { mode: f.get('mode'), cutoffDate: f.get('cutoffDate'), accounts: data.accounts.map(a => ({ accountId: a.id, amount: Number(f.get(a.id)) })), obligations: obligations.map(o => ({ ...o, activityId: o.activityId || null })), reason: f.get('reason') }); }}>
       <label>Modalidad<select name="mode" defaultValue={workbench.startup?.mode || 'RECONSTRUCTION'}><option value="RECONSTRUCTION">Reconstrucción</option><option value="CUTOFF">Fecha de corte</option></select></label><label>Saldo al cierre de<input name="cutoffDate" type="date" defaultValue={workbench.startup?.cutoffDate || data.today} required /></label>
-      {data.accounts.map(a => <label key={a.id}>Saldo esperado: {a.name} ({a.currencyCode})<input name={a.id} type="number" step="0.01" defaultValue="0" required /></label>)}
+      {data.accounts.map(a => <label key={a.id}>Saldo esperado: {a.name} ({a.currencyCode})<input name={a.id} type="number" step="0.01" defaultValue={workbench.startup?.preview.accounts?.find(row => row.accountId === a.id)?.amount ?? 0} required /></label>)}
       <fieldset><legend>Obligaciones iniciales sin movimiento de caja</legend><p>Responsable: positivo si el club debe pagarle; negativo si debe al club. Alumnos: deuda positiva del alumno.</p>
         {obligations.map((o, i) => <div className="finance-form" key={i}>
           <label>Identificador de origen<input value={o.sourceKey} required onChange={e => setObligations(rows => rows.map((r, n) => n === i ? { ...r, sourceKey: e.target.value } : r))} /></label>

@@ -115,9 +115,13 @@ export function validateWorkbook(buffer: Buffer, filename: string, mime: string)
         parsed[column.key]=value;
       }
       const sourceValues=(schema.columns as readonly XlsxImportColumn[]).map((column)=>rawFor(column)??null);
+      for (const key of ['amount','fee','taxes']) {
+        const amount = parsed[key];
+        if (typeof amount === 'number' && (Math.abs(amount) > 999999999999.99 || Math.abs(amount * 100 - Math.round(amount * 100)) > .0001 || (amount < 0 && !(sheet === 'SALDOS_INICIALES' && parsed.kind === 'RESPONSIBLE')))) errors.push(issue('INVALID_AMOUNT','Importe fuera de rango o con más de dos decimales.',{sheet,row_number:rowNumber,field:key}));
+      }
       const get=(key:string)=>parsed[key]??undefined;
       rows.push({sheet,rowNumber,values:parsed,sourceValues});
-      referenceRows.push({sheet,rowNumber,sector:get("sector"),activity:get("activity"),modality:get("modality"),instructor:get("instructor"),category:get("category"),paymentMethod:get("paymentMethod"),document:get("document")??get("counterparty"),externalReference:get("externalReference"),values:sourceValues});
+      referenceRows.push({sheet,rowNumber,sector:get("sector"),activity:get("activity"),modality:get("modality"),instructor:get("instructor"),category:get("category"),paymentMethod:get("paymentMethod"),document:get("document")??get("counterparty"),externalReference:get("externalReference"),account:get("account"),values:sourceValues});
     }
     rowCounts[sheet]=populated.length;
     const last=Number(populated.at(-1)?.[1]??0);
