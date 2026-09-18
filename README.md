@@ -7,7 +7,7 @@ Punto de entrada operativo para miClub Gestión: API Express/TypeScript, web Rea
 - `DATA_SOURCE=postgres` y `CRM_SOURCE=postgres`; PostgreSQL conserva datos operativos, CRM, identidad, membresías y auditoría.
 - La autenticación es obligatoria (`AUTH_ENABLED=true`). El arranque productivo rechaza una sesión débil, una URL pública sin HTTPS o fuentes legacy.
 - Toda operación de negocio obtiene `clubId` de la sesión y membresía autenticadas. No se acepta un tenant enviado por query, body o headers del cliente.
-- Google Sheets no es una fuente de lectura productiva: se admite únicamente como entrada de importaciones explícitas, auditadas y acotadas.
+- Google Sheets está fuera del runtime y de la importación soportada. La historia se carga mediante XLSX controlado.
 - No existe fallback productivo a mocks, fixtures, Google Sheets ni SQLite. Los artefactos legacy solo sirven para pruebas, migración o consulta histórica.
 
 El estado y los controles previos al siguiente módulo administrativo están en el [readiness canónico previo al reset](docs/pre-reset-readiness.md). La [arquitectura actual](docs/architecture-current.md) y el [inventario de rutas](docs/api-route-inventory.md) complementan esa referencia.
@@ -18,11 +18,10 @@ El estado y los controles previos al siguiente módulo administrativo están en 
 npm install
 cp .env.example .env
 npm run db:migrations:check
-npm run db:migrate
 npm run dev
 ```
 
-Configure en `.env` una conexión PostgreSQL, un `SESSION_SECRET` local de al menos 32 caracteres y los valores marcados como obligatorios en `.env.example`. `npm run db:migrate` carga ese mismo `.env`, pero requiere además la credencial administrativa independiente `ADMIN_DATABASE_URL` (o el bloque `PGADMIN*`); no utiliza la credencial runtime `DATABASE_URL` para ejecutar DDL. La API usa `http://localhost:4000` y Vite `http://localhost:5173`.
+Configure en `.env` una conexión PostgreSQL, un `SESSION_SECRET` local de al menos 32 caracteres y los valores marcados como obligatorios en `.env.example`. Para una base real, aplique el SQL mediante DBeaver siguiendo las guías de `docs/dbeaver/`; no ejecute `db:migrate` automáticamente contra ella. En una base descartable, `db:migrate` requiere credenciales administrativas independientes. La API usa `http://localhost:4000` y Vite `http://localhost:5173`.
 
 Durante la etapa actual, `BILLING_MODE` conserva las etiquetas `disabled`,
 `sandbox` y `live` únicamente como preparación técnica para la futura

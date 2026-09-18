@@ -1,5 +1,25 @@
 # Testing
 
+## Auditoría local — 2026-09-17
+
+- API: `npm run test -w @miclub/api`: 417 PASS.
+- Web: `npm run test -w @miclub/web`: 71 PASS tras retirar un test que
+  inspeccionaba componentes sin consumidores y agregar una regresión de
+  referencias del borrador.
+- Shared: `npm run test -w @miclub/shared`: 7 PASS.
+- Manifiesto: `npm run db:migrations:check`: 15 PASS.
+- `npm run typecheck` y `npm run build`: PASS. Vite informa chunk principal
+  de 834,86 kB sin dividir.
+- `npm run lint`: FAIL, 205 errores y 577 advertencias globales. El lint
+  focalizado del nuevo helper y los cambios de fotos/diálogo pasó. No se
+  deshabilitaron reglas. `npm run deadcode` también FAIL; su inventario se usó
+  para retirar copias JS y dos componentes sin consumidores, no para borrar
+  indiscriminadamente contratos o archivos detectados como candidatos.
+- DB: sólo metadatos con rol `miclub_audit` y `transaction_read_only=on`.
+  No hubo E2E navegador ni integración nueva en PostgreSQL aislado en esta
+  pasada. Los resultados anteriores de integración no certifican el checkout
+  actual ni el entorno real.
+
 ## Verificación del circuito — 2026-09-11
 
 - Suite de `*.test.ts`/`*.test.tsx` de api/src, web/src y shared/src con

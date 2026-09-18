@@ -205,6 +205,8 @@ export interface AdministrationActivityDto {
   instructorCommissionPercent: number;
   settlementMode?: string | null;
   settlementFixedAmount?: number | null;
+  fixedFeeFrequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
+  currencyCode?: 'ARS' | 'USD' | 'BRL' | 'EUR' | null;
   termsEffectiveFrom?: string | null;
   termsEffectiveTo?: string | null;
   generatesEnrollments: boolean;

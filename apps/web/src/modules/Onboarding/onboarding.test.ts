@@ -45,13 +45,16 @@ test('gate recupera el estado y sólo persiste el borrador al finalizar', () => 
   assert.doesNotMatch(source, /advanceOnboarding/); assert.match(source, /invalidateTenantQueries\(clubId\)/);
 });
 
-test('al completar consulta capacidades efectivas y ofrece un destino explícito y recuperable tras refresh', () => {
+test('confirma la creación antes de refrescar navegación y panel', () => {
   const source = readFileSync(new URL('./OnboardingGate.tsx', import.meta.url), 'utf8');
   const complete = source.indexOf('await completeOnboarding(draft)');
-  const refreshCapabilities = source.indexOf('await getNavigation()', complete);
-  const persist = source.indexOf('sessionStorage.setItem', refreshCapabilities);
-  assert.ok(complete >= 0 && complete < refreshCapabilities && refreshCapabilities < persist);
-  assert.match(source,/hasClubCapability\(navigation\.capabilities,CLUB_CAPABILITIES\.DATA_MIGRATION\)/);
+  const persist = source.indexOf('sessionStorage.setItem', complete);
+  const confirmed = source.indexOf('setCompletionConfirmed(true)', persist);
+  const refreshNavigation = source.indexOf('await getNavigation()', confirmed);
+  const refreshDashboard = source.indexOf('await loadHomeDashboardResources()', confirmed);
+  assert.ok(complete >= 0 && complete < persist && persist < confirmed && confirmed < refreshNavigation && confirmed < refreshDashboard);
+  assert.match(source,/result\.capabilities\.DATA_MIGRATION/);
+  assert.match(source,/result\.recommendedDestination/);
   assert.match(source,/sessionStorage\.getItem\(completionStorageKey\(clubId\)\)/);
   assert.match(source,/destination==='MIGRATION'\?'\/app\/migration':'\/app'/);
 });
@@ -144,11 +147,11 @@ test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reduci
   assert.match(styles, /border: 2px dashed/);
 });
 
-test('la advertencia exige ceros al importar capital histórico', () => {
+test('la advertencia diferencia capital importado y saldos de cuentas', () => {
   const source = readFileSync(new URL('./OpeningBalancesStep.tsx', import.meta.url), 'utf8');
   assert.match(source, /Evitá duplicar tus saldos/);
-  assert.match(source, /tres saldos son obligatorios y pueden ser cero/);
-  assert.match(source, /ingresá cero en Caja, Cuenta Corriente y Dólares/);
+  assert.match(source, /tres importes son obligatorios y pueden ser cero/);
+  assert.match(source, /movimientos de capital que ya explican ese dinero, ingresá cero aquí/);
   assert.doesNotMatch(source, /omití este paso/);
   assert.match(source, /role="note"/);
 });
@@ -214,16 +217,4 @@ test('la migración del onboarding es informativa y deriva la carga al módulo n
   const source = readFileSync(new URL('./MigrationStep.tsx', import.meta.url), 'utf8');
   for (const text of ['CommercialPlanCards','ADMINISTRACIÓN','INSCRIPCIONES','Completar onboarding','Ir a Migración','Dry-run','Confirmar','cero los tres saldos del paso 2']) assert.match(source, new RegExp(text));
   assert.doesNotMatch(source, /type="file"|state\.run|onPendingImport|Aplicar este dry-run/);
-});
-
-test('Administración conserva wrappers persistentes y onboarding usa editores locales', () => {
-  const forms = readFileSync(new URL('../Administration/SetupForms.tsx', import.meta.url), 'utf8');
-  const dialog = readFileSync(new URL('./OnboardingDialog.tsx', import.meta.url), 'utf8');
-  assert.match(forms, /Promise\.all\(\[getAdministrationSectors\(\),getSectorTemplates\(\)\]\)/);
-  assert.match(forms, /createAdministrationSector[\s\S]*\/api\/sectors\/\$\{s\.id\}\/status[\s\S]*\/archive/);
-  assert.match(forms, /WorkerDetailModal[\s\S]*createAdministrationWorker[\s\S]*updateAdministrationWorker/);
-  assert.match(forms, /\/api\/instructors[\s\S]*\/api\/administration\/activity-icons/);
-  assert.match(forms, /FIXED · monto fijo[\s\S]*VARIABLE · porcentaje/);
-  assert.match(forms, /LocalSectorSetupForm/); assert.match(forms, /LocalWorkerSetupForm/); assert.match(forms, /LocalActivitySetupForm/);
-  assert.doesNotMatch(dialog, /persistence\?\.save/);
 });

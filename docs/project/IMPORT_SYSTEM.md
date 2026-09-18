@@ -2,6 +2,16 @@
 
 ## Contrato efectivo
 
+La hoja `SALDOS_INICIALES` de v4 registra **obligaciones históricas** de alumnos,
+responsables, empleados y proveedores. No representa los importes de Caja,
+Banco y Caja USD que se configuran en el paso 2 del onboarding. Un movimiento
+histórico no crea por sí solo una obligación inicial con persona, moneda y
+vencimiento identificados; por eso el contrato actual tiene una hoja explícita.
+Esas filas ingresan en estado DRAFT y requieren conciliación antes de operar.
+La convivencia con movimientos de capital históricos también requiere revisar
+el corte para evitar duplicar la liquidez. Esta auditoría no cambia la plantilla
+ni el pipeline de importación.
+
 XLSX → PostgreSQL; sin Google Sheets. MICLUB_XLSX_IMPORT_VERSION es v4 desde 2026-09-11. El identificador XLSX_IMPORT_V1_SCHEMA conserva su nombre por compatibilidad de código.
 
 Archivo: apps/api/data/db/Modelo_Import_miClub.xlsx. Hojas exactas (orden no contractual), headers fila 1, datos desde fila 2:

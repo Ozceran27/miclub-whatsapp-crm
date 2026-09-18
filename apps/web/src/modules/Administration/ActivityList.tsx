@@ -6,15 +6,14 @@ import { useSession } from '../../session';
 import { archiveAdministrationActivity, changeAdministrationActivityStatus, getAdministrationActivities, getAnnualActivityRanking } from '../../services/api/administrationApi';
 import { ActivityDetailModal } from './ActivityDetailModal';
 import { ActivityCreateEditModal } from './ActivityCreateEditModal';
+import { describeActivityTerms } from './activityTerms';
 
 const integer = new Intl.NumberFormat('es-AR');
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 const activityIcons: Record<string, string> = { football: '⚽', basketball: '🏀', volleyball: '🏐', tennis: '🎾', swimming: '🏊', running: '🏃', cycling: '🚴', gym: '🏋️', weights: '💪', yoga: '🧘', pilates: '🤸', dance: '💃', 'martial-arts': '🥋', boxing: '🥊', hockey: '🏑', rugby: '🏉', skating: '⛸️', handball: '🤾', gymnastics: '🤸‍♀️', other: '⭐' };
 
 const displayStatus = (status: string) => status.replaceAll('_', ' ').replace(/^./, (letter) => letter.toLocaleUpperCase('es-AR'));
-const commission = (activity: AdministrationActivityDto) => activity.settlementMode?.toLowerCase() === 'fixed'
-  ? `Fijo ${money.format(activity.settlementFixedAmount ?? 0)}`
-  : activity.settlementMode?.toLowerCase() === 'variable' ? `Variable ${activity.clubSharePercentage ?? activity.clubCommissionPercent}% club` : 'Sin términos vigentes';
+const commission = describeActivityTerms;
 
 export function ActivityList({ canViewFinancials }: { canViewFinancials: boolean }) {
   const [activities, setActivities] = useState<AdministrationActivityDto[]>([]);

@@ -1,5 +1,45 @@
 # Current State
 
+## Auditoría de flujo y limpieza — 2026-09-17
+
+Revisión del checkout `main` posterior a las entregas financieras: registro,
+sesión, onboarding, configuración de sectores, trabajadores y actividades,
+contratos compartidos, plantilla XLSX y organización del árbol. La suite local
+verifica reglas y rutas con mocks; no sustituye un recorrido visual ni una
+instalación PostgreSQL descartable desde cero. No se modificó la base real.
+
+Corregido en esta pasada: el editor de actividad conserva la moneda y frecuencia
+del término FIXED al reabrirlo; lista y detalle muestran esos valores en vez de
+asumir ARS/mensual. El onboarding reconoce la finalización del servidor antes de
+refrescar menú/panel, de modo que una falla secundaria de lectura no invita a
+reenviar una creación exitosa. Cancelar la edición de un trabajador conserva su
+foto original; las fotos temporales nuevas se descartan al cancelar. El editor
+bloquea la eliminación u omisión de sectores e instructores usados por
+actividades del borrador. El texto de arranque distingue liquidez de deudas
+históricas. Se retiraron cuatro componentes
+sin consumidores y copias JS generadas previamente archivadas.
+
+La hoja XLSX `SALDOS_INICIALES` v4 representa obligaciones históricas de personas,
+no el efectivo/banco del paso de saldos del onboarding. Se mantienen plantilla y
+pipeline para una decisión de producto posterior; ver IMPORT_SYSTEM. Un
+movimiento importado no crea automáticamente esa obligación explícita.
+
+La conexión `AUDIT_DATABASE_URL` respondió como `miclub_audit` con
+`transaction_read_only=on`. Una inspección sólo de metadatos encontró
+`clubs`, `club_onboarding`, `activity_terms`, `opening_balance_batches`,
+`activity_settlements`, `finance_startups`, `initial_obligations` y tablas de
+revisión/pagos. También encontró las columnas comprobadas de términos, revisión
+y onboarding. Esto no verifica datos, grants, ledger, paridad ni una instalación
+completa; no se realizó ninguna escritura SQL.
+
+Pendiente antes de una prueba real certificada: SQL manual aplicado y validado en
+el entorno de prueba, recorrido navegador completo con cuenta y club nuevos,
+persistencia del borrador de onboarding al recargar, comprobación visual de las
+referencias en el editor, y cierre de lint/deadcode.
+Las secciones históricas siguientes documentan entregas anteriores y pueden
+contener cifras de tests o bugs ya superados; usar esta sección y el código
+actual para el estado de esta auditoría.
+
 ## Circuito financiero DEC-017 — entrega 2026-09-11
 
 El runtime /api/finance conecta cuentas, movimientos, pagos y aplicaciones a cuotas

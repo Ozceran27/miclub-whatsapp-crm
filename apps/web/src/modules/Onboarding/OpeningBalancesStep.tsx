@@ -29,8 +29,8 @@ export function OpeningBalancesStep({values,onChange}:{values:Values;onChange:(v
     else if(event.key==='Tab') setOpen(false);
   };
   return <div className="setup-form opening-balances-form">
-    <p>Registrá el capital anterior a miClub. Se asentará en las cuentas canónicas Caja, Banco y Caja USD; el libro contable seguirá siendo la única fuente del saldo.</p>
-    <aside className="onboarding-balance-warning" role="note"><strong><span aria-hidden="true">⚠</span> Evitá duplicar tus saldos</strong><p>Los tres saldos son obligatorios y pueden ser cero. Si vas a importar capital histórico, ingresá cero en Caja, Cuenta Corriente y Dólares; este paso no se puede omitir.</p></aside>
+    <p>Registrá el dinero disponible al comenzar: Caja, Cuenta Corriente y Caja USD. Este paso configura saldos de cuentas, no deudas de personas.</p>
+    <aside className="onboarding-balance-warning" role="note"><strong><span aria-hidden="true">⚠</span> Evitá duplicar tus saldos</strong><p>Los tres importes son obligatorios y pueden ser cero. Si vas a importar movimientos de capital que ya explican ese dinero, ingresá cero aquí y conciliá el arranque antes de operar.</p></aside>
     <div className="opening-balances-form__currency currency-listbox" ref={rootRef}>
       <span id={`${listboxId}-label`}>Moneda operativa</span><input type="hidden" name="currency" value={values.currency}/>
       <button ref={buttonRef} type="button" className="currency-listbox__trigger" aria-haspopup="listbox" aria-expanded={open} aria-controls={listboxId} aria-labelledby={`${listboxId}-label ${listboxId}-value`} aria-activedescendant={open?`${listboxId}-${activeCode}`:undefined} onClick={()=>setOpen(value=>!value)} onKeyDown={onButtonKeyDown}>

@@ -42,7 +42,12 @@ PostgreSQL es la única fuente operacional. dataSourceService y crmService devue
 
 Rutas raíz /members, /debtors, /summary y otras, así como endpoints CRM, mantienen contratos consumidos por frontend sobre PostgreSQL. Coexisten lecturas /api en español/inglés, dashboardService y postgresDashboard/*; no asumir que todo es código muerto.
 
-Candidatos: LoginScreen.tsx, EconomyComparisonCards.tsx, JS en docs/legacy-generated-js, completeOnboarding antiguo, fallback workers sin employees y calculador TS de settlement sin consumidor runtime. No eliminados.
+Los JS generados archivados, `LoginScreen.tsx`,
+`EconomyComparisonCards.tsx`, `SetupForms.tsx` y `StepPersistence.tsx` se
+retiraron del árbol en la auditoría de
+septiembre de 2026 tras confirmar que no tienen consumidores runtime. Git
+conserva su historial. Permanecen por revisar `completeOnboarding` antiguo,
+el fallback workers sin employees y el calculador TS de settlement.
 
 ## Límites pendientes
 

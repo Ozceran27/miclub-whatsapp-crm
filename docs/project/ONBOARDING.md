@@ -1,5 +1,19 @@
 # Onboarding
 
+## Ajustes de interfaz — 2026-09-17
+
+La respuesta de `POST /api/onboarding/complete` confirma la creación y aporta
+el destino recomendado. El diálogo marca éxito antes de refrescar la navegación
+y el panel; un error en esas lecturas secundarias se recupera al navegar y no
+convierte la finalización en un fallo aparente. Al cancelar la edición de un
+trabajador se conserva la foto temporal previamente guardada en el borrador;
+una foto nueva sin guardar se descarta. El paso 2 identifica dinero disponible
+en cuentas, mientras `SALDOS_INICIALES` en XLSX v4 identifica deudas históricas.
+El borrador impide eliminar un sector o instructor referenciado por una actividad;
+si se retrocede, tampoco permite omitir ese paso mientras haya referencias.
+La recarga de página todavía descarta el borrador temporal y las contraseñas de
+trabajadores incluidas en él; no se introdujo persistencia insegura en navegador.
+
 ## Corrección verificada el 2026-09-08
 
 El error recuperable de saldos se reprodujo como PostgreSQL `23502`: la función

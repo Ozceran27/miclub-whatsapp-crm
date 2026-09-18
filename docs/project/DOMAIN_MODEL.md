@@ -39,7 +39,7 @@ Rutas relativas a apps/api/src salvo shared/web indicados.
 | --- | --- | --- | --- |
 | Auth/registro | auth/loginService, registrationService, sessionService, userRepository; clubProvisioningService | shared contracts/auth; web session, LoginPage, RegisterPage | auth, registration, provisioning |
 | Onboarding | onboardingService / onboardingRepository | shared contracts/onboarding; web modules/Onboarding | onboarding, atomicity, billing, photos |
-| Sectores | ruta → sectorsRepository; catalog/readOnlyRepository | tipos locales y shared administration; SectorList/SetupForms | sectors, sectorCapacity |
+| Sectores | ruta → sectorsRepository; catalog/readOnlyRepository | tipos locales y shared administration; SectorList y SectorDraftList | sectors, sectorCapacity |
 | Workers | administration/workersService, workerMutationService / workersRepository | AdministrationWorkerMutationDto; WorkerDraftList/Administración | workersService, workerMutationService |
 | Actividades | ruta → activitiesRepository; readOnlyRepository | shared contracts/activities, ActivityInput local; ActivityDraftList | activitiesRepository, activityTermsMigration |
 | Liquidaciones | vistas SQL → postgresDashboard/implementation; calculador TS aislado | activity_settlements/allocations; Inicio/Economía indirectos | activitySettlementService, SQL estático |

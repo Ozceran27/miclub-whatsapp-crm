@@ -32,13 +32,16 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
     document.addEventListener('keydown', keydown);
     return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); previous?.focus(); };
   }, []);
-  useEffect(()=>{headingRef.current?.focus();setValidationError('');},[step]);
+  useEffect(()=>{headingRef.current?.focus();},[step]);
   const advance = (outcome:OnboardingStepOutcome='COMPLETED') => {
     if(step===2&&!hasValidOpeningBalances(draft.openingBalances)){setValidationError('Revisá la moneda y los saldos: deben ser números iguales o mayores que cero.');return;}
-    onNext(outcome);
+    setValidationError('');onNext(outcome);
   };
-  const goBack=()=>onBack();
+  const goBack=()=>{setValidationError('');onBack();};
   const optional = isSkippableStep(step);
+  const skipBlocked = step===3
+    ? draft.activities.some(activity=>draft.sectors.some(sector=>sector.clientId===activity.sectorClientId&&!sector.isSystem))
+    : step===4&&draft.activities.some(activity=>activity.instructorClientId!==null);
   const status = success ? '¡Configuración creada! Elegí cómo continuar.' : pending ? 'Enviando configuración definitiva…' : error ? 'Error recuperable: no se pudo finalizar' : 'Listo para revisar; todavía no se envió';
   const nextLabel=step===1?'Empezar Configuración':'Siguiente';
   return <div className="onboarding-backdrop" data-testid="onboarding-backdrop">
@@ -46,10 +49,10 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
       <div className="onboarding-dialog__top"><OnboardingProgress step={step} optional={optional} /></div>
       <div className="onboarding-viewport"><section className="onboarding-step" data-direction={direction} key={step} aria-busy={pending}><header className="onboarding-step__header"><span className="onboarding-step__icon" aria-hidden="true">{content.icon}</span><div><div className="onboarding-step__meta"><p className="onboarding-step__eyebrow">{content.eyebrow}</p><span className="onboarding-requirement">{optional ? 'Opcional' : 'Obligatorio'}</span></div><h2 id={titleId} ref={headingRef} tabIndex={-1} data-initial-focus>{content.title}</h2><p>{content.description}</p></div></header>{content.body}</section></div>
       <footer className="onboarding-actions">
-        <div className="onboarding-feedback"><div className="onboarding-save-state" data-state={error?'error':pending?'loading':success?'success':'ready'} role="status" aria-live="polite"><span aria-hidden="true">{error?'!':pending?'…':'○'}</span>{status}</div>{success && <div className="onboarding-success" role="status"><strong>Tu club está listo</strong><p>{destination==='MIGRATION'?'Tu plan tiene Migración efectiva. Podés abrir el módulo ahora.':'Free quedó activo sin Migración. Podés continuar al panel.'}</p></div>}{error && <div className="onboarding-error" role="alert"><p>{error}</p></div>}{validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}</div>
+        <div className="onboarding-feedback"><div className="onboarding-save-state" data-state={error?'error':pending?'loading':success?'success':'ready'} role="status" aria-live="polite"><span aria-hidden="true">{error?'!':pending?'…':'○'}</span>{status}</div>{skipBlocked&&<p role="note">Hay actividades que usan esta configuración. Reasignalas o eliminalas antes de omitir el paso.</p>}{success && <div className="onboarding-success" role="status"><strong>Tu club está listo</strong><p>{destination==='MIGRATION'?'Tenés acceso efectivo a Migración. Podés abrir el módulo ahora.':'Podés continuar al panel. Migración no está disponible con tus permisos y capacidades actuales.'}</p></div>}{error && <div className="onboarding-error" role="alert"><p>{error}</p></div>}{validationError && <div className="onboarding-error" role="alert"><p>{validationError}</p></div>}</div>
         <div className="onboarding-actions__buttons">
         {step>=2&&!success&&<button className="secondary-btn" type="button" disabled={pending} onClick={goBack}>← Atrás</button>}
-        {optional && <button className="ghost-btn" type="button" disabled={pending} title="Descartar los cambios temporales de este paso y continuar" onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
+        {optional && <button className="ghost-btn" type="button" disabled={pending||skipBlocked} title={skipBlocked?'Reasigná o eliminá primero las actividades que usan esta configuración.':'Descartar los cambios temporales de este paso y continuar'} onClick={()=>advance('SKIPPED')}><ActionIcon type="skip"/>Omitir</button>}
         {success?<button className="primary-btn" type="button" onClick={onContinue}><ActionIcon type="next"/>{destination==='MIGRATION'?'Ir a Migración':'Ir al panel'}</button>:step < 7 ? <button className="primary-btn" type="button" disabled={pending} onClick={()=>advance()}><span>{nextLabel}</span><ActionIcon type="next"/></button> : <button className="primary-btn" type="button" disabled={pending} onClick={onComplete}>{pending ? 'Enviando una única vez…' : <><ActionIcon type={error?'retry':'launch'}/>{error?'REINTENTAR':'INICIAR MI CLUB'}</>}</button>}
         </div>
       </footer>

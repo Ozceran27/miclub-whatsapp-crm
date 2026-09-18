@@ -1,9 +1,10 @@
-import { DEFAULT_SECTOR_ICON_KEY, getSectorIcon, SECTOR_COLOR_PALETTE, SECTOR_ICON_CATALOG, type OnboardingSectorDraft } from '@miclub/shared';
+import { DEFAULT_SECTOR_ICON_KEY, getSectorIcon, SECTOR_COLOR_PALETTE, SECTOR_ICON_CATALOG, type OnboardingActivityDraft, type OnboardingSectorDraft } from '@miclub/shared';
 import { useState, type FormEvent } from 'react';
 import { DraftEditorModal } from './DraftEditorModal';
+import { activitiesForSector } from './draftDependencies';
 
 const statusLabel = { active: 'Activo', inactive: 'Inactivo', under_repair: 'En reparación' };
-export function SectorDraftList({ items, onChange }: { items: OnboardingSectorDraft[]; onChange: (items: OnboardingSectorDraft[]) => void }) {
+export function SectorDraftList({ items, activities = [], onChange }: { items: OnboardingSectorDraft[]; activities?: readonly OnboardingActivityDraft[]; onChange: (items: OnboardingSectorDraft[]) => void }) {
   const [editing, setEditing] = useState<OnboardingSectorDraft | null>();
   const [capacityMode, setCapacityMode] = useState<OnboardingSectorDraft['capacityMode']>('INCOME');
   const [configuredCapacity, setConfiguredCapacity] = useState<number | null>(null);
@@ -19,9 +20,9 @@ export function SectorDraftList({ items, onChange }: { items: OnboardingSectorDr
     onChange(current ? items.map(item => item.clientId === current.clientId ? value : item) : [...items, value]); setEditing(undefined);
   };
   return <section className="draft-editor"><h3>Sectores del club</h3><div className="draft-card-grid">
-    {items.map(item => { const icon = getSectorIcon(item.iconKey); return <article className="draft-card" key={item.clientId}>
-      <span className="draft-card__icon" role="img" aria-label={icon.name}>{icon.glyph}</span><div className="draft-card__body"><strong>{item.name}</strong><span><i className="draft-color" style={{ backgroundColor:item.color }}/> {statusLabel[item.status]}</span>{item.isSystem && <small>Elemento del sistema · protegido</small>}</div>
-      <div className="draft-card__actions">{item.isSystem ? <span className="draft-lock" title="No se puede modificar">🔒</span> : <><button type="button" className="draft-icon-button" onClick={() => { setCapacityMode(item.capacityMode); setConfiguredCapacity(item.configuredCapacity); setEditing(item); }} aria-label={`Editar ${item.name}`}>✎</button><button type="button" className="draft-icon-button draft-icon-button--danger" onClick={() => onChange(items.filter(value => value.clientId !== item.clientId))} aria-label={`Eliminar ${item.name}`}>🗑</button></>}</div>
+    {items.map(item => { const icon = getSectorIcon(item.iconKey); const linked = activitiesForSector(activities,item.clientId); return <article className="draft-card" key={item.clientId}>
+      <span className="draft-card__icon" role="img" aria-label={icon.name}>{icon.glyph}</span><div className="draft-card__body"><strong>{item.name}</strong><span><i className="draft-color" style={{ backgroundColor:item.color }}/> {statusLabel[item.status]}</span>{item.isSystem && <small>Elemento del sistema · protegido</small>}{linked.length>0&&<small>Usado por {linked.map(activity=>activity.name).join(', ')}. Reasigná o eliminá la actividad primero.</small>}</div>
+      <div className="draft-card__actions">{item.isSystem ? <span className="draft-lock" title="No se puede modificar">🔒</span> : <><button type="button" className="draft-icon-button" onClick={() => { setCapacityMode(item.capacityMode); setConfiguredCapacity(item.configuredCapacity); setEditing(item); }} aria-label={`Editar ${item.name}`}>✎</button><button type="button" className="draft-icon-button draft-icon-button--danger" disabled={linked.length>0} onClick={() => onChange(items.filter(value => value.clientId !== item.clientId))} aria-label={`Eliminar ${item.name}`}>🗑</button></>}</div>
     </article>; })}
     <button className="draft-add-card" type="button" onClick={() => { setCapacityMode('INCOME'); setConfiguredCapacity(null); setEditing(null); }}><span aria-hidden="true">＋</span><strong>Agregar Nuevo Sector</strong></button>
   </div>{editing !== undefined && <DraftEditorModal title={editing ? 'Editar sector' : 'Agregar Nuevo Sector'} onClose={() => setEditing(undefined)}><form className="draft-form" onSubmit={save}>

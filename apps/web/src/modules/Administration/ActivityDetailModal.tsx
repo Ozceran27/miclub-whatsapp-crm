@@ -1,6 +1,7 @@
 import type { AdministrationActivityDto, AdministrationEnrollmentDto, AdministrationMovementDto } from '@miclub/shared';
 import { useEffect, useId, useRef, useState } from 'react';
 import { getActivityEnrollments, getActivityMovements } from '../../services/api/administrationApi';
+import { describeActivityTerms } from './activityTerms';
 
 type Props = { activity: AdministrationActivityDto; onClose: () => void };
 const focusable = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
@@ -47,8 +48,8 @@ export function ActivityDetailModal({ activity, onClose }: Props) {
   }, [onClose]);
 
   const mode = activity.settlementMode?.toLowerCase();
-  const settlement = mode === 'fixed' ? 'Fijo mensual' : mode === 'variable' ? 'Variable por porcentaje' : 'Sin términos vigentes';
-  const settlementValue = mode === 'fixed' ? money.format(activity.settlementFixedAmount ?? 0) : mode === 'variable' ? `${activity.clubSharePercentage ?? activity.clubCommissionPercent}% para el club` : 'No aplica';
+  const settlement = mode === 'fixed' ? 'Fijo' : mode === 'variable' ? 'Variable por porcentaje' : 'Sin términos vigentes';
+  const settlementValue = mode === 'fixed' || mode === 'variable' ? describeActivityTerms(activity) : 'No aplica';
 
   return <div className="sector-modal__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="sector-modal activity-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={dialogRef} tabIndex={-1}>
     <header className="sector-modal__header"><div><p className="eyebrow">Detalle de actividad</p><h2 id={titleId}>{activity.name}</h2><p id={descriptionId}>Información operativa y financiera de solo lectura.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${activity.name}`}>×</button></header>
