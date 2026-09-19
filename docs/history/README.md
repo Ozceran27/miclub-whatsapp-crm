@@ -2,7 +2,18 @@
 
 > **Advertencia (2026-07-28): no use el contenido de este directorio para despliegues nuevos.** Describe checkpoints, Sheets, SQLite o fallbacks anteriores al contrato productivo vigente. Puede servir para arqueología, migraciones y auditorías, pero no define configuración actual.
 
-La referencia vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md). PostgreSQL, autenticación y tenant de sesión son obligatorios en producción; no se permite fallback productivo.
+La referencia vigente es
+[`../operations/pre-reset-readiness.md`](../operations/pre-reset-readiness.md).
+PostgreSQL, autenticación y tenant de sesión son obligatorios en producción; no
+se permite fallback productivo.
+
+## Organización
+
+- [`audits/`](audits/): auditorías fechadas y evidencia de inspección.
+- [`decisions/`](decisions/): decisiones sustituidas o absorbidas por la documentación canónica.
+- [`plans/`](plans/): planes de entrega ya ejecutados o reemplazados.
+- [`forensics/`](forensics/README.md): reconstrucciones de incidentes y análisis forense.
+- Archivos de esta carpeta: checkpoints y contexto legacy que todavía se cita por nombre.
 
 ## Documentos archivados
 
@@ -21,3 +32,7 @@ La referencia vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md
 
 Las auditorías y reconstrucciones fechadas están catalogadas separadamente en
 [`forensics/`](forensics/README.md). No deben usarse como runbooks vigentes.
+
+Los documentos históricos no se eliminan cuando conservan decisiones, checksums
+o contexto necesario para interpretar Git. Cualquier procedimiento todavía
+vigente debe vivir fuera de `history/` y enlazarse desde [`../README.md`](../README.md).

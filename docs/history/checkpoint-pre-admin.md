@@ -1,6 +1,6 @@
 # Checkpoint canónico pre-admin
 
-> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../operations/pre-reset-readiness.md).
 
 
 **Vigente desde:** 2026-07-28  
@@ -14,7 +14,7 @@
 - Google Sheets se usa solo como importación temporal hacia PostgreSQL, nunca como fuente de consultas productivas.
 - Mocks, fixtures y SQLite no tienen fallback productivo. Sus usos permitidos son pruebas, migración o auditoría histórica explícita.
 - Los endpoints debug e import permanecen deshabilitados salvo una ventana operativa aprobada.
-- Los contratos HTTP vigentes son los del [inventario reconciliado](../api-route-inventory.md).
+- Los contratos HTTP vigentes son los del [inventario reconciliado](../reference/api-routes.md).
 
 ## Gate antes de trabajar en admin
 
@@ -41,10 +41,10 @@ Los comandos que dependen de PostgreSQL o Google Sheets deben ejecutarse solo co
 
 Este checkpoint fija invariantes y gates; los pasos detallados viven únicamente aquí:
 
-- [Identidad, autorización y tenant](../auth-tenant-remediation-runbook.md).
-- [Corte, validación y retiro de legacy en PostgreSQL](../postgres-cutover-runbook.md).
+- [Identidad, autorización y tenant](../operations/auth-tenant-remediation.md).
+- [Corte, validación y retiro de legacy en PostgreSQL](../operations/postgres-cutover.md).
 - [Importación controlada Google Sheets → PostgreSQL](google-sheets-postgres-migration.md).
-- [Configuración y recuperación del arranque](../bootstrap-config-current.md).
+- [Configuración y recuperación del arranque](bootstrap-config-legacy.md).
 - [Diagnósticos SQL asistidos con DBeaver](../dbeaver/README.md).
 
 ## Evidencia de cierre

@@ -96,7 +96,7 @@ FIXED mensual: completed operational income − fixed monthly club fee − settl
 
 Ejemplo obligatorio: 500000 − 150000 − 30000 = 320000.
 
-No inferir pagos al responsable de cualquier egreso. PAYMENT/ADVANCE son movimientos indivisibles por allocation activa/tipo; dividir operación real exige movimientos separados. Ver docs/business-rules/activity-settlement-allocations.md.
+No inferir pagos al responsable de cualquier egreso. PAYMENT/ADVANCE son movimientos indivisibles por allocation activa/tipo; dividir operación real exige movimientos separados. Ver docs/domains/business-rules/activity-settlement-allocations.md.
 
 Los términos históricos respetan effective_from/effective_to; no sustituirlos por condiciones actuales. El modelo moderno agrega fixed_club_fee, fixed_fee_frequency y currency_code; frecuencias DAILY/WEEKLY/MONTHLY/YEARLY.
 

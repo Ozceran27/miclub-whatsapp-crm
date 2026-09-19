@@ -2,6 +2,21 @@
 
 Git continúa siendo el historial técnico autoritativo.
 
+## 2026-09-19 — Organización documental y referencias verificables
+
+- Reorganizado `docs/` en áreas estables para proyecto, arquitectura, dominios,
+  importación, operaciones, referencias, DBeaver, manual e historia.
+- Movidos planes, decisiones sustituidas y auditorías anteriores a `history/`;
+  separados diagnósticos y correcciones SQL manuales en `dbeaver/`.
+- Conservado el diagnóstico histórico de liquidaciones en su ruta estable para
+  no alterar el checksum de la migración que lo referencia.
+- Actualizadas las referencias de documentación, código, tests y scripts a las
+  rutas nuevas.
+- Agregado `npm run docs:check` al control raíz y a CI para detectar enlaces
+  Markdown locales rotos.
+- Sincronizado y verificado el Manual Oficial en Markdown, HTML y PDF.
+- Sin cambios de schema, migraciones ni ejecución SQL sobre bases reales.
+
 ## 2026-09-07 — Sincronización del bootstrap aprobado
 
 - Auditada implementación en 42b81a3; actualizado CURRENT_STATE primero y después arquitectura, dominio, datos, testing y contratos relacionados.

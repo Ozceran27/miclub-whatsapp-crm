@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-08-05  
 **Alcance:** plan de producto, datos y operación para evolucionar el módulo **ADMINISTRACIÓN** sin cambiar el runtime de backend ni frontend en esta PR.  
-**Fuentes canónicas:** [`architecture-current.md`](architecture-current.md), [`pre-reset-readiness.md`](pre-reset-readiness.md), [`api-route-inventory.md`](api-route-inventory.md), [`business-rules/operational-balances.md`](business-rules/operational-balances.md) y diagnósticos SQL bajo [`dbeaver/`](dbeaver/).
+**Fuentes canónicas:** [`architecture-current.md`](../../architecture/runtime.md), [`pre-reset-readiness.md`](../../operations/pre-reset-readiness.md), [`api-route-inventory.md`](../../reference/api-routes.md), [`business-rules/operational-balances.md`](../../domains/business-rules/operational-balances.md) y diagnósticos SQL bajo [`dbeaver/`](../../dbeaver/).
 
 ## Arquitectura actual
 

@@ -1,6 +1,6 @@
 # API Contracts
 
-Resumen. El inventario detallado canónico es `docs/api-route-inventory.md`.
+Resumen. El inventario detallado canónico es `docs/reference/api-routes.md`.
 
 Auditado sobre 42b81a3. Una ruta presente no implica flujo E2E certificado. Ver CURRENT_STATE para bugs RLS y revocación en invitaciones.
 

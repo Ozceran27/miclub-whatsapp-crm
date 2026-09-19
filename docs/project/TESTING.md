@@ -1,5 +1,31 @@
 # Testing
 
+## Cierre de organización y auditoría — 2026-09-19
+
+- `npm run docs:check`: PASS.
+- API: 417/417 PASS; web: 71/71 PASS; shared: 7/7 PASS.
+- Manifiesto de migraciones: 15/15 PASS, incluidos checksums inmutables.
+- Frontera Google Sheets runtime: 1/1 PASS.
+- `npm run typecheck` y `npm run build`: PASS. Vite mantiene la advertencia
+  conocida por el chunk principal de 834,86 kB.
+- `npm run lint`: FAIL con 205 errores y 577 advertencias por la deuda global ya
+  inventariada. El nuevo verificador documental y la regresión agregada pasan su
+  lint focalizado.
+- `npm run deadcode`: FAIL por candidatos y exports históricos pendientes; no se
+  eliminaron contratos o entrypoints sólo por aparecer en ese inventario.
+- `git diff --check`: PASS; los avisos CRLF/LF corresponden a la configuración
+  local de fin de línea.
+- Sin escritura en PostgreSQL, ejecución de SQL real ni nuevo E2E de navegador.
+
+## Integridad documental — 2026-09-19
+
+- `npm run docs:check`: valida enlaces Markdown locales en todo `docs/` y falla
+  ante destinos inexistentes. Se ejecuta también desde `npm run check` y CI.
+- El Manual Oficial regenerado fue inspeccionado como PDF A4 de 10 páginas; se
+  revisaron páginas inicial, intermedia y final sin recortes ni superposiciones.
+- El control de enlaces no valida afirmaciones de negocio ni URLs externas; esas
+  revisiones continúan dependiendo del código, tests y procedimientos del dominio.
+
 ## Auditoría local — 2026-09-17
 
 - API: `npm run test -w @miclub/api`: 417 PASS.

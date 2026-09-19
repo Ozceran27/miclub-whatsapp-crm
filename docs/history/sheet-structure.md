@@ -2,7 +2,7 @@
 
 > **HISTÓRICO — NO EJECUTABLE EN INSTALACIONES NUEVAS.** Estos rangos pertenecían
 > al importador retirado de Google Sheets. La importación XLSX vigente se describe
-> en [`../import-xlsx.md`](../import-xlsx.md) y no utiliza Google Sheets API.
+> en [`../import-xlsx.md`](../imports/xlsx-runbook.md) y no utiliza Google Sheets API.
 
 Hojas relevantes:
 - ADMINISTRACIÓN

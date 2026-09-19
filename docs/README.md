@@ -1,24 +1,47 @@
-# Documentación
+# Documentación de miClub Gestión
 
-## Fuente canónica vigente de readiness
+Este directorio separa fuentes vigentes, procedimientos operativos, referencias,
+SQL manual y material histórico. El código y las migraciones versionadas siguen
+siendo la autoridad de implementación. Para conocer el estado comprobado del
+checkout, comenzar por [`project/CURRENT_STATE.md`](project/CURRENT_STATE.md).
 
-- [`pre-reset-readiness.md`](pre-reset-readiness.md): índice único del gate previo al reset y de las fuentes especializadas que lo componen. No afirma que un procedimiento haya sido ejecutado.
-- [`architecture-current.md`](architecture-current.md): arquitectura desplegable actual; remite al índice anterior para cualquier decisión de readiness.
-- [`runtime-boundaries.md`](runtime-boundaries.md): límites del proceso productivo.
-- [`legacy-runtime-inventory.md`](legacy-runtime-inventory.md): grafo, clasificación y puerta de eliminación de legado.
-- [`import-xlsx.md`](import-xlsx.md): operación soportada de importación.
-- [`deployment-runbook.md`](deployment-runbook.md): procedimiento de despliegue.
-- [`onboarding-delivery-plan.md`](onboarding-delivery-plan.md): secuencia de
-  cortes desplegables, gates y promoción controlada del nuevo onboarding.
-- [`postgres-cutover-runbook.md`](postgres-cutover-runbook.md): procedimiento de corte y reversión de datos.
+## Estructura
 
-Los runbooks y SQL manuales describen procedimientos. Su presencia, contenido o
-marcas de checklist no constituyen evidencia de aplicación en ningún entorno.
+| Carpeta | Contenido | Punto de entrada |
+| --- | --- | --- |
+| `project/` | Contexto canónico, estado, reglas, decisiones y roadmap | [`project/README.md`](project/README.md) |
+| `architecture/` | Arquitectura desplegable, límites de runtime y migraciones | [`architecture/README.md`](architecture/README.md) |
+| `domains/` | Reglas y funcionamiento por dominio | [`domains/README.md`](domains/README.md) |
+| `imports/` | Contrato y operación del importador XLSX | [`imports/README.md`](imports/README.md) |
+| `operations/` | Readiness, despliegue, RLS, retención y controles | [`operations/README.md`](operations/README.md) |
+| `reference/` | Inventarios técnicos de consulta | [`reference/README.md`](reference/README.md) |
+| `dbeaver/` | SQL manual, diagnósticos y procedimientos de base | [`dbeaver/README.md`](dbeaver/README.md) |
+| `manual/` | Manual de usuario en formatos distribuibles | [`manual/README.md`](manual/README.md) |
+| `history/` | Checkpoints, planes y auditorías sustituidos | [`history/README.md`](history/README.md) |
 
-## Evidencia forense e historia
+El archivo `activity-settlements-historical-diagnostic.sql` permanece en la raíz
+porque su ruta forma parte del contenido de una migración ya publicada y, por lo
+tanto, de su checksum. Los diagnósticos nuevos deben ubicarse en `dbeaver/diagnostics/`.
 
-Los diagnósticos fechados y las reconstrucciones de incidentes viven en
-[`history/forensics/`](history/forensics/README.md). Sirven como evidencia de lo
-observado en su fecha, pero no reemplazan las fuentes canónicas anteriores. Los
-readiness y checkpoints sustituidos se catalogan en
-[`history/`](history/README.md).
+## Lectura recomendada
+
+1. [`project/CURRENT_STATE.md`](project/CURRENT_STATE.md)
+2. [`project/ARCHITECTURE.md`](project/ARCHITECTURE.md)
+3. [`project/BUSINESS_RULES.md`](project/BUSINESS_RULES.md)
+4. [`operations/pre-reset-readiness.md`](operations/pre-reset-readiness.md)
+5. Documento del dominio afectado
+
+Los runbooks y SQL describen procedimientos. Su presencia en Git no demuestra
+que hayan sido ejecutados. PostgreSQL real sólo se modifica mediante el flujo
+manual definido para DBeaver.
+
+## Control de enlaces
+
+Después de mover o renombrar documentación, ejecutar:
+
+```bash
+npm run docs:check
+```
+
+El control recorre todos los Markdown bajo `docs/` y falla si un enlace local no
+resuelve a un archivo o directorio existente.

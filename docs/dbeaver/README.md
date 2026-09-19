@@ -1,5 +1,18 @@
 # Ejecución en DBeaver
 
+## Organización
+
+- Raíz: scripts y guías vigentes con nombre estable, algunos consumidos por tests.
+- [`diagnostics/`](diagnostics/README.md): consultas y verificaciones manuales.
+- [`corrections/`](corrections/README.md): correcciones puntuales conservadas.
+- `administration/`: evolución manual del módulo administrativo en instalaciones legacy.
+- `import-constraints/`: diagnóstico y aplicación coordinada de constraints del importador.
+- `integral-backfill-2026-08/` y `stabilization-2026-08/`: procedimientos históricos autocontenidos.
+- `tenant-deletion/` y `tenant-reset/`: operaciones destructivas con sus propias precondiciones.
+
+No mover los scripts de raíz sin actualizar sus consumidores en código, tests y
+mensajes operativos. La ubicación forma parte del procedimiento humano.
+
 Los archivos son SQL plano UTF-8. Abrirlos directamente desde DBeaver y usar
 **Execute SQL Script**; no copiar una representación JSON que muestre `\n`, ya
 que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
@@ -9,9 +22,9 @@ que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 > **HISTÓRICO — REPARACIÓN LEGACY.** Los pasos 01/02/03/08 y el backfill
 > `integral-backfill-2026-08/` se diseñaron exclusivamente para la instalación
 > preexistente de miClub/Fernando Ramos. No son onboarding, provisioning ni
-> migraciones aplicables a una instalación nueva. Una instalación nueva debe usar
-> el alta normal y `npm run db:migrate`; no debe copiar UUID, identidad ni datos de
-> Fernando.
+> migraciones aplicables a una instalación nueva. Una base descartable puede usar
+> el runner de migraciones; una base real sigue el procedimiento manual aprobado
+> en DBeaver. Nunca copiar UUID, identidad ni datos de Fernando.
 
 ## Orden histórico de reparación
 
@@ -45,7 +58,7 @@ no reemplazar ese orden con ejecuciones parciales.
 
 ## Scripts administrativos post-admin
 
-Los archivos de `administration/` son diagnósticos y remediaciones **manuales para instalaciones legacy**. Su presencia en Git no demuestra que hayan sido ejecutados y no reemplazan `npm run db:migrate`. El estado, orden de migraciones versionadas y evidencia exigida se documentan en [`../pre-reset-readiness.md`](../pre-reset-readiness.md) y en la [`política del manifiesto`](../migration-manifest-policy.md).
+Los archivos de `administration/` son diagnósticos y remediaciones **manuales para instalaciones legacy**. Su presencia en Git no demuestra que hayan sido ejecutados y no reemplazan `npm run db:migrate`. El estado, orden de migraciones versionadas y evidencia exigida se documentan en [`../operations/pre-reset-readiness.md`](../operations/pre-reset-readiness.md) y en la [`política del manifiesto`](../architecture/migration-manifest.md).
 
 Antes de ejecutar uno, registrar backup, entorno, operador y checksum. Ejecutar primero `administration/01_admin_schema_diagnostic_readonly.sql`; no aplicar DDL manual si el objeto equivalente ya existe por migración. `administration/99_admin_rollback_manual.sql` sólo revierte objetos manuales vacíos, no el ledger de migraciones ni datos productivos.
 

@@ -25,7 +25,7 @@ test("roles operativos no heredan privilegios administrativos de Director", () =
   }
 });
 test("SQL contiene auditoría previa, gate, compatibilidad y verificaciones", () => {
-  const sql=readFileSync(new URL("../../../../../docs/dbeaver-workers-payment-and-roles.sql",import.meta.url),"utf8");
+  const sql=readFileSync(new URL("../../../../../docs/dbeaver/diagnostics/workers-payment-and-roles.sql",import.meta.url),"utf8");
   assert.match(sql,/AUDITORÍA \(solo lectura\)/); assert.match(sql,/AUDIT_GATE_FAILED/); assert.match(sql,/COMPATIBILIDAD TEMPORAL/);
   assert.match(sql,/upper\(role\.code\) in \('TRABAJADOR', 'INSTRUCTOR'\)/); assert.match(sql,/club:manage/);
   assert.match(sql,/lower\(existing\.code\) = lower\(value\.code\)/);

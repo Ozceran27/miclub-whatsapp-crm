@@ -1,6 +1,6 @@
 # Checkpoint canónico post-admin
 
-> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../operations/pre-reset-readiness.md).
 
 
 **Fecha de corte:** 2026-08-06  
@@ -140,7 +140,7 @@ Todos los paths son tenant-scoped. Los GET paginados aceptan `page`/`limit` y s�
 | POST | `/api/movements/:id/void` | `movements.cancel`; requiere `updatedAt` y motivo |
 | POST | `/api/inscripciones` | `enrollments.create`; alta validada y auditada |
 
-El inventario completo reconciliado está en [`api-route-inventory.md`](../api-route-inventory.md).
+El inventario completo reconciliado está en [`api-route-inventory.md`](../reference/api-routes.md).
 
 ## Rollback
 

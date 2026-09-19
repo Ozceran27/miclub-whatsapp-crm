@@ -14,6 +14,8 @@ Logo: apps/web/public/logo/miClub - Logo trans.png
 
 Actualización post-admin: 06/08/2026. El capítulo operativo vigente de Administración se incorpora al final de este documento. Los artefactos HTML/PDF deben regenerarse antes de distribución externa.
 
+Última sincronización de estructura y referencias técnicas: 19/09/2026.
+
 
 
 ÍNDICE
@@ -216,7 +218,7 @@ Convención de signos del gráfico “Gastos por Tipo”: para Gastos Operativos
 
 CAPÍTULO 9 — MIGRACIÓN XLSX (VIGENTE)
 
-La importación soportada recibe un archivo `.xlsx` mediante `POST /api/migration`. Es independiente de Google Sheets: no consulta Google Sheets API, no requiere credenciales `GOOGLE_*` y no utiliza la dependencia `googleapis`. Se debe ejecutar primero el dry-run, revisar errores y conservar el hash y reporte del lote antes de persistir. La guía operativa vigente es `docs/import-xlsx.md`.
+La importación soportada recibe un archivo `.xlsx` mediante `POST /api/migration`. Es independiente de Google Sheets: no consulta Google Sheets API, no requiere credenciales `GOOGLE_*` y no utiliza la dependencia `googleapis`. Se debe ejecutar primero el dry-run, revisar errores y conservar el hash y reporte del lote antes de persistir. La guía operativa vigente es `docs/imports/xlsx-runbook.md`.
 
 Los antiguos procedimientos que leían rangos de una planilla Google o archivaban inscripciones de ese importador están en `docs/history/` y no deben ejecutarse en instalaciones nuevas. XLSX continúa soportado aunque Google Sheets haya sido retirado.
 
@@ -252,4 +254,4 @@ Gestionar categorías, trabajadores, cuotas y socios desde las tarjetas rápidas
 
 ### Buenas prácticas y soporte
 
-Actualizar el panel antes de decidir, no compartir sesiones, no modificar el tenant desde herramientas del navegador y conservar el `requestId` de cualquier error. Ante una falla de escritura, no repetir compulsivamente: verificar primero si la operación quedó registrada. El índice vigente para localizar las fuentes técnicas, procedimientos de rollback y evidencia exigida es `docs/pre-reset-readiness.md`; el manual no afirma el estado aplicado de un entorno.
+Actualizar el panel antes de decidir, no compartir sesiones, no modificar el tenant desde herramientas del navegador y conservar el `requestId` de cualquier error. Ante una falla de escritura, no repetir compulsivamente: verificar primero si la operación quedó registrada. El índice vigente para localizar las fuentes técnicas, procedimientos de rollback y evidencia exigida es `docs/operations/pre-reset-readiness.md`; el manual no afirma el estado aplicado de un entorno.

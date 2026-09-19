@@ -15,12 +15,12 @@ El arranque productivo exige `AUTH_ENABLED=true`, `DATA_SOURCE=postgres`, `CRM_S
 
 La importación soportada es exclusivamente XLSX mediante `/api/migration`, con autenticación, tenant, validación de lote y auditoría. Tras certificar el E2E XLSX y comprobar el grafo de imports, Google Sheets fue retirado definitivamente: no existen adaptadores, script operativo, comandos npm, variables de entorno ni dependencia `googleapis` en el build/runtime de la API. Sus documentos históricos no son herramientas ejecutables.
 
-SQLite permanece como artefacto de prueba de compatibilidad y no es fuente, respaldo automático ni fallback de producción. El `mockData` sin consumidores fue eliminado. El grafo y la puerta de retiro están en [`legacy-runtime-inventory.md`](legacy-runtime-inventory.md); el contexto anterior está en [`history/`](history/README.md).
+SQLite permanece como artefacto de prueba de compatibilidad y no es fuente, respaldo automático ni fallback de producción. El `mockData` sin consumidores fue eliminado. El grafo y la puerta de retiro están en [`legacy-runtime-inventory.md`](legacy-inventory.md); el contexto anterior está en [`history/`](../history/README.md).
 
 ## Superficies HTTP
 
-Las rutas se montan en `apps/api/src/index.ts`; el inventario reconciliado está en [`api-route-inventory.md`](api-route-inventory.md). Salvo login/registro y health técnico, las superficies de negocio requieren autenticación; las rutas tenant-scoped requieren además membresía.
+Las rutas se montan en `apps/api/src/index.ts`; el inventario reconciliado está en [`api-route-inventory.md`](../reference/api-routes.md). Salvo login/registro y health técnico, las superficies de negocio requieren autenticación; las rutas tenant-scoped requieren además membresía.
 
 ## Referencia operativa
 
-La fuente vigente para cualquier decisión de readiness previa al reset es [`pre-reset-readiness.md`](pre-reset-readiness.md). Esta página sólo define la arquitectura; los procedimientos y la evidencia exigida se consultan en las fuentes enlazadas por ese índice, sin inferir que hayan sido ejecutados.
+La fuente vigente para cualquier decisión de readiness previa al reset es [`pre-reset-readiness.md`](../operations/pre-reset-readiness.md). Esta página sólo define la arquitectura; los procedimientos y la evidencia exigida se consultan en las fuentes enlazadas por ese índice, sin inferir que hayan sido ejecutados.

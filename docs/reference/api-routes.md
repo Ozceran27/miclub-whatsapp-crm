@@ -7,7 +7,7 @@
 - **Pública:** no requiere sesión (`/health`, login y registro condicionado por flag).
 - **Sesión:** requiere autenticación; **tenant** añade membresía activa y toma `clubId` exclusivamente del contexto servidor.
 - **Permiso/flag:** suma el control indicado. En producción la autenticación es obligatoria y no existe bypass.
-- Los paths `legacy-compat` conservan contratos del frontend, pero sus datos provienen solo de PostgreSQL. Su retiro está previsto para el **2026-11-06**, después de migrar los consumidores enumerados en [`legacy-compat-audit.md`](legacy-compat-audit.md).
+- Los paths `legacy-compat` conservan contratos del frontend, pero sus datos provienen solo de PostgreSQL. Su retiro está previsto para el **2026-11-06**, después de migrar los consumidores enumerados en [`legacy-compat-audit.md`](../history/audits/legacy-compat-2026-08-16.md).
 
 ## Autenticación — montaje `/auth`
 
@@ -84,7 +84,7 @@ Todas requieren sesión, membresía activa, tenant derivado por el servidor y re
 | POST | `/api/movements/:id/void` | `movements.cancel` (`finance:write` sólo por compatibilidad temporal) |
 | POST | `/api/inscripciones` | `enrollments.create` (`club:manage` sólo por compatibilidad temporal) |
 
-Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La compatibilidad legacy está centralizada, vence el 2026-11-06 y su criterio de retiro queda registrado en [`legacy-compat-audit.md`](legacy-compat-audit.md); no forma parte del permiso canónico de las rutas.
+Las lecturas `/api/sectores`, `/api/actividades`, `/api/movimientos` y `/api/inscripciones` pertenecen a `readOnlyRoutes.ts` y alimentan listas y detalles administrativos. La compatibilidad legacy está centralizada, vence el 2026-11-06 y su criterio de retiro queda registrado en [`legacy-compat-audit.md`](../history/audits/legacy-compat-2026-08-16.md); no forma parte del permiso canónico de las rutas.
 
 ## Compatibilidad PostgreSQL y CRM
 

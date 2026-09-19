@@ -13,16 +13,16 @@ documentos especializados; este documento los enlaza sin reproducirlos.
 
 | Área | Fuente canónica | Uso en el gate |
 | --- | --- | --- |
-| Arquitectura y límites de runtime | [`architecture-current.md`](architecture-current.md) y [`runtime-boundaries.md`](runtime-boundaries.md) | Confirmar el contrato desplegable y las fuentes autoritativas. |
-| Migraciones y ledger | [`migration-manifest-policy.md`](migration-manifest-policy.md) | Validar orden, identidad, checksums y evidencia del ledger; la presencia de SQL o de objetos no prueba aplicación. |
-| Onboarding | [`onboarding.md`](onboarding.md) | Ejecutar la secuencia funcional canónica una vez preparado el schema. |
-| Liquidaciones de actividades | [`business-rules/activity-settlement-allocations.md`](business-rules/activity-settlement-allocations.md) | Validar la invariantes de asignación y conciliación sin reinterpretarlas aquí. |
-| Importación XLSX | [`import-xlsx.md`](import-xlsx.md) y [`migration/xlsx-v1.md`](migration/xlsx-v1.md) | Aplicar el flujo soportado, sus validaciones y trazabilidad de lote. |
-| Despliegue, corte y rollback | [`deployment-runbook.md`](deployment-runbook.md) y [`postgres-cutover-runbook.md`](postgres-cutover-runbook.md) | Ejecutar procedimientos y registrar el resultado; un runbook no afirma que el paso ya ocurrió. |
+| Arquitectura y límites de runtime | [`architecture-current.md`](../architecture/runtime.md) y [`runtime-boundaries.md`](../architecture/runtime-boundaries.md) | Confirmar el contrato desplegable y las fuentes autoritativas. |
+| Migraciones y ledger | [`migration-manifest-policy.md`](../architecture/migration-manifest.md) | Validar orden, identidad, checksums y evidencia del ledger; la presencia de SQL o de objetos no prueba aplicación. |
+| Onboarding | [`onboarding.md`](../domains/onboarding.md) | Ejecutar la secuencia funcional canónica una vez preparado el schema. |
+| Liquidaciones de actividades | [`business-rules/activity-settlement-allocations.md`](../domains/business-rules/activity-settlement-allocations.md) | Validar la invariantes de asignación y conciliación sin reinterpretarlas aquí. |
+| Importación XLSX | [`import-xlsx.md`](../imports/xlsx-runbook.md) y [`migration/xlsx-v1.md`](../imports/xlsx-contract-v1.md) | Aplicar el flujo soportado, sus validaciones y trazabilidad de lote. |
+| Despliegue, corte y rollback | [`deployment-runbook.md`](deployment.md) y [`postgres-cutover-runbook.md`](postgres-cutover.md) | Ejecutar procedimientos y registrar el resultado; un runbook no afirma que el paso ya ocurrió. |
 
 El inventario de rutas de API se consulta en
-[`api-route-inventory.md`](api-route-inventory.md). Los SQL de
-[`dbeaver/`](dbeaver/README.md) son procedimientos manuales de diagnóstico o
+[`api-route-inventory.md`](../reference/api-routes.md). Los SQL de
+[`dbeaver/`](../dbeaver/README.md) son procedimientos manuales de diagnóstico o
 remediación: su existencia en Git nunca se interpreta como estado aplicado ni
 como sustituto del manifiesto.
 
@@ -38,4 +38,4 @@ repitiendo SQL manual a ciegas.
 
 Después del reset, se siguen los runbooks enlazados y se adjuntan sus salidas al
 ticket. Las afirmaciones fechadas anteriores se conservan sólo para trazabilidad
-en [`history/`](history/README.md) y no participan en una decisión nueva.
+en [`history/`](../history/README.md) y no participan en una decisión nueva.

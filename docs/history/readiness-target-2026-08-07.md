@@ -1,6 +1,6 @@
 # Readiness de migraciones (sanitizado)
 
-> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+> **Documento histórico. No usar para decidir un reset o despliegue nuevo.** La fuente vigente es [`../pre-reset-readiness.md`](../operations/pre-reset-readiness.md).
 
 
 - Commit inspeccionado: `cd5cb486fedd87be07fae7daeff8da987d7a9287`

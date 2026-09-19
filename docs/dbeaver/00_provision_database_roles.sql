@@ -8,7 +8,7 @@ BEGIN
     RAISE EXCEPTION USING
       ERRCODE='insufficient_privilege',
       MESSAGE=format('La conexión actual (%s) no es superusuario PostgreSQL',current_user),
-      HINT='En una instalación local ejecute el aprovisionamiento como el usuario postgres; consulte docs/runtime-rls-rollout.md';
+      HINT='En una instalación local ejecute el aprovisionamiento como el usuario postgres; consulte docs/operations/runtime-rls-rollout.md';
   END IF;
 END
 $preflight$;

@@ -1,5 +1,7 @@
 # miClub Gestión — Project Knowledge Base
 
+Índice general de documentación: [`../README.md`](../README.md).
+
 Esta carpeta es la **capa de contexto de proyecto** para ChatGPT, Work, Codex y el equipo humano.
 
 Su función no es reemplazar la documentación técnica canónica ya existente en `docs/`, sino dar a cualquier agente una entrada rápida y coherente al estado, arquitectura, reglas y objetivos del proyecto.
@@ -9,7 +11,7 @@ Su función no es reemplazar la documentación técnica canónica ya existente e
 Ante contradicciones, usar este orden:
 
 1. **Código runtime actual + migraciones versionadas**.
-2. **Documentación canónica especializada existente en `docs/`**.
+2. **Documentación canónica especializada en las áreas catalogadas de `docs/`**.
 3. **Documentos de `docs/project/`** como síntesis y mapa de navegación.
 4. Historial Git y documentos históricos como evidencia de evolución, no como especificación vigente.
 
@@ -38,22 +40,25 @@ No reinterpretar una regla de negocio sólo porque un documento histórico la de
 
 Consultar especialmente:
 
-- `docs/pre-reset-readiness.md`
-- `docs/architecture-current.md`
-- `docs/architecture.md`
-- `docs/runtime-boundaries.md`
-- `docs/migration-manifest-policy.md`
-- `docs/api-route-inventory.md`
-- `docs/tenant.md`
-- `docs/onboarding.md`
-- `docs/economy.md`
-- `docs/import-xlsx.md`
-- `docs/migration/xlsx-v1.md`
-- `docs/business-rules/activity-settlement-allocations.md`
-- `docs/deployment-runbook.md`
-- `docs/postgres-cutover-runbook.md`
+- `docs/operations/pre-reset-readiness.md`
+- `docs/architecture/runtime.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/runtime-boundaries.md`
+- `docs/architecture/migration-manifest.md`
+- `docs/reference/api-routes.md`
+- `docs/domains/tenancy.md`
+- `docs/domains/onboarding.md`
+- `docs/domains/economy.md`
+- `docs/imports/xlsx-runbook.md`
+- `docs/imports/xlsx-contract-v1.md`
+- `docs/domains/business-rules/activity-settlement-allocations.md`
+- `docs/operations/deployment.md`
+- `docs/operations/postgres-cutover.md`
 
 ## Nota de sincronización
+
+La estructura documental y sus referencias se sincronizaron el **2026-09-19**.
+Ejecutar `npm run docs:check` después de mover, renombrar o agregar documentos.
 
 Este paquete fue preparado el **2026-09-07** tomando como referencia el repositorio `Ozceran27/miclub-whatsapp-crm` en `main`, la documentación disponible allí y el contexto de dirección del proyecto.
 

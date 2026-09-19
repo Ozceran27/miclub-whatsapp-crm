@@ -51,6 +51,6 @@ el fallback workers sin employees y el calculador TS de settlement.
 
 ## Límites pendientes
 
-Además de B01/B02: escritura FIXED versus lectura SQL antigua, ciclo de liquidaciones incompleto y catálogos de clasificación duplicados. docs/runtime-boundaries.md aún describe carga dinámica SQLite y una ruta XLSX obsoletas; no usar esos pasajes para reconstruir runtime.
+Además de B01/B02: escritura FIXED versus lectura SQL antigua, ciclo de liquidaciones incompleto y catálogos de clasificación duplicados. docs/architecture/runtime-boundaries.md aún describe carga dinámica SQLite y una ruta XLSX obsoletas; no usar esos pasajes para reconstruir runtime.
 
 Fuentes: apps/api/src/index.ts, db/*, routes/*, services/crmService.ts, services/dataSourceService.ts; apps/web/src/session.tsx, router.tsx, serverState/*; package.json de los tres workspaces.

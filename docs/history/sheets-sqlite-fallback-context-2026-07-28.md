@@ -1,6 +1,6 @@
 # Arquitectura actual
 
-> **Documento histórico (2026-07-28). No usar para despliegues nuevos.** La referencia vigente es [`../pre-reset-readiness.md`](../pre-reset-readiness.md).
+> **Documento histórico (2026-07-28). No usar para despliegues nuevos.** La referencia vigente es [`../pre-reset-readiness.md`](../operations/pre-reset-readiness.md).
 ## `mockData` legacy y uso permitido
 
 `apps/api/src/data/mockData.ts` es un fallback legacy para mantener operables demos,

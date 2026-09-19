@@ -67,7 +67,7 @@ como evidencia de la ejecución.
   explicación y no autoriza que el reset la borre o reclasifique.
   Las huellas se guardan en una tabla temporal de la conexión, no en la base.
 - Los scripts no sustituyen el backup, la revisión humana ni el gate de
-  readiness de [`../../pre-reset-readiness.md`](../../pre-reset-readiness.md).
+  readiness de [`../../pre-reset-readiness.md`](../../operations/pre-reset-readiness.md).
 
 ## Qué ejecutar y cuándo
 

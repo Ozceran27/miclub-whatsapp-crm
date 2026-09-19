@@ -10,7 +10,7 @@ Punto de entrada operativo para miClub Gestión: API Express/TypeScript, web Rea
 - Google Sheets está fuera del runtime y de la importación soportada. La historia se carga mediante XLSX controlado.
 - No existe fallback productivo a mocks, fixtures, Google Sheets ni SQLite. Los artefactos legacy solo sirven para pruebas, migración o consulta histórica.
 
-El estado y los controles previos al siguiente módulo administrativo están en el [readiness canónico previo al reset](docs/pre-reset-readiness.md). La [arquitectura actual](docs/architecture-current.md) y el [inventario de rutas](docs/api-route-inventory.md) complementan esa referencia.
+El estado y los controles previos al siguiente módulo administrativo están en el [readiness canónico previo al reset](docs/operations/pre-reset-readiness.md). La [arquitectura actual](docs/architecture/runtime.md) y el [inventario de rutas](docs/reference/api-routes.md) complementan esa referencia.
 
 ## Inicio local
 
@@ -50,7 +50,7 @@ onboarding y esta política deberá reemplazarse explícitamente.
 
 ## Importación XLSX
 
-La vía soportada es el importador XLSX autenticado. Ejecute siempre dry-run y conserve el hash y reporte del lote antes de confirmar. Google Sheets y SQLite están fuera del runtime productivo; consulte el [runbook XLSX](docs/import-xlsx.md).
+La vía soportada es el importador XLSX autenticado. Ejecute siempre dry-run y conserve el hash y reporte del lote antes de confirmar. Google Sheets y SQLite están fuera del runtime productivo; consulte el [runbook XLSX](docs/imports/xlsx-runbook.md).
 
 ## Sincronización de cotizaciones
 
@@ -65,19 +65,20 @@ EXCHANGE_RATE_SYNC_PAIRS=USD/ARS npm run sync:exchange-rates -w @miclub/api -- 2
 
 Las cotizaciones se almacenan siempre como ARS, BRL o EUR por USD; el adaptador
 del BCE invierte su dato USD por EUR. Para URLs, ventanas, reintentos y diagnóstico
-de `miclub.exchange_rate_sync_state`, consulte el [runbook de cotizaciones](docs/exchange-rates.md).
+de `miclub.exchange_rate_sync_state`, consulte el [runbook de cotizaciones](docs/domains/exchange-rates.md).
 
 ## Documentación operativa
 
-- [Readiness canónico previo al reset](docs/pre-reset-readiness.md)
-- [Arquitectura canónica](docs/architecture.md)
-- [Inventario de endpoints](docs/api-route-inventory.md)
-- [Tenant canónico](docs/tenant.md)
-- [Onboarding canónico](docs/onboarding.md)
-- [Economía canónica](docs/economy.md)
-- [Cotizaciones oficiales](docs/exchange-rates.md)
-- [Despliegue](docs/deployment-runbook.md)
-- [Runbook de corte PostgreSQL](docs/postgres-cutover-runbook.md)
+- [Índice general de documentación](docs/README.md)
+- [Readiness canónico previo al reset](docs/operations/pre-reset-readiness.md)
+- [Arquitectura canónica](docs/architecture/overview.md)
+- [Inventario de endpoints](docs/reference/api-routes.md)
+- [Tenant canónico](docs/domains/tenancy.md)
+- [Onboarding canónico](docs/domains/onboarding.md)
+- [Economía canónica](docs/domains/economy.md)
+- [Cotizaciones oficiales](docs/domains/exchange-rates.md)
+- [Despliegue](docs/operations/deployment.md)
+- [Runbook de corte PostgreSQL](docs/operations/postgres-cutover.md)
 - [Archivo histórico (no usar para despliegues nuevos)](docs/history/README.md)
 
 ## WhatsApp

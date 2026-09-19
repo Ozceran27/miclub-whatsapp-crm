@@ -17,6 +17,7 @@ jobs:
       # `npm install` also validates and refreshes the lock when analysis tooling
       # versions are intentionally upgraded in the same pull request.
       - run: npm install
+      - run: npm run docs:check
       - run: npm run lint -ws
       - run: npm run check:no-google-sheets-runtime
       - run: npm run deadcode

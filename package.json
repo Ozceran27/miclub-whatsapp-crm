@@ -12,7 +12,7 @@
     "typecheck": "npm run typecheck -ws",
     "start": "npm run start -w @miclub/api",
     "start:prod": "npm run build && npm run start",
-    "check": "npm run lint -ws && npm run deadcode && npm run typecheck && npm run build && npm run test -ws --if-present",
+    "check": "npm run docs:check && npm run lint -ws && npm run deadcode && npm run typecheck && npm run build && npm run test -ws --if-present",
     "check:no-google-sheets-runtime": "tsx --test apps/api/src/routes/googleSheetsRuntimeBoundary.test.ts",
     "audit:postgres": "tsx apps/api/src/scripts/auditPostgres.ts",
     "audit:economy-yearly-breakdown": "tsx apps/api/src/scripts/auditEconomyYearlyBreakdown.ts",
@@ -28,7 +28,8 @@
     "auth:set-password": "npm run auth:set-password -w @miclub/api --",
     "club:set-plan": "npm run club:set-plan -w @miclub/api --",
     "lint": "eslint .",
-    "deadcode": "knip"
+    "deadcode": "knip",
+    "docs:check": "node scripts/check-doc-links.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

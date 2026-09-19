@@ -6,7 +6,7 @@ Estado: inventario estructural obtenido; auditoría del ledger bloqueada por per
 
 Captura UTC: 2026-09-08T00:53:51.211Z. Conexión exclusiva mediante AUDIT_DATABASE_URL de .env.codex.local, sin publicar credenciales. Gate confirmado antes de catálogos: current_user=miclub_audit; transaction_read_only=on. Catálogos consultados en transacción REPEATABLE READ READ ONLY, terminada con ROLLBACK. No se ejecutaron DDL, migraciones, escrituras, nextval ni funciones de negocio. No se consultaron filas operativas/personales. El ledger devolvió 42501 (permiso insuficiente); no se obtuvo su contenido y no se afirma que esté vacío.
 
-Se compararon migrationManifest.ts, SQL de sus 94 entradas (lectura estática y hashes LF), migrationCompatibility.ts, docs/migration-manifest-policy.md, DATA_MODEL.md y ARCHITECTURE.md. No se reconstruyó una base descartable; la comparación no es un diff exhaustivo contra una instalación canónica ejecutada.
+Se compararon migrationManifest.ts, SQL de sus 94 entradas (lectura estática y hashes LF), migrationCompatibility.ts, docs/architecture/migration-manifest.md, DATA_MODEL.md y ARCHITECTURE.md. No se reconstruyó una base descartable; la comparación no es un diff exhaustivo contra una instalación canónica ejecutada.
 
 ## Inventario
 
@@ -210,7 +210,7 @@ No todas representan el mismo riesgo; considerar triggers y semántica de actor.
 
 ## Archivos y validación
 
-Se conservan únicamente este informe y `2026-09-07-ledger-manual.sql` bajo docs/audits. Se retiraron los scripts auxiliares, las capturas JSON y los logs locales tras sintetizar sus resultados. No se modificó código de producto ni docs canónicas. Base: cero cambios. SQL generado: consulta SELECT del ledger para ejecución manual, no migración ni reparación. Los resultados de tests/build/typecheck/lint se detallan a continuación.
+Se conservan únicamente este informe y `2026-09-07-ledger-manual.sql` bajo docs/history/audits. Se retiraron los scripts auxiliares, las capturas JSON y los logs locales tras sintetizar sus resultados. No se modificó código de producto ni docs canónicas. Base: cero cambios. SQL generado: consulta SELECT del ledger para ejecución manual, no migración ni reparación. Los resultados de tests/build/typecheck/lint se detallan a continuación.
 
 ### Validación local del repositorio
 

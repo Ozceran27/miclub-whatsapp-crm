@@ -1,5 +1,26 @@
 # Current State
 
+## Organización documental y control de referencias — 2026-09-19
+
+`docs/` quedó organizado por propósito: proyecto, arquitectura, dominios,
+importación, operaciones, referencia, SQL manual, manual de usuario e historia.
+Los documentos históricos, decisiones sustituidas, planes cerrados y auditorías
+anteriores están separados de las fuentes vigentes. Los diagnósticos y
+correcciones SQL sueltas quedaron dentro de `docs/dbeaver/`, sin alterar su
+contenido ejecutable. El diagnóstico histórico de liquidaciones permanece en la
+raíz de `docs/` porque su ruta integra el checksum de una migración publicada.
+
+Todas las referencias conocidas del repositorio fueron ajustadas a las rutas
+nuevas. `npm run docs:check` valida enlaces Markdown locales y forma parte de
+`npm run check` y CI. El manual oficial fue sincronizado en Markdown, HTML y PDF;
+el PDF resultante tiene 10 páginas A4 y fue revisado visualmente en páginas
+inicial, intermedia y final.
+
+Esta reorganización no cambia el modelo de datos ni ejecuta SQL. Los scripts para
+una base real siguen requiriendo ejecución manual y validada mediante DBeaver.
+El estado funcional de la auditoría del 17/09 y sus gates pendientes continúa
+vigente.
+
 ## Auditoría de flujo y limpieza — 2026-09-17
 
 Revisión del checkout `main` posterior a las entregas financieras: registro,
@@ -170,7 +191,7 @@ Otros riesgos: PGSSL desactiva verificación de certificado; trust proxy=true re
 3. Reparar gates locales y certificar registro, aislamiento A/B y First Clean Club Journey.
 4. Sólo después preparar readiness de reset real con backup/restauración, ledger y SQL manual revisado.
 
-La existencia de scripts no prueba ejecución. Rige docs/pre-reset-readiness.md; el reset real no es el próximo paso automático.
+La existencia de scripts no prueba ejecución. Rige docs/operations/pre-reset-readiness.md; el reset real no es el próximo paso automático.
 # Verificación RC — 2026-09-08
 
 Trabajo sin commit sobre `bec17e642b3a6f151aaab62a51b179926a7da5bb`.

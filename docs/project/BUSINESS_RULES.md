@@ -149,7 +149,7 @@ La regla documentada vigente establece que un movimiento `PAYMENT` o `ADVANCE` e
 
 Si una operación real debe aplicarse a más de una liquidación, se registran movimientos separados.
 
-Consultar `docs/business-rules/activity-settlement-allocations.md`.
+Consultar `docs/domains/business-rules/activity-settlement-allocations.md`.
 
 ## 13. Saldos iniciales
 

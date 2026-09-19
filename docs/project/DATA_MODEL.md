@@ -50,4 +50,4 @@ runMigrations verifica hashes sobre LF, inventario y grafo. migrationCompatibili
 
 ## Reset y drift
 
-Validar ledger, schema, grants, RLS y backup/restauración en entorno aislado antes de reset. DDL manual/dumps no son prueba de estado aplicado ni reemplazo del manifiesto. SQL real: ejecución manual DBeaver. Ver docs/pre-reset-readiness.md y TESTING.md.
+Validar ledger, schema, grants, RLS y backup/restauración en entorno aislado antes de reset. DDL manual/dumps no son prueba de estado aplicado ni reemplazo del manifiesto. SQL real: ejecución manual DBeaver. Ver docs/operations/pre-reset-readiness.md y TESTING.md.

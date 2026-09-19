@@ -1,6 +1,6 @@
 # Runbook de corte a PostgreSQL
 
-Este documento describe el estado vigente posterior al corte y los controles restantes para retirar SQLite. El corte de Google Sheets ya finalizó; sus antiguos pasos no son ejecutables en una instalación nueva y se conservan en [`history/google-sheets-postgres-migration.md`](history/google-sheets-postgres-migration.md).
+Este documento describe el estado vigente posterior al corte y los controles restantes para retirar SQLite. El corte de Google Sheets ya finalizó; sus antiguos pasos no son ejecutables en una instalación nueva y se conservan en [`history/google-sheets-postgres-migration.md`](../history/google-sheets-postgres-migration.md).
 
 ## Estado objetivo de producción
 
@@ -59,7 +59,7 @@ cp apps/api/data/miclub.sqlite backups/final-cutover/miclub.sqlite
 sqlite3 backups/final-cutover/miclub.sqlite ".backup 'backups/final-cutover/miclub.sqlite.backup'"
 ```
 
-El backup final de Google Sheets pertenece al acta histórica del corte. Para una instalación nueva, la importación soportada es un archivo `.xlsx` mediante `POST /api/migration`; no usa Google Sheets API, credenciales `GOOGLE_*` ni la dependencia `googleapis`. Véase [`import-xlsx.md`](import-xlsx.md).
+El backup final de Google Sheets pertenece al acta histórica del corte. Para una instalación nueva, la importación soportada es un archivo `.xlsx` mediante `POST /api/migration`; no usa Google Sheets API, credenciales `GOOGLE_*` ni la dependencia `googleapis`. Véase [`import-xlsx.md`](../imports/xlsx-runbook.md).
 
 ## Reglas de eliminación
 
