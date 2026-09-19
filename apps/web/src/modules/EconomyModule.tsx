@@ -20,7 +20,7 @@ export default function EconomyModule() {
 
   return (
     <main className="module-content">
-      <FinancialCircuitPanel />
+      <FinancialCircuitPanel summaryOnly />
       <section className="module-hero home-hero economy-module-hero">
         <div className="home-hero__copy">
           <p className="eyebrow">Economía Club</p>

@@ -1,9 +1,11 @@
 import { getPostgresPool } from "../../db/postgres.js";
+import { withTenantTransaction } from "../../db/transaction.js";
 
 type WorkerRow = {
   id: string;
   club_id: string;
   person_id: string;
+  photo_file_id: string | null;
   code: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -46,12 +48,15 @@ const LEGACY_LIMITATIONS = [
 
 export const getWorkersPage = async (clubId: string, limit: number, offset: number): Promise<WorkersPage> => {
   const pool = await getPostgresPool();
-  const exists = await pool.query<{ employees: string | null }>("select to_regclass('miclub.employees')::text as employees");
+  return withTenantTransaction(clubId,async db=>{
+  const exists = await db.query<{ employees: string | null }>("select to_regclass('miclub.employees')::text as employees");
   const hasEmployees = Boolean(exists.rows[0]?.employees);
 
   const result = hasEmployees
-    ? await pool.query<WorkerRow>(`
-        select e.id::text, e.club_id::text, e.person_id::text, null::text as code,
+    ? await db.query<WorkerRow>(`
+        select e.id::text, e.club_id::text, e.person_id::text,
+          (select ep.id::text from miclub.employee_photos ep where ep.club_id=e.club_id and ep.employee_id=e.id and ep.status='active' and ep.deleted_at is null order by ep.updated_at desc,ep.id limit 1) as photo_file_id,
+          null::text as code,
           p.first_name, p.last_name, p.dni, p.phone, p.email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), 'Sin nombre') as display_name,
           r.code as role, s.name as sector, e.salary, e.has_fixed_compensation, e.fixed_compensation_amount, e.fixed_compensation_frequency, e.currency_code, e.status,
@@ -77,8 +82,8 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
         where e.club_id = $1 and e.archived_at is null
         order by p.last_name, p.first_name, e.id
         limit $2 offset $3`, [clubId, limit, offset])
-    : await pool.query<WorkerRow>(`
-        select p.id::text, p.club_id::text, p.id::text as person_id, null::text as code,
+    : await db.query<WorkerRow>(`
+        select p.id::text, p.club_id::text, p.id::text as person_id, null::text as photo_file_id, null::text as code,
           p.first_name, p.last_name, p.dni, p.phone, p.email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), i.display_name, 'Sin nombre') as display_name,
           coalesce(r.code, case when i.id is not null then 'INSTRUCTOR' end) as role,
@@ -119,4 +124,5 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
     dataSource: hasEmployees ? "employees" : "legacy",
     limitations: hasEmployees ? [] : LEGACY_LIMITATIONS
   };
+  },pool);
 };

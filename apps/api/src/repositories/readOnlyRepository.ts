@@ -41,11 +41,11 @@ const listDefinitions = {
   sectores: {
     sectorColumn: "s.id",
     clubColumn: "s.club_id",
-    select: `s.id, s.manager_person_id, s.code, s.name, s.icon_key, s.color, s.opening_time, s.closing_time,
+    select: `s.id, s.manager_person_id, s.code, s.name, s.description, s.icon_key, s.color, s.opening_time, s.closing_time,
       s.max_capacity, s.capacity_mode, s.configured_capacity,
       capacity.maximum_capacity, capacity.current_usage, capacity.utilization_percentage,
       capacity.idle_percentage, capacity.data_status as capacity_data_status,
-      s.municipal_status, s.financial_status, s.operational_status,
+      s.municipal_status, s.financial_status, s.operational_status, s.status,
       s.uses_enrollments, s.uses_activities, s.notes, s.created_at, s.updated_at,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name,
       (select count(*)::integer from miclub.activities a
@@ -60,18 +60,18 @@ const listDefinitions = {
     orderBy: "s.name asc, s.id asc",
     filters: {
       search: textSearch(["s.code", "s.name", "s.notes"]),
-      status: { column: "s.operational_status" },
+      status: { column: "s.status" },
       usesEnrollments: { column: "s.uses_enrollments", cast: "boolean" },
       usesActivities: { column: "s.uses_activities", cast: "boolean" }
     }
   },
   actividades: {
     sectorColumn: "a.sector_id",
-    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true",
+    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id",
     clubColumn: "a.club_id",
     select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name, a.instructor_id,
-      i.display_name as instructor_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
+      i.display_name as instructor_name, terms.responsible_person_id, nullif(trim(concat_ws(' ', responsible.first_name, responsible.last_name)), '') as responsible_person_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
       a.club_commission_percent, a.instructor_commission_percent, a.max_capacity,
       lower(terms.mode) as settlement_mode, terms.fixed_club_fee as settlement_fixed_amount, terms.fixed_fee_frequency, terms.currency_code,
       terms.club_share_percentage, terms.effective_from as terms_effective_from, terms.effective_to as terms_effective_to, a.generates_enrollments,

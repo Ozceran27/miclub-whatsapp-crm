@@ -1703,6 +1703,34 @@
       ]
     },
     {
+      "id": "GET /auth/worker-invitations",
+      "method": "GET",
+      "path": "/auth/worker-invitations",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "session",
+      "membership": "none",
+      "permission": "none",
+      "role": "account-owner",
+      "sectorScope": "tenant-invitation",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"]
+    },
+    {
+      "id": "POST /auth/worker-invitations/:id/:decision",
+      "method": "POST",
+      "path": "/auth/worker-invitations/:id/:decision",
+      "source": "apps/api/src/routes/authRoutes.ts",
+      "authentication": "session",
+      "membership": "none",
+      "permission": "none",
+      "role": "account-owner",
+      "sectorScope": "tenant-invitation",
+      "mutability": "write",
+      "idempotency": "single-use",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"]
+    },
+    {
       "id": "POST /auth/login",
       "method": "POST",
       "path": "/auth/login",
@@ -1980,7 +2008,7 @@
       "source": "apps/api/src/routes/administrationRoutes.ts",
       "authentication": "session",
       "membership": "active",
-      "permission": "sectors.edit",
+      "permission": "sectors.create",
       "role": "any-with-permission",
       "sectorScope": "tenant",
       "mutability": "create",
@@ -2054,6 +2082,26 @@
       "idempotency": "idempotent"
     },
     {
+      "id": "DELETE /api/administration/workers/:id/photo",
+      "method": "DELETE",
+      "path": "/api/administration/workers/:id/photo",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.manage",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ],
+      "mutability": "delete",
+      "idempotency": "idempotent"
+    },
+    {
       "id": "GET /api/modules/navigation",
       "method": "GET",
       "path": "/api/modules/navigation",
@@ -2103,6 +2151,26 @@
       "permission": "activities.view",
       "role": "any-with-permission",
       "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration/activities/:id/terms",
+      "method": "GET",
+      "path": "/api/administration/activities/:id/terms",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
       "mutability": "read",
       "idempotency": "safe",
       "testCategories": [

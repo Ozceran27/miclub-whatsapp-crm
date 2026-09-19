@@ -29,7 +29,6 @@ export default function AdministrationModule() {
 
   return (
     <main className="module-content">
-      <FinancialCircuitPanel summaryOnly />
       <section className="module-hero home-hero economy-module-hero">
         <div className="home-hero__copy">
           <p className="eyebrow">Administración</p>
@@ -41,6 +40,11 @@ export default function AdministrationModule() {
         </div>
       </section>
 
+      <nav className="section-panel" aria-label="Accesos de Administración">
+        <a href="#admin-summary">Resumen</a> · <a href="#admin-sectors">Sectores</a> · <a href="#admin-workers">Trabajadores</a> · <a href="#admin-activities">Actividades</a> · <a href="#admin-finance">Saldos y liquidaciones</a> · <a href="#admin-operations">Operaciones</a>
+      </nav>
+
+      <div id="admin-summary">
       {dashboard.status === 'loading' && (
         <EconomyDashboardState type="loading" title="Cargando Administración" message="Consultando PostgreSQL y preparando indicadores operativos reales." />
       )}
@@ -76,13 +80,17 @@ export default function AdministrationModule() {
           <AdministrationActions onCreateMovement={()=>setMovementOpen(true)} onCreateEnrollment={()=>setEnrollmentOpen(true)} canCreateMovement={capabilities.createMovement} canCreateEnrollment={capabilities.createEnrollment}/>
         </section>
       )}
-      {capabilities.sectors ? <SectorList /> : <UnavailableSurface capability="sectors" title="Sectores" />}
-      {capabilities.activities ? <ActivityList canViewFinancials={capabilities.activityFinancials} /> : <UnavailableSurface capability="activities" title="Actividades" />}
-      {capabilities.enrollments ? <EnrollmentList /> : <UnavailableSurface capability="enrollments" title="Inscripciones" />}
-      {capabilities.movements ? <MovementList /> : <UnavailableSurface capability="movements" title="Movimientos" />}
-      {capabilities.workers ? <WorkerList /> : <UnavailableSurface capability="workers" title="Trabajadores" />}
-      {capabilities.tasks ? <TaskPanel canCreate={capabilities.createTask} canEdit={capabilities.editTask} /> : <UnavailableSurface capability="tasks" title="Tareas" />}
-      {capabilities.requests ? <RequestPanel canApprove={capabilities.approveRequest} canReject={capabilities.rejectRequest} /> : <UnavailableSurface capability="requests" title="Solicitudes" />}
+      </div>
+      <div id="admin-sectors">{capabilities.sectors ? <SectorList /> : <UnavailableSurface capability="sectors" title="Sectores" />}</div>
+      <div id="admin-workers">{capabilities.workers ? <WorkerList /> : <UnavailableSurface capability="workers" title="Trabajadores" />}</div>
+      <div id="admin-activities">{capabilities.activities ? <ActivityList canViewFinancials={capabilities.activityFinancials} /> : <UnavailableSurface capability="activities" title="Actividades" />}</div>
+      <div id="admin-finance"><FinancialCircuitPanel /></div>
+      <div id="admin-operations">
+        {capabilities.enrollments ? <EnrollmentList /> : <UnavailableSurface capability="enrollments" title="Inscripciones" />}
+        {capabilities.movements ? <MovementList /> : <UnavailableSurface capability="movements" title="Movimientos" />}
+        {capabilities.tasks ? <TaskPanel canCreate={capabilities.createTask} canEdit={capabilities.editTask} /> : <UnavailableSurface capability="tasks" title="Tareas" />}
+        {capabilities.requests ? <RequestPanel canApprove={capabilities.approveRequest} canReject={capabilities.rejectRequest} /> : <UnavailableSurface capability="requests" title="Solicitudes" />}
+      </div>
       {capabilities.createMovement && <MovementCreateModal open={movementOpen} onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
       {capabilities.createEnrollment && <EnrollmentCreateModal open={enrollmentOpen} onClose={()=>setEnrollmentOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
     </main>

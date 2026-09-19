@@ -59,19 +59,6 @@ const endOfMonth = (value: string) => {
   const date = dateAtUtc(value);
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
 };
-const fullMonthCount = (from: string, to: string) => {
-  const start = dateAtUtc(from);
-  const end = dateAtUtc(to);
-  return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth() + 1;
-};
-const fixedPeriodCount = (from: string, to: string, frequency: NonNullable<ActivityTerm["fixedFeeFrequency"]>) => {
-  const days = Math.round((dateAtUtc(to).valueOf() - dateAtUtc(from).valueOf()) / 86_400_000) + 1;
-  if (frequency === "DAILY") return days;
-  if (frequency === "WEEKLY") return Math.ceil(days / 7);
-  if (frequency === "MONTHLY") return fullMonthCount(from, to);
-  return Math.ceil(fullMonthCount(from, to) / 12);
-};
-
 const localDate = (value: string | Date): string => {
   if (typeof value === "string" && ISO_DATE.test(value)) return value;
   const date = value instanceof Date ? value : new Date(value);
@@ -111,7 +98,7 @@ export const validateActivityTerms = (terms: ActivityTerm[]): void => {
  * Positive balance means an amount owed to the activity responsible.
  * VARIABLE: income assigned by Buenos Aires calendar date × responsible share.
  * FIXED: income − the configured club fee for each covered frequency unit.
- * Monthly terms require complete calendar months instead of implicit prorating.
+ * Every fixed due date belongs completely to one period; it is never prorated.
  * Payments and advances enter only through explicit settlement allocations.
  */
 export const calculateActivitySettlements = (input: {
@@ -131,7 +118,6 @@ export const calculateActivitySettlements = (input: {
     return applicable.map((term) => {
       const from = term.effectiveFrom > input.period.from ? term.effectiveFrom : input.period.from;
       const to = term.effectiveTo && term.effectiveTo < input.period.to ? term.effectiveTo : input.period.to;
-      if (term.mode === "FIXED" && term.fixedFeeFrequency === "MONTHLY" && (!from.endsWith("-01") || to !== endOfMonth(to))) throw new Error(`MONTHLY FIXED settlements require complete calendar months for ${activityId}`);
       const belongs = (value: string | Date) => {
         const day = localDate(value);
         return day >= from && day <= to;
@@ -144,7 +130,7 @@ export const calculateActivitySettlements = (input: {
         .reduce((total, row) => total + row.amount, 0));
       const responsibleGross = term.mode === "VARIABLE"
         ? money(completedIncome * ((100 - term.clubSharePercentage!) / 100))
-        : money(completedIncome - term.fixedClubFee! * fixedPeriodCount(from, to, term.fixedFeeFrequency!));
+        : money(completedIncome - term.fixedClubFee! * fixedDueCount(term, input.period.from, input.period.to));
       return { activityId, sectorId: term.sectorId, termId: term.id, mode: term.mode, completedIncome,
         responsibleGross, completedAllocations, responsibleBalance: money(responsibleGross - completedAllocations) };
     });
@@ -196,6 +182,28 @@ const cents = (amount: number): number => {
     throw new Error('Invalid monetary amount');
   }
   return result;
+};
+
+/** Counts contractual due dates, assigning every due date to exactly one month. */
+const fixedDueCount = (term: ActivityTerm, from: string, to: string): number => {
+  const start = term.effectiveFrom > from ? term.effectiveFrom : from;
+  const end = term.effectiveTo && term.effectiveTo < to ? term.effectiveTo : to;
+  if (start > end) return 0;
+  if (term.fixedFeeFrequency === 'DAILY') return Math.round((dateAtUtc(end).valueOf() - dateAtUtc(start).valueOf()) / 86_400_000) + 1;
+  if (term.fixedFeeFrequency === 'WEEKLY') {
+    const distance = Math.max(0, Math.ceil((dateAtUtc(start).valueOf() - dateAtUtc(term.effectiveFrom).valueOf()) / (7 * 86_400_000)));
+    const firstDue = addDays(term.effectiveFrom, distance * 7);
+    return firstDue > end ? 0 : Math.floor((dateAtUtc(end).valueOf() - dateAtUtc(firstDue).valueOf()) / (7 * 86_400_000)) + 1;
+  }
+  if (term.fixedFeeFrequency === 'MONTHLY') {
+    let count=0;
+    for(let cursor=`${from.slice(0,7)}-01`;cursor<=to;){const due=endOfMonth(cursor);if(due>=start&&due<=end)count+=1;const date=dateAtUtc(cursor);date.setUTCMonth(date.getUTCMonth()+1);cursor=date.toISOString().slice(0,10);}
+    return count;
+  }
+  const anchor = dateAtUtc(term.effectiveFrom);
+  let count=0;
+  for(let year=dateAtUtc(from).getUTCFullYear();year<=dateAtUtc(to).getUTCFullYear();year+=1){const last=new Date(Date.UTC(year,anchor.getUTCMonth()+1,0)).getUTCDate();const due=new Date(Date.UTC(year,anchor.getUTCMonth(),Math.min(anchor.getUTCDate(),last))).toISOString().slice(0,10);if(due>=start&&due<=end)count+=1;}
+  return count;
 };
 
 const checkedDate = (value: string): string => {
@@ -258,56 +266,13 @@ export function calculateMonthlySettlements(input: {
     return row;
   };
   const applicable = input.terms.filter(term => term.effectiveFrom <= to && (!term.effectiveTo || term.effectiveTo >= from));
-  const allocations = new Map<string, number>();
-  for (const allocation of input.fullMonthFeeAllocations ?? []) {
-    if (allocations.has(allocation.termId)) throw new Error('Duplicate fixed fee allocation');
-    const term = applicable.find(item => item.id === allocation.termId);
-    if (!term || term.mode !== 'FIXED' || term.partialMonthPolicy !== 'FULL_MONTH') throw new Error('Invalid fixed fee allocation');
-    allocations.set(term.id, cents(allocation.amount));
-  }
   for (const term of applicable) {
     checkedDate(term.effectiveFrom);
     if (term.effectiveTo) checkedDate(term.effectiveTo);
     const row = rowFor(term);
     if (term.mode !== 'FIXED') continue;
-    if (term.fixedFeeFrequency !== 'MONTHLY') throw new Error('Nonmonthly agreement requires review');
-    if (!term.partialMonthPolicy) throw new Error('Partial month policy requires review');
     const fee = cents(term.fixedClubFee!);
-    const start = term.effectiveFrom > from ? term.effectiveFrom : from;
-    const end = term.effectiveTo && term.effectiveTo < to ? term.effectiveTo : to;
-    if (term.partialMonthPolicy === 'CALENDAR_DAYS') {
-      const days = (dateAtUtc(end).valueOf() - dateAtUtc(start).valueOf()) / 86400000 + 1;
-      row.fixedClubFee = Math.round(fee * days / Number(to.slice(-2)));
-    } else {
-      const peers = applicable.filter(other => other.activityId === term.activityId);
-      if (peers.length > 1) {
-        if (peers.some(other => other.mode !== 'FIXED' || other.partialMonthPolicy !== 'FULL_MONTH' || other.currencyCode !== term.currencyCode || cents(other.fixedClubFee!) !== fee || !allocations.has(other.id))) {
-          throw new Error('Full monthly fee handoff requires explicit distribution');
-        }
-        if (peers.reduce((sum, other) => sum + allocations.get(other.id)!, 0) !== fee) throw new Error('Fixed fee distribution must equal one monthly fee');
-        row.fixedClubFee = allocations.get(term.id)!;
-      } else {
-        if (allocations.has(term.id) && allocations.get(term.id) !== fee) throw new Error('Fixed fee distribution must equal one monthly fee');
-        row.fixedClubFee = fee;
-      }
-    }
-  }
-  // Round the cumulative calendar fraction, so adjacent assignments sum to
-  // exactly one fee even when the monthly fee is not divisible by the days.
-  const prorated = applicable.filter(term => term.mode === 'FIXED' && term.partialMonthPolicy === 'CALENDAR_DAYS')
-    .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-  const fractions = new Map<string, { exact: number; rounded: number }>();
-  for (const term of prorated) {
-    const key = JSON.stringify([term.activityId, term.currencyCode, term.fixedClubFee]);
-    const total = fractions.get(key) ?? { exact: 0, rounded: 0 };
-    const start = term.effectiveFrom > from ? term.effectiveFrom : from;
-    const end = term.effectiveTo && term.effectiveTo < to ? term.effectiveTo : to;
-    const days = (dateAtUtc(end).valueOf() - dateAtUtc(start).valueOf()) / 86400000 + 1;
-    total.exact += cents(term.fixedClubFee!) * days / Number(to.slice(-2));
-    const rounded = Math.round(total.exact);
-    rowFor(term).fixedClubFee = rounded - total.rounded;
-    total.rounded = rounded;
-    fractions.set(key, total);
+    row.fixedClubFee = fee * fixedDueCount(term, from, to);
   }
   for (const collection of input.collections) {
     if (!active(collection) || !inMonth(collection.occurredAt)) continue;

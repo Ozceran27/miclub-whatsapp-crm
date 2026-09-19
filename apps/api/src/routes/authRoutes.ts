@@ -7,7 +7,7 @@ import asyncHandler from "./asyncHandler.js";
 import { registerClub, RegistrationError } from "../auth/registrationService.js";
 import { auditService } from "../services/auditService.js";
 import { toPermissionCode, toRoleCode, type PublicAuthUser } from "@miclub/shared";
-import { resolveWorkerInvitation, WorkerMutationError } from "../services/administration/workerMutationService.js";
+import { listWorkerInvitations, resolveWorkerInvitation, resolveWorkerInvitationById, WorkerMutationError } from "../services/administration/workerMutationService.js";
 
 const publicUser = (context: { userId: string; email: string; clubId: string; membershipId: string; role: string; permissions: readonly string[] }): PublicAuthUser => ({
   userId: context.userId,
@@ -111,6 +111,8 @@ router.post("/worker-invitations/:decision", asyncHandler(async (req, res) => {
     return res.status(409).json({ error: true, code: "INVITATION_INVALID", message: "La invitación no es válida." });
   }
 }));
+router.get('/worker-invitations',asyncHandler(async(req,res)=>{const session=getSession(req);if(!session?.userId)return res.status(401).json({error:true,code:'AUTHENTICATION_REQUIRED',message:'Sesión requerida'});if(session.membershipId){const current=await getActiveMembershipContext(session.userId,session.membershipId);if(!current||isSessionRevoked(session,current.session_revoked_before)){clearSessionCookie(req,res);return res.status(401).json({error:true,code:'SESSION_REVOKED',message:'Iniciá sesión nuevamente.'});}}return res.json({items:await listWorkerInvitations(session.userId)});}));
+router.post('/worker-invitations/:id/:decision',asyncHandler(async(req,res)=>{const session=getSession(req);if(!session?.userId)return res.status(401).json({error:true,code:'AUTHENTICATION_REQUIRED',message:'Sesión requerida'});if(session.membershipId){const current=await getActiveMembershipContext(session.userId,session.membershipId);if(!current||isSessionRevoked(session,current.session_revoked_before)){clearSessionCookie(req,res);return res.status(401).json({error:true,code:'SESSION_REVOKED',message:'Iniciá sesión nuevamente.'});}}const id=String(req.params.id),decision=String(req.params.decision);if(!/^[0-9a-f-]{36}$/i.test(id)||!['accept','reject'].includes(decision))return res.status(404).json({error:true,code:'NOT_FOUND',message:'Recurso inexistente'});try{return res.json(await resolveWorkerInvitationById(session.userId,id,decision as 'accept'|'reject',{requestId:req.requestId,ip:req.ip,userAgent:req.get('user-agent')}));}catch(error){if(!(error instanceof WorkerMutationError))throw error;return res.status(409).json({error:true,code:'INVITATION_INVALID',message:'La invitación no es válida.'});}}));
 
 router.get("/me", asyncHandler(async (req, res) => {
   if (!isAuthEnabled()) return res.status(503).json({ authenticated: false, authEnabled: false, code: "AUTH_CONFIGURATION_ERROR" });

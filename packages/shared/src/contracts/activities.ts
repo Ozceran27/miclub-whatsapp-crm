@@ -8,7 +8,9 @@ import type { ActivityFeeFrequency, OperationalCurrency } from './onboarding.js'
 export interface ActivityMutationContract {
   updatedAt?: string;
   sectorId: string;
-  instructorId?: string | null;
+  instructorId: string;
+  /** Person who receives (or owes) the economic result. Defaults to the instructor's person. */
+  responsiblePersonId?: string | null;
   code?: string | null;
   name: string;
   modality?: string | null;

@@ -197,7 +197,28 @@ El provisioning observado crea clubes con `America/Argentina/Buenos_Aires`.
 
 Los cálculos deben respetar timezone del club cuando el modelo permita personalizarlo.
 
-## 19. Conflictos abiertos: no son reglas aceptadas
+## 19. Configuración administrativa y remuneraciones (vigente 2026-09-19)
+
+- Archivar reemplaza eliminar para sectores, trabajadores, actividades y hechos
+  financieros con historia.
+- Toda actividad nueva o modificada exige Instructor operativo. El Instructor es
+  responsable operativo; `responsible_person_id` identifica al receptor económico.
+- VARIABLE guarda el porcentaje del club. FIXED guarda el importe del club y su
+  frecuencia DAILY/WEEKLY/MONTHLY/YEARLY.
+- Cada vencimiento fijo se imputa completo a una fecha y a un único mes: diario
+  por día activo, semanal cada siete días desde la vigencia, mensual al cierre del
+  mes y anual en el aniversario. No se prorratea.
+- La remuneración fija de un empleado es histórica e independiente. Sus
+  obligaciones se generan como borradores y requieren aprobación; se suman a sus
+  derechos por actividades.
+- Procesar usa el neto por persona y moneda. Las deudas se compensan FIFO sin caja;
+  cada porción con caja genera un movimiento propio dentro de un grupo anulable.
+- Editar una liquidación crea un ajuste firmado y fuerza nueva revisión. Anular un
+  grupo conserva registros, anula movimientos y allocations y recalcula saldos.
+- Corregir saldos iniciales reemplaza el lote canónico mediante movimientos de
+  reversión y nueva apertura; nunca inserta capital paralelo.
+
+## 20. Conflictos abiertos: no son reglas aceptadas
 
 ### Definiciones confirmadas 2026-09-09
 

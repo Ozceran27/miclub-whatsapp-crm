@@ -52,14 +52,14 @@ test("asigna ingresos al término local y suma subtotales cuando cambia el porce
   assert.deepEqual(aggregateActivitySettlementsBySector(rows), [{ sectorId: "s1", responsibleBalance: 140_000 }]);
 });
 
-test("FIXED multiplica la cuota únicamente para meses calendario completos", () => {
+test("FIXED asigna cada vencimiento mensual completo sin prorratear", () => {
   const fixed = term({ mode: "FIXED", clubSharePercentage: null, fixedFeeFrequency: "MONTHLY", fixedClubFee: 150_000 });
   const rows = calculateActivitySettlements({
     period: { from: "2026-07-01", to: "2026-08-31" }, terms: [fixed],
     incomes: [{ activityId: "a1", occurredAt: "2026-08-10", amount: 650_000, status: "COMPLETADO" }], allocations: [],
   });
   assert.equal(rows[0].responsibleBalance, 350_000);
-  assert.throws(() => calculateActivitySettlements({ period: { from: "2026-07-15", to: "2026-08-31" }, terms: [fixed], incomes: [], allocations: [] }), /complete calendar months/);
+  assert.equal(calculateActivitySettlements({ period: { from: "2026-07-15", to: "2026-08-31" }, terms: [fixed], incomes: [], allocations: [] })[0].responsibleBalance,-300_000);
 });
 
 test("rechaza gaps y superposiciones antes de liquidar", () => {

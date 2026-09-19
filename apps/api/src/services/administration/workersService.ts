@@ -8,6 +8,7 @@ export const getAdministrationWorkers = async (clubId: string, limit: number, of
       id: worker.id,
       clubId: worker.club_id,
       personId: worker.person_id,
+      photoFileId: worker.photo_file_id,
       code: worker.code,
       displayName: worker.display_name,
       firstName: worker.first_name,

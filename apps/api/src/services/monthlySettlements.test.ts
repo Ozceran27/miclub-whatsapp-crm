@@ -58,24 +58,28 @@ void test('FIXED devolución no reduce el fijo y limita devoluciones acumuladas'
   assert.throws(() => calculateMonthlySettlements({ ...data, refunds: [refund, { ...refund, id: 'r2', amount: 90000, originalResponsibleAmount: 90000 }] }), /exceeds/);
 });
 
-void test('mes completo exige distribución única al cambiar de responsable', () => {
+void test('cada vencimiento mensual pertenece al término que cubre el cierre del mes', () => {
   const data = input();
   const fixed = term({ mode: 'FIXED', clubSharePercentage: null, fixedClubFee: 85000, fixedFeeFrequency: 'MONTHLY', partialMonthPolicy: 'FULL_MONTH', effectiveTo: '2026-09-15' });
   data.terms = [fixed, { ...fixed, id: 'bruno-arte', personId: 'bruno', effectiveFrom: '2026-09-16', effectiveTo: null }];
-  assert.throws(() => calculateMonthlySettlements(data), /explicit distribution/);
-  const rows = calculateMonthlySettlements({ ...data, fullMonthFeeAllocations: [{ termId: fixed.id, amount: 40000 }, { termId: 'bruno-arte', amount: 45000 }] });
+  const rows = calculateMonthlySettlements(data);
   assert.equal(rows.reduce((sum, row) => sum + row.fixedClubFee, 0), 85000);
-  assert.throws(() => calculateMonthlySettlements({ ...data, fullMonthFeeAllocations: [{ termId: fixed.id, amount: 85000 }, { termId: 'bruno-arte', amount: 85000 }] }), /one monthly fee/);
+  assert.equal(rows.find(row => row.personId === 'ana')?.fixedClubFee, 0);
+  assert.equal(rows.find(row => row.personId === 'bruno')?.fixedClubFee, 85000);
 });
 
-void test('prorrateo por vigencia usa días calendario; frecuencia sin revisar bloquea', () => {
+void test('FIXED no prorratea y soporta vencimientos semanal, diario y anual', () => {
   const data = input();
   data.collections = [];
   data.payments = [];
   data.terms = [term({ mode: 'FIXED', clubSharePercentage: null, fixedClubFee: 90000, fixedFeeFrequency: 'MONTHLY', partialMonthPolicy: 'CALENDAR_DAYS', effectiveFrom: '2026-09-16' })];
-  assert.equal(calculateMonthlySettlements(data)[0].fixedClubFee, 45000);
+  assert.equal(calculateMonthlySettlements(data)[0].fixedClubFee, 90000);
   data.terms[0].fixedFeeFrequency = 'WEEKLY';
-  assert.throws(() => calculateMonthlySettlements(data), /Nonmonthly/);
+  assert.equal(calculateMonthlySettlements(data)[0].fixedClubFee, 270000);
+  data.terms[0].fixedFeeFrequency = 'DAILY';
+  assert.equal(calculateMonthlySettlements(data)[0].fixedClubFee, 15 * 90000);
+  data.terms[0].fixedFeeFrequency = 'YEARLY';
+  assert.equal(calculateMonthlySettlements(data)[0].fixedClubFee, 90000);
 });
 
 void test('no mezcla personas ni monedas; compensa deuda antigua antes que reciente', () => {

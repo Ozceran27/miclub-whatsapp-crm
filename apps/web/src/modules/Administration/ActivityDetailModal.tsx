@@ -1,6 +1,6 @@
 import type { AdministrationActivityDto, AdministrationEnrollmentDto, AdministrationMovementDto } from '@miclub/shared';
 import { useEffect, useId, useRef, useState } from 'react';
-import { getActivityEnrollments, getActivityMovements } from '../../services/api/administrationApi';
+import { getActivityEnrollments, getActivityMovements, getActivityTermHistory, type ActivityTermHistoryItem } from '../../services/api/administrationApi';
 import { describeActivityTerms } from './activityTerms';
 
 type Props = { activity: AdministrationActivityDto; onClose: () => void };
@@ -16,13 +16,14 @@ export function ActivityDetailModal({ activity, onClose }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [enrollments, setEnrollments] = useState<AdministrationEnrollmentDto[]>([]);
   const [movements, setMovements] = useState<AdministrationMovementDto[]>([]);
+  const [terms,setTerms]=useState<ActivityTermHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([getActivityEnrollments(activity.id, controller.signal), getActivityMovements(activity.id, controller.signal)])
-      .then(([enrollmentResponse, movementResponse]) => { setEnrollments(enrollmentResponse.items); setMovements(movementResponse.items); })
+    Promise.all([getActivityEnrollments(activity.id, controller.signal), getActivityMovements(activity.id, controller.signal),getActivityTermHistory(activity.id,controller.signal)])
+      .then(([enrollmentResponse, movementResponse,termResponse]) => { setEnrollments(enrollmentResponse.items); setMovements(movementResponse.items);setTerms(termResponse.items); })
       .catch((loadError) => { if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el detalle relacionado.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -54,9 +55,10 @@ export function ActivityDetailModal({ activity, onClose }: Props) {
   return <div className="sector-modal__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="sector-modal activity-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={dialogRef} tabIndex={-1}>
     <header className="sector-modal__header"><div><p className="eyebrow">Detalle de actividad</p><h2 id={titleId}>{activity.name}</h2><p id={descriptionId}>Información operativa y financiera de solo lectura.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${activity.name}`}>×</button></header>
     <section aria-labelledby={`${titleId}-general`}><h3 id={`${titleId}-general`}>Actividad</h3><dl className="sector-modal__facts">
-      <div><dt>Sector</dt><dd>{activity.sectorName || 'Sin sector'}</dd></div><div><dt>Instructor responsable</dt><dd>{activity.instructorName || 'Sin asignar'}</dd></div><div><dt>Estado</dt><dd>{displayStatus(activity.status)}</dd></div>
-      <div><dt>Modalidad de liquidación</dt><dd>{settlement}</dd></div><div><dt>Cuota de inscripción (legado)</dt><dd>{activity.enrollmentFee == null ? 'No configurada' : money.format(activity.enrollmentFee)}</dd></div><div><dt>Valor de liquidación</dt><dd>{settlementValue}</dd></div>
+      <div><dt>Sector</dt><dd>{activity.sectorName || 'Sin sector'}</dd></div><div><dt>Instructor responsable</dt><dd>{activity.instructorName || 'Sin asignar'}</dd></div><div><dt>Receptor económico</dt><dd>{activity.responsiblePersonName || activity.instructorName || 'Sin asignar'}</dd></div><div><dt>Estado</dt><dd>{displayStatus(activity.status)}</dd></div>
+      <div><dt>Modalidad de liquidación</dt><dd>{settlement}</dd></div><div><dt>Vigencia actual</dt><dd>{activity.termsEffectiveFrom || 'Sin definir'} — {activity.termsEffectiveTo || 'vigente'}</dd></div><div><dt>Cuota de inscripción (legado)</dt><dd>{activity.enrollmentFee == null ? 'No configurada' : money.format(activity.enrollmentFee)}</dd></div><div><dt>Valor de liquidación</dt><dd>{settlementValue}</dd></div>
     </dl></section>
+    <section aria-labelledby={`${titleId}-terms`}><h3 id={`${titleId}-terms`}>Historia económica <span>{terms.length}</span></h3>{terms.length?<ul className="sector-modal__items">{terms.map(term=><li key={term.id}><div><strong>{term.mode==='FIXED'?`${term.currencyCode??''} ${term.fixedClubFee??0} · ${term.fixedFeeFrequency}`:`Club ${term.clubSharePercentage??0}%`}</strong><small>{term.effectiveFrom} — {term.effectiveTo||'vigente'} · receptor {term.responsiblePersonName||'pendiente de revisión'}</small></div><span>v{term.revision}</span></li>)}</ul>:<p>No hay términos económicos disponibles.</p>}</section>
     <section aria-labelledby={`${titleId}-enrollments`}><h3 id={`${titleId}-enrollments`}>Inscriptos <span>{enrollments.length}</span></h3>{loading ? <p role="status">Cargando inscriptos y movimientos…</p> : enrollments.length ? <ul className="sector-modal__items">{enrollments.map((item) => <li key={item.id}><div><strong>{item.displayName || `${item.firstName || ''} ${item.lastName || ''}`.trim() || 'Persona sin nombre'}</strong><small>{displayStatus(item.status)} · Vence {item.dueDate ? displayDate(item.dueDate) : 'sin fecha'}</small></div><span>{money.format(item.feeAmount)}</span></li>)}</ul> : <p>No hay inscriptos asociados.</p>}</section>
     <section aria-labelledby={`${titleId}-movements`}><h3 id={`${titleId}-movements`}>Movimientos asociados <span>{movements.length}</span></h3>{!loading && (movements.length ? <ul className="sector-modal__items">{movements.map((item) => <li key={item.id}><div><strong>{item.concept || item.category || 'Sin concepto'}</strong><small>{displayDate(item.date)} · {displayStatus(item.status)}</small></div><span className={item.type === 'EGRESOS' ? 'sector-modal__amount--expense' : ''}>{money.format(item.amount)}</span></li>)}</ul> : <p>No hay movimientos asociados directamente a esta actividad.</p>)}{error && <p className="sector-modal__error" role="alert">{error}</p>}</section>
     <section aria-labelledby={`${titleId}-audit`}><h3 id={`${titleId}-audit`}>Auditoría</h3><dl className="sector-modal__facts activity-modal__audit"><div><dt>Creada</dt><dd>{displayDate(activity.createdAt)}</dd></div><div><dt>Última actualización</dt><dd>{displayDate(activity.updatedAt)}</dd></div><div><dt>Identificador</dt><dd><code>{activity.id}</code></dd></div></dl></section>

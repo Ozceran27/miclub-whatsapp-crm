@@ -8,6 +8,9 @@ export type AdministrationPaginatedResponse<T> = HttpPaginatedResponse<T>;
 export type AdministrationRecordStatus = "active" | "inactive" | "under_repair" | "archived" | LegacyUnknownCode<"administration-record-status">;
 
 export interface SectorTemplateDto { id: string; code: string; displayName: string; iconKey: string; displayOrder: number }
+export type AdministrationSectorCreateDto =
+  | { source: "template"; templateId: string; color: string; status: "active" | "inactive" | "under_repair" }
+  | { source: "custom"; name: string; code?: string | null; description?: string | null; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; capacityMode?: "ENROLLMENTS" | "INCOME"; configuredCapacity?: number | null };
 export type AdministrationMovementType = "INGRESOS" | "EGRESOS" | LegacyUnknownCode<"administration-movement-type">;
 export type AdministrationFinancialStatus = "sin_movimientos" | "pendiente" | "pagado" | "parcial" | "a_liquidar" | "liquidado" | "deuda" | "vencido" | "cancelado" | "otro" | LegacyUnknownCode<"administration-financial-status">;
 export type AdministrationOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | "ANULADO" | "REVISAR" | LegacyUnknownCode<"administration-operational-status">;
@@ -154,6 +157,7 @@ export interface AdministrationSectorDto {
   managerName?: string | null;
   code: string;
   name: string;
+  description?: string | null;
   color?: string | null;
   iconKey?: string | null;
   openingTime?: string | null;
@@ -171,6 +175,7 @@ export interface AdministrationSectorDto {
   activitiesCount?: number;
   activeEnrollmentsCount?: number;
   isSystem?: boolean;
+  status: AdministrationRecordStatus;
   municipalStatus?: string | null;
   financialStatus?: AdministrationFinancialStatus | null;
   operationalStatus?: AdministrationOperationalStatus | null;
@@ -190,6 +195,8 @@ export interface AdministrationActivityDto {
   managerPersonId?: string | null;
   instructorId?: string | null;
   instructorName?: string | null;
+  responsiblePersonId?: string | null;
+  responsiblePersonName?: string | null;
   managerName?: string | null;
   code?: string | null;
   name: string;
@@ -223,6 +230,8 @@ export interface AdministrationWorkerDto {
   id: string;
   clubId?: string | null;
   personId?: string | null;
+  /** Opaque identifier for the current private profile photo; never a public URL. */
+  photoFileId?: string | null;
   code?: string | null;
   displayName: string;
   firstName?: string | null;
@@ -265,6 +274,8 @@ export interface AdministrationWorkerMutationDto {
   phone?: string | null;
   email?: string | null;
   password?: string;
+  /** Defaults to true for backwards-compatible onboarding payloads. */
+  systemAccessEnabled?: boolean;
   role: "TRABAJADOR" | "INSTRUCTOR" | "DIRECTOR";
   sectorId?: string | null;
   hasFixedCompensation: boolean;
@@ -272,6 +283,8 @@ export interface AdministrationWorkerMutationDto {
   fixedCompensationFrequency: FixedCompensationFrequency | null;
   currencyCode: import("./onboarding.js").OperationalCurrency | null;
   employmentStartDate?: string | null;
+  compensationEffectiveFrom?: string | null;
+  photoFileId?: string | null;
   notes?: string | null;
 }
 

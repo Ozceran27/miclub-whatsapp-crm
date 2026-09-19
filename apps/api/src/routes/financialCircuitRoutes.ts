@@ -1,8 +1,9 @@
 import { Router, type Request } from 'express';
-import { PERMISSIONS, type PartialMonthPolicy } from '@miclub/shared';
+import { PERMISSIONS } from '@miclub/shared';
 import { requirePermission } from '../middleware/authorization.js';
 import asyncHandler from './asyncHandler.js';
-import { assertFinancialSchema, financeTransaction, financialError, readFinancialCircuit, recordResponsiblePayment, resolveTerm, reviewSettlement } from '../services/financialCircuitService.js';
+import { adjustSettlement, assertFinancialSchema, financeTransaction, financialError, financialMoney, readFinancialCircuit, recordResponsiblePayment, resolveTerm, reviewSettlement, voidPayoutGroup, voidSettlementAdjustment } from '../services/financialCircuitService.js';
+import { editEmployeeCompensationObligation, listEmployeeCompensationObligations, refreshEmployeeCompensationObligations, reviewEmployeeCompensationObligation } from '../services/employeeCompensationService.js';
 import { abandonEnrollment, correctFinancialMovement, createFinancialMovement, refundCollection } from '../services/financialMovementService.js';
 import { withTenantTransaction } from '../db/transaction.js';
 import { approveStartup, previewStartup, reconcileMovement, payInitialObligation } from '../services/financialStartupService.js';
@@ -84,19 +85,41 @@ router.get('/finance/history/:entity/:id', requirePermission(PERMISSIONS.FINANCE
   res.json(await withTenantTransaction(req.auth!.clubId, async db => (await db.query('select entity_type,entity_id,before_data,after_data,actor_id,reason,created_at from miclub.finance_history where club_id=$1 and entity_type=$2 and entity_id=$3 order by created_at desc', [req.auth!.clubId, String(req.params.entity), id])).rows));
 }));
 router.post('/finance/terms/:id/resolve', requirePermission(PERMISSIONS.FINANCE_CORRECT), asyncHandler(async (req, res) => {
-  const b = body(req, ['revision', 'personId', 'partialMonthPolicy', 'distributions']);
-  if (b.distributions !== undefined && !Array.isArray(b.distributions)) throw financialError('Distribución inválida.', 400);
-  if (Array.isArray(b.distributions) && b.distributions.some((d: unknown) => !d || typeof d !== 'object' || typeof (d as Record<string, unknown>).month !== 'string' || typeof (d as Record<string, unknown>).amount !== 'number')) throw financialError('Distribución inválida.', 400);
-  res.json(await run(req, db => resolveTerm(db, req.auth!, uuid(req.params.id), revision(b.revision), uuid(b.personId), (b.partialMonthPolicy ?? null) as PartialMonthPolicy | null, (b.distributions ?? []) as { month: string; amount: number }[])));
+  const b = body(req, ['revision', 'personId']);
+  res.json(await run(req, db => resolveTerm(db, req.auth!, uuid(req.params.id), revision(b.revision), uuid(b.personId))));
 }));
 for (const operation of ['approve', 'close'] as const) router.post(`/finance/settlements/:id/${operation}`, requirePermission(PERMISSIONS.FINANCE_REVIEW), asyncHandler(async (req, res) => {
   const b = body(req, ['revision']);
   res.json(await run(req, db => reviewSettlement(db, req.auth!, uuid(req.params.id), revision(b.revision), text(b.reason), operation === 'close')));
 }));
 router.post('/finance/responsibles/:id/pay', requirePermission(PERMISSIONS.FINANCE_PAY), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req, res) => {
-  const b = body(req, ['accountId', 'amount', 'date', 'debtCollection']);
+  const b = body(req, ['accountId', 'categoryId', 'paymentMethodId', 'amount', 'date', 'debtCollection']);
   if (b.debtCollection !== undefined && typeof b.debtCollection !== 'boolean') throw financialError('Tipo de operación inválido.', 400);
-  res.json(await run(req, db => recordResponsiblePayment(db, req.auth!, uuid(req.params.id), uuid(b.accountId), b.amount as number, text(b.date), b.debtCollection === true)));
+  res.json(await run(req, db => recordResponsiblePayment(db, req.auth!, uuid(req.params.id), uuid(b.accountId), uuid(b.categoryId), uuid(b.paymentMethodId), b.amount as number, text(b.date), b.debtCollection === true, text(b.reason))));
+}));
+router.post('/finance/settlements/:id/adjustments', requirePermission(PERMISSIONS.FINANCE_CORRECT), asyncHandler(async (req,res) => {
+  const b=body(req,['revision','amount']); res.status(201).json(await run(req,db=>adjustSettlement(db,req.auth!,uuid(req.params.id),revision(b.revision),Number(b.amount),text(b.reason))));
+}));
+router.post('/finance/settlement-adjustments/:id/void', requirePermission(PERMISSIONS.FINANCE_CORRECT), asyncHandler(async (req,res) => {
+  const b=body(req,['revision']); res.json(await run(req,db=>voidSettlementAdjustment(db,req.auth!,uuid(req.params.id),revision(b.revision),text(b.reason))));
+}));
+router.post('/finance/payout-groups/:id/void', requirePermission(PERMISSIONS.FINANCE_CORRECT), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req,res) => {
+  body(req,[]); res.json(await run(req,db=>voidPayoutGroup(db,req.auth!,uuid(req.params.id),text(req.body.reason))));
+}));
+
+router.get('/finance/compensation-obligations', requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req,res) => {
+  res.json(await withTenantTransaction(req.auth!.clubId,db=>listEmployeeCompensationObligations(db,req.auth!)));
+}));
+router.post('/finance/compensation-obligations/refresh', requirePermission(PERMISSIONS.FINANCE_REVIEW), asyncHandler(async (req,res) => {
+  const b=body(req,['through']); res.json(await run(req,db=>refreshEmployeeCompensationObligations(db,req.auth!,b.through == null ? undefined : text(b.through))));
+}));
+router.patch('/finance/compensation-obligations/:id', requirePermission(PERMISSIONS.FINANCE_CORRECT), asyncHandler(async (req,res) => {
+  const b=body(req,['revision','amount','periodFrom','periodTo','dueDate','sectorId']);
+  const sectorId=b.sectorId==null?null:uuid(b.sectorId);
+  res.json(await run(req,db=>editEmployeeCompensationObligation(db,req.auth!,uuid(req.params.id),revision(b.revision),{amount:Number(b.amount),periodFrom:text(b.periodFrom),periodTo:text(b.periodTo),dueDate:text(b.dueDate),sectorId},text(b.reason))));
+}));
+for (const operation of ['approve','cancel'] as const) router.post(`/finance/compensation-obligations/:id/${operation}`,requirePermission(PERMISSIONS.FINANCE_REVIEW),asyncHandler(async(req,res)=>{
+  const b=body(req,['revision']); res.json(await run(req,db=>reviewEmployeeCompensationObligation(db,req.auth!,uuid(req.params.id),revision(b.revision),operation==='approve',text(b.reason))));
 }));
 const cashKeys = ['movementDate', 'movementType', 'accountId', 'categoryId', 'sectorId', 'activityId', 'personId', 'paymentMethodId', 'concept', 'counterpartyText', 'amount', 'taxes', 'operationalStatus', 'receivableId'];
 const cash = (value: unknown) => {
@@ -129,6 +152,20 @@ router.post('/finance/startup/preview', requirePermission(PERMISSIONS.FINANCE_RE
 router.post('/finance/startup/approve', requirePermission(PERMISSIONS.FINANCE_RECONCILE), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req, res) => {
   const b = body(req, ['revision', 'acceptDifferences']);
   res.json(await run(req, db => approveStartup(db, req.auth!, revision(b.revision), b.acceptDifferences === true)));
+}));
+router.get('/finance/opening-balances',requirePermission(PERMISSIONS.FINANCE_RECONCILE),requirePermission(PERMISSIONS.SECTORS_ANY),asyncHandler(async(req,res)=>{
+  res.json(await withTenantTransaction(req.auth!.clubId,async db=>{
+    await assertFinancialSchema(db);
+    const batch=(await db.query(`select id,revision,operation,status,replaces_batch_id "replacesBatchId",reconciliation_status "reconciliationStatus",idempotency_key "operationKey",created_by "createdBy",created_at "createdAt" from miclub.opening_balance_batches where club_id=$1 order by revision desc limit 1`,[req.auth!.clubId])).rows[0]??null;
+    const movements=batch?(await db.query(`select m.id,m.account_id "accountId",a.code "accountCode",m.amount::float8 amount,m.currency_code "currencyCode",m.operational_status "status",m.voided_at "voidedAt",o.reverses_movement_id "reversesMovementId" from miclub.opening_balance_movements o join miclub.movements m on m.id=o.movement_id join miclub.financial_accounts a on a.id=m.account_id and a.club_id=m.club_id where m.club_id=$1 and o.batch_id=$2 order by a.code,m.id`,[req.auth!.clubId,batch.id])).rows:[];
+    const revisions=(await db.query(`select id,previous_snapshot "previousSnapshot",replacement_snapshot "replacementSnapshot",reason,actor_id "actorId",created_at "createdAt" from miclub.opening_balance_revisions where club_id=$1 order by created_at desc limit 20`,[req.auth!.clubId])).rows;
+    return {batch,movements,revisions};
+  }));
+}));
+router.post('/finance/opening-balances/replace',requirePermission(PERMISSIONS.FINANCE_RECONCILE),requirePermission(PERMISSIONS.SECTORS_ANY),asyncHandler(async(req,res)=>{
+  const b=body(req,['cash','bank','usdCash']);
+  const values=[Number(b.cash),Number(b.bank),Number(b.usdCash)];values.forEach(financialMoney);const key=text(req.get('idempotency-key'));
+  res.json(await run(req,async db=>{const previous=(await db.query(`select to_jsonb(x) snapshot from (select * from miclub.opening_balance_batches where club_id=$1 and status='APPLIED' order by revision desc limit 1)x`,[req.auth!.clubId])).rows[0]?.snapshot??null;const batch=(await db.query<{id:string}>(`select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6) id`,[req.auth!.clubId,values[0],values[1],values[2],`${key}:opening`,req.auth!.userId])).rows[0];const replacement={batchId:batch.id,cash:values[0],bank:values[1],usdCash:values[2]};await db.query(`insert into miclub.opening_balance_revisions(club_id,operation_key,previous_snapshot,replacement_snapshot,reason,actor_id) values($1,$2,$3,$4,$5,$6) on conflict(club_id,operation_key) do nothing`,[req.auth!.clubId,key,previous,JSON.stringify(replacement),text(b.reason),req.auth!.userId]);return replacement;}));
 }));
 router.post('/finance/initial-obligations/:id/pay', requirePermission(PERMISSIONS.FINANCE_PAY), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req,res) => {
   const b = body(req,['accountId','amount','date']);

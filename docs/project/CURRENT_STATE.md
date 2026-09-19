@@ -1,5 +1,29 @@
 # Current State
 
+## Configuración operativa desde Administración — 2026-09-19
+
+Administración es ahora la superficie permanente para crear, consultar, editar y
+archivar sectores, trabajadores/instructores y actividades después del onboarding.
+Los formularios escriben directamente con UUID, tenant derivado de sesión,
+permisos backend y control de concurrencia donde corresponde. La navegación
+sectorial se invalida al crear o cambiar el ciclo de vida de un sector.
+
+El circuito financiero incorpora términos históricos de remuneración, obligaciones
+en borrador/aprobadas, ajustes firmados de liquidación, pagos parciales netos por
+persona y moneda, compensación FIFO entre actividades y remuneraciones, grupos de
+pago anulables y reemplazo auditado de saldos iniciales. Los fijos DAILY, WEEKLY,
+MONTHLY y YEARLY generan vencimientos completos; no existe prorrateo entre meses.
+Economía conserva el resumen de sólo lectura y las mutaciones quedan en
+Administración.
+
+La migración versionada es
+`202609190001_administration_configuration.sql`. La base real no fue modificada:
+requiere ejecutar manualmente y validar
+`docs/dbeaver/2026-09-19-administracion-operativa.sql`. Hasta completar ese gate,
+el runtime financiero informa que falta el esquema en lugar de inventar saldos.
+Las secciones históricas inferiores que describen UI sólo lectura, invitaciones sin
+bandeja o prorrateo FIXED quedan sustituidas por este estado y por el código actual.
+
 ## Organización documental y control de referencias — 2026-09-19
 
 `docs/` quedó organizado por propósito: proyecto, arquitectura, dominios,

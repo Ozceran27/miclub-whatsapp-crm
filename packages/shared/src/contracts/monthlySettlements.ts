@@ -60,12 +60,33 @@ export interface PersistedSettlement extends MonthlySettlementLine {
   closedAt: string | null;
   personName: string;
   activityName: string;
+  baseBalance?: number;
+  adjustments?: number;
+}
+export type CompensationObligationState = 'DRAFT' | 'APPROVED' | 'REQUIRES_REVIEW' | 'CANCELLED';
+export interface EmployeeCompensationObligation {
+  id: string;
+  employeeId: string;
+  personId: string;
+  personName: string;
+  currencyCode: string;
+  periodFrom: string;
+  periodTo: string;
+  dueDate: string;
+  amount: number;
+  paid: number;
+  balance: number;
+  reviewState: CompensationObligationState;
+  revision: number;
+  sectorId: string | null;
 }
 export interface FinanceDiagnostic { activityId: string; message: string }
 export interface FinancialCircuit {
   month: string;
   today: string;
   settlements: PersistedSettlement[];
+  compensationObligations?: EmployeeCompensationObligation[];
+  payoutGroups?: { id: string; personId: string; personName: string; currencyCode: string; direction: 'PAY' | 'COLLECT'; amount: number; status: 'COMPLETED' | 'VOIDED'; createdAt: string; reason: string; voidedAt: string | null }[];
   diagnostics: FinanceDiagnostic[];
   projection: FinancialProjection;
   accounts: { id: string; name: string; currencyCode: string }[];

@@ -1,18 +1,22 @@
 import type { AdministrationActivityDto, AdministrationSectorDto } from '@miclub/shared';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../api';
 import {
   createAdministrationActivity, getActivityFormCatalogs, updateAdministrationActivity,
   type ActivityIconCatalogItem, type ActivityInstructorCatalogItem, type AdministrationActivityMutation,
 } from '../../services/api/administrationApi';
+import { useModalAccessibility } from './useModalAccessibility';
 
 const iconGlyphs: Record<string, string> = { football: '⚽', basketball: '🏀', volleyball: '🏐', tennis: '🎾', swimming: '🏊', running: '🏃', cycling: '🚴', gym: '🏋️', weights: '💪', yoga: '🧘', pilates: '🤸', dance: '💃', 'martial-arts': '🥋', boxing: '🥊', hockey: '🏑', rugby: '🏉', skating: '⛸️', handball: '🤾', gymnastics: '🤸‍♀️', other: '⭐' };
 
 type Props = { activity?: AdministrationActivityDto; onClose: () => void; onSaved: () => void };
 
 export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
+  const dialogRef=useRef<HTMLDivElement>(null);
+  useModalAccessibility(dialogRef,true,onClose);
   const [sectors, setSectors] = useState<AdministrationSectorDto[]>([]);
   const [instructors, setInstructors] = useState<ActivityInstructorCatalogItem[]>([]);
+  const [responsibles, setResponsibles] = useState<Array<{id:string;name:string}>>([]);
   const [icons, setIcons] = useState<ActivityIconCatalogItem[]>([]);
   const [mode, setMode] = useState<'FIXED' | 'VARIABLE'>(activity?.settlementMode?.toUpperCase() === 'VARIABLE' ? 'VARIABLE' : 'FIXED');
   const [iconKey, setIconKey] = useState(activity?.iconKey ?? 'other');
@@ -23,7 +27,7 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
   useEffect(() => {
     const controller = new AbortController();
     getActivityFormCatalogs(controller.signal).then((catalogs) => {
-      setSectors(catalogs.sectors); setInstructors(catalogs.instructors); setIcons(catalogs.icons);
+      setSectors(catalogs.sectors); setInstructors(catalogs.instructors); setIcons(catalogs.icons); setResponsibles(catalogs.responsibles);
       if (!activity?.iconKey && catalogs.icons[0]) setIconKey(catalogs.icons[0].iconKey);
     }).catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los catálogos.'); })
       .finally(() => { if (!controller.signal.aborted) setLoadingCatalogs(false); });
@@ -36,7 +40,7 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
     const field = (name: string) => { const value = data.get(name); return typeof value === 'string' ? value : ''; };
     const number = (name: string) => Number(data.get(name) || 0);
     const input: AdministrationActivityMutation = {
-      sectorId: field('sectorId'), instructorId: field('instructorId'),
+      sectorId: field('sectorId'), instructorId: field('instructorId'), responsiblePersonId: field('responsiblePersonId') || null,
       name: field('name').trim(), code: field('code').trim() || null,
       modality: field('modality').trim() || null, color: field('color'), iconKey,
       maxCapacity: data.get('maxCapacity') ? number('maxCapacity') : null,
@@ -56,7 +60,7 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
   };
 
   return <div className="sector-modal__backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
-    <div className="sector-modal activity-form-modal" role="dialog" aria-modal="true" aria-labelledby="activity-form-title">
+    <div className="sector-modal activity-form-modal" role="dialog" aria-modal="true" aria-labelledby="activity-form-title" ref={dialogRef} tabIndex={-1}>
       <header className="sector-modal__header"><div><p className="eyebrow">Actividades</p><h2 id="activity-form-title">{activity ? 'Editar actividad' : 'Crear Nueva Actividad'}</h2><p>Definí la liquidación del club. La cuota del socio se configura en el flujo de inscripciones.</p></div><button className="sector-modal__close" type="button" onClick={onClose} disabled={saving} aria-label="Cerrar">×</button></header>
       {error && <p className="activity-form__error" role="alert">{error}</p>}
       {loadingCatalogs ? <p role="status">Cargando sectores, instructores e iconos…</p> : <form className="activity-form" onSubmit={(event) => void submit(event)}>
@@ -65,6 +69,7 @@ export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
           <label>Código<input name="code" defaultValue={activity?.code ?? ''} /></label>
           <label>Sector responsable<select name="sectorId" required defaultValue={activity?.sectorId ?? ''}><option value="" disabled>Seleccionar sector…</option>{sectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}</select></label>
           <label>Instructor responsable<select name="instructorId" required defaultValue={activity?.instructorId ?? ''}><option value="" disabled>Seleccionar instructor…</option>{instructors.map((instructor) => <option key={instructor.id} value={instructor.id}>{instructor.displayName}</option>)}</select></label>
+          <label>Receptor económico<select name="responsiblePersonId" defaultValue={activity?.responsiblePersonId ?? ''}><option value="">Usar la persona del instructor</option>{responsibles.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
           <label>Modalidad<input name="modality" defaultValue={activity?.modality ?? ''} /></label>
           <label>Estado<select name="status" defaultValue={activity?.status === 'active' ? 'active' : 'inactive'}><option value="active">Activa</option><option value="inactive">Inactiva</option></select></label>
           <label>Cupo máximo<input name="maxCapacity" type="number" min="0" step="1" defaultValue={activity?.maxCapacity ?? ''} /></label>

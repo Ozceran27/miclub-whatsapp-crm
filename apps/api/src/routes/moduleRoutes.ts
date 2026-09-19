@@ -3,7 +3,7 @@ import { Router } from "express";
 import asyncHandler from "./asyncHandler.js";
 import { getEconomyClubSectorBalances, getEconomyClubSummary, listEconomyClubMovements } from "../services/economyClubService.js";
 import { requirePermission } from "../middleware/authorization.js";
-import { getPostgresPool } from "../db/postgres.js";
+import { withTenantTransaction } from "../db/transaction.js";
 import { resolveClubCapabilities } from "../services/clubCapabilityService.js";
 import { listNavigableSectors } from "../repositories/navigationRepository.js";
 
@@ -11,11 +11,10 @@ import { listNavigableSectors } from "../repositories/navigationRepository.js";
 const router = Router();
 
 router.get("/navigation", requirePermission(PERMISSIONS.DASHBOARD_READ), asyncHandler(async (req, res) => {
-  const pool = await getPostgresPool();
-  const [sectors, capabilities] = await Promise.all([
-    listNavigableSectors(req.auth!.clubId, pool),
-    resolveClubCapabilities(req.auth!.clubId, pool),
-  ]);
+  const {sectors,capabilities}=await withTenantTransaction(req.auth!.clubId,async db=>({
+    sectors:await listNavigableSectors(req.auth!.clubId,db),
+    capabilities:await resolveClubCapabilities(req.auth!.clubId,db),
+  }));
   res.set("Cache-Control", "private, no-store");
   res.vary("Cookie");
   res.json({

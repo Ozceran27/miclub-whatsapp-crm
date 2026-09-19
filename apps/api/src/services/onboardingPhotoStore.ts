@@ -47,3 +47,10 @@ export async function deleteOnboardingPhoto(clubId:string,fileId:string){
   const row=await withTenantTransaction(clubId,async db=>(await db.query<{object_key:string}>(`update miclub.employee_photos set status='deleted',deleted_at=now(),updated_at=now() where id=$1 and club_id=$2 and status='temporary' returning object_key`,[fileId,clubId])).rows[0],await getPostgresPool());
   if(row)await fs.rm(objectPath(row.object_key),{force:true});
 }
+
+/** Removes an employee's active private photo without exposing its storage key. */
+export async function deleteEmployeePhoto(clubId:string,employeeId:string){
+  const rows=await withTenantTransaction(clubId,async db=>(await db.query<{object_key:string}>(`update miclub.employee_photos set status='deleted',deleted_at=now(),updated_at=now() where club_id=$1 and employee_id=$2 and status='active' and deleted_at is null returning object_key`,[clubId,employeeId])).rows,await getPostgresPool());
+  await Promise.all(rows.map(row=>fs.rm(objectPath(row.object_key),{force:true})));
+  return {deleted:rows.length>0};
+}

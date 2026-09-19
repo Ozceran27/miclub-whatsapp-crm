@@ -1,5 +1,24 @@
 # Financial Model
 
+## Extensión administrativa — 2026-09-19
+
+Esta sección sustituye las menciones históricas inferiores a prorrateo o a una
+integración futura. Los términos FIXED DAILY/WEEKLY/MONTHLY/YEARLY generan
+vencimientos completos y asignados a un único mes. La frecuencia semanal se ancla
+en `effective_from`, la mensual vence al cierre calendario y la anual en el
+aniversario. No hay prorrateo.
+
+`employee_compensation_terms` conserva remuneraciones históricas y
+`employee_compensation_obligations` materializa borradores idempotentes. Sólo los
+aprobados participan del pago. El neto por persona/moneda suma liquidaciones de
+actividad y remuneraciones; primero compensa deudas FIFO sin caja y luego crea un
+movimiento por cada porción pagada/cobrada bajo un `payout_group_id` anulable.
+Los ajustes no sobrescriben el cálculo base y fuerzan `REQUIRES_REVIEW`.
+
+Las correcciones de apertura llaman al mecanismo canónico
+`replace_opening_balances`, que revierte el lote previo y crea uno nuevo. La
+migración y el script DBeaver del 19/09 deben aplicarse antes de usar esta extensión.
+
 ## Integración operativa — 2026-09-11
 
 `financialCircuitService` aplica el calculador mensual al runtime PostgreSQL;

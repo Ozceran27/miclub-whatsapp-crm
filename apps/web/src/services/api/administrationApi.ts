@@ -1,4 +1,4 @@
-import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
+import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorCreateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -16,29 +16,35 @@ export const getAdministrationSectors = (signal?: AbortSignal) =>
 
 export type SectorTemplate = { id: string; code: string; display_name: string; icon_key: string; display_order: number };
 export const getSectorTemplates = (signal?: AbortSignal) => apiJson<{items: SectorTemplate[]}>('/api/administration/sector-templates', { signal });
-export const createAdministrationSector = (input: {templateId:string;color:string;status:'active'|'inactive'|'under_repair'}) =>
+export const createAdministrationSector = (input: AdministrationSectorCreateDto) =>
   apiJson<Record<string,unknown>>('/api/administration/sectors', { method: 'POST', body: JSON.stringify(input) });
+export const updateAdministrationSector = (id:string,input:Record<string,unknown>) => apiJson(`/api/sectors/${encodeURIComponent(id)}` as `/${string}`,{method:'PATCH',body:JSON.stringify(input)});
+export const changeAdministrationSectorStatus = (id:string,updatedAt:string,status:'active'|'inactive'|'under_repair') => apiJson(`/api/sectors/${encodeURIComponent(id)}/status` as `/${string}`,{method:'PATCH',body:JSON.stringify({updatedAt,status})});
+export const archiveAdministrationSector = (id:string,updatedAt:string) => apiJson(`/api/sectors/${encodeURIComponent(id)}/archive` as `/${string}`,{method:'POST',body:JSON.stringify({updatedAt})});
 
 export const getAdministrationActivities = (signal?: AbortSignal) =>
   apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100', { cache: 'no-store', signal });
 
 export type ActivityIconCatalogItem = { iconKey: string; displayName: string };
-export type ActivityInstructorCatalogItem = { id: string; displayName: string; isActive: boolean };
+export type ActivityInstructorCatalogItem = { id: string; personId: string; displayName: string; isActive: boolean };
+export type ActivityTermHistoryItem = { id:string; mode:'FIXED'|'VARIABLE'; fixedClubFee:number|null; fixedFeeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY'|null; clubSharePercentage:number|null; currencyCode:string|null; effectiveFrom:string; effectiveTo:string|null; responsiblePersonId:string|null; responsiblePersonName:string|null; revision:number };
 export type AdministrationActivityMutation = ActivityMutationContract;
 export type AdministrationActivityMutationResponse = { id: string; updatedAt: string } & Record<string, unknown>;
 
 export const getActivityFormCatalogs = async (signal?: AbortSignal) => {
-  const [sectors, instructors, icons] = await Promise.all([
+  const [sectors, instructors, icons, workers] = await Promise.all([
     getAdministrationSectors(signal),
-    apiJson<{ items: Array<{ id: string; displayName?: string; name?: string; isActive?: boolean; status?: string }> }>('/api/administration/activity-instructors', { cache: 'no-store', signal }),
+    apiJson<{ items: Array<{ id: string; personId: string; displayName?: string; name?: string; isActive?: boolean; status?: string }> }>('/api/administration/activity-instructors', { cache: 'no-store', signal }),
     apiJson<{ items: ActivityIconCatalogItem[] }>('/api/administration/activity-icons', { cache: 'no-store', signal }),
+    getAdministrationWorkers(signal),
   ]);
   return {
-    sectors: sectors.items.filter((sector) => sector.operationalStatus !== 'inactive'),
+    sectors: sectors.items.filter((sector) => sector.status === 'active'),
     instructors: instructors.items
       .filter((instructor) => instructor.isActive !== false && instructor.status !== 'inactive')
-      .map((instructor) => ({ id: instructor.id, displayName: instructor.displayName ?? instructor.name ?? 'Instructor sin nombre', isActive: true })),
+      .map((instructor) => ({ id: instructor.id, personId: instructor.personId, displayName: instructor.displayName ?? instructor.name ?? 'Instructor sin nombre', isActive: true })),
     icons: icons.items,
+    responsibles: workers.items.filter(worker=>worker.isActive && worker.personId).map(worker=>({id:worker.personId!,name:worker.displayName})),
   };
 };
 
@@ -55,6 +61,7 @@ export const getAdministrationWorkers = (signal?: AbortSignal) =>
   apiJson<AdministrationWorkersResponse>('/api/administration/workers?page=1&limit=100', { cache: 'no-store', signal });
 export const createAdministrationWorker = (input: AdministrationWorkerMutationDto) => apiJson('/api/administration/workers', { method: 'POST', body: JSON.stringify(input) });
 export const updateAdministrationWorker = (id: string, input: AdministrationWorkerMutationDto) => apiJson(`/api/administration/workers/${encodeURIComponent(id)}` as `/${string}`, { method: 'PUT', body: JSON.stringify(input) });
+export const deleteAdministrationWorkerPhoto = (id: string) => apiJson<{deleted:boolean}>(`/api/administration/workers/${encodeURIComponent(id)}/photo` as `/${string}`, { method: 'DELETE' });
 export const archiveAdministrationWorker = (id: string) => apiJson(`/api/administration/workers/${encodeURIComponent(id)}` as `/${string}`, { method: 'DELETE' });
 
 export const getAnnualActivityRanking = (signal?: AbortSignal) =>
@@ -71,6 +78,8 @@ export const getActivityEnrollments = (activityId: string, signal?: AbortSignal)
 
 export const getActivityMovements = (activityId: string, signal?: AbortSignal) =>
   apiJson<AdministrationMovementsResponse>(`/api/movimientos?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });
+export const getActivityTermHistory = (activityId:string,signal?:AbortSignal) =>
+  apiJson<{items:ActivityTermHistoryItem[]}>(`/api/administration/activities/${encodeURIComponent(activityId)}/terms` as `/${string}`,{cache:'no-store',signal});
 
 type AdministrationListFilters = Record<string, string | undefined>;
 

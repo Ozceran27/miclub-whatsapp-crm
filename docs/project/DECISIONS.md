@@ -130,6 +130,18 @@ No se deduce el receptor histórico desde el instructor actual. No se borra un
 pago cuando se corrige el ingreso. El exceso pagado queda como deuda de su
 receptor (60000 pagados − 48000 de derecho corregido = 12000 de deuda).
 
+## DEC-018 — Administración es la superficie permanente de configuración
+
+**Status:** Accepted e implementado en código el 2026-09-19; despliegue SQL pendiente.
+
+Onboarding conserva su borrador atómico, pero Administración reutiliza sus patrones
+de formulario para mutaciones inmediatas. Sectores, trabajadores, instructores y
+actividades son tenant-scoped; eliminar significa archivar. El Instructor operativo
+y el receptor económico son relaciones distintas. Las remuneraciones se versionan,
+generan obligaciones aprobables y se netean por persona/moneda con actividades.
+Los fijos usan vencimientos completos, sin prorrateo. Ajustes, pagos, anulaciones y
+reemplazos de apertura preservan historia y exigen motivo e idempotencia.
+
 ## Decisiones pendientes (sin aceptación implícita)
 
 DEC-016 — Confirmado por dirección 2026-09-09: liquidación por mes del cobro,
@@ -140,10 +152,12 @@ IMPORT_SYSTEM para alcance implementado y decisiones financieras pendientes.
 
 | ID | Decisión por resolver | Implementación observada |
 | --- | --- | --- |
-| C01 | Definido en DEC-017; integración pendiente | Tablas/vistas presentes; nuevo cálculo mensual unitario sin conexión runtime; lectura FIXED desalineada |
-| C02 | Entrega/aceptación de invitaciones y lifecycle Instructor | Token sólo hasheado; entrega no encontrada; caminos de alta/actualización divergen |
 | C03 | Persistencia intermedia de onboarding | Finalización persistente; draft/avance temporal, F5 reinicia; promesa previa no retirada por esta auditoría |
-| C04 | Definido en DEC-017; integración pendiente | Nuevo cálculo por obligación resta liquidaciones; consumidores legacy todavía pendientes de sustitución |
 | C05 | Retiro/reconciliación de clasificación fallback | economyDomain conserva listas distintas del catálogo |
+
+C01, C02 y C04 quedaron resueltos en código por DEC-017/018: el runtime
+materializa liquidaciones, existe bandeja autenticada de invitaciones y el neto
+resta las obligaciones al responsable. Su certificación de entorno continúa
+dependiendo de aplicar la migración manual y ejecutar el E2E PostgreSQL.
 
 B01–B07 en CURRENT_STATE son defectos/brechas a corregir, no ADRs aceptados. Las decisiones DEC-001–013 y los ejemplos financieros permanecen vigentes.

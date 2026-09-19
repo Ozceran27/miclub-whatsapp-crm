@@ -22,10 +22,11 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "code", "name", "modality", "color", "iconKey", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
+  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "responsiblePersonId", "code", "name", "modality", "color", "iconKey", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
-  if (body.instructorId !== undefined && body.instructorId !== null && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "VALIDATION_ERROR", "instructorId debe ser UUID o null."); return null; }
+  if (typeof body.instructorId !== "string" || !UUID.test(body.instructorId)) { fail(res, 400, "ACTIVITY_REQUIRES_INSTRUCTOR", "Toda actividad requiere un instructor operativo."); return null; }
+  if (body.responsiblePersonId !== undefined && body.responsiblePersonId !== null && (typeof body.responsiblePersonId !== "string" || !UUID.test(body.responsiblePersonId))) { fail(res, 400, "VALIDATION_ERROR", "responsiblePersonId debe ser UUID o null."); return null; }
   if (body.instructorCommissionPercent !== undefined && (typeof body.instructorCommissionPercent !== "number" || !Number.isFinite(body.instructorCommissionPercent) || body.instructorCommissionPercent < 0)) { fail(res, 400, "VALIDATION_ERROR", "instructorCommissionPercent debe ser un número no negativo."); return null; }
   const settlement = body.settlement as Record<string, unknown> | undefined;
   if (!settlement) { fail(res, 400, "VALIDATION_ERROR", "settlement es obligatorio."); return null; }
@@ -37,10 +38,9 @@ const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput
   const variableValid = mode === "VARIABLE" && settlement.fixedFeeFrequency === null && settlement.fixedClubFee === null && settlement.currencyCode === null && typeof settlement.clubSharePercentage === "number" && Number.isFinite(settlement.clubSharePercentage) && settlement.clubSharePercentage >= 0 && settlement.clubSharePercentage <= 100;
   if (keys.some((key) => !["mode", "fixedClubFee", "fixedFeeFrequency", "currencyCode", "clubSharePercentage", "effectiveFrom"].includes(key)) || !effectiveFromValid || (!fixedValid && !variableValid)) { fail(res, 400, "VALIDATION_ERROR", "La liquidación FIXED o VARIABLE no es válida."); return null; }
   if (body.maxCapacity !== undefined && body.maxCapacity !== null && (!Number.isInteger(body.maxCapacity) || Number(body.maxCapacity) < 0)) { fail(res, 400, "VALIDATION_ERROR", "maxCapacity debe ser entero no negativo."); return null; }
-  if (body.status !== undefined && !["active", "inactive"].includes(String(body.status))) { fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); return null; }
-  if ((body.status ?? "inactive") === "active" && (typeof body.instructorId !== "string" || !UUID.test(body.instructorId))) { fail(res, 400, "ACTIVE_ACTIVITY_REQUIRES_INSTRUCTOR", "Una actividad activa requiere instructor responsable."); return null; }
+  if (body.status !== undefined && (typeof body.status !== "string" || !["active", "inactive"].includes(body.status))) { fail(res, 400, "VALIDATION_ERROR", "status debe ser active o inactive."); return null; }
   const contract = body as unknown as ActivityMutationContract;
-  return { ...contract, managerPersonId: null, clubCommissionPercent: settlement.mode === "VARIABLE" ? settlement.clubSharePercentage as number : 0, name: body.name.trim() } as ActivityInput;
+  return { ...contract, managerPersonId: null, clubCommissionPercent: settlement.mode === "VARIABLE" ? Number(settlement.clubSharePercentage) : 0, name: body.name.trim() };
 };
 
 const respond = (res: Response, result: ActivityMutationResult) => {
@@ -50,6 +50,7 @@ const respond = (res: Response, result: ActivityMutationResult) => {
     missing: [404, "ACTIVITY_NOT_FOUND", "Actividad no encontrada."], conflict: [409, "OPTIMISTIC_CONCURRENCY_CONFLICT", "La actividad fue modificada por otra operación; recargue los datos."],
     model_not_applied: [503, "ACTIVITY_MODEL_NOT_APPLIED", "El modelo de mutaciones de actividades todavía no fue aplicado."], invalid_manager: [404, "INVALID_MANAGER", "El responsable no fue encontrado."],
     invalid_sector: [404, "INVALID_SECTOR", "El sector no fue encontrado."], invalid_instructor: [404, "INVALID_INSTRUCTOR", "El instructor no fue encontrado."],
+    invalid_responsible: [404, "INVALID_RESPONSIBLE", "El receptor económico no es una persona operativa activa del club."],
     dependencies: [409, "ACTIVITY_HAS_DEPENDENCIES", "La actividad tiene dependencias y no existe una regla segura para archivarla."],
     invalid_terms: [409, "INVALID_ACTIVITY_TERMS", "La nueva vigencia solapa o deja un hueco en las condiciones económicas."],
     settled_history: [409, "SETTLED_ACTIVITY_TERMS", "No se puede alterar historia económica ya liquidada."],

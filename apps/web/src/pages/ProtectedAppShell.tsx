@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdministrationModule from '../modules/AdministrationModule';
 import CrmModule from '../modules/CrmModule';
 import DataMigrationModule from '../modules/DataMigrationModule';
@@ -13,6 +13,7 @@ import { tenantModuleKey } from '../tenantScope';
 import { hasAdministrationCapability, visibleModules } from '../administrationCapabilities';
 import { OnboardingGate } from '../modules/Onboarding/OnboardingGate';
 import { getNavigation, type BackendNavigation } from '../services/api/navigationApi';
+import { apiJson } from '../api';
 
 const CORE_LABELS: Record<CoreModuleId, string> = { home: 'INICIO', economy: 'ECONOMÍA CLUB', crm: 'CRM', administration: 'ADMINISTRACIÓN', dataMigration: 'MIGRACIÓN' };
 const isCoreModule = (value: string): value is CoreModuleId => value in CORE_LABELS;
@@ -26,6 +27,11 @@ export default function ProtectedAppShell() {
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => { const controller = new AbortController(); getNavigation(controller.signal).then(result => { if (!controller.signal.aborted) setNavigation(result); }).catch(() => undefined); return () => controller.abort(); }, [clubId, path]);
+  useEffect(() => {
+    const refresh = () => { void getNavigation().then(setNavigation).catch(() => undefined); };
+    window.addEventListener('miclub:navigation-changed', refresh);
+    return () => window.removeEventListener('miclub:navigation-changed', refresh);
+  }, [clubId]);
   const modules = useMemo(() => visibleModules([
     ...navigation.modules.map((id) => ({ id, label: CORE_LABELS[id] })),
     ...navigation.sectors.map((sector) => ({ id: `sector:${sector.id}` as const, label: sector.name.toLocaleUpperCase('es-AR') })),
@@ -45,5 +51,7 @@ export default function ProtectedAppShell() {
     if (currentModule === 'dataMigration') return <DataMigrationModule />;
     return <PlaceholderModule title={sector?.name ?? 'Sector'} description="Sector configurado para este club desde el catálogo persistido." futureItems={['Actividades.', 'Inscriptos.', 'Movimientos.', 'Liquidaciones.']} />;
   };
-  return <OnboardingGate onNavigationReady={setNavigation}><div className="container app-shell"><header className="app-header"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" /><div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div><div className="app-header__actions"><button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>{theme === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}</button><button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}</button></div></header>{logoutError && <p className="login-error" role="alert">{logoutError}</p>}<ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} /><div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div></div></OnboardingGate>;
+  return <OnboardingGate onNavigationReady={setNavigation}><div className="container app-shell"><header className="app-header"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" /><div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div><div className="app-header__actions"><button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>{theme === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}</button><button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}</button></div></header>{logoutError && <p className="login-error" role="alert">{logoutError}</p>}<InvitationInbox/><ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} /><div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div></div></OnboardingGate>;
 }
+
+function InvitationInbox(){const[items,setItems]=useState<Array<{id:string;clubName:string;role:string;expiresAt:string}>>([]);const[message,setMessage]=useState('');const load=useCallback(()=>apiJson<{items:Array<{id:string;clubName:string;role:string;expiresAt:string}>}>('/auth/worker-invitations').then(r=>setItems(r.items)).catch(()=>undefined),[]);useEffect(()=>{void load();},[load]);if(!items.length)return null;return <section className="section-panel" aria-label="Invitaciones pendientes"><h2>Invitaciones a clubes</h2>{items.map(item=><article key={item.id}><strong>{item.clubName}</strong><span> · {item.role} · vence {new Date(item.expiresAt).toLocaleDateString('es-AR')}</span><button onClick={()=>void apiJson(`/auth/worker-invitations/${item.id}/accept` as `/${string}`,{method:'POST'}).then(()=>{setMessage('Invitación aceptada.');return load();})}>Aceptar</button><button onClick={()=>void apiJson(`/auth/worker-invitations/${item.id}/reject` as `/${string}`,{method:'POST'}).then(()=>load())}>Rechazar</button></article>)}{message&&<p role="status">{message}</p>}</section>}

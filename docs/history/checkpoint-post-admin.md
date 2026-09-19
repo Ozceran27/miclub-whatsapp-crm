@@ -80,6 +80,7 @@ La tabla entre los marcadores siguientes se deriva de `migrationManifest.ts`; `n
 | `202609090001_reservations_and_deposits_categories.sql` | Agrega Reservas y Señas operativas sin reclasificar historia. | `d04f7a3cd5fccdf50f21c4a08411bb09e06f796c8f093e41e9baaf4a212f588b` | Después de `202609050003_classify_cmv_as_non_operational.sql`. |
 | `202609090002_financial_operating_circuit.sql` | Historia financiera, revisiones, devoluciones, compensaciones y conciliación inicial DEC-017. | `8ca524bc9c99e85e1118f7df828c98c8f12e572d29c6dabf32e8f7a0fcfdbfdd` | Después de `202609090001_reservations_and_deposits_categories.sql`. |
 | `202609090003_initial_obligation_applications.sql` | Historia financiera, revisiones, devoluciones, compensaciones y conciliación inicial DEC-017. | `b7e6f505f03e11c9cb1a7539c2585cb05feb81f400c9195e0c7c9da02ede458d` | Después de `202609090002_financial_operating_circuit.sql`. |
+| `202609190001_administration_configuration.sql` | Habilita configuración permanente, remuneraciones versionadas, ajustes auditados y anulación de grupos desde Administración. | `c1002a3a9451f008bf59bd0245db3c9991f86ed878ea383ae77af10d6e18035e` | Después de `202609090003_initial_obligation_applications.sql`. |
 <!-- POST_ADMIN_MIGRATIONS:END -->
 
 Además existen SQL manuales de Administración en [`dbeaver/administration/`](../dbeaver/administration/): diagnóstico, permisos, evolución de sectores/actividades, empleados, tareas/solicitudes y asociación de movimientos. Son herramientas de auditoría o remediación para instalaciones legacy; **no se consideran aplicadas por estar en Git ni reemplazan las migraciones**. Antes de desplegar se debe guardar como evidencia la salida de:
@@ -192,11 +193,11 @@ Registrar commit, entorno, backup restaurable, salida del ledger SQL, resultado 
 
 1. Retirar el fallback legacy el 2026-11-06 después de auditar que ningún titular activo carece de sus equivalentes granulares.
 2. Aplicar permisos granulares a los GET administrativos que hoy dependen sólo del gate tenant o de `administration.view`.
-3. Implementar UI de edición para sectores, actividades y trabajadores; las fichas actuales son de sólo lectura.
+3. Validar visualmente en navegador los editores de sectores, actividades y trabajadores ya implementados, incluyendo teclado, móvil y tema oscuro.
 4. Implementar gestión de categorías, cuotas y socios desde las acciones rápidas.
 5. Definir modelo antes de habilitar Reservas y Membresías; hoy son placeholders intencionales.
 6. Completar asignación de tareas (`tasks.assign`) y una UI de bandeja/decisión de solicitudes.
 7. Eliminar el fallback legacy de trabajadores después de desplegar y validar `miclub.employees` en todos los entornos.
-8. Añadir conciliación, cierres por período, reapertura con doble autorización y exportación administrativa.
+8. Definir reapertura con doble autorización y exportación administrativa; conciliación, revisión, pagos parciales y anulación ya están integrados en el circuito.
 9. Ejecutar y adjuntar evidencias de migración, backup, restauración, smoke tests e aislamiento en el entorno productivo; no pueden certificarse desde el repositorio.
 10. Regenerar los artefactos HTML/PDF del manual desde el Markdown actualizado antes de su distribución externa.

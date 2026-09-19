@@ -9,8 +9,11 @@ import { parseListQuery } from "./listQuery.js";
 import { createSector, listSectorTemplates, type SectorActor } from "../repositories/sectorsRepository.js";
 import { archiveWorker, createWorker, updateWorker, WorkerMutationError, type WorkerActor } from "../services/administration/workerMutationService.js";
 import { getPostgresPool } from "../db/postgres.js";
+import { tenantExecutor } from "../db/transaction.js";
+import { deleteEmployeePhoto } from "../services/onboardingPhotoStore.js";
 
 const router = Router();
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 router.use(requireAuth, requireMembership, rejectClientClubId, requirePermission(PERMISSIONS.ADMINISTRATION_VIEW));
 
@@ -31,12 +34,17 @@ const workerMutation = (operation: (actor: WorkerActor, id: string, body: unknow
 router.post("/workers", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHandler(async (req, res) => {
   try {
     const result = await createWorker(workerActor(req), req.body);
-    if (result.invitationPending === true) return res.status(409).json({ error: true, code: "CONFLICT", message: "No se pudo completar el alta." });
+    if (result.invitationPending === true) return res.status(202).json({ invitationPending: true, message: "La invitación quedó pendiente de aceptación por la cuenta existente." });
     return res.status(201).json(result);
   }
   catch (error) { if (!(error instanceof WorkerMutationError)) throw error; res.status(error.code === "invalid_input" ? 400 : 409).json({ error: true, code: error.code === "invalid_input" ? "INVALID_INPUT" : "CONFLICT", message: error.code === "invalid_input" ? error.message : "No se pudo completar el alta." }); }
 }));
 router.put("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id, body) => updateWorker(actor, id, body)));
+router.delete("/workers/:id/photo", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHandler(async (req, res) => {
+  const id=String(req.params.id);
+  if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de trabajador inválido."});
+  res.json(await deleteEmployeePhoto(req.auth!.clubId, id));
+}));
 router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id) => archiveWorker(actor, id)));
 
 router.get("/sector-templates", requirePermission(PERMISSIONS.SECTORS_VIEW), asyncHandler(async (_req, res) => {
@@ -50,23 +58,43 @@ router.get("/activity-icons", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), as
 }));
 
 router.get("/activity-instructors", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (req, res) => {
-  const pool = await getPostgresPool();
-  const result = await pool.query(`select id, display_name as "displayName", true as "isActive"
+  const result = await tenantExecutor(req.auth!.clubId).query(`select id, person_id as "personId", display_name as "displayName", true as "isActive"
     from miclub.instructors where club_id=$1 and is_active=true order by display_name, id`, [req.auth!.clubId]);
   res.json({ items: result.rows });
 }));
 
-router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_EDIT), asyncHandler(async (req, res) => {
+router.get("/activities/:id/terms", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (req, res) => {
+  const id=String(req.params.id);
+  if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de actividad inválido."});
+  const sectors=req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:req.auth!.sectorIds;
+  const result=await tenantExecutor(req.auth!.clubId).query(`select t.id,t.mode,t.fixed_club_fee::float8 "fixedClubFee",t.fixed_fee_frequency "fixedFeeFrequency",t.club_share_percentage::float8 "clubSharePercentage",t.currency_code "currencyCode",t.effective_from::text "effectiveFrom",t.effective_to::text "effectiveTo",t.responsible_person_id "responsiblePersonId",concat_ws(' ',p.first_name,p.last_name) "responsiblePersonName",t.revision
+    from miclub.activity_terms t join miclub.activities a on a.id=t.activity_id and a.club_id=t.club_id
+    left join miclub.people p on p.id=t.responsible_person_id and p.club_id=t.club_id
+    where t.club_id=$1 and t.activity_id=$2 and ($3::uuid[] is null or a.sector_id=any($3)) order by t.effective_from desc,t.id`,[req.auth!.clubId,id,sectors]);
+  res.json({items:result.rows});
+}));
+
+router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_CREATE), asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const color = typeof body.color === "string" ? body.color.trim().toUpperCase() : "";
   const status = body.status;
-  if (typeof body.templateId !== "string" || !uuid.test(body.templateId) || !/^#[0-9A-F]{6}$/.test(color)
-    || !["active", "inactive", "under_repair"].includes(String(status))) {
-    return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "templateId, color hexadecimal y status válidos son obligatorios." });
-  }
+  const source = body.source === "custom" ? "custom" : "template";
+  if (!/^#[0-9A-F]{6}$/.test(color) || !["active", "inactive", "under_repair"].includes(String(status)))
+    return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "color hexadecimal y status válidos son obligatorios." });
   const actor: SectorActor = { userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId, requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent") };
-  const result = await createSector(actor, { templateId: body.templateId, color, status: status as "active" | "inactive" | "under_repair" });
+  let input: Parameters<typeof createSector>[1];
+  if (source === "template") {
+    if (typeof body.templateId !== "string" || !UUID.test(body.templateId)) return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "templateId válido es obligatorio." });
+    input = { source, templateId: body.templateId, color, status: status as "active" | "inactive" | "under_repair" };
+  } else {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const iconKey = typeof body.iconKey === "string" ? body.iconKey.trim() : "";
+    const capacityMode = body.capacityMode === "ENROLLMENTS" ? "ENROLLMENTS" : "INCOME";
+    const configuredCapacity = capacityMode === "ENROLLMENTS" ? Number(body.configuredCapacity) : null;
+    if (!name || !iconKey || (capacityMode === "ENROLLMENTS" && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "Nombre, icono y capacidad válidos son obligatorios para un sector personalizado." });
+    input = { source, name, code: typeof body.code === "string" ? body.code : null, description: typeof body.description === "string" ? body.description.trim() || null : null, iconKey, color, status: status as "active" | "inactive" | "under_repair", capacityMode, configuredCapacity };
+  }
+  const result = await createSector(actor, input);
   if (result.kind === "invalid_template") return res.status(400).json({ error: true, code: "INVALID_TEMPLATE", message: "La plantilla no existe o está inactiva." });
   if (result.kind === "duplicate") return res.status(409).json({ error: true, code: "SECTOR_TEMPLATE_DUPLICATE", message: "El club ya tiene un sector activo con esa plantilla." });
   return res.status(201).json(result.sector);

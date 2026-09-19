@@ -12,9 +12,9 @@ const ACTIVITY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const UPDATED_AT = '2026-08-05T12:00:00.000Z';
 const limitedActor: ActivityActor = { userId: 'user-limited', membershipId: 'membership-limited', clubId: CLUB_A, sectorIds: [SECTOR_A], canAccessAnySector: false };
 const anySectorActor: ActivityActor = { ...limitedActor, userId: 'user-any', membershipId: 'membership-any', sectorIds: [], canAccessAnySector: true };
-const input = (sectorId: string): ActivityInput => ({ sectorId, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
+const input = (sectorId: string): ActivityInput => ({ sectorId, instructorId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
 
-type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; updated_at: string; archived_at: null };
+type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; instructor_id?: string; updated_at: string; archived_at: null };
 const installActivityPool = (stored: StoredActivity, settlementLocked = false) => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = {
@@ -28,7 +28,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
           && (params?.[2] === true || sectors.includes(stored.sector_id));
         return { rows: visible ? [stored] : [] };
       }
-      if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true }] };
+      if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true, responsible: true, instructor_person_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }] };
       if (sql.includes('from miclub.activity_terms') && sql.includes('for update')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: null }] };
       if (sql.includes('from miclub.activity_settlements')) return { rows: [{ locked: settlementLocked }] };
       if (sql.includes('update miclub.activity_terms')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: '2026-08-31' }] };
@@ -52,7 +52,7 @@ const createPool = (settlement: ActivityInput['settlement'], failAudit = false) 
     queries.push({ sql, params });
     if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
     if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
-    if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true }] };
+    if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true, responsible: true, instructor_person_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }] };
     if (sql.includes('insert into miclub.activities')) return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] };
     if (sql.includes('insert into miclub.activity_terms')) return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] };
     if (sql.includes('INSERT INTO miclub.audit_log')) {
@@ -73,7 +73,8 @@ for (const settlement of [
   const result = await createActivity(limitedActor, { ...input(SECTOR_A), settlement });
   assert.equal(result.kind, 'created');
   const insert = queries.find(({ sql }) => sql.includes('insert into miclub.activity_terms'));
-  assert.deepEqual(insert?.params?.slice(2, 8), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.currencyCode, settlement.clubSharePercentage, settlement.effectiveFrom]);
+  assert.deepEqual(insert?.params?.slice(2, 7), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.currencyCode, settlement.clubSharePercentage]);
+  assert.equal(insert?.params?.[9], settlement.effectiveFrom);
   assert.equal(queries.filter(({ sql }) => sql.includes('INSERT INTO miclub.audit_log')).length, 2, 'audita actividad y término');
   assert.equal(queries.at(-1)?.sql, 'COMMIT');
 });
@@ -134,7 +135,8 @@ for (const settlement of [
   assert.match(close?.sql ?? '', /effective_to=\$3::date - 1/);
   assert.equal(close?.params?.[2], settlement.effectiveFrom);
   const insert = queries.find(({ sql }) => sql.includes('insert into miclub.activity_terms'));
-  assert.deepEqual(insert?.params?.slice(2, 8), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.currencyCode, settlement.clubSharePercentage, settlement.effectiveFrom]);
+  assert.deepEqual(insert?.params?.slice(2, 7), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.currencyCode, settlement.clubSharePercentage]);
+  assert.equal(insert?.params?.[8], settlement.effectiveFrom);
 });
 
 test('rechaza vigencias solapadas y preserva historia liquidada antes de escribir la actividad', async () => {
@@ -167,7 +169,7 @@ test('upsertActivity no pisa monthly_fee cuando la cuota del import viene en bla
 });
 
 test('el usuario limitado no puede hacer update, status ni archive en el segundo sector, pero sectors:any sí', async () => {
-  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_B, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_B, manager_person_id: null, instructor_id: input(SECTOR_B).instructorId, updated_at: UPDATED_AT, archived_at: null };
   const operations = [
     (actor: ActivityActor) => updateActivity(actor, ACTIVITY_ID, UPDATED_AT, input(SECTOR_B)),
     (actor: ActivityActor) => setActivityStatus(actor, ACTIVITY_ID, UPDATED_AT, 'inactive'),
