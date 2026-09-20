@@ -18,7 +18,7 @@ export const administrationActions: readonly AdministrationAction[] = [
   { label: 'Cargar Socio', description: 'Permitirá dar de alta o actualizar los datos principales de un socio.', icon: '👤', availability: 'coming-soon' },
   { operation: 'sector', label: 'Gestionar Sectores', description: 'Creá sectores y administrá su identidad visual, capacidad y estado.', icon: '🏟️', availability: 'enabled' },
   { operation: 'activity', label: 'Gestionar Actividades', description: 'Creá actividades y configurá su operación y liquidación.', icon: '⭐', availability: 'enabled' },
-  { operation: 'worker', label: 'Gestionar Trabajadores', description: 'Creá trabajadores e instructores y mantené sus roles y responsabilidades.', icon: '🧑‍💼', availability: 'enabled' },
+  { operation: 'worker', label: 'Gestionar Trabajadores', description: 'Creá trabajadores e instructores y mantené sus roles y responsabilidades.', icon: '🧑', availability: 'enabled' },
   { label: 'Gestionar Categorías', description: 'Permitirá organizar categorías administrativas para clasificar operaciones.', icon: '🏷️', availability: 'coming-soon' },
   { label: 'Gestionar Membresías', description: 'Permitirá administrar planes y condiciones comerciales del club.', icon: '🎟️', availability: 'coming-soon' },
 ] as const;
