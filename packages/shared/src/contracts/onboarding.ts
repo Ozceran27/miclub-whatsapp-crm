@@ -61,12 +61,15 @@ export interface OpeningBalancesResponse { batchId: string }
 export type AdvanceOnboardingResponse = OnboardingState;
 export type CompleteOnboardingResponse = OnboardingState;
 
-export const PROVISIONED_ONBOARDING_SECTORS = [
+/** Canonical system sectors provisioned for every tenant. Business logic uses codes, never display names. */
+export const REQUIRED_SYSTEM_SECTORS = [
   { clientId: "system:administracion", code: "administracion", name: "Administración", iconKey: "administration", isSystem: true },
   { clientId: "system:tesoreria", code: "tesoreria", name: "Tesorería", iconKey: "treasury", isSystem: true },
   { clientId: "system:areas-comunes", code: "areas-comunes", name: "Áreas Comunes", iconKey: "social-hall", isSystem: true },
 ] as const;
-export type ProvisionedOnboardingSectorCode = typeof PROVISIONED_ONBOARDING_SECTORS[number]["code"];
+/** @deprecated Prefer REQUIRED_SYSTEM_SECTORS. Kept as a source-compatible alias. */
+export const PROVISIONED_ONBOARDING_SECTORS = REQUIRED_SYSTEM_SECTORS;
+export type ProvisionedOnboardingSectorCode = typeof REQUIRED_SYSTEM_SECTORS[number]["code"];
 type OnboardingSectorDraftBase = { clientId: string; code: string; name: string; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; isSystem: boolean };
 /** Capacity is deliberately discriminated so an income-based sector can never carry a stale enrollment limit. */
 export type OnboardingSectorDraft = OnboardingSectorDraftBase & (

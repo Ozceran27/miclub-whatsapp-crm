@@ -1,7 +1,8 @@
-import { ACTIVITY_VISUAL_CATALOG, getActivityVisual, SECTOR_COLOR_PALETTE, type ActivityFeeFrequency, type OnboardingActivityDraft, type OnboardingSectorDraft, type OnboardingWorkerDraft, type OperationalCurrency } from '@miclub/shared';
+import { ACTIVITY_VISUAL_CATALOG, getActivityVisual, type ActivityFeeFrequency, type OnboardingActivityDraft, type OnboardingSectorDraft, type OnboardingWorkerDraft, type OperationalCurrency } from '@miclub/shared';
 import { useState, type FormEvent } from 'react';
 import { DraftEditorModal } from './DraftEditorModal';
 import { NumberInput } from '../MoneyInput';
+import { ActivityIconPicker, ConfigurationColorPicker } from '../../shared/ConfigurationVisualFields';
 
 const frequencyLabels: Record<ActivityFeeFrequency,string> = { DAILY:'Diaria', WEEKLY:'Semanal', MONTHLY:'Mensual', YEARLY:'Anual' };
 const currencySymbol = (currency: OperationalCurrency) => new Intl.NumberFormat('es-AR',{style:'currency',currency}).formatToParts(0).find(part=>part.type==='currency')?.value ?? currency;
@@ -9,12 +10,6 @@ const currencySymbol = (currency: OperationalCurrency) => new Intl.NumberFormat(
 type Props = { items: OnboardingActivityDraft[]; sectors: OnboardingSectorDraft[]; workers: OnboardingWorkerDraft[]; currency: OperationalCurrency; onChange:(items:OnboardingActivityDraft[])=>void };
 type EditorProps = Omit<Props,'items'|'onChange'> & { initial: OnboardingActivityDraft | null; onSave:(value:OnboardingActivityDraft)=>void };
 
-function ColorControl({ value, onChange }:{value:string;onChange:(value:string)=>void}) {
-  return <fieldset className="draft-color-control draft-color-control--activity"><legend>Color de la actividad</legend><div className="draft-palette draft-palette--activity" role="group" aria-label="Colores predefinidos">{SECTOR_COLOR_PALETTE.map(color=><label key={color.hex} style={{backgroundColor:color.hex}} title={color.name}><input type="radio" name="activityColor" value={color.hex} checked={value.toUpperCase()===color.hex} onChange={()=>onChange(color.hex)}/><span className="sr-only">{color.name}</span></label>)}</div><label className="draft-color-control__button">Elegir color personalizado<input aria-label="Abrir selector de color personalizado" type="color" value={value} onChange={event=>onChange(event.target.value)}/></label></fieldset>;
-}
-function IconPicker({ value, onChange }:{value:string;onChange:(value:string)=>void}) {
-  return <fieldset><legend>Icono de la actividad</legend><div className="draft-icon-grid draft-icon-grid--catalog">{ACTIVITY_VISUAL_CATALOG.map(item=><label key={item.key} title={`${item.name} · ${item.category}`} aria-label={`${item.name} · ${item.category}`}><input type="radio" name="activityIcon" checked={value===item.key} onChange={()=>onChange(item.key)}/><span aria-hidden="true">{item.glyph}</span><span className="sr-only">{item.name} · {item.category}</span></label>)}</div></fieldset>;
-}
 function ActivityEditor({ initial, sectors, workers, currency, onSave }:EditorProps) {
   const [mode,setMode]=useState<'FIXED'|'VARIABLE'>(initial?.settlementMode??'VARIABLE');
   const [color,setColor]=useState(initial?.color??'#2563EB'); const [icon,setIcon]=useState(initial?.iconKey??ACTIVITY_VISUAL_CATALOG[0].key);
@@ -24,7 +19,7 @@ function ActivityEditor({ initial, sectors, workers, currency, onSave }:EditorPr
     <div className="draft-form__grid draft-form__identity"><label>Nombre<input name="name" required defaultValue={initial?.name}/></label><label>Instructor responsable<select name="instructor" required defaultValue={initial?.instructorClientId??''}><option value="">Seleccionar…</option>{workers.filter(worker=>worker.role==='INSTRUCTOR').map(worker=><option key={worker.clientId} value={worker.clientId}>{worker.firstName} {worker.lastName}</option>)}</select></label></div>
     <fieldset><legend>Organización</legend><div className="draft-form__grid"><label>Sector<select name="sector" required defaultValue={initial?.sectorClientId??''}><option value="">Seleccionar…</option>{sectors.map(sector=><option key={sector.clientId} value={sector.clientId}>{sector.name}</option>)}</select></label><label>Estado<select name="status" defaultValue={initial?.status??'inactive'}><option value="active">Activa</option><option value="inactive">Inactiva</option></select></label></div></fieldset>
     <fieldset><legend>Condiciones económicas</legend><div className="draft-form__grid"><label>Modalidad<select value={mode} onChange={event=>setMode(event.target.value as typeof mode)}><option value="VARIABLE">Porcentaje del club</option><option value="FIXED">Monto fijo para el club</option></select></label>{mode==='VARIABLE'?<label>Porcentaje del club<NumberInput suffix="%" name="clubSharePercentage" min="0" max="100" step="0.01" required defaultValue={initial?.settlementMode==='VARIABLE'?initial.clubSharePercentage:0}/><small>El club conserva este porcentaje; el resto corresponde al responsable.</small></label>:<><label>Monto fijo para el club<NumberInput prefix={money} name="fixedClubFee" min="0" step="0.01" required defaultValue={initial?.settlementMode==='FIXED'?initial.fixedClubFee:0}/></label><label>Frecuencia<select name="fixedFeeFrequency" required defaultValue={initial?.settlementMode==='FIXED'?initial.fixedFeeFrequency:'MONTHLY'}>{Object.entries(frequencyLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></>}</div></fieldset>
-    <ColorControl value={color} onChange={setColor}/><IconPicker value={icon} onChange={setIcon}/>
+    <ConfigurationColorPicker value={color} onChange={setColor} label="Color de la actividad"/><ActivityIconPicker value={icon} onChange={setIcon}/>
   </form>;
 }
 

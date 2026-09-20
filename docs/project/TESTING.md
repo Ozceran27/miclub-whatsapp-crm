@@ -57,16 +57,16 @@
 - `npm run lint`: **280 errores, 577 advertencias** en el repositorio. Este gate
   no está aprobado y no se certifica una release integral libre de deuda técnica.
 - `git diff --check`: sin errores de whitespace.
-- Comprobación visual local con cuenta descartable: Inicio y Economía cargan
+- Comprobación visual local con cuenta descartable: Inicio y Tesorería cargan
   las tarjetas, liquidaciones, herramientas y gráficos. Se reprodujo el fallo
-  de GROUP BY y se verificó que Economía carga después de la corrección.
+  de GROUP BY y se verificó que Tesorería carga después de la corrección.
 
 La integración prueba recuperación de estructura parcial sin ledger, repetición
 del script manual, rechazo de deriva estructural, respuesta 503 por schema faltante,
 deuda por sobrepago, devoluciones corregidas/anuladas con cuotas sincronizadas,
 concurrencia e idempotencia, compensación de deuda inicial, pagos de proveedores,
 aislamiento A/B, acceso a Migración según plan y override, importación XLSX v4 con
-saldo inicial DRAFT, y todos los recursos consumidos por Economía.
+saldo inicial DRAFT, y todos los recursos consumidos por Tesorería.
 
 Las pruebas crean y eliminan únicamente bases descartables después de verificar
 `miclub.test_cluster=release_candidate_isolated`. No se ejecutó SQL modificador

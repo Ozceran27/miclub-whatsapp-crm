@@ -23,8 +23,8 @@ export default function EconomyModule() {
       <FinancialCircuitPanel summaryOnly />
       <section className="module-hero home-hero economy-module-hero">
         <div className="home-hero__copy">
-          <p className="eyebrow">Economía Club</p>
-          <h2>Tablero económico del club</h2>
+          <p className="eyebrow">Tesorería</p>
+          <h2>Tablero de Tesorería</h2>
           <p>Resumen financiero, movimientos recientes y pendientes operativos.</p>
         </div>
         <div className="home-sync-badges economy-module-actions" aria-label="Acciones de economía">
@@ -33,12 +33,12 @@ export default function EconomyModule() {
       </section>
 
       {dashboard.status === 'loading' && (
-        <EconomyDashboardState type="loading" title="Cargando Economía Club" message="Consultando PostgreSQL y preparando indicadores, gráficos y movimientos." />
+        <EconomyDashboardState type="loading" title="Cargando Tesorería" message="Consultando PostgreSQL y preparando indicadores, gráficos y movimientos." />
       )}
       {dashboard.status === 'error' && (
         <EconomyDashboardState
           type="error"
-          title="No se pudo cargar Economía Club"
+          title="No se pudo cargar Tesorería"
           message={dashboard.error?.message ?? 'Error desconocido al consultar los datos económicos.'}
           actionLabel="Reintentar"
           onAction={() => void dashboard.loadEconomyDashboard()}

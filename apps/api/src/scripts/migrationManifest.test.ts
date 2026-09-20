@@ -46,6 +46,19 @@ test("el manifiesto incluye exactamente una vez cada SQL versionado y conserva s
   }
 });
 
+test("la reparación de sectores de sistema es tenant-scoped, idempotente y falla ante ambigüedad", async () => {
+  const sql = await readFile(path.join(migrationsDir, "202609200001_required_system_sectors.sql"), "utf8");
+  assert.match(sql, /GROUP BY s\.club_id,c\.code HAVING count\(\*\) > 1/);
+  assert.match(sql, /GROUP BY s\.id HAVING count\(DISTINCT c\.code\)>1/);
+  assert.match(sql, /archived_at IS NOT NULL[\s\S]*RAISE EXCEPTION/);
+  assert.match(sql, /CROSS JOIN canonical[\s\S]*NOT EXISTS[\s\S]*s\.club_id = club\.id/);
+  assert.match(sql, /HAVING count\(s\.id\) <> 3/);
+  assert.match(sql, /'administracion','Administración','administration'/);
+  assert.match(sql, /'tesoreria','Tesorería','treasury'/);
+  assert.match(sql, /'areas-comunes','Áreas Comunes','social-hall'/);
+  assert.doesNotMatch(sql, /delete from miclub\.sectors/i);
+});
+
 test("los checksums de migración son estables entre checkouts LF y CRLF", () => {
   const lf = "BEGIN;\nSELECT 1;\nCOMMIT;\n";
   const crlf = lf.replace(/\n/g, "\r\n");

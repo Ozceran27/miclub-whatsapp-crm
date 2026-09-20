@@ -1,10 +1,11 @@
-import { PERMISSIONS, type AdministrationSectorDto, type AdministrationSectorsResponse } from '@miclub/shared';
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { createAdministrationSector, getAdministrationSectors, getSectorTemplates, type SectorTemplate } from '../../services/api/administrationApi';
+import { DEFAULT_SECTOR_ICON_KEY, PERMISSIONS, type AdministrationSectorDto, type AdministrationSectorsResponse } from '@miclub/shared';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { createAdministrationSector, getAdministrationSectors } from '../../services/api/administrationApi';
 import { SectorDetailModal } from './SectorDetailModal';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
 import { useSession } from '../../session';
-import { useModalAccessibility } from './useModalAccessibility';
+import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
+import { ConfigurationColorPicker, SectorIconPicker } from '../shared/ConfigurationVisualFields';
 
 const integer = new Intl.NumberFormat('es-AR');
 const formText = (form: FormData, name: string) => { const value=form.get(name); return typeof value==='string' ? value.trim() : ''; };
@@ -35,11 +36,11 @@ export function SectorList() {
   const [error, setError] = useState<string | null>(null);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [templates, setTemplates] = useState<SectorTemplate[]>([]);
   const [newColor, setNewColor] = useState('#2563EB');
-  const [creationSource, setCreationSource] = useState<'template'|'custom'>('template');
-  const creationDialogRef=useRef<HTMLDivElement>(null);
-  useModalAccessibility(creationDialogRef,creating,()=>setCreating(false));
+  const [newIconKey, setNewIconKey] = useState(DEFAULT_SECTOR_ICON_KEY);
+  const [capacityMode, setCapacityMode] = useState<'ENROLLMENTS'|'INCOME'>('INCOME');
+  const [configuredCapacity, setConfiguredCapacity] = useState<number | null>(null);
+  const openCreation = useCallback(() => { setNewColor('#2563EB'); setNewIconKey(DEFAULT_SECTOR_ICON_KEY); setCapacityMode('INCOME'); setConfiguredCapacity(null); setCreating(true); }, []);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -60,20 +61,18 @@ export function SectorList() {
     return () => {window.clearTimeout(timer);controller.abort();};
   }, [load]);
 
-  useEffect(() => { if (creating && templates.length === 0) void getSectorTemplates().then(({items}) => setTemplates(items)).catch((e: unknown) => setError(e instanceof Error ? e.message : 'No se pudo cargar el catálogo.')); }, [creating, templates.length]);
   useEffect(() => {
-    const openCreation = () => { if (canCreate) setCreating(true); };
-    window.addEventListener('miclub:create-sector', openCreation);
-    return () => window.removeEventListener('miclub:create-sector', openCreation);
-  }, [canCreate]);
+    const onCreate = () => { if (canCreate) openCreation(); };
+    window.addEventListener('miclub:create-sector', onCreate);
+    return () => window.removeEventListener('miclub:create-sector', onCreate);
+  }, [canCreate, openCreation]);
 
   const create = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); const data = new FormData(event.currentTarget); setLoading(true); setError(null);
-    const templateId = formText(data,'templateId'); const color = formText(data,'color'); const status = formText(data,'status');
-    if (!color || !status) { setError('Datos de sector inválidos.'); setLoading(false); return; }
+    const status = formText(data,'status');
+    if (!newColor || !status || !newIconKey || (capacityMode === 'ENROLLMENTS' && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) { setError('Datos de sector inválidos.'); setLoading(false); return; }
     try {
-      if(creationSource==='template') await createAdministrationSector({source:'template',templateId,color,status:status as 'active'|'inactive'|'under_repair'});
-      else { const capacityMode=formText(data,'capacityMode')==='ENROLLMENTS'?'ENROLLMENTS':'INCOME'; await createAdministrationSector({source:'custom',name:formText(data,'name'),description:formText(data,'description')||null,iconKey:formText(data,'iconKey')||'category',color,status:status as 'active'|'inactive'|'under_repair',capacityMode,configuredCapacity:capacityMode==='ENROLLMENTS'?Number(formText(data,'configuredCapacity')):null}); }
+      await createAdministrationSector({name:formText(data,'name'),description:formText(data,'description')||null,iconKey:newIconKey,color:newColor,status:status as 'active'|'inactive'|'under_repair',capacityMode,configuredCapacity:capacityMode==='ENROLLMENTS'?configuredCapacity:null});
       setCreating(false); await load(); window.dispatchEvent(new Event('miclub:navigation-changed'));
     }
     catch (e) { setError(e instanceof Error ? e.message : 'No se pudo crear el sector.'); setLoading(false); }
@@ -90,7 +89,7 @@ export function SectorList() {
           <h3 id="sector-list-title">Sectores del club</h3>
           <p>{response ? `${response.total} sectores configurados` : 'Configuración, capacidad y operación actual.'}</p>
         </div>
-        <div className="sector-list__actions">{canCreate && <button className="icon-btn" type="button" onClick={() => setCreating(true)}>+ Nuevo sector</button>}<button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar sectores'}</button></div>
+        <div className="sector-list__actions">{canCreate && <button className="icon-btn" type="button" onClick={openCreation}>+ Nuevo sector</button>}<button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar sectores'}</button></div>
       </div>
 
       {error && <div className="sector-list__state sector-list__state--error" role="alert"><span>{error}</span><button type="button" onClick={() => void load()}>Reintentar</button></div>}
@@ -127,9 +126,24 @@ export function SectorList() {
         </div>
       )}
       {selectedSector && <SectorDetailModal sector={selectedSector} canEdit={canEdit} canArchive={canArchive} onClose={() => setSelectedSectorId(null)} onChanged={async()=>{setSelectedSectorId(null);await load();window.dispatchEvent(new Event('miclub:navigation-changed'));}} />}
-      {canCreate && <div ref={creationDialogRef}>
-      {creating && <div className="sector-modal__backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setCreating(false); }}><form className="sector-modal sector-create" onSubmit={(e) => void create(e)}><header className="sector-modal__header"><div><p className="eyebrow">Configuración del club</p><h2>Nuevo sector</h2><p>Usá una plantilla o definí un sector personalizado.</p></div><button className="sector-modal__close" type="button" onClick={() => setCreating(false)}>×</button></header><fieldset><legend>Origen</legend><label><input type="radio" checked={creationSource==='template'} onChange={()=>setCreationSource('template')}/> Plantilla</label><label><input type="radio" checked={creationSource==='custom'} onChange={()=>setCreationSource('custom')}/> Personalizado</label></fieldset>{creationSource==='template'?<label>Plantilla<select name="templateId" required defaultValue=""><option value="" disabled>Seleccionar…</option>{templates.map(t => <option key={t.id} value={t.id}>{t.display_name}</option>)}</select></label>:<><label>Nombre<input name="name" required/></label><label>Descripción<textarea name="description" rows={2}/></label><label>Icono<input name="iconKey" defaultValue="category" required/></label><label>Capacidad<select name="capacityMode" defaultValue="INCOME"><option value="INCOME">Por ingresos</option><option value="ENROLLMENTS">Por inscripciones</option></select></label><label>Cupo configurado<input name="configuredCapacity" type="number" min="1"/></label></>}<label>Color<input name="color" type="color" value={newColor} onChange={e => setNewColor(e.target.value.toUpperCase())} /></label><fieldset><legend>Paleta rápida</legend>{['#2563EB','#16A34A','#DC2626','#9333EA','#EA580C','#0891B2'].map(color => <button key={color} type="button" className="sector-create__swatch" data-selected={newColor === color} style={{backgroundColor:color}} onClick={() => setNewColor(color)} aria-label={`Usar color ${color}`} />)}</fieldset><label>Estado<select name="status" defaultValue="active"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="under_repair">En reparación</option></select></label><div className="sector-list__actions"><button type="button" className="ghost-btn" onClick={() => setCreating(false)}>Cancelar</button><button type="submit" className="icon-btn" disabled={loading}>Crear sector</button></div></form></div>}
-      </div>}
+      {canCreate && creating && <ConfigurationEditorModal
+        title="Agregar Nuevo Sector"
+        eyebrow="Configuración del club"
+        description="Definí la identidad visual, capacidad y estado del sector."
+        busy={loading}
+        onClose={() => setCreating(false)}
+        footer={<><button type="button" className="ghost-btn" onClick={() => setCreating(false)} disabled={loading}>Cancelar</button><button type="submit" className="primary-btn" form="administration-sector-create" disabled={loading}>{loading ? 'Creando…' : 'Crear sector'}</button></>}
+      >
+        <form id="administration-sector-create" className="draft-form" onSubmit={(event) => void create(event)}>
+          <label>Nombre<input name="name" required /></label>
+          <SectorIconPicker value={newIconKey} onChange={setNewIconKey} />
+          <ConfigurationColorPicker value={newColor} onChange={setNewColor} label="Color del sector" />
+          <fieldset><legend>Modo de capacidad</legend><label><input type="radio" name="capacityMode" value="INCOME" checked={capacityMode === 'INCOME'} onChange={() => { setCapacityMode('INCOME'); setConfiguredCapacity(null); }}/> Ingresos</label><label><input type="radio" name="capacityMode" value="ENROLLMENTS" checked={capacityMode === 'ENROLLMENTS'} onChange={() => { setCapacityMode('ENROLLMENTS'); setConfiguredCapacity(value => value ?? 1); }}/> Espacio Disponible</label></fieldset>
+          {capacityMode === 'ENROLLMENTS' && <label>Cant. Máx.<input name="configuredCapacity" type="number" min="1" step="1" required value={configuredCapacity ?? ''} onChange={event => setConfiguredCapacity(event.currentTarget.value === '' ? null : Number(event.currentTarget.value))}/></label>}
+          <label>Estado<select name="status" defaultValue="active"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="under_repair">En reparación</option></select></label>
+          <fieldset><legend>Configuración avanzada</legend><label>Descripción<textarea name="description" rows={3}/></label></fieldset>
+        </form>
+      </ConfigurationEditorModal>}
     </section>
   );
 }

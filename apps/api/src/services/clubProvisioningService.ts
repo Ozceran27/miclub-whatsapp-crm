@@ -1,4 +1,4 @@
-import { CLUB_ROLE_DEFINITIONS, MOVEMENT_CATEGORY_CATALOG, type ClubRegistrationDto } from "@miclub/shared";
+import { CLUB_ROLE_DEFINITIONS, MOVEMENT_CATEGORY_CATALOG, REQUIRED_SYSTEM_SECTORS, type ClubRegistrationDto } from "@miclub/shared";
 
 export interface TransactionClient {
   query<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: readonly unknown[]): Promise<{ rows: T[] }>;
@@ -75,10 +75,10 @@ export async function provisionClub(
     values ($1, $2, $3, $4, 'active', 'Director', current_date, false, null, null)`,
   [clubId, person.rows[0].id, user.rows[0].id, membership.rows[0].id]);
   await client.query(`
-    insert into miclub.sectors (club_id, code, name, is_system, status, uses_activities)
-    values ($1, 'administracion', 'Administración', true, 'active', false),
-           ($1, 'tesoreria', 'Tesorería', true, 'active', false),
-           ($1, 'areas-comunes', 'Áreas Comunes', true, 'active', false)` , [clubId]);
+    insert into miclub.sectors (club_id, code, name, icon, icon_key, is_system, status, uses_activities)
+    select $1, item.code, item.name, item.icon_key, item.icon_key, true, 'active', false
+      from jsonb_to_recordset($2::jsonb) as item(code text, name text, icon_key text)`,
+  [clubId, JSON.stringify(REQUIRED_SYSTEM_SECTORS.map(({ code, name, iconKey }) => ({ code, name, icon_key: iconKey })))]);
   await client.query(`insert into miclub.payment_methods (club_id, name) values ($1, 'Efectivo'), ($1, 'Transferencia') on conflict do nothing`, [clubId]);
   await client.query(`
     insert into miclub.movement_categories (club_id, name, direction, is_active, catalog_id)

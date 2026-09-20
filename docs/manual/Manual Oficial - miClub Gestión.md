@@ -14,7 +14,7 @@ Logo: apps/web/public/logo/miClub - Logo trans.png
 
 Actualización post-admin: 06/08/2026. El capítulo operativo vigente de Administración se incorpora al final de este documento. Los artefactos HTML/PDF deben regenerarse antes de distribución externa.
 
-Última sincronización de estructura y referencias técnicas: 19/09/2026.
+Última sincronización de estructura y referencias técnicas: 20/09/2026.
 
 
 
@@ -24,7 +24,7 @@ Capítulo 0 Presentación
 
 Capítulo 1 Inicio
 
-Capítulo 2 Economía Club
+Capítulo 2 Tesorería
 
 Capítulo 3 Espacio Fitness
 
@@ -205,9 +205,9 @@ Inconsistencias detectadas
 4. Rutas legacy raíz: el frontend consume /summary, /members, /debtors y no rutas /api. Impacto: contrato heredado; solución: documentar y migrar con compatibilidad.
 
 
-## Economía Club · gráficos analíticos anuales
+## Tesorería · gráficos analíticos anuales
 
-La fila analítica anual de Economía Club utiliza `GET /api/economy/yearly-breakdown` con fecha de referencia opcional `?asOf=AAAA-MM-DD` y muestra los gráficos “Ingresos Operativos por Categoría” y “Gastos por Tipo” con una ventana móvil interanual inclusiva en zona `America/Argentina/Buenos_Aires`: desde el mismo mes del año anterior hasta el mes actual, ambos extremos incluidos. Por esta regla aprobada se devuelven 13 puntos mensuales, con labels que incluyen mes y año, claves `AAAA-MM` para no mezclar meses iguales de años distintos y valores cero para meses sin movimientos. El backend filtra movimientos consolidados con `operational_status = COMPLETADO`, usa `movement_date >= fromMonth` y `movement_date < toExclusive`, excluye pendientes/cancelados/anulados por estado operativo y no modifica datos históricos.
+La fila analítica anual de Tesorería utiliza `GET /api/economy/yearly-breakdown` con fecha de referencia opcional `?asOf=AAAA-MM-DD` y muestra los gráficos “Ingresos Operativos por Categoría” y “Gastos por Tipo” con una ventana móvil interanual inclusiva en zona `America/Argentina/Buenos_Aires`: desde el mismo mes del año anterior hasta el mes actual, ambos extremos incluidos. Por esta regla aprobada se devuelven 13 puntos mensuales, con labels que incluyen mes y año, claves `AAAA-MM` para no mezclar meses iguales de años distintos y valores cero para meses sin movimientos. El backend filtra movimientos consolidados con `operational_status = COMPLETADO`, usa `movement_date >= fromMonth` y `movement_date < toExclusive`, excluye pendientes/cancelados/anulados por estado operativo y no modifica datos históricos.
 
 Categorías operativas para ingresos y gastos operativos: INSCRIPCIÓN, CUOTA, TURNOS, COMISIÓN, ALQUILER, EVENTOS, VENTAS, CLASES, CURSOS, KIOSCO y BEBIDAS. El gráfico de ingresos operativos incluye solo `movement_type = INGRESOS`, excluye CAPITAL y publica únicamente categorías con total interanual mayor que cero.
 
@@ -232,7 +232,7 @@ Ingresar con una membresía activa que tenga `administration.view` y elegir **Ad
 
 Las tarjetas superiores resumen inscripciones activas, capacidad, trabajadores y actividades, con comparaciones cuando existe historial suficiente. Revisar la fecha y el mensaje de disponibilidad antes de interpretar una variación. Los rankings y tendencias son indicadores operativos, no un cierre contable.
 
-En **Sectores**, seleccionar una fila para consultar responsable, capacidad, actividades y movimientos relacionados. Los sectores de sistema están protegidos. En **Actividades**, seleccionar una fila para consultar configuración, inscriptos, movimientos asociados mediante `activity_id` y auditoría. En **Trabajadores**, abrir la ficha para consultar relación laboral, acceso, permisos y actividades. Estas tres fichas son de sólo lectura.
+En **Sectores**, seleccionar una fila para consultar responsable, capacidad, actividades y movimientos relacionados. Los sectores de sistema están protegidos. Las acciones rápidas habilitadas permiten crear sectores personalizados, trabajadores/instructores y actividades con formularios coherentes con el Onboarding. Sectores configura nombre, icono, color, capacidad y estado sin plantillas; Trabajadores valida fotos JPG/PNG/WebP de hasta 5 MB y conserva acceso, sector, fechas, notas y remuneración; Actividades comienza en modalidad VARIABLE y conserva términos, moneda, frecuencia y vigencia al editar.
 
 Si Trabajadores muestra una advertencia de fuente legacy, salario y fecha de ingreso pueden no estar disponibles; no completar esos datos por inferencia. **Actualizar** vuelve a consultar PostgreSQL y no importa datos externos.
 
@@ -248,9 +248,9 @@ En **Tareas**, crear título, descripción opcional y vencimiento; luego cambiar
 
 Las solicitudes se pueden consultar con `requests.view`. Aprobar o rechazar requiere el permiso correspondiente; una decisión ya tomada no se repite y los tipos sin handler seguro no se ejecutan. Registrar un motivo claro aun cuando sea opcional.
 
-### Acciones todavía no disponibles
+### Acciones rápidas y disponibilidad
 
-Gestionar categorías, trabajadores, cuotas y socios desde las tarjetas rápidas todavía no abre un flujo completo. Reservas y Membresías aparecen como **Próximamente** hasta definir modelo, disponibilidad, pagos y cancelaciones. No usar SQL manual para sustituir esas funciones.
+En escritorio se muestran diez tarjetas en dos filas de cinco. Están habilitadas **Cargar Movimiento**, **Cargar Inscripción**, **Gestionar Sectores**, **Gestionar Actividades** y **Gestionar Trabajadores** cuando la membresía posee el permiso correspondiente. **Cargar Cuota**, **Crear Reserva**, **Cargar Socio**, **Gestionar Categorías** y **Gestionar Membresías** aparecen como **Próximamente** y no ejecutan acciones. Cada tarjeta explica su utilidad mediante un tooltip al posar el cursor o recibir foco de teclado; “Sin permiso” es distinto de una función futura. No usar SQL manual para sustituir funciones no habilitadas.
 
 ### Buenas prácticas y soporte
 

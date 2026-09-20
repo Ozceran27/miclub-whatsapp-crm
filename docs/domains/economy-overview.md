@@ -1,8 +1,8 @@
-# Economía Club
+# Tesorería
 
 ## Descripción general
 
-El panel **Economía Club** consolida la lectura financiera operativa del club desde PostgreSQL. Su objetivo es mostrar una foto clara de ingresos, egresos, balance, liquidez, proyección, evolución mensual, rankings, métodos de pago, pendientes y últimos movimientos sin agregar lógica financiera en la capa visual.
+El panel visible **Tesorería** —con rutas y contratos técnicos `economy` conservados por compatibilidad— consolida la lectura financiera operativa del club desde PostgreSQL. Su objetivo es mostrar una foto clara de ingresos, egresos, balance, liquidez, proyección, evolución mensual, rankings, métodos de pago, pendientes y últimos movimientos sin agregar lógica financiera en la capa visual.
 
 La pantalla se arma en `EconomyModule` con tarjetas de cabecera, insights, resumen mensual, gráficos, rankings, métodos de pago, pendientes y movimientos recientes. La UI consume endpoints `/api/economy/*` desde `useEconomyDashboard`, manteniendo los cálculos en API/repositorios.
 

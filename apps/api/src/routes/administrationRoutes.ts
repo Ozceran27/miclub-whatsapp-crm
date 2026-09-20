@@ -6,7 +6,7 @@ import { getAdministrationSummary } from "../services/administration/administrat
 import asyncHandler from "./asyncHandler.js";
 import { getAdministrationWorkers } from "../services/administration/workersService.js";
 import { parseListQuery } from "./listQuery.js";
-import { createSector, listSectorTemplates, type SectorActor } from "../repositories/sectorsRepository.js";
+import { createSector, type SectorActor } from "../repositories/sectorsRepository.js";
 import { archiveWorker, createWorker, updateWorker, WorkerMutationError, type WorkerActor } from "../services/administration/workerMutationService.js";
 import { getPostgresPool } from "../db/postgres.js";
 import { tenantExecutor } from "../db/transaction.js";
@@ -47,10 +47,6 @@ router.delete("/workers/:id/photo", requirePermission(PERMISSIONS.WORKERS_MANAGE
 }));
 router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id) => archiveWorker(actor, id)));
 
-router.get("/sector-templates", requirePermission(PERMISSIONS.SECTORS_VIEW), asyncHandler(async (_req, res) => {
-  res.json({ items: await listSectorTemplates() });
-}));
-
 router.get("/activity-icons", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (_req, res) => {
   const pool = await getPostgresPool();
   const result = await pool.query("select icon_key as \"iconKey\", display_name as \"displayName\" from miclub.activity_icon_catalog order by sort_order, display_name");
@@ -78,25 +74,18 @@ router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_CREATE), asyncHand
   const body = req.body as Record<string, unknown>;
   const color = typeof body.color === "string" ? body.color.trim().toUpperCase() : "";
   const status = body.status;
-  const source = body.source === "custom" ? "custom" : "template";
+  if (body.templateId !== undefined || body.source === "template")
+    return res.status(400).json({ error: true, code: "SECTOR_TEMPLATES_DISABLED", message: "La creación de sectores desde plantillas no está disponible." });
   if (!/^#[0-9A-F]{6}$/.test(color) || !["active", "inactive", "under_repair"].includes(String(status)))
     return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "color hexadecimal y status válidos son obligatorios." });
   const actor: SectorActor = { userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId, requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent") };
-  let input: Parameters<typeof createSector>[1];
-  if (source === "template") {
-    if (typeof body.templateId !== "string" || !UUID.test(body.templateId)) return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "templateId válido es obligatorio." });
-    input = { source, templateId: body.templateId, color, status: status as "active" | "inactive" | "under_repair" };
-  } else {
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    const iconKey = typeof body.iconKey === "string" ? body.iconKey.trim() : "";
-    const capacityMode = body.capacityMode === "ENROLLMENTS" ? "ENROLLMENTS" : "INCOME";
-    const configuredCapacity = capacityMode === "ENROLLMENTS" ? Number(body.configuredCapacity) : null;
-    if (!name || !iconKey || (capacityMode === "ENROLLMENTS" && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "Nombre, icono y capacidad válidos son obligatorios para un sector personalizado." });
-    input = { source, name, code: typeof body.code === "string" ? body.code : null, description: typeof body.description === "string" ? body.description.trim() || null : null, iconKey, color, status: status as "active" | "inactive" | "under_repair", capacityMode, configuredCapacity };
-  }
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const iconKey = typeof body.iconKey === "string" ? body.iconKey.trim() : "";
+  const capacityMode = body.capacityMode === "ENROLLMENTS" ? "ENROLLMENTS" : "INCOME";
+  const configuredCapacity = capacityMode === "ENROLLMENTS" ? Number(body.configuredCapacity) : null;
+  if (!name || !iconKey || (capacityMode === "ENROLLMENTS" && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "Nombre, icono y capacidad válidos son obligatorios para un sector personalizado." });
+  const input: Parameters<typeof createSector>[1] = { name, code: typeof body.code === "string" ? body.code : null, description: typeof body.description === "string" ? body.description.trim() || null : null, iconKey, color, status: status as "active" | "inactive" | "under_repair", capacityMode, configuredCapacity };
   const result = await createSector(actor, input);
-  if (result.kind === "invalid_template") return res.status(400).json({ error: true, code: "INVALID_TEMPLATE", message: "La plantilla no existe o está inactiva." });
-  if (result.kind === "duplicate") return res.status(409).json({ error: true, code: "SECTOR_TEMPLATE_DUPLICATE", message: "El club ya tiene un sector activo con esa plantilla." });
   return res.status(201).json(result.sector);
 }));
 

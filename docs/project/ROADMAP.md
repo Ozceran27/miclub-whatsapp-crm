@@ -14,7 +14,7 @@ Bootstrap del repositorio completado sobre 42b81a3; documentación docs/project 
 
 ## First Clean Club E2E
 
-En PostgreSQL descartable: registro/rollback → login → onboarding/saldos/sectores/workers/actividad/plan → finalización → Inicio → XLSX dry-run/apply → Economía/Administración/CRM → logout. Validar paridad financiera y ausencia de cruces tenant.
+En PostgreSQL descartable: registro/rollback → login → onboarding/saldos/sectores/workers/actividad/plan → finalización → Inicio → XLSX dry-run/apply → Tesorería/Administración/CRM → logout. Validar paridad financiera y ausencia de cruces tenant.
 
 ## Database reset readiness
 

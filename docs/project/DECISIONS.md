@@ -143,7 +143,7 @@ Los fijos usan vencimientos completos, sin prorrateo. Ajustes, pagos, anulacione
 reemplazos de apertura preservan historia y exigen motivo e idempotencia.
 
 Los sectores de sistema `administracion` y `tesoreria` se enlazan conceptualmente
-a los módulos núcleo Administración y Economía Club; se conservan como entidades
+a los módulos núcleo Administración y Tesorería; se conservan como entidades
 tenant para referencias y permisos, pero se excluyen de las pestañas sectoriales
 dinámicas. `areas-comunes` conserva su pestaña independiente.
 

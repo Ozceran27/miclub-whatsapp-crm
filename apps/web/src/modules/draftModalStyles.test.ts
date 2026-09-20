@@ -32,7 +32,7 @@ test('audita superficies opacas del modal de borradores por tema y zona', async 
 
 test('matriz visual estática cubre diálogos, temas, viewports, scroll y apilamiento', async () => {
   const [styles, modal, sectors, workers, activities] = await Promise.all([
-    readSource('../styles.css'), readSource('./Onboarding/editors/DraftEditorModal.tsx'),
+    readSource('../styles.css'), readSource('./shared/ConfigurationEditorModal.tsx'),
     readSource('./Onboarding/editors/SectorDraftList.tsx'), readSource('./Onboarding/editors/WorkerDraftList.tsx'),
     readSource('./Onboarding/editors/ActivityDraftList.tsx'),
   ]);

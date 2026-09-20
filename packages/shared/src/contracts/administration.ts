@@ -7,10 +7,16 @@ export type AdministrationPaginatedResponse<T> = HttpPaginatedResponse<T>;
 
 export type AdministrationRecordStatus = "active" | "inactive" | "under_repair" | "archived" | LegacyUnknownCode<"administration-record-status">;
 
-export interface SectorTemplateDto { id: string; code: string; displayName: string; iconKey: string; displayOrder: number }
-export type AdministrationSectorCreateDto =
-  | { source: "template"; templateId: string; color: string; status: "active" | "inactive" | "under_repair" }
-  | { source: "custom"; name: string; code?: string | null; description?: string | null; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; capacityMode?: "ENROLLMENTS" | "INCOME"; configuredCapacity?: number | null };
+export type AdministrationSectorCreateDto = {
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  iconKey: string;
+  color: string;
+  status: "active" | "inactive" | "under_repair";
+  capacityMode: "ENROLLMENTS" | "INCOME";
+  configuredCapacity: number | null;
+};
 export type AdministrationMovementType = "INGRESOS" | "EGRESOS" | LegacyUnknownCode<"administration-movement-type">;
 export type AdministrationFinancialStatus = "sin_movimientos" | "pendiente" | "pagado" | "parcial" | "a_liquidar" | "liquidado" | "deuda" | "vencido" | "cancelado" | "otro" | LegacyUnknownCode<"administration-financial-status">;
 export type AdministrationOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | "ANULADO" | "REVISAR" | LegacyUnknownCode<"administration-operational-status">;

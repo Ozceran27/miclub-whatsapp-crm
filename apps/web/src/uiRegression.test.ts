@@ -62,10 +62,9 @@ test('checklist UI: modal, Escape, teclado, restauración de foco y foco visible
 });
 
 test('la utilidad sr-only conserva los nombres accesibles de selectores visuales', async () => {
-  const [styles, sectors, activities] = await Promise.all([
+  const [styles, visuals] = await Promise.all([
     readFile(new URL('./styles.css', import.meta.url), 'utf8'),
-    readFile(new URL('./modules/Onboarding/editors/SectorDraftList.tsx', import.meta.url), 'utf8'),
-    readFile(new URL('./modules/Onboarding/editors/ActivityDraftList.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/shared/ConfigurationVisualFields.tsx', import.meta.url), 'utf8'),
   ]);
   const srOnlyRule = styles.match(/\.sr-only\s*\{([^}]*)\}/)?.[1];
 
@@ -82,15 +81,15 @@ test('la utilidad sr-only conserva los nombres accesibles de selectores visuales
   assert.match(styles, /\.sr-only\.sr-only-focusable:focus/);
   assert.match(styles, /\.sr-only\.sr-only-focusable:focus-within/);
 
-  assert.match(sectors, /<span className="sr-only">\{icon\.name\}<\/span>/);
-  assert.match(sectors, /<span className="sr-only">\{color\.name\}/);
-  assert.match(activities, /<span className="sr-only">\{item\.name\} · \{item\.category\}<\/span>/);
+  assert.match(visuals, /<span className="sr-only">\{icon\.name\}<\/span>/);
+  assert.match(visuals, /<span className="sr-only">\{color\.name\}/);
+  assert.match(visuals, /<span className="sr-only">\{item\.name\} · \{item\.category\}<\/span>/);
 });
 
 test('los catálogos de iconos son adaptables y no generan scroll horizontal', async () => {
-  const [styles, activities] = await Promise.all([
+  const [styles, visuals] = await Promise.all([
     readFile(new URL('./styles.css', import.meta.url), 'utf8'),
-    readFile(new URL('./modules/Onboarding/editors/ActivityDraftList.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/shared/ConfigurationVisualFields.tsx', import.meta.url), 'utf8'),
   ]);
   const iconGridRule = styles.match(/\.draft-icon-grid\s*\{([^}]*)\}/)?.[1];
 
@@ -101,9 +100,9 @@ test('los catálogos de iconos son adaptables y no generan scroll horizontal', a
   assert.match(styles, /\.draft-form fieldset\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*hidden/s);
   assert.match(styles, /\.draft-icon-grid--catalog\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/s);
   assert.match(styles, /\.draft-sector-icons\s*\{[^}]*min-width:\s*0[^}]*overflow-x:\s*hidden/s);
-  assert.match(activities, /className="draft-icon-grid draft-icon-grid--catalog"/);
-  assert.match(activities, /ACTIVITY_VISUAL_CATALOG\.map/);
-  assert.match(activities, /aria-label=\{`\$\{item\.name\} · \$\{item\.category\}`\}/);
+  assert.match(visuals, /className="draft-icon-grid draft-icon-grid--catalog"/);
+  assert.match(visuals, /ACTIVITY_VISUAL_CATALOG\.map/);
+  assert.match(visuals, /aria-label=\{`\$\{item\.name\} · \$\{item\.category\}`\}/);
 });
 
 test('los modales de borradores usan superficies opacas específicas en ambos temas', async () => {
@@ -172,7 +171,7 @@ test('los modales de borradores usan superficies opacas específicas en ambos te
 test('regresión visual: Sectores, Trabajadores y Actividades cubren temas y viewports contrastantes', async () => {
   const [styles, modal, sectors, workers, activities] = await Promise.all([
     readFile(new URL('./styles.css', import.meta.url), 'utf8'),
-    readFile(new URL('./modules/Onboarding/editors/DraftEditorModal.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./modules/shared/ConfigurationEditorModal.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./modules/Onboarding/editors/SectorDraftList.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./modules/Onboarding/editors/WorkerDraftList.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./modules/Onboarding/editors/ActivityDraftList.tsx', import.meta.url), 'utf8'),

@@ -5,11 +5,9 @@ import { getCurrencyPrefix } from '../currencyPresentation';
 import { MoneyInput } from '../MoneyInput';
 import { DraftEditorModal } from './DraftEditorModal';
 import { activitiesForInstructor } from './draftDependencies';
+import { validateWorkerPhoto } from '../../shared/workerPhotoValidation';
 
-export const WORKER_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
-export const validateWorkerPhoto = (file:File) => !['image/jpeg','image/png','image/webp'].includes(file.type)
-  ? 'Formato no admitido. Usá JPG, PNG o WebP.'
-  : file.size > WORKER_PHOTO_MAX_BYTES ? 'La foto supera el máximo de 5 MB.' : null;
+export { WORKER_PHOTO_MAX_BYTES, validateWorkerPhoto } from '../../shared/workerPhotoValidation';
 
 type FixedCompensationFieldsProps = { currency:OperationalCurrency; worker:OnboardingWorkerDraft|null };
 export function FixedCompensationFields({currency,worker}:FixedCompensationFieldsProps){const prefix=getCurrencyPrefix(currency);return <div className="worker-compensation-fields"><label>Monto ({currency})<MoneyInput prefix={prefix} name="fixedCompensationAmount" min="0" step="0.01" required defaultValue={worker?.hasFixedCompensation?worker.fixedCompensationAmount??0:0} aria-label={`Monto de remuneración fija en ${currency}`} /></label><label>Frecuencia<select name="fixedCompensationFrequency" required defaultValue={worker?.hasFixedCompensation?worker.fixedCompensationFrequency??'MONTHLY':'MONTHLY'}><option value="DAILY">Diaria</option><option value="WEEKLY">Semanal</option><option value="MONTHLY">Mensual</option><option value="YEARLY">Anual</option></select></label></div>}

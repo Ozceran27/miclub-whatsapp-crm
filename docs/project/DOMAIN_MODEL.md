@@ -48,7 +48,7 @@ Rutas relativas a apps/api/src salvo shared/web indicados.
 | Pagos/deudas | financeService / paymentsRepository, receivablesRepository | queries locales; consumidores financieros | financeRoutes; sin gate DB ejecutado |
 | Categorías | shared movementCategoryCatalog; catalogRepository/provisioning | category_catalog/aliases/movement_categories; formularios/Economía | categoryCatalogMigration, economy |
 | Inicio | dashboardService, postgresDashboardService y postgresDashboard/* | shared legacy; HomeModule | dashboard/balances |
-| Economía | economyService, economyDomain, economyClubService / economyRepository y economy/* | shared contracts/economy; EconomyModule | characterization/domain/repository |
+| Tesorería (`economy` interno) | economyService, economyDomain, economyClubService / economyRepository y economy/* | shared contracts/economy; EconomyModule | characterization/domain/repository |
 | Administración | administration Read/Summary services y repositories | shared contracts/administration; AdministrationModule | metrics/capacity/read |
 | CRM | crmService/messages / crmRepository | shared legacy/members; CrmModule | crm/messages/prepareMessages |
 | XLSX | xlsxMigration validator/referenceResolver/workbook | shared contracts/xlsxImport; DataMigrationModule | workbook/validator/references |

@@ -4,14 +4,26 @@ import test from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-void test('los accesos rápidos de configuración ejecutan los modales reales', () => {
+void test('los accesos rápidos respetan orden, estado, accesibilidad y modales reales', () => {
   const actions = read('./AdministrationActions.tsx');
   const module = read('../AdministrationModule.tsx');
 
   for (const operation of ['sector', 'worker', 'activity']) {
     assert.match(actions, new RegExp(`operation: '${operation}'`));
   }
-  assert.match(actions, /configuredOperation\.run\(\)/);
+  const labels = [...actions.matchAll(/label: '([^']+)'/g)].map(match => match[1]);
+  const catalogSource = actions.slice(actions.indexOf('export const administrationActions'), actions.indexOf('] as const;'));
+  assert.deepEqual(labels.slice(0, 10), [
+    'Cargar Movimiento', 'Cargar Inscripción', 'Cargar Cuota', 'Crear Reserva', 'Cargar Socio',
+    'Gestionar Sectores', 'Gestionar Actividades', 'Gestionar Trabajadores', 'Gestionar Categorías', 'Gestionar Membresías',
+  ]);
+  assert.equal((catalogSource.match(/availability: 'enabled'/g) ?? []).length, 5);
+  assert.equal((catalogSource.match(/availability: 'coming-soon'/g) ?? []).length, 5);
+  assert.match(actions, /if \(!disabled\) run\?\.\(\)/);
+  assert.match(actions, /role="tooltip"/);
+  assert.match(actions, /aria-disabled=\{disabled\}/);
+  assert.match(actions, /onFocus=\{\(\) => setOpen\(true\)\}/);
+  assert.match(actions, /event\.key === 'Escape'/);
   assert.match(module, /onCreateSector=\{\(\)=>window\.dispatchEvent\(new Event\('miclub:create-sector'\)\)\}/);
   assert.match(module, /onCreateWorker=\{\(\)=>window\.dispatchEvent\(new Event\('miclub:create-worker'\)\)\}/);
   assert.match(module, /onCreateActivity=\{\(\)=>window\.dispatchEvent\(new Event\('miclub:create-activity'\)\)\}/);
@@ -19,4 +31,5 @@ void test('los accesos rápidos de configuración ejecutan los modales reales', 
   assert.match(read('./SectorList.tsx'), /addEventListener\('miclub:create-sector'/);
   assert.match(read('./WorkerList.tsx'), /addEventListener\('miclub:create-worker'/);
   assert.match(read('./ActivityList.tsx'), /addEventListener\('miclub:create-activity'/);
+  assert.doesNotMatch(module, /administration-anchor-nav/);
 });

@@ -34,8 +34,8 @@ Sectores de sistema esperados al provisionar club:
 - Tesorería.
 - Áreas Comunes.
 
-En la navegación principal, Administración se representa mediante el módulo núcleo
-Administración y Tesorería mediante Economía Club. Esos dos sectores persisten en
+En la navegación principal, Administración y Tesorería se representan mediante sus módulos núcleo.
+Esos dos sectores persisten en
 PostgreSQL pero no deben crear pestañas dinámicas duplicadas. Áreas Comunes sí
 dispone de pestaña sectorial propia.
 

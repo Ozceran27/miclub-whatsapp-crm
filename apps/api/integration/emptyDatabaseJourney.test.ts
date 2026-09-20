@@ -132,7 +132,7 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
     assert.equal(navigation.response.status, 200, "la navegación debe responder tras registro, login y lectura del onboarding");
     assert.ok(Array.isArray(navigation.body.sectors));
 
-    for (const route of ["/api/movement-categories", "/api/catalogs/roles", "/api/administration/sector-templates", "/templates"]) {
+    for (const route of ["/api/movement-categories", "/api/catalogs/roles", "/templates"]) {
       const catalog = await request(route, {}, cookie);
       assert.equal(catalog.response.status, 200, `${route} debe estar disponible`);
       const items = Array.isArray(catalog.body) ? catalog.body : catalog.body.items;
@@ -140,10 +140,12 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
     }
 
     // El onboarding debe poder crear entidades reales partiendo del tenant recién provisionado.
-    const templateCatalog = await request("/api/administration/sector-templates", {}, cookie);
-    assert.equal(templateCatalog.body.items.length, 30, "el runner debe instalar las 30 plantillas canónicas");
-    assert.ok(templateCatalog.body.items.every((item: Record<string, unknown>) => typeof item.icon_key === "string" && item.icon_key.length > 0));
-    const sectorCreated = await request("/api/administration/sectors", json({ templateId: templateCatalog.body.items[0].id, color: "#2563EB", status: "active" }), cookie);
+    const retiredTemplates = await request("/api/administration/sector-templates", {}, cookie);
+    assert.equal(retiredTemplates.response.status, 404, "el catálogo histórico no debe exponerse para crear sectores");
+    const rejectedTemplatePayload = await request("/api/administration/sectors", json({ templateId: crypto.randomUUID(), color: "#2563EB", status: "active" }), cookie);
+    assert.equal(rejectedTemplatePayload.response.status, 400);
+    assert.equal(rejectedTemplatePayload.body.code, "SECTOR_TEMPLATES_DISABLED");
+    const sectorCreated = await request("/api/administration/sectors", json({ name: "Deportes", iconKey: "sports", color: "#2563EB", status: "active", capacityMode: "INCOME", configuredCapacity: null }), cookie);
     assert.equal(sectorCreated.response.status, 201);
     const workerCreated = await request("/api/administration/workers", json({ firstName: "Inés", lastName: "Instructora", dni: "32999888", email: `instructor-${databaseName}@integration.invalid`, password: "Instructor-12345", role: "INSTRUCTOR", sectorId: sectorCreated.body.id, paymentMode: "VARIABLE" }), cookie);
     assert.equal(workerCreated.response.status, 201);

@@ -25,9 +25,7 @@ export type SectorUpdate = Partial<{
   status: "active" | "inactive" | "under_repair";
 }>;
 
-export type SectorCreate =
-  | { source: "template"; templateId: string; color: string; status: "active" | "inactive" | "under_repair" }
-  | { source: "custom"; name: string; code?: string | null; description?: string | null; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; capacityMode?: "ENROLLMENTS" | "INCOME"; configuredCapacity?: number | null };
+export type SectorCreate = { name: string; code?: string | null; description?: string | null; iconKey: string; color: string; status: "active" | "inactive" | "under_repair"; capacityMode: "ENROLLMENTS" | "INCOME"; configuredCapacity: number | null };
 
 export type SectorMutationResult =
   | { kind: "updated"; sector: SectorRow }
@@ -131,42 +129,21 @@ export const archiveSector = async (actor: SectorActor, id: string, expectedUpda
   }, pool);
 };
 
-export const listSectorTemplates = async (): Promise<Record<string, unknown>[]> => {
-  const pool = await getPostgresPool();
-  const result = await pool.query(`select id, code, display_name, icon_key, display_order from miclub.sector_templates where is_active=true order by display_order, display_name`);
-  return result.rows;
-};
-
 const normalizeCode = (value: string): string => normalizeComparableText(value).toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60) || "SECTOR";
 
-export const createSector = async (actor: SectorActor, input: SectorCreate): Promise<{ kind: "created"; sector: SectorRow } | { kind: "invalid_template" } | { kind: "duplicate" }> => {
+export const createSector = async (actor: SectorActor, input: SectorCreate): Promise<{ kind: "created"; sector: SectorRow }> => {
   const pool = await getPostgresPool();
   return withTenantTransaction(actor.clubId, async (executor) => {
-    if (input.source === "custom") {
-      const baseCode = normalizeCode(input.code || input.name);
-      await executor.query(`select pg_advisory_xact_lock(hashtextextended($1,19001))`,[`${actor.clubId}:${baseCode}`]);
-      const existing = await executor.query<{ code: string }>(`select code from miclub.sectors where club_id=$1 and lower(code) like lower($2)`, [actor.clubId, `${baseCode}%`]);
-      const used = new Set(existing.rows.map((row) => row.code.toUpperCase()));
-      let code = baseCode;
-      for (let suffix = 2; used.has(code); suffix += 1) code = `${baseCode.slice(0, 55)}_${suffix}`;
-      const inserted = await executor.query<SectorRow>(`insert into miclub.sectors
-        (club_id, code, name, description, icon, icon_key, color, capacity_mode, configured_capacity, status, is_system, created_by, updated_by)
-        values ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,false,$10::uuid,$10::uuid) returning ${sectorColumns}`,
-      [actor.clubId, code, input.name.trim(), input.description ?? null, input.iconKey, input.color, input.capacityMode ?? "INCOME", input.configuredCapacity ?? null, input.status, actor.userId]);
-      return { kind: "created", sector: inserted.rows[0] };
-    }
-    const template = await executor.query<{ id: string; code: string; display_name: string; icon_key: string }>(
-      `select id, code, display_name, icon_key from miclub.sector_templates where id=$1 and is_active=true`, [input.templateId],
-    );
-    const item = template.rows[0];
-    if (!item) return { kind: "invalid_template" };
-    await executor.query(`select pg_advisory_xact_lock(hashtextextended($1,19001))`,[`${actor.clubId}:${item.code.toUpperCase()}`]);
-    const duplicate = await executor.query(`select 1 from miclub.sectors where club_id=$1 and archived_at is null and (template_id=$2 or lower(code)=lower($3))`, [actor.clubId, item.id,item.code]);
-    if (duplicate.rows[0]) return { kind: "duplicate" };
+    const baseCode = normalizeCode(input.code || input.name);
+    await executor.query(`select pg_advisory_xact_lock(hashtextextended($1,19001))`,[`${actor.clubId}:${baseCode}`]);
+    const existing = await executor.query<{ code: string }>(`select code from miclub.sectors where club_id=$1 and lower(code) like lower($2)`, [actor.clubId, `${baseCode}%`]);
+    const used = new Set(existing.rows.map((row) => row.code.toUpperCase()));
+    let code = baseCode;
+    for (let suffix = 2; used.has(code); suffix += 1) code = `${baseCode.slice(0, 55)}_${suffix}`;
     const inserted = await executor.query<SectorRow>(`insert into miclub.sectors
-      (club_id, template_id, code, name, icon, color, status, is_system, created_by, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7,false,$8::uuid,$8::uuid) returning ${sectorColumns}`,
-    [actor.clubId, item.id, item.code, item.display_name, item.icon_key, input.color, input.status, actor.userId]);
+      (club_id, code, name, description, icon, icon_key, color, capacity_mode, configured_capacity, status, is_system, created_by, updated_by)
+      values ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,false,$10::uuid,$10::uuid) returning ${sectorColumns}`,
+    [actor.clubId, code, input.name.trim(), input.description ?? null, input.iconKey, input.color, input.capacityMode, input.configuredCapacity, input.status, actor.userId]);
     return { kind: "created", sector: inserted.rows[0] };
   }, pool);
 };

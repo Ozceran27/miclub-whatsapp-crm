@@ -6,8 +6,8 @@ import { provisionClub, type TransactionClient } from "./clubProvisioningService
 
 const input = { firstName: "Ana", lastName: "Pérez", dni: "12345678", phone: "1155555555", email: "ana@example.com", club: { name: "Club Norte" } };
 
-type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; categories: string[]; employees: { membershipId: string; hasFixedCompensation: boolean; fixedCompensationAmount: null }[] };
-const emptyState = (): State => ({ clubs: [], subscriptions: new Map(), roles: new Map(), onboarding: [], memberships: [], categories: [], employees: [] });
+type State = { clubs: string[]; subscriptions: Map<string, string>; roles: Map<string, string>; onboarding: string[]; memberships: string[]; sectors: { code:string; name:string; icon_key:string }[]; categories: string[]; employees: { membershipId: string; hasFixedCompensation: boolean; fixedCompensationAmount: null }[] };
+const emptyState = (): State => ({ clubs: [], subscriptions: new Map(), roles: new Map(), onboarding: [], memberships: [], sectors: [], categories: [], employees: [] });
 
 /** Small transactional adapter: it verifies the cross-statement provisioning contract without requiring a developer database. */
 const harness = (failAt = -1) => {
@@ -32,6 +32,7 @@ const harness = (failAt = -1) => {
       assert.match(sql, /has_fixed_compensation[\s\S]*fixed_compensation_amount[\s\S]*false, null, null/);
       state.employees.push({ membershipId: String(values?.[3]), hasFixedCompensation: false, fixedCompensationAmount: null });
     }
+    if (sql.includes("insert into miclub.sectors")) state.sectors = JSON.parse(String(values?.[1]));
     if (sql.includes("insert into miclub.movement_categories")) state.categories = JSON.parse(String(values?.[1])).map(({ code }: { code: string }) => code);
     return { rows: [] };
   };
@@ -68,6 +69,8 @@ test("el provisioning permite crear después trabajadores e instructores con sus
     membershipId: "membership-id", hasFixedCompensation: false, fixedCompensationAmount: null,
   }, "el Director conserva su membresía y una compensación inicial válida sin monto inventado");
   assert.deepEqual(integration.state().categories, MOVEMENT_CATEGORY_CATALOG.map(([code]) => code));
+  assert.deepEqual(integration.state().sectors.map(({ code }) => code), ["administracion", "tesoreria", "areas-comunes"]);
+  assert.equal(new Set(integration.state().sectors.map(({ code }) => code)).size, 3);
 });
 test("el club registrado obtiene FREE y no recibe features de DEVELOPMENT", async () => {
   const integration = harness(); await integration.run();

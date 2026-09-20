@@ -59,7 +59,7 @@ export function EconomyYearlyBreakdownCharts({ yearlyBreakdown }: Props) {
   const lastMonth = yearlyBreakdown.months[yearlyBreakdown.months.length - 1]?.label;
   const subtitle = firstMonth && lastMonth ? `Evolución interanual · ${firstMonth} a ${lastMonth}` : 'Evolución interanual';
   return (
-    <div className="economy-yearly-breakdown-grid" aria-label="Gráficos analíticos anuales de Economía Club">
+    <div className="economy-yearly-breakdown-grid" aria-label="Gráficos analíticos anuales de Tesorería">
       <EconomyMultiSeriesLineChart title="📈 Ingresos Operativos por Categoría" subtitle={subtitle} emptyMessage="Sin ingresos operativos para el período seleccionado." series={yearlyBreakdown.operatingIncomeByCategory} months={yearlyBreakdown.months} colors={INCOME_COLORS} ariaLabel="Gráfico de ingresos operativos por categoría" />
       <EconomyMultiSeriesLineChart title="📉 Gastos (Brutos) por Tipo " subtitle={subtitle} emptyMessage="Sin gastos clasificados para el período seleccionado." series={yearlyBreakdown.expensesByType} months={yearlyBreakdown.months} colors={EXPENSE_COLORS} ariaLabel="Gráfico de gastos por tipo" note={unclassified > 0 ? `${unclassified} movimientos de egreso sin clasificación no fueron incluidos.` : undefined} />
     </div>

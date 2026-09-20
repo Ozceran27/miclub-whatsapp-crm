@@ -14,7 +14,7 @@ Logo: apps/web/public/logo/miClub - Logo trans.png
 
 Actualizaci&#243;n post-admin: 06/08/2026. El cap&#237;tulo operativo vigente de Administraci&#243;n se incorpora al final de este documento. Los artefactos HTML/PDF deben regenerarse antes de distribuci&#243;n externa.
 
-&#218;ltima sincronizaci&#243;n de estructura y referencias t&#233;cnicas: 19/09/2026.
+&#218;ltima sincronizaci&#243;n de estructura y referencias t&#233;cnicas: 20/09/2026.
 
 
 
@@ -24,7 +24,7 @@ Cap&#237;tulo 0 Presentaci&#243;n
 
 Cap&#237;tulo 1 Inicio
 
-Cap&#237;tulo 2 Econom&#237;a Club
+Cap&#237;tulo 2 Tesorer&#237;a
 
 Cap&#237;tulo 3 Espacio Fitness
 
@@ -205,9 +205,9 @@ Inconsistencias detectadas
 4. Rutas legacy ra&#237;z: el frontend consume /summary, /members, /debtors y no rutas /api. Impacto: contrato heredado; soluci&#243;n: documentar y migrar con compatibilidad.
 
 
-## Econom&#237;a Club &#183; gr&#225;ficos anal&#237;ticos anuales
+## Tesorer&#237;a &#183; gr&#225;ficos anal&#237;ticos anuales
 
-La fila anal&#237;tica anual de Econom&#237;a Club utiliza `GET /api/economy/yearly-breakdown` con fecha de referencia opcional `?asOf=AAAA-MM-DD` y muestra los gr&#225;ficos “Ingresos Operativos por Categor&#237;a” y “Gastos por Tipo” con una ventana m&#243;vil interanual inclusiva en zona `America/Argentina/Buenos_Aires`: desde el mismo mes del a&#241;o anterior hasta el mes actual, ambos extremos incluidos. Por esta regla aprobada se devuelven 13 puntos mensuales, con labels que incluyen mes y a&#241;o, claves `AAAA-MM` para no mezclar meses iguales de a&#241;os distintos y valores cero para meses sin movimientos. El backend filtra movimientos consolidados con `operational_status = COMPLETADO`, usa `movement_date &gt;= fromMonth` y `movement_date &lt; toExclusive`, excluye pendientes/cancelados/anulados por estado operativo y no modifica datos hist&#243;ricos.
+La fila anal&#237;tica anual de Tesorer&#237;a utiliza `GET /api/economy/yearly-breakdown` con fecha de referencia opcional `?asOf=AAAA-MM-DD` y muestra los gr&#225;ficos “Ingresos Operativos por Categor&#237;a” y “Gastos por Tipo” con una ventana m&#243;vil interanual inclusiva en zona `America/Argentina/Buenos_Aires`: desde el mismo mes del a&#241;o anterior hasta el mes actual, ambos extremos incluidos. Por esta regla aprobada se devuelven 13 puntos mensuales, con labels que incluyen mes y a&#241;o, claves `AAAA-MM` para no mezclar meses iguales de a&#241;os distintos y valores cero para meses sin movimientos. El backend filtra movimientos consolidados con `operational_status = COMPLETADO`, usa `movement_date &gt;= fromMonth` y `movement_date &lt; toExclusive`, excluye pendientes/cancelados/anulados por estado operativo y no modifica datos hist&#243;ricos.
 
 Categor&#237;as operativas para ingresos y gastos operativos: INSCRIPCI&#211;N, CUOTA, TURNOS, COMISI&#211;N, ALQUILER, EVENTOS, VENTAS, CLASES, CURSOS, KIOSCO y BEBIDAS. El gr&#225;fico de ingresos operativos incluye solo `movement_type = INGRESOS`, excluye CAPITAL y publica &#250;nicamente categor&#237;as con total interanual mayor que cero.
 
@@ -232,7 +232,7 @@ Ingresar con una membres&#237;a activa que tenga `administration.view` y elegir 
 
 Las tarjetas superiores resumen inscripciones activas, capacidad, trabajadores y actividades, con comparaciones cuando existe historial suficiente. Revisar la fecha y el mensaje de disponibilidad antes de interpretar una variaci&#243;n. Los rankings y tendencias son indicadores operativos, no un cierre contable.
 
-En **Sectores**, seleccionar una fila para consultar responsable, capacidad, actividades y movimientos relacionados. Los sectores de sistema est&#225;n protegidos. En **Actividades**, seleccionar una fila para consultar configuraci&#243;n, inscriptos, movimientos asociados mediante `activity_id` y auditor&#237;a. En **Trabajadores**, abrir la ficha para consultar relaci&#243;n laboral, acceso, permisos y actividades. Estas tres fichas son de s&#243;lo lectura.
+En **Sectores**, seleccionar una fila para consultar responsable, capacidad, actividades y movimientos relacionados. Los sectores de sistema est&#225;n protegidos. Las acciones r&#225;pidas habilitadas permiten crear sectores personalizados, trabajadores/instructores y actividades con formularios coherentes con el Onboarding. Sectores configura nombre, icono, color, capacidad y estado sin plantillas; Trabajadores valida fotos JPG/PNG/WebP de hasta 5 MB y conserva acceso, sector, fechas, notas y remuneraci&#243;n; Actividades comienza en modalidad VARIABLE y conserva t&#233;rminos, moneda, frecuencia y vigencia al editar.
 
 Si Trabajadores muestra una advertencia de fuente legacy, salario y fecha de ingreso pueden no estar disponibles; no completar esos datos por inferencia. **Actualizar** vuelve a consultar PostgreSQL y no importa datos externos.
 
@@ -248,9 +248,9 @@ En **Tareas**, crear t&#237;tulo, descripci&#243;n opcional y vencimiento; luego
 
 Las solicitudes se pueden consultar con `requests.view`. Aprobar o rechazar requiere el permiso correspondiente; una decisi&#243;n ya tomada no se repite y los tipos sin handler seguro no se ejecutan. Registrar un motivo claro aun cuando sea opcional.
 
-### Acciones todav&#237;a no disponibles
+### Acciones r&#225;pidas y disponibilidad
 
-Gestionar categor&#237;as, trabajadores, cuotas y socios desde las tarjetas r&#225;pidas todav&#237;a no abre un flujo completo. Reservas y Membres&#237;as aparecen como **Pr&#243;ximamente** hasta definir modelo, disponibilidad, pagos y cancelaciones. No usar SQL manual para sustituir esas funciones.
+En escritorio se muestran diez tarjetas en dos filas de cinco. Est&#225;n habilitadas **Cargar Movimiento**, **Cargar Inscripci&#243;n**, **Gestionar Sectores**, **Gestionar Actividades** y **Gestionar Trabajadores** cuando la membres&#237;a posee el permiso correspondiente. **Cargar Cuota**, **Crear Reserva**, **Cargar Socio**, **Gestionar Categor&#237;as** y **Gestionar Membres&#237;as** aparecen como **Pr&#243;ximamente** y no ejecutan acciones. Cada tarjeta explica su utilidad mediante un tooltip al posar el cursor o recibir foco de teclado; “Sin permiso” es distinto de una funci&#243;n futura. No usar SQL manual para sustituir funciones no habilitadas.
 
 ### Buenas pr&#225;cticas y soporte
 

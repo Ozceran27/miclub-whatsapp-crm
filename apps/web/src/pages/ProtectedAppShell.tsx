@@ -15,7 +15,7 @@ import { OnboardingGate } from '../modules/Onboarding/OnboardingGate';
 import { getNavigation, type BackendNavigation } from '../services/api/navigationApi';
 import { apiJson } from '../api';
 
-const CORE_LABELS: Record<CoreModuleId, string> = { home: 'INICIO', economy: 'ECONOMÍA CLUB', crm: 'CRM', administration: 'ADMINISTRACIÓN', dataMigration: 'MIGRACIÓN' };
+const CORE_LABELS: Record<CoreModuleId, string> = { home: 'INICIO', economy: 'TESORERÍA', crm: 'CRM', administration: 'ADMINISTRACIÓN', dataMigration: 'MIGRACIÓN' };
 const isCoreModule = (value: string): value is CoreModuleId => value in CORE_LABELS;
 
 export default function ProtectedAppShell() {

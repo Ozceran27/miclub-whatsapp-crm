@@ -44,10 +44,6 @@ export default function AdministrationModule() {
         </div>
       </section>
 
-      <nav className="section-panel" aria-label="Accesos de Administración">
-        <a href="#admin-summary">Resumen</a> · <a href="#admin-sectors">Sectores</a> · <a href="#admin-workers">Trabajadores</a> · <a href="#admin-activities">Actividades</a> · <a href="#admin-finance">Saldos y liquidaciones</a> · <a href="#admin-operations">Operaciones</a>
-      </nav>
-
       <div id="admin-summary">
       {dashboard.status === 'loading' && (
         <EconomyDashboardState type="loading" title="Cargando Administración" message="Consultando PostgreSQL y preparando indicadores operativos reales." />

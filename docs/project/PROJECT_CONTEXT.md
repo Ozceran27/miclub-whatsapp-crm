@@ -16,7 +16,7 @@ Un club nuevo debe poder:
 4. Completar la configuración inicial.
 5. Definir sectores, trabajadores/instructores y actividades.
 6. Registrar movimientos, inscripciones, cuotas y demás operaciones.
-7. Consultar Inicio, Economía, Administración y CRM.
+7. Consultar Inicio, Tesorería, Administración y CRM.
 8. Importar historia desde una plantilla XLSX estándar cuando su plan lo habilite.
 9. Operar exclusivamente con PostgreSQL como fuente de verdad.
 
@@ -43,7 +43,7 @@ Un club nuevo debe poder:
 - Pagos y cuentas a cobrar.
 - Liquidaciones.
 - Inicio y dashboards.
-- Economía.
+- Tesorería (nombre visible; economía se conserva como denominación técnica interna).
 - Administración.
 - CRM.
 - Importación XLSX.

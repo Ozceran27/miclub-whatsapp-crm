@@ -2,7 +2,7 @@
 
 ## Objetivo y regla de consolidación
 
-Este documento es el inventario normativo de las métricas expuestas por el módulo Economía. La implementación indicada como **autoritativa** es la única que puede decidir semántica económica. Los componentes web sólo pueden seleccionar valores ya calculados, formatearlos y calcular geometría o porcentajes estrictamente visuales. Una migración de una implementación duplicada debe hacerse en un PR posterior, una métrica por vez, comparando exactamente contra los resultados aprobados antes de borrar el código anterior.
+Este documento es el inventario normativo de las métricas expuestas por el módulo visible Tesorería (`economy` en rutas y nombres internos). La implementación indicada como **autoritativa** es la única que puede decidir semántica económica. Los componentes web sólo pueden seleccionar valores ya calculados, formatearlos y calcular geometría o porcentajes estrictamente visuales. Una migración de una implementación duplicada debe hacerse en un PR posterior, una métrica por vez, comparando exactamente contra los resultados aprobados antes de borrar el código anterior.
 
 Este catálogo no cambia fórmulas ni SQL productivo. En particular, un PR que cambie una fórmula de dominio no debe cambiar también las consultas productivas que la alimentan.
 

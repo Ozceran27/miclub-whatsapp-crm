@@ -1,5 +1,29 @@
 # Current State
 
+## Tesorería y sectores obligatorios — 2026-09-20
+
+La superficie visible antes llamada “Economía Club” se denomina **Tesorería** en
+navegación, títulos, estados, accesibilidad y manual. Por compatibilidad se
+conservan `/app/economy`, `/api/economy/*` y los nombres técnicos internos. Los
+módulos núcleo Administración y Tesorería no se duplican como pestañas de sector;
+Áreas Comunes sí permanece como sector dinámico.
+
+`REQUIRED_SYSTEM_SECTORS` es la definición compartida de `administracion`,
+`tesoreria` y `areas-comunes`. El registro la usa para aprovisionar exactamente
+los tres sectores. La migración idempotente
+`202609200001_required_system_sectors.sql` repara instalaciones existentes y
+aborta ante códigos normalizados duplicados o coincidencias archivadas ambiguas.
+La auditoría de solo lectura encontró un club con onboarding completo, 30
+plantillas históricas y cero sectores; la base real continúa sin escrituras hasta
+ejecutar manualmente `docs/dbeaver/2026-09-20-sectores-sistema.sql`.
+
+Administración y Onboarding comparten el mismo contenedor modal accesible, los
+selectores de color e iconos y la validación de fotos. La creación administrativa
+de sectores es exclusivamente personalizada: se retiró la ruta de plantillas y
+el contrato ya no admite `templateId`. Las diez acciones rápidas ocupan dos filas
+de cinco en escritorio, exponen ayuda al hover/foco y distinguen disponibilidad,
+próximamente y falta de permiso sin una franja de feedback redundante.
+
 ## Correcciones operativas posteriores al despliegue — 2026-09-19
 
 La lista de movimientos obtiene `activity_id` desde `miclub.movements`, porque la
@@ -17,8 +41,8 @@ la membresía. Ya no se resuelven como funcionalidades futuras.
 
 Administración y Tesorería continúan siendo sectores de sistema persistidos para
 relaciones operativas y financieras, pero no generan pestañas sectoriales
-duplicadas: sus superficies son los módulos núcleo Administración y Economía
-Club, respectivamente. Áreas Comunes y los sectores configurables sí se publican
+duplicadas: sus superficies son los módulos núcleo Administración y Tesorería,
+respectivamente. Áreas Comunes y los sectores configurables sí se publican
 como pestañas dinámicas.
 
 ## Configuración operativa desde Administración — 2026-09-19
@@ -34,7 +58,7 @@ en borrador/aprobadas, ajustes firmados de liquidación, pagos parciales netos p
 persona y moneda, compensación FIFO entre actividades y remuneraciones, grupos de
 pago anulables y reemplazo auditado de saldos iniciales. Los fijos DAILY, WEEKLY,
 MONTHLY y YEARLY generan vencimientos completos; no existe prorrateo entre meses.
-Economía conserva el resumen de sólo lectura y las mutaciones quedan en
+Tesorería conserva el resumen de sólo lectura y las mutaciones quedan en
 Administración.
 
 La migración versionada es

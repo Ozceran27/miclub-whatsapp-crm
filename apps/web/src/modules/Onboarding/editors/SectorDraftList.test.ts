@@ -21,15 +21,16 @@ void test('el catálogo plano ofrece al menos 50 iconos únicos y conserva sus c
 
 void test('el editor muestra una sola grilla sin búsqueda ni secciones por categoría', async () => {
   const source = await readFile(new URL('./SectorDraftList.tsx', import.meta.url), 'utf8');
+  const visuals = await readFile(new URL('../../shared/ConfigurationVisualFields.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /Elegí una plantilla|name="templateId"|Filtrar iconos|iconFilter|categoryNames|visibleIcons/);
-  assert.equal(source.match(/className="draft-icon-grid draft-icon-grid--catalog"/g)?.length, 1);
-  assert.match(source, /SECTOR_ICON_CATALOG\.map\(icon=>/);
-  assert.doesNotMatch(source, /Object\.entries|icon\.category===|<section key=\{category\}/);
+  assert.match(source, /<SectorIconPicker/);
+  assert.match(visuals, /SECTOR_ICON_CATALOG\.map\(icon =>/);
+  assert.doesNotMatch(visuals, /Object\.entries|icon\.category===|<section key=\{category\}/);
 });
 
 void test('cada opción de la grilla es un radio con nombre y ayudas accesibles', async () => {
-  const source = await readFile(new URL('./SectorDraftList.tsx', import.meta.url), 'utf8');
-  assert.match(source, /type="radio" name="iconKey" value=\{icon\.key\} required/);
+  const source = await readFile(new URL('../../shared/ConfigurationVisualFields.tsx', import.meta.url), 'utf8');
+  assert.match(source, /type="radio" name="sectorIconKey" value=\{icon\.key\}/);
   assert.match(source, /aria-label=\{icon\.name\}/);
   assert.match(source, /title=\{icon\.name\}/);
   assert.match(source, /className="sr-only">\{icon\.name\}/);

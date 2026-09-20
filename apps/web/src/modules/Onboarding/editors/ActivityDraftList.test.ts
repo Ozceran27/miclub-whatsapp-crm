@@ -3,25 +3,26 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const source = readFile(new URL('./ActivityDraftList.tsx', import.meta.url), 'utf8');
+const visualFields = readFile(new URL('../../shared/ConfigurationVisualFields.tsx', import.meta.url), 'utf8');
 const numberInputSource = readFile(new URL('../MoneyInput.tsx', import.meta.url), 'utf8');
 const styles = readFile(new URL('../../../styles.css', import.meta.url), 'utf8');
 const catalog = readFile(new URL('../../../../../../packages/shared/src/activityVisualCatalog.ts', import.meta.url), 'utf8');
 
 test('la selección principal de color no muestra el código hexadecimal', async () => {
-  const activityEditor = await source;
+  const [activityEditor, visuals] = await Promise.all([source, visualFields]);
 
-  assert.match(activityEditor, /SECTOR_COLOR_PALETTE\.map/);
-  assert.match(activityEditor, /className="sr-only">\{color\.name\}<\/span>/);
-  assert.doesNotMatch(activityEditor, /<code>|\{value\.toUpperCase\(\)\}<\/code>/);
-  assert.doesNotMatch(activityEditor, /<span className="sr-only">[^<]*\{color\.hex\}/);
-  assert.match(activityEditor, />Elegir color personalizado<input/);
+  assert.match(activityEditor, /<ConfigurationColorPicker/);
+  assert.match(visuals, /SECTOR_COLOR_PALETTE\.map/);
+  assert.match(visuals, /className="sr-only">\{color\.name\}, \{color\.hex\}<\/span>/);
+  assert.doesNotMatch(visuals, /<code>|\{value\.toUpperCase\(\)\}<\/code>/);
+  assert.match(visuals, />Elegir color personalizado<input/);
 });
 
 test('el color elegido continúa formando parte del borrador guardado', async () => {
-  const activityEditor = await source;
+  const [activityEditor, visuals] = await Promise.all([source, visualFields]);
 
-  assert.match(activityEditor, /onChange=\{\(\)=>onChange\(color\.hex\)\}/);
-  assert.match(activityEditor, /onChange=\{event=>onChange\(event\.target\.value\)\}/);
+  assert.match(visuals, /onChange=\{\(\) => onChange\(color\.hex\)\}/);
+  assert.match(visuals, /onChange=\{event => onChange\(event\.target\.value\.toUpperCase\(\)\)\}/);
   assert.match(activityEditor, /const common=\{[^}]*iconKey:icon,color,status:/);
 });
 
@@ -44,11 +45,12 @@ test('cada rama guardada limpia los valores incompatibles de la unión', async (
 });
 
 test('muestra el catálogo completo en una única grilla, sin buscador ni categorías visibles', async () => {
-  const activityEditor = await source;
+  const [activityEditor, visuals] = await Promise.all([source, visualFields]);
 
-  assert.equal((activityEditor.match(/draft-icon-grid draft-icon-grid--catalog/g) ?? []).length, 1);
-  assert.match(activityEditor, /ACTIVITY_VISUAL_CATALOG\.map/);
-  assert.doesNotMatch(activityEditor, /type="search"|const \[query|categories\.map|<section key=\{category\}/);
+  assert.match(activityEditor, /<ActivityIconPicker/);
+  assert.equal((visuals.match(/draft-icon-grid draft-icon-grid--catalog/g) ?? []).length, 2);
+  assert.match(visuals, /ACTIVITY_VISUAL_CATALOG\.map/);
+  assert.doesNotMatch(visuals, /type="search"|const \[query|categories\.map|<section key=\{category\}/);
 });
 
 test('ofrece al menos 50 iconos y controles visuales de ancho y tamaño accesibles', async () => {

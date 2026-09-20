@@ -37,7 +37,7 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
   const status = paymentMethods.statusCounts ?? { completed: 0, pending: 0, canceled: 0 };
 
   return (
-    <div className="economy-finance-triptych" aria-label="Indicadores complementarios de Economía Club">
+    <div className="economy-finance-triptych" aria-label="Indicadores complementarios de Tesorería">
       <article className="card home-kpi-card finance-card economy-mini-finance-card economy-mini-finance-card--expenses">
         <div className="home-card-heading finance-card__header">
           <h4>⚠️ Balance de Gastos</h4>

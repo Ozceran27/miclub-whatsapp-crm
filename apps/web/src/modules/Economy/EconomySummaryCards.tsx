@@ -40,9 +40,9 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     ? `${comparison.currentPeriod} vs ${comparison.previousPeriod}`
     : 'Último mes completo vs mes anterior';
   const cards: TopCard[] = [
-    { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Economía Club', value: formatEconomyMoney(summary.income), variant: 'positive', tooltip: economyMetricTooltips.monthlyIncome },
-    { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Economía Club', value: formatEconomyMoney(summary.expenses), variant: 'negative', tooltip: economyMetricTooltips.monthlyExpenses },
-    { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Economía Club', value: formatEconomyMoney(summary.balance), variant: 'utility', tooltip: economyMetricTooltips.monthlyBalance },
+    { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Tesorería', value: formatEconomyMoney(summary.income), variant: 'positive', tooltip: economyMetricTooltips.monthlyIncome },
+    { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Tesorería', value: formatEconomyMoney(summary.expenses), variant: 'negative', tooltip: economyMetricTooltips.monthlyExpenses },
+    { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Tesorería', value: formatEconomyMoney(summary.balance), variant: 'utility', tooltip: economyMetricTooltips.monthlyBalance },
     { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive', metric: find('income'), centerValue: true, tooltip: economyMetricTooltips.incomeVariation },
     { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative', metric: find('expenses'), centerValue: true, tooltip: economyMetricTooltips.expensesVariation },
     { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility', metric: find('utility'), centerValue: true, tooltip: economyMetricTooltips.utilityVariation },
@@ -51,7 +51,7 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
   ];
 
   return (
-    <div className="economy-kpi-strip" aria-label="Resumen analítico de Economía Club">
+    <div className="economy-kpi-strip" aria-label="Resumen analítico de Tesorería">
       {cards.map((card) => (
         <article className={`card home-kpi-card home-kpi-card--compact finance-card economy-top-card economy-top-card--${card.variant}${card.centerValue ? ' economy-top-card--center-value' : ''}`} key={card.label}>
           <div className="home-card-heading finance-card__header economy-top-card__header">

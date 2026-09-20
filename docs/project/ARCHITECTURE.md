@@ -20,7 +20,7 @@ La separación por capas es heterogénea: activities, movements, enrollments, ta
 
 SessionProvider rehidrata /auth/me, cambia membership y propaga logout entre pestañas. apiFetch centraliza transporte y expiración. serverState/client.ts implementa QueryClient/useServerQuery propios: no hay TanStack React Query. queryKeys incluye club, recurso, filtros, paginación y versión; TenantCacheBoundary cancela/retira cache al cambiar club.
 
-Módulos: Inicio, Economía, Administración, CRM, Migración y Onboarding. Conviven DTO compartidos, respuestas normalizadas genéricas y contratos legacy. Ver DOMAIN_MODEL para consumidores.
+Módulos visibles: Inicio, Tesorería, Administración, CRM, Migración y Onboarding. Tesorería conserva rutas, DTO y nombres técnicos internos `economy` para compatibilidad. Conviven DTO compartidos, respuestas normalizadas genéricas y contratos legacy. Ver DOMAIN_MODEL para consumidores.
 
 ## PostgreSQL y tenancy
 
