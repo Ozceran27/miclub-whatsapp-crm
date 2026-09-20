@@ -17,7 +17,7 @@ export type SectorActor = {
 export type SectorUpdate = Partial<{
   name: string;
   description: string | null;
-  icon: string | null;
+  iconKey: string;
   color: string;
   managerPersonId: string | null;
   capacityMode: "ENROLLMENTS" | "INCOME";
@@ -60,7 +60,10 @@ export const updateSector = async (actor: SectorActor, id: string, expectedUpdat
     const before = current.rows[0];
     if (!before) return { kind: "missing" };
     if (new Date(before.updated_at).toISOString() !== new Date(expectedUpdatedAt).toISOString()) return { kind: "conflict" };
-    if (isProtectedSector(before) && input.name !== undefined && input.name !== before.name) return { kind: "protected" };
+    if (isProtectedSector(before) && (
+      (input.name !== undefined && input.name !== before.name)
+      || (input.iconKey !== undefined && input.iconKey !== before.icon_key)
+    )) return { kind: "protected" };
 
     if (input.managerPersonId) {
       const manager = await executor.query(`select p.id from miclub.people p where p.club_id=$1 and p.id=$2 and (
@@ -71,7 +74,7 @@ export const updateSector = async (actor: SectorActor, id: string, expectedUpdat
     }
 
     const fields: Array<[string, unknown]> = [
-      ["name", input.name], ["description", input.description], ["icon", input.icon], ["color", input.color],
+      ["name", input.name], ["description", input.description], ["icon", input.iconKey], ["icon_key", input.iconKey], ["color", input.color],
       ["manager_person_id", input.managerPersonId], ["capacity_mode", input.capacityMode], ["configured_capacity", input.configuredCapacity],
       ["status", input.status],
     ].filter((entry) => entry[1] !== undefined) as Array<[string, unknown]>;

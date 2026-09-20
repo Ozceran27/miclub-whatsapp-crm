@@ -1,4 +1,4 @@
-import { PERMISSIONS } from "@miclub/shared";
+import { PERMISSIONS, SECTOR_ICON_CATALOG } from "@miclub/shared";
 import { Router, type Request, type Response } from "express";
 import { requirePermission, requireSectorAccess } from "../middleware/authorization.js";
 import { archiveSector, setSectorStatus, updateSector, type SectorActor, type SectorMutationResult, type SectorUpdate } from "../repositories/sectorsRepository.js";
@@ -28,7 +28,7 @@ const respond = (res: Response, result: SectorMutationResult) => {
   if (result.kind === "updated") return res.json(result.sector);
   if (result.kind === "missing") return fail(res, 404, "SECTOR_NOT_FOUND", "Sector no encontrado.");
   if (result.kind === "conflict") return fail(res, 409, "OPTIMISTIC_CONCURRENCY_CONFLICT", "El sector fue modificado por otra operación; recargue los datos.");
-  if (result.kind === "protected") return fail(res, 409, "SYSTEM_SECTOR_PROTECTED", "El sector de sistema no puede renombrarse, archivarse ni cambiar de estado.");
+  if (result.kind === "protected") return fail(res, 409, "SYSTEM_SECTOR_PROTECTED", "El nombre, el icono y el archivado de un sector de sistema están protegidos.");
   if (result.kind === "invalid_manager") return fail(res, 400, "INVALID_MANAGER", "El responsable no pertenece al club.");
   return fail(res, 409, "SECTOR_HAS_DEPENDENCIES", "El sector tiene dependencias y no puede archivarse.", result.dependencies);
 };
@@ -39,12 +39,14 @@ router.patch("/sectors/:id", requirePermission(PERMISSIONS.SECTORS_EDIT), requir
   const body = req.body as Record<string, unknown>;
   const version = expectedVersion(body, res);
   if (!version) return;
-  const allowed = new Set(["updatedAt", "name", "description", "icon", "color", "managerPersonId", "capacityMode", "configuredCapacity"]);
+  const allowed = new Set(["updatedAt", "name", "description", "iconKey", "color", "managerPersonId", "capacityMode", "configuredCapacity"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) return fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables.");
   if (typeof body.name !== "string" || !body.name.trim()) return fail(res, 400, "VALIDATION_ERROR", "name es obligatorio.");
-  for (const field of ["description", "icon", "color"] as const) {
+  for (const field of ["description", "iconKey", "color"] as const) {
     if (body[field] !== undefined && body[field] !== null && typeof body[field] !== "string") return fail(res, 400, "VALIDATION_ERROR", `${field} debe ser texto.`);
   }
+  if (body.iconKey !== undefined && !SECTOR_ICON_CATALOG.some(({ key }) => key === body.iconKey)) return fail(res, 400, "VALIDATION_ERROR", "iconKey no pertenece al catálogo de sectores.");
+  if (body.color !== undefined && (typeof body.color !== "string" || !/^#[0-9A-F]{6}$/i.test(body.color))) return fail(res, 400, "VALIDATION_ERROR", "color debe ser hexadecimal.");
   if (body.managerPersonId !== undefined && body.managerPersonId !== null && (typeof body.managerPersonId !== "string" || !UUID.test(body.managerPersonId))) return fail(res, 400, "VALIDATION_ERROR", "managerPersonId inválido.");
   const changesCapacity = body.capacityMode !== undefined || body.configuredCapacity !== undefined;
   if (changesCapacity && !(body.capacityMode === "INCOME" && body.configuredCapacity === null)

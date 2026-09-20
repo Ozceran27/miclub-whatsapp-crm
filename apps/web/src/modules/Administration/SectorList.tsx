@@ -10,21 +10,25 @@ import { ConfigurationColorPicker, SectorIconPicker } from '../shared/Configurat
 const integer = new Intl.NumberFormat('es-AR');
 const formText = (form: FormData, name: string) => { const value=form.get(name); return typeof value==='string' ? value.trim() : ''; };
 
-const statusLabel = (sector: AdministrationSectorDto) => {
-  const status = sector.status?.trim();
-  if (!status) return 'Sin estado';
-  return status.charAt(0).toUpperCase() + status.slice(1).toLocaleLowerCase('es-AR').replaceAll('_', ' ');
-};
-
-const capacityType = ({ capacityMode }: AdministrationSectorDto) => capacityMode === 'INCOME' ? 'Ingresos' : capacityMode === 'ENROLLMENTS' ? 'Espacio Disponible' : 'Sin configurar';
-
-const schedule = ({ openingTime, closingTime }: AdministrationSectorDto) =>
-  openingTime && closingTime ? `${openingTime.slice(0, 5)}–${closingTime.slice(0, 5)}` : 'Sin horario';
+const statusLabels: Record<string, string> = { active: 'Activo', inactive: 'Inactivo', under_repair: 'En reparación', archived: 'Archivado' };
+const statusLabel = ({ status }: AdministrationSectorDto) => statusLabels[status] ?? status?.replaceAll('_', ' ') ?? 'Sin estado';
 
 const usedCapacity = ({ capacityDataStatus, currentUsage, maximumCapacity, utilizationPercentage }: AdministrationSectorDto) =>
   capacityDataStatus !== 'AVAILABLE' || maximumCapacity == null || utilizationPercentage == null
     ? 'Sin datos'
     : `${integer.format(currentUsage ?? 0)} / ${integer.format(maximumCapacity)} · ${integer.format(utilizationPercentage)}%`;
+
+const idleCapacity = ({ capacityDataStatus, idlePercentage }: AdministrationSectorDto) =>
+  capacityDataStatus === 'AVAILABLE' && idlePercentage != null ? `${integer.format(idlePercentage)}%` : 'Sin datos';
+
+const annualProfitability = ({ annualOperatingProfitability, operatingCurrencyCode }: AdministrationSectorDto) => {
+  const currency = operatingCurrencyCode || 'ARS';
+  try {
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(annualOperatingProfitability ?? 0);
+  } catch {
+    return `${integer.format(annualOperatingProfitability ?? 0)} ${currency}`;
+  }
+};
 
 export function SectorList() {
   const { permissions } = useSession();
@@ -110,16 +114,16 @@ export function SectorList() {
               <span className="sector-list__identity">
                 <span role="img" aria-label={`Icono de ${sector.name}`}>{getSectorVisualMeta(sector).icon}</span>
                 <span className="sector-list__color" style={{ backgroundColor: sector.color || '#91a4c8' }} aria-label={`Color ${sector.color || 'no configurado'}`} />
-                <span><strong>{sector.name}</strong><small>{sector.code}</small></span>
+                <strong>{sector.name}</strong>
               </span>
-              <span className="sector-list__status" data-active={sector.status === 'active'}>{statusLabel(sector)}</span>
+              <span className="sector-list__status" data-status={sector.status}>{statusLabel(sector)}</span>
               <span className="sector-list__datum"><small>Responsable</small><strong>{sector.managerName || 'Sin asignar'}</strong></span>
-              <span className="sector-list__datum"><small>Horario</small><strong>{schedule(sector)}</strong></span>
-              <span className="sector-list__datum"><small>Tipo de capacidad</small><strong>{capacityType(sector)}</strong></span>
               <span className="sector-list__datum"><small>Capacidad utilizada</small><strong>{usedCapacity(sector)}</strong></span>
+              <span className="sector-list__datum"><small>Capacidad ociosa</small><strong>{idleCapacity(sector)}</strong></span>
               <span className="sector-list__datum"><small>Actividades</small><strong>{integer.format(sector.activitiesCount ?? 0)}</strong></span>
               <span className="sector-list__datum"><small>Inscriptos activos</small><strong>{integer.format(sector.activeEnrollmentsCount ?? 0)}</strong></span>
-              {sector.isSystem && <span className="sector-list__system-badge">Sistema</span>}
+              <span className="sector-list__datum sector-list__profitability"><small>Rentabilidad operativa anual</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0} title={`Acumulado ${sector.annualOperatingProfitabilityYear ?? new Date().getFullYear()} hasta hoy`}>{annualProfitability(sector)}</strong></span>
+              <span className="sector-list__system-badge" data-visible={sector.isSystem || undefined} role={sector.isSystem ? 'img' : undefined} aria-label={sector.isSystem ? 'Sector del sistema' : undefined} title={sector.isSystem ? 'Sector del sistema' : undefined}>{sector.isSystem ? '🔒' : null}</span>
               <span className="sector-list__arrow" aria-hidden="true">›</span>
             </button>
           ))}

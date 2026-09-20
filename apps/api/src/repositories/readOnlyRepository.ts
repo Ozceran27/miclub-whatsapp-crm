@@ -55,9 +55,28 @@ const listDefinitions = {
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
         where e.club_id = s.club_id and a.sector_id = s.id
           and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as active_enrollments_count,
+      coalesce((select sum(case
+        when movement.movement_type = 'INGRESOS' then abs(movement.amount)
+        when movement.movement_type = 'EGRESOS' then -abs(movement.amount)
+        else 0 end)
+        from miclub.movements movement
+        join miclub.movement_categories category on category.id = movement.category_id and category.club_id = movement.club_id
+        join miclub.category_catalog catalog on catalog.id = category.catalog_id
+        where movement.club_id = s.club_id and movement.sector_id = s.id
+          and movement.operational_status = 'COMPLETADO'
+          and movement.movement_type in ('INGRESOS', 'EGRESOS')
+          and catalog.classification = 'OPERATIONAL'
+          and movement.movement_date >= make_timestamptz(
+            extract(year from (now() at time zone coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires')))::integer,
+            1, 1, 0, 0, 0,
+            coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires'))
+          and movement.movement_date < now()), 0)::float8 as annual_operating_profitability,
+      extract(year from (now() at time zone coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires')))::integer as annual_operating_profitability_year,
+      club.base_currency_code as operating_currency_code,
       s.is_system`,
-    from: "miclub.sectors s left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id left join miclub.v_sector_capacity_metrics capacity on capacity.club_id=s.club_id and capacity.sector_id=s.id",
+    from: "miclub.sectors s join miclub.clubs club on club.id=s.club_id left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id left join miclub.v_sector_capacity_metrics capacity on capacity.club_id=s.club_id and capacity.sector_id=s.id",
     orderBy: "s.name asc, s.id asc",
+    baseWhere: "s.archived_at is null",
     filters: {
       search: textSearch(["s.code", "s.name", "s.notes"]),
       status: { column: "s.status" },

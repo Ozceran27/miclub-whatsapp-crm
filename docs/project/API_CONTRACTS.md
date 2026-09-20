@@ -79,6 +79,16 @@ Bajo `/api/economy`: summary, evolution, by-sector, rankings, categories, paymen
 - `/api/administration/summary`
 - `/api/administration/workers`
 
+`GET /api/sectores` excluye archivados y agrega por sector
+`annualOperatingProfitability`, `annualOperatingProfitabilityYear` y
+`operatingCurrencyCode`. El importe representa el resultado de categorías
+operativas completadas desde el inicio del año local del club hasta hoy.
+
+`PATCH /api/sectors/:id` usa `iconKey` como entrada canónica y sincroniza la
+metadata visual persistida. Nombre e ícono permanecen protegidos para sectores
+de sistema. `POST /api/sectors/:id/archive` conserva historia y rechaza sectores
+de sistema o con trabajadores/actividades vigentes.
+
 Además mutaciones de sectors, activities, tasks, requests, movements y enrollments.
 
 ## Concurrencia

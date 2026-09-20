@@ -56,6 +56,12 @@ void test("el contador de sectores incluye sólo actividades canónicamente acti
   assert.match(calls[0] ?? "", /a\.status = 'activa'::miclub\.entity_status/);
   assert.match(calls[0] ?? "", /a\.archived_at is null/);
   assert.doesNotMatch(calls[0] ?? "", /a\.status = 'active'/);
+  assert.match(calls[0] ?? "", /s\.archived_at is null/);
+  assert.match(calls[0] ?? "", /movement\.club_id = s\.club_id and movement\.sector_id = s\.id/);
+  assert.match(calls[0] ?? "", /movement\.operational_status = 'COMPLETADO'/);
+  assert.match(calls[0] ?? "", /catalog\.classification = 'OPERATIONAL'/);
+  assert.match(calls[0] ?? "", /make_timestamptz/);
+  assert.match(calls[0] ?? "", /club\.base_currency_code as operating_currency_code/);
 });
 
 void test("movimientos toma activity_id de la tabla base y no de la vista enriquecida", async () => {

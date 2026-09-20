@@ -60,3 +60,13 @@ test("rechaza payloads inválidos sin acceder a la base", async () => {
     assert.equal((await response.json() as { code: string }).code, "VALIDATION_ERROR");
   });
 });
+
+test("rechaza el alias ambiguo icon y expone iconKey como contrato de edición", async () => {
+  await withServer(auth, async (baseUrl) => {
+    const response = await patchSector(baseUrl, SECTOR_ID, {
+      updatedAt: "2026-08-05T12:00:00.000Z", name: "Fitness", icon: "fitness",
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json() as { code: string }).code, "VALIDATION_ERROR");
+  });
+});

@@ -155,7 +155,7 @@ export const resolveWorkerInvitationById=(userId:string,id:string,decision:'acce
 export const updateWorker = async (actor: WorkerActor, id: string, body: unknown) => {
   const input = validateWorkerMutation(body, false); const pool = await getPostgresPool();
   return withTenantTransaction(actor.clubId, async (db) => {
-    const current = (await db.query<Record<string, unknown>>(`select e.*,r.code as role_code from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update`, [actor.clubId, id])).rows[0];
+    const current = (await db.query<Record<string, unknown>>(`select e.*,r.code as role_code from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update of e`, [actor.clubId, id])).rows[0];
     if (!current) throw new WorkerMutationError("not_found", "Trabajador inexistente.");
     if (current.role_code === "DIRECTOR" && input.role !== "DIRECTOR") {
       const count = await db.query(`select 1 from miclub.user_club_memberships m join miclub.roles r on r.id=m.role_id where m.club_id=$1 and r.code='DIRECTOR' and m.status='active' and m.id<>$2 limit 1`, [actor.clubId, current.membership_id]);
@@ -192,7 +192,7 @@ export const updateWorker = async (actor: WorkerActor, id: string, body: unknown
 
 export const archiveWorker = async (actor: WorkerActor, id: string) => {
   const pool = await getPostgresPool(); return withTenantTransaction(actor.clubId, async (db) => {
-    const current = (await db.query<Record<string, unknown>>(`select e.*,r.code as role_code from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update`, [actor.clubId,id])).rows[0];
+    const current = (await db.query<Record<string, unknown>>(`select e.*,r.code as role_code from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update of e`, [actor.clubId,id])).rows[0];
     if (!current) throw new WorkerMutationError("not_found", "Trabajador inexistente.");
     if (current.role_code === "DIRECTOR") { const other = await db.query(`select 1 from miclub.user_club_memberships m join miclub.roles r on r.id=m.role_id where m.club_id=$1 and r.code='DIRECTOR' and m.status='active' and m.id<>$2 limit 1`,[actor.clubId,current.membership_id]); if (!other.rows[0]) throw new WorkerMutationError("last_director", "No se puede archivar al último Director activo."); }
     const instructor = (await db.query<{ id: string }>(`select id::text from miclub.instructors where club_id=$1 and person_id=$2 for update`, [actor.clubId, current.person_id])).rows[0];

@@ -33,3 +33,18 @@ void test('los accesos rápidos respetan orden, estado, accesibilidad y modales 
   assert.match(read('./ActivityList.tsx'), /addEventListener\('miclub:create-activity'/);
   assert.doesNotMatch(module, /administration-anchor-nav/);
 });
+
+void test('la administración de sectores presenta el nuevo resumen y editor visual', () => {
+  const list = read('./SectorList.tsx');
+  const modal = read('./SectorDetailModal.tsx');
+  assert.match(list, /Capacidad ociosa/);
+  assert.match(list, /Rentabilidad operativa anual/);
+  assert.match(list, /Sector del sistema/);
+  assert.doesNotMatch(list, /<small>\{sector\.code\}<\/small>/);
+  assert.doesNotMatch(list, /Tipo de capacidad/);
+  assert.doesNotMatch(list, /<small>Horario<\/small>/);
+  assert.match(modal, /<SectorIconPicker value=\{iconKey\}/);
+  assert.match(modal, /<ConfigurationColorPicker value=\{color\}/);
+  assert.match(modal, /Eliminar sector/);
+  assert.match(modal, /sector\.isSystem \? \{\} : \{ iconKey \}/);
+});

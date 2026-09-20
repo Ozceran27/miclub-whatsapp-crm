@@ -1,4 +1,4 @@
-import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorCreateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
+import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorCreateDto, AdministrationSectorUpdateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -16,7 +16,7 @@ export const getAdministrationSectors = (signal?: AbortSignal) =>
 
 export const createAdministrationSector = (input: AdministrationSectorCreateDto) =>
   apiJson<Record<string,unknown>>('/api/administration/sectors', { method: 'POST', body: JSON.stringify(input) });
-export const updateAdministrationSector = (id:string,input:Record<string,unknown>) => apiJson(`/api/sectors/${encodeURIComponent(id)}` as `/${string}`,{method:'PATCH',body:JSON.stringify(input)});
+export const updateAdministrationSector = (id:string,input:AdministrationSectorUpdateDto) => apiJson(`/api/sectors/${encodeURIComponent(id)}` as `/${string}`,{method:'PATCH',body:JSON.stringify(input)});
 export const changeAdministrationSectorStatus = (id:string,updatedAt:string,status:'active'|'inactive'|'under_repair') => apiJson(`/api/sectors/${encodeURIComponent(id)}/status` as `/${string}`,{method:'PATCH',body:JSON.stringify({updatedAt,status})});
 export const archiveAdministrationSector = (id:string,updatedAt:string) => apiJson(`/api/sectors/${encodeURIComponent(id)}/archive` as `/${string}`,{method:'POST',body:JSON.stringify({updatedAt})});
 
@@ -64,9 +64,6 @@ export const getAnnualActivityRanking = (signal?: AbortSignal) =>
 
 export const getSectorActivities = (sectorId: string, signal?: AbortSignal) =>
   apiJson<AdministrationActivitiesResponse>(`/api/actividades?page=1&limit=100&sectorId=${encodeURIComponent(sectorId)}`, { cache: 'no-store', signal });
-
-export const getSectorMovements = (sectorId: string, signal?: AbortSignal) =>
-  apiJson<AdministrationMovementsResponse>(`/api/movimientos?page=1&limit=20&sectorId=${encodeURIComponent(sectorId)}`, { cache: 'no-store', signal });
 
 export const getActivityEnrollments = (activityId: string, signal?: AbortSignal) =>
   apiJson<AdministrationEnrollmentsResponse>(`/api/inscripciones?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });

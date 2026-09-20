@@ -17,6 +17,16 @@ export type AdministrationSectorCreateDto = {
   capacityMode: "ENROLLMENTS" | "INCOME";
   configuredCapacity: number | null;
 };
+export type AdministrationSectorUpdateDto = {
+  updatedAt: string;
+  name: string;
+  description: string | null;
+  iconKey?: string;
+  color: string;
+  managerPersonId: string | null;
+  capacityMode: "ENROLLMENTS" | "INCOME";
+  configuredCapacity: number | null;
+};
 export type AdministrationMovementType = "INGRESOS" | "EGRESOS" | LegacyUnknownCode<"administration-movement-type">;
 export type AdministrationFinancialStatus = "sin_movimientos" | "pendiente" | "pagado" | "parcial" | "a_liquidar" | "liquidado" | "deuda" | "vencido" | "cancelado" | "otro" | LegacyUnknownCode<"administration-financial-status">;
 export type AdministrationOperationalStatus = "COMPLETADO" | "PENDIENTE" | "CANCELADO" | "ANULADO" | "REVISAR" | LegacyUnknownCode<"administration-operational-status">;
@@ -180,6 +190,9 @@ export interface AdministrationSectorDto {
   occupancyRate?: number | null;
   activitiesCount?: number;
   activeEnrollmentsCount?: number;
+  annualOperatingProfitability?: number;
+  annualOperatingProfitabilityYear?: number;
+  operatingCurrencyCode?: string;
   isSystem?: boolean;
   status: AdministrationRecordStatus;
   municipalStatus?: string | null;

@@ -39,6 +39,9 @@ void test("los instructores usan el estado canónico y no una columna is_active 
   assert.match(source, /status='activa'/);
   assert.match(source, /status='suspendida'/);
   assert.match(source, /status='cancelada'/);
+  assert.equal((source.match(/for update of e/g) ?? []).length, 2);
+  assert.doesNotMatch(source, /left join miclub\.roles[^`]+for update`/s);
+  assert.match(source, /input\.role === "INSTRUCTOR"[\s\S]+on conflict \(club_id,person_id\) do update set display_name=excluded\.display_name,status='activa'/);
 });
 
 const actor = { userId: "10000000-0000-4000-8000-000000000001", membershipId: "10000000-0000-4000-8000-000000000002", clubId: "10000000-0000-4000-8000-000000000003" };

@@ -56,6 +56,33 @@ test("updateSector rechaza un updated_at obsoleto sin escribir ni auditar", asyn
   assert.equal(queries.some(({ sql }) => sql.includes("update miclub.sectors") || sql.includes("audit_log")), false);
 });
 
+test("updateSector sincroniza icon e icon_key para que la identidad editada sea visible", async () => {
+  const before = { id: "44444444-4444-4444-8444-444444444444", club_id: actor.clubId, name: "FITNESS", icon_key: "fitness", is_system: false, updated_at: updatedAt };
+  const after = { ...before, icon_key: "tennis", updated_at: "2026-08-05T12:01:00.000Z" };
+  const queries = fakePool((sql) => {
+    if (sql.includes("from miclub.sectors")) return { rows: [before] };
+    if (sql.includes("update miclub.sectors")) return { rows: [after] };
+    if (sql.includes("INSERT INTO miclub.audit_log")) return { rows: [{ id: "audit-1" }] };
+    throw new Error(`SQL inesperado: ${sql}`);
+  });
+
+  assert.equal((await updateSector(actor, before.id, updatedAt, { iconKey: "tennis" })).kind, "updated");
+  const update = queries.find(({ sql }) => sql.includes("update miclub.sectors"));
+  assert.match(update?.sql ?? "", /icon=\$4/);
+  assert.match(update?.sql ?? "", /icon_key=\$5/);
+  assert.deepEqual(update?.params?.slice(3), ["tennis", "tennis"]);
+});
+
+test("updateSector protege el icono de un sector de sistema", async () => {
+  const before = { id: "44444444-4444-4444-8444-444444444444", name: "TESORERÍA", icon_key: "treasury", is_system: true, updated_at: updatedAt };
+  const queries = fakePool((sql) => {
+    if (sql.includes("from miclub.sectors")) return { rows: [before] };
+    throw new Error(`No debía ejecutar: ${sql}`);
+  });
+  assert.deepEqual(await updateSector(actor, before.id, updatedAt, { iconKey: "fitness" }), { kind: "protected" });
+  assert.equal(queries.some(({ sql }) => sql.includes("update miclub.sectors") || sql.includes("audit_log")), false);
+});
+
 test("updateSector sólo admite como responsable a personal operativo activo del tenant", async () => {
   const before = { id: "44444444-4444-4444-8444-444444444444", name: "FITNESS", is_system: false, updated_at: updatedAt };
   const managerId = "55555555-5555-4555-8555-555555555555";

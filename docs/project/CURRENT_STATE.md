@@ -1,5 +1,25 @@
 # Current State
 
+## Sectores administrativos y edición de trabajadores — 2026-09-20
+
+La lista de Sectores de Administración presenta identidad en una sola línea,
+estado localizado, capacidad utilizada y ociosa, conteos operativos y
+rentabilidad operativa acumulada del año en curso. La rentabilidad se calcula en
+PostgreSQL por tenant y sector con movimientos `COMPLETADO`, tipos ingreso/egreso
+y la clasificación persistida `OPERATIONAL`, respetando la zona horaria y moneda
+operativa del club. Los sectores archivados quedan fuera del catálogo visible.
+
+El editor permanente de sectores reutiliza el modal de configuración, permite
+seleccionar ícono y color, resume su operación y expone eliminación como
+archivado auditado. Los sectores de sistema conservan protegidos nombre, ícono y
+archivado. `icon` e `icon_key` se actualizan juntos para evitar identidades
+visuales divergentes.
+
+La edición y el archivado de trabajadores bloquean exclusivamente la fila de
+`employees` en las consultas con joins opcionales. Esto evita el error PostgreSQL
+`0A000` al cambiar un Trabajador a Instructor y conserva la sincronización
+tenant-scoped de rol, permisos e Instructor.
+
 ## Tesorería y sectores obligatorios — 2026-09-20
 
 La superficie visible antes llamada “Economía Club” se denomina **Tesorería** en
