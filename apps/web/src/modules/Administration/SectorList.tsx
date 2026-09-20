@@ -61,6 +61,11 @@ export function SectorList() {
   }, [load]);
 
   useEffect(() => { if (creating && templates.length === 0) void getSectorTemplates().then(({items}) => setTemplates(items)).catch((e: unknown) => setError(e instanceof Error ? e.message : 'No se pudo cargar el catálogo.')); }, [creating, templates.length]);
+  useEffect(() => {
+    const openCreation = () => { if (canCreate) setCreating(true); };
+    window.addEventListener('miclub:create-sector', openCreation);
+    return () => window.removeEventListener('miclub:create-sector', openCreation);
+  }, [canCreate]);
 
   const create = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); const data = new FormData(event.currentTarget); setLoading(true); setError(null);

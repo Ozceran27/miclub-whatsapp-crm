@@ -6,27 +6,31 @@ import { PERMISSIONS } from "@miclub/shared";
 import { setPostgresPoolForTests, type PgPool } from "../db/postgres.js";
 import moduleRoutes from "./moduleRoutes.js";
 
-test("GET /api/modules/navigation usa el estado administrativo canónico de sectores", async () => {
+void test("GET /api/modules/navigation usa el estado administrativo canónico de sectores", async () => {
   const fixtures = [
     { id: "active", name: "Activo", code: "activo", operational_status: "activa", archived_at: null },
+    { id: "administration", name: "Administración", code: "administracion", operational_status: "activa", archived_at: null, is_system: true },
+    { id: "treasury", name: "Tesorería", code: "tesoreria", operational_status: "activa", archived_at: null, is_system: true },
+    { id: "common-areas", name: "Áreas Comunes", code: "areas-comunes", operational_status: "activa", archived_at: null, is_system: true },
     { id: "inactive", name: "Suspendido", code: "suspendido", operational_status: "suspendida", archived_at: null },
     { id: "null", name: "Sin estado", code: "sin-estado", operational_status: null, archived_at: null },
   ];
   let sectorSql = "";
-  const query = async <T>(sql: string) => {
-    if (["BEGIN","COMMIT","ROLLBACK"].includes(sql) || sql.includes("set_config")) return {rows:[] as T[]};
+  const query = <T>(sql: string): Promise<{ rows: T[] }> => {
+    if (["BEGIN","COMMIT","ROLLBACK"].includes(sql) || sql.includes("set_config")) return Promise.resolve({rows:[] as T[]});
     if (sql.includes("from miclub.sectors")) {
       sectorSql = sql;
       if (/operational_status\s*[,<>=)]*\s*'(?:active|inactive)'/.test(sql)
         || /coalesce\(operational_status,\s*'(?:active|inactive)'/.test(sql)) throw Object.assign(new Error("invalid input value for enum miclub.entity_status"), { code: "22P02" });
-      return { rows: fixtures.filter((row) => row.operational_status === null || row.operational_status === "activa") as T[] };
+      return Promise.resolve({ rows: fixtures.filter((row) => (row.operational_status === null || row.operational_status === "activa")
+        && !(row.is_system && ["administracion", "tesoreria"].includes(row.code))) as T[] });
     }
-    if (sql.includes("from miclub.club_capabilities")) return { rows: [] as T[] };
-    throw new Error(`Consulta inesperada: ${sql}`);
+    if (sql.includes("from miclub.club_capabilities")) return Promise.resolve({ rows: [] as T[] });
+    return Promise.reject(new Error(`Consulta inesperada: ${sql}`));
   };
   const pool = {
     query,
-    async connect() { return {query,release(){}}; },
+    connect() { return Promise.resolve({query,release(){}}); },
     async end() {},
   } as PgPool;
   setPostgresPoolForTests(pool);
@@ -47,8 +51,9 @@ test("GET /api/modules/navigation usa el estado administrativo canónico de sect
     const response = await fetch(`http://127.0.0.1:${address.port}/api/modules/navigation`);
     assert.equal(response.status, 200);
     const body = await response.json() as { sectors: Array<{ id: string }> };
-    assert.deepEqual(body.sectors.map(({ id }) => id), ["active", "null"]);
+    assert.deepEqual(body.sectors.map(({ id }) => id), ["active", "common-areas", "null"]);
     assert.match(sectorSql, /status='active'/);
+    assert.match(sectorSql, /is_system and code in \('administracion','tesoreria'\)/);
     assert.doesNotMatch(sectorSql, /operational_status[^\n]*'(?:active|inactive)'/);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

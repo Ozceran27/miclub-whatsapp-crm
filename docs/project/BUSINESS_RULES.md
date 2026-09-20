@@ -34,6 +34,11 @@ Sectores de sistema esperados al provisionar club:
 - Tesorería.
 - Áreas Comunes.
 
+En la navegación principal, Administración se representa mediante el módulo núcleo
+Administración y Tesorería mediante Economía Club. Esos dos sectores persisten en
+PostgreSQL pero no deben crear pestañas dinámicas duplicadas. Áreas Comunes sí
+dispone de pestaña sectorial propia.
+
 Su lógica debe basarse en códigos/system metadata, no en strings dispersos.
 
 ## 4. Personas e identidades
@@ -203,6 +208,8 @@ Los cálculos deben respetar timezone del club cuando el modelo permita personal
   financieros con historia.
 - Toda actividad nueva o modificada exige Instructor operativo. El Instructor es
   responsable operativo; `responsible_person_id` identifica al receptor económico.
+- Un Instructor operativo se identifica con `instructors.status = 'activa'`; el
+  esquema canónico no duplica ese estado mediante un booleano `is_active`.
 - VARIABLE guarda el porcentaje del club. FIXED guarda el importe del club y su
   frecuencia DAILY/WEEKLY/MONTHLY/YEARLY.
 - Cada vencimiento fijo se imputa completo a una fecha y a un único mes: diario

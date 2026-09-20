@@ -14,6 +14,7 @@ import { MovementCreateModal } from './Administration/MovementCreateModal';
 import { EnrollmentCreateModal } from './Administration/EnrollmentCreateModal';
 import { useSession } from '../session';
 import { useState } from 'react';
+import { PERMISSIONS } from '@miclub/shared';
 import { getAdministrationCapabilities, type AdministrationCapability } from '../administrationCapabilities';
 import { MoneyPresentation } from './shared/MoneyPresentation';
 import type { PresentationCurrencyCode } from '../utils';
@@ -26,6 +27,9 @@ export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
   const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false);
   const capabilities = getAdministrationCapabilities(session.permissions);
+  const canCreateSector=session.permissions.includes(PERMISSIONS.SECTORS_CREATE);
+  const canCreateWorker=session.permissions.includes(PERMISSIONS.WORKERS_MANAGE);
+  const canCreateActivity=session.permissions.includes(PERMISSIONS.ACTIVITIES_CREATE);
 
   return (
     <main className="module-content">
@@ -77,7 +81,18 @@ export default function AdministrationModule() {
             presentationCurrencyCode={dashboard.summary.balance.conversion.presentationCurrencyCode as PresentationCurrencyCode}
             quote={{ appliedRate: dashboard.summary.balance.conversion.appliedRate, rateDate: dashboard.summary.balance.conversion.rateDate, source: dashboard.summary.balance.conversion.source, convertedValue: dashboard.summary.balance.conversion.appliedRate === null ? null : dashboard.summary.balance.conversion.convertedValue }}
           />}
-          <AdministrationActions onCreateMovement={()=>setMovementOpen(true)} onCreateEnrollment={()=>setEnrollmentOpen(true)} canCreateMovement={capabilities.createMovement} canCreateEnrollment={capabilities.createEnrollment}/>
+          <AdministrationActions
+            onCreateMovement={()=>setMovementOpen(true)}
+            onCreateEnrollment={()=>setEnrollmentOpen(true)}
+            onCreateSector={()=>window.dispatchEvent(new Event('miclub:create-sector'))}
+            onCreateWorker={()=>window.dispatchEvent(new Event('miclub:create-worker'))}
+            onCreateActivity={()=>window.dispatchEvent(new Event('miclub:create-activity'))}
+            canCreateMovement={capabilities.createMovement}
+            canCreateEnrollment={capabilities.createEnrollment}
+            canCreateSector={canCreateSector}
+            canCreateWorker={canCreateWorker}
+            canCreateActivity={canCreateActivity}
+          />
         </section>
       )}
       </div>

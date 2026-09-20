@@ -51,6 +51,12 @@ export function ActivityList({ canViewFinancials }: { canViewFinancials: boolean
     return () => {window.clearTimeout(timer);controller.abort();};
   }, [load]);
 
+  useEffect(() => {
+    const openCreation = () => { if (canCreate) setEditingActivity('new'); };
+    window.addEventListener('miclub:create-activity', openCreation);
+    return () => window.removeEventListener('miclub:create-activity', openCreation);
+  }, [canCreate]);
+
   const annualItems = useMemo(()=>ranking?.annual.items ?? [],[ranking]);
   const financialByActivity = useMemo(() => new Map(annualItems.filter(({ id }) => id).map((item) => [item.id, item])), [annualItems]);
   const selectedActivity = activities.find(({ id }) => id === selectedActivityId);

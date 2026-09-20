@@ -59,7 +59,7 @@ router.get("/activity-icons", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), as
 
 router.get("/activity-instructors", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (req, res) => {
   const result = await tenantExecutor(req.auth!.clubId).query(`select id, person_id as "personId", display_name as "displayName", true as "isActive"
-    from miclub.instructors where club_id=$1 and is_active=true order by display_name, id`, [req.auth!.clubId]);
+    from miclub.instructors where club_id=$1 and status='activa' order by display_name, id`, [req.auth!.clubId]);
   res.json({ items: result.rows });
 }));
 

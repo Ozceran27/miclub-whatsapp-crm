@@ -46,6 +46,12 @@ export function WorkerList() {
     return () => {window.clearTimeout(timer);controller.abort();};
   }, [load]);
 
+  useEffect(() => {
+    const openCreation = () => { if (canManage) setCreating(true); };
+    window.addEventListener('miclub:create-worker', openCreation);
+    return () => window.removeEventListener('miclub:create-worker', openCreation);
+  }, [canManage]);
+
   const workers = response?.items ?? [];
   return (
     <section className="section-panel worker-list" aria-labelledby="worker-list-title" aria-busy={loading}>

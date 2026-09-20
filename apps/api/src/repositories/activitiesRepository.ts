@@ -39,12 +39,12 @@ const validReferences = async (executor: { query: Pool["query"] }, actor: Activi
   const result = await executor.query<{ sector: boolean; manager: boolean; instructor: boolean; responsible: boolean; instructor_person_id: string | null }>(`
     select exists(select 1 from miclub.sectors where club_id=$1 and id=$2 and archived_at is null) sector,
       ($3::uuid is null or exists(select 1 from miclub.people where club_id=$1 and id=$3)) manager,
-      exists(select 1 from miclub.instructors where club_id=$1 and id=$4 and is_active=true) instructor,
-      (select person_id from miclub.instructors where club_id=$1 and id=$4 and is_active=true) instructor_person_id,
+      exists(select 1 from miclub.instructors where club_id=$1 and id=$4 and status='activa') instructor,
+      (select person_id from miclub.instructors where club_id=$1 and id=$4 and status='activa') instructor_person_id,
       ($5::uuid is null or exists(
         select 1 from miclub.people p where p.club_id=$1 and p.id=$5 and (
           exists(select 1 from miclub.employees e where e.club_id=p.club_id and e.person_id=p.id and e.status='active' and e.archived_at is null)
-          or exists(select 1 from miclub.instructors i where i.club_id=p.club_id and i.person_id=p.id and i.is_active=true)
+          or exists(select 1 from miclub.instructors i where i.club_id=p.club_id and i.person_id=p.id and i.status='activa')
         ))) responsible`,
   [actor.clubId, input.sectorId, input.managerPersonId, input.instructorId, input.responsiblePersonId ?? null]);
   const row = result.rows[0];

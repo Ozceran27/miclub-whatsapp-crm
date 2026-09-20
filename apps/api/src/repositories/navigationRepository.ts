@@ -11,6 +11,7 @@ export async function listNavigableSectors(clubId: string, db: QueryExecutor): P
     `select id, name, code from miclub.sectors
      where club_id=$1 and archived_at is null
        and status='active'
+       and not (is_system and code in ('administracion','tesoreria'))
      order by name`,
     [clubId],
   );

@@ -33,6 +33,14 @@ test("SQL contiene auditoría previa, gate, compatibilidad y verificaciones", ()
   assert.doesNotMatch(executableSql,/on conflict\s*\(club_id,\s*code\)/i);
 });
 
+void test("los instructores usan el estado canónico y no una columna is_active inexistente", () => {
+  const source = readFileSync(new URL("./workerMutationService.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /miclub\.instructors[^`]*is_active/s);
+  assert.match(source, /status='activa'/);
+  assert.match(source, /status='suspendida'/);
+  assert.match(source, /status='cancelada'/);
+});
+
 const actor = { userId: "10000000-0000-4000-8000-000000000001", membershipId: "10000000-0000-4000-8000-000000000002", clubId: "10000000-0000-4000-8000-000000000003" };
 const existingBody = { ...base, password: undefined };
 const mockPool = (respond: (sql: string, params: unknown[]) => Record<string, unknown>[]) => {

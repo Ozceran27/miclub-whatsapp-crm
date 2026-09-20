@@ -1,5 +1,26 @@
 # Current State
 
+## Correcciones operativas posteriores al despliegue — 2026-09-19
+
+La lista de movimientos obtiene `activity_id` desde `miclub.movements`, porque la
+vista histórica `v_movements_enriched` no expone esa columna. Esto elimina el
+`42703` observado en `/api/movimientos` sin modificar el esquema real.
+
+El catálogo y las mutaciones de instructores usan `instructors.status` con los
+valores reales de `miclub.entity_status` (`activa`, `suspendida`, `cancelada`). El
+runtime ya no consulta ni intenta escribir una columna `instructors.is_active`
+que no existe en el esquema desplegado.
+
+Los accesos rápidos “Gestionar Sectores”, “Gestionar Trabajadores” y “Gestionar
+Actividades” abren los formularios permanentes de creación según los permisos de
+la membresía. Ya no se resuelven como funcionalidades futuras.
+
+Administración y Tesorería continúan siendo sectores de sistema persistidos para
+relaciones operativas y financieras, pero no generan pestañas sectoriales
+duplicadas: sus superficies son los módulos núcleo Administración y Economía
+Club, respectivamente. Áreas Comunes y los sectores configurables sí se publican
+como pestañas dinámicas.
+
 ## Configuración operativa desde Administración — 2026-09-19
 
 Administración es ahora la superficie permanente para crear, consultar, editar y

@@ -76,6 +76,9 @@ for (const settlement of [
   assert.deepEqual(insert?.params?.slice(2, 7), [settlement.mode, settlement.fixedClubFee, settlement.fixedFeeFrequency, settlement.currencyCode, settlement.clubSharePercentage]);
   assert.equal(insert?.params?.[9], settlement.effectiveFrom);
   assert.equal(queries.filter(({ sql }) => sql.includes('INSERT INTO miclub.audit_log')).length, 2, 'audita actividad y término');
+  const references = queries.find(({ sql }) => sql.includes('select exists(select 1 from miclub.sectors'));
+  assert.match(references?.sql ?? '', /miclub\.instructors[\s\S]*status='activa'/);
+  assert.doesNotMatch(references?.sql ?? '', /is_active/);
   assert.equal(queries.at(-1)?.sql, 'COMMIT');
 });
 

@@ -67,7 +67,7 @@ export const updateSector = async (actor: SectorActor, id: string, expectedUpdat
     if (input.managerPersonId) {
       const manager = await executor.query(`select p.id from miclub.people p where p.club_id=$1 and p.id=$2 and (
         exists(select 1 from miclub.employees e where e.club_id=p.club_id and e.person_id=p.id and e.status='active' and e.archived_at is null)
-        or exists(select 1 from miclub.instructors i where i.club_id=p.club_id and i.person_id=p.id and i.is_active=true)
+        or exists(select 1 from miclub.instructors i where i.club_id=p.club_id and i.person_id=p.id and i.status='activa')
       )`, [actor.clubId, input.managerPersonId]);
       if (!manager.rows[0]) return { kind: "invalid_manager" };
     }

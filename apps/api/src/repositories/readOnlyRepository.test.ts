@@ -57,3 +57,34 @@ void test("el contador de sectores incluye sólo actividades canónicamente acti
   assert.match(calls[0] ?? "", /a\.archived_at is null/);
   assert.doesNotMatch(calls[0] ?? "", /a\.status = 'active'/);
 });
+
+void test("movimientos toma activity_id de la tabla base y no de la vista enriquecida", async () => {
+  const calls: Array<{ sql: string; params: unknown[] }> = [];
+  const pool: PgPool = {
+    query: <T>(sql: string, params: unknown[] = []) => {
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql) || sql.includes("set_config")) return Promise.resolve({ rows: [] });
+      calls.push({ sql, params });
+      return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "0" }] : []) as T[] });
+    },
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
+  };
+  pool.connect = () => Promise.resolve({ query: pool.query, release: () => undefined });
+  setPostgresPoolForTests(pool);
+
+  await getReadOnlyPage("movimientos", {
+    clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    limit: 20,
+    offset: 0,
+    filters: { activityId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+  });
+
+  assert.match(calls[0]?.sql ?? "", /movement_sequence\.activity_id/);
+  assert.doesNotMatch(calls[0]?.sql ?? "", /m\.activity_id/);
+  assert.deepEqual(calls[0]?.params, [
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    20,
+    0,
+  ]);
+});

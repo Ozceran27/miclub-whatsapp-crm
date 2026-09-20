@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 
 type AdministrationAction = {
+  operation?: 'movement' | 'enrollment' | 'sector' | 'worker' | 'activity';
   label: string;
   description: string;
   icon: string;
@@ -19,8 +20,8 @@ const reservationDefinitions = [
 ];
 
 const administrationActions: AdministrationAction[] = [
-  { label: 'Cargar Movimiento', description: 'Registrar ingresos, egresos o ajustes administrativos del club.', icon: '↕' },
-  { label: 'Cargar Inscripción', description: 'Iniciar el alta de una persona en una actividad o plan.', icon: '📝' },
+  { operation: 'movement', label: 'Cargar Movimiento', description: 'Registrar ingresos, egresos o ajustes administrativos del club.', icon: '↕' },
+  { operation: 'enrollment', label: 'Cargar Inscripción', description: 'Iniciar el alta de una persona en una actividad o plan.', icon: '📝' },
   { label: 'Cargar Cuota', description: 'Gestionar la carga de cuotas y vencimientos asociados.', icon: '💳' },
   {
     label: 'Crear Reserva',
@@ -29,10 +30,10 @@ const administrationActions: AdministrationAction[] = [
     placeholder: { pendingDefinitions: reservationDefinitions }
   },
   { label: 'Cargar Socio', description: 'Dar de alta o actualizar los datos principales de un socio.', icon: '👤' },
-  { label: 'Gestionar Sectores', description: 'Administrar sectores, cupos y metadatos visibles del club.', icon: '🏟️' },
+  { operation: 'sector', label: 'Gestionar Sectores', description: 'Crear un sector y administrar cupos y metadatos visibles del club.', icon: '🏟️' },
   { label: 'Gestionar Categorías', description: 'Organizar categorías administrativas para clasificar operaciones.', icon: '🏷️' },
-  { label: 'Gestionar Trabajadores', description: 'Mantener trabajadores, roles y responsabilidades operativas.', icon: '🧑‍💼' },
-  { label: 'Gestionar Actividades', description: 'Editar actividades, oferta vigente y configuración asociada.', icon: '⭐' },
+  { operation: 'worker', label: 'Gestionar Trabajadores', description: 'Crear trabajadores y mantener sus roles y responsabilidades.', icon: '🧑‍💼' },
+  { operation: 'activity', label: 'Gestionar Actividades', description: 'Crear actividades y configurar su operación y liquidación.', icon: '⭐' },
   {
     label: 'Gestionar Membresías',
     description: 'Próxima etapa: planes y condiciones comerciales, luego de validar el modelo integral.',
@@ -41,7 +42,20 @@ const administrationActions: AdministrationAction[] = [
   }
 ];
 
-export function AdministrationActions({onCreateMovement,onCreateEnrollment,canCreateMovement,canCreateEnrollment}:{onCreateMovement:()=>void;onCreateEnrollment:()=>void;canCreateMovement:boolean;canCreateEnrollment:boolean}) {
+type AdministrationActionsProps = {
+  onCreateMovement: () => void;
+  onCreateEnrollment: () => void;
+  onCreateSector: () => void;
+  onCreateWorker: () => void;
+  onCreateActivity: () => void;
+  canCreateMovement: boolean;
+  canCreateEnrollment: boolean;
+  canCreateSector: boolean;
+  canCreateWorker: boolean;
+  canCreateActivity: boolean;
+};
+
+export function AdministrationActions(props: AdministrationActionsProps) {
   const feedbackId = useId();
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
 
@@ -52,6 +66,14 @@ export function AdministrationActions({onCreateMovement,onCreateEnrollment,canCr
 
     setSelectedAction(`${action.label}: ${detail}`);
   };
+
+  const operation = {
+    movement: { run: props.onCreateMovement, enabled: props.canCreateMovement },
+    enrollment: { run: props.onCreateEnrollment, enabled: props.canCreateEnrollment },
+    sector: { run: props.onCreateSector, enabled: props.canCreateSector },
+    worker: { run: props.onCreateWorker, enabled: props.canCreateWorker },
+    activity: { run: props.onCreateActivity, enabled: props.canCreateActivity },
+  } as const;
 
   const feedbackMessage = selectedAction ? `${selectedAction}.` : 'Seleccioná una acción administrativa para continuar.';
 
@@ -66,28 +88,31 @@ export function AdministrationActions({onCreateMovement,onCreateEnrollment,canCr
       </div>
 
       <div className="administration-actions__grid" aria-describedby={feedbackId}>
-        {administrationActions.map((action) => (
-          <button
-            aria-label={`${action.label}. ${action.description}`}
-            className={`administration-action-card${action.placeholder ? ' administration-action-card--placeholder' : ''}`}
-            key={action.label}
-            onClick={() => action.label==='Cargar Movimiento'?onCreateMovement():action.label==='Cargar Inscripción'?onCreateEnrollment():handlePreparedAction(action)}
-            disabled={(action.label==='Cargar Movimiento'&&!canCreateMovement)||(action.label==='Cargar Inscripción'&&!canCreateEnrollment)}
-            type="button"
-          >
-            <span className="administration-action-card__icon" aria-hidden="true">{action.icon}</span>
-            <span className="administration-action-card__content">
-              <span className="administration-action-card__title">
-                <strong>{action.label}</strong>
-                {action.placeholder && <span className="administration-action-card__badge">Próximamente</span>}
+        {administrationActions.map((action) => {
+          const configuredOperation = action.operation ? operation[action.operation] : undefined;
+          return (
+            <button
+              aria-label={`${action.label}. ${action.description}`}
+              className={`administration-action-card${action.placeholder ? ' administration-action-card--placeholder' : ''}`}
+              key={action.label}
+              onClick={() => configuredOperation ? configuredOperation.run() : handlePreparedAction(action)}
+              disabled={configuredOperation ? !configuredOperation.enabled : false}
+              type="button"
+            >
+              <span className="administration-action-card__icon" aria-hidden="true">{action.icon}</span>
+              <span className="administration-action-card__content">
+                <span className="administration-action-card__title">
+                  <strong>{action.label}</strong>
+                  {action.placeholder && <span className="administration-action-card__badge">Próximamente</span>}
+                </span>
+                <small>{action.description}</small>
               </span>
-              <small>{action.description}</small>
-            </span>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
 
-      {!canCreateMovement&&<p className="administration-actions__feedback">No tenés el permiso movements.create para cargar movimientos.</p>}{!canCreateEnrollment&&<p className="administration-actions__feedback">No tenés el permiso enrollments.create para cargar inscripciones.</p>}<p className="administration-actions__feedback" id={feedbackId} role="status" aria-live="polite">
+      {!props.canCreateMovement&&<p className="administration-actions__feedback">No tenés permiso para cargar movimientos.</p>}{!props.canCreateEnrollment&&<p className="administration-actions__feedback">No tenés permiso para cargar inscripciones.</p>}<p className="administration-actions__feedback" id={feedbackId} role="status" aria-live="polite">
         {feedbackMessage}
       </p>
     </section>
