@@ -23,6 +23,7 @@ WHERE membership_id IS NULL OR position IS NULL OR position<>upper(trim(position
 ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_position_role_check;
 ALTER TABLE miclub.employees ADD CONSTRAINT employees_position_role_check
   CHECK(position IN ('DIRECTOR','INSTRUCTOR','TRABAJADOR'));
+ALTER TABLE miclub.employees ALTER COLUMN position SET NOT NULL;
 
 -- Replace the single-column sector FK with a tenant-scoped relationship.
 ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_sector_id_fkey;

@@ -2,6 +2,7 @@ import { isActivityIconKey, ROLE_DEFAULT_PERMISSIONS, REQUIRED_ONBOARDING_STEPS,
 import { hashPassword } from "../auth/passwordHasher.js";
 import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
+import { hasActivityResponsibleEmployee } from "../db/schemaCapabilities.js";
 import { auditService } from "../services/auditService.js";
 import { billingService } from "../services/billingService.js";
 import { readCommercialPlanCatalog } from "../services/planCommercialCatalog.js";
@@ -134,6 +135,7 @@ export const completeOnboardingDraft=async(actor:OnboardingActor,draft:Onboardin
  await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`${actor.clubId}:COMPLETE_ONBOARDING`]);
  const previous=await db.query<{idempotency_key:string;result:unknown}>(`select idempotency_key,result from miclub.onboarding_operations where club_id=$1 and operation='COMPLETE_ONBOARDING' for update`,[actor.clubId]);
  if(previous.rows[0]){if(previous.rows[0].idempotency_key!==draft.idempotencyKey)throw Object.assign(new Error('El onboarding ya fue finalizado con otra operación.'),{code:'ONBOARDING_ALREADY_COMPLETED'});return completionResultFromRow(previous.rows[0].result);}
+ if(draft.activities.length && !await hasActivityResponsibleEmployee(db))throw Object.assign(new Error('La migración de responsables de actividades todavía no fue aplicada. Ejecute el SQL versionado antes de finalizar actividades.'),{code:'ONBOARDING_SCHEMA_UNAVAILABLE'});
  const before=await ensure(db,actor.clubId); const selectedPlan=await validateDraftCatalog(ctx);
  await db.query(`insert into miclub.onboarding_operations(club_id,operation,idempotency_key,contract_version,created_by) values($1,'COMPLETE_ONBOARDING',$2,$3,$4)`,[actor.clubId,draft.idempotencyKey,draft.contractVersion,actor.userId]);
  await finalizePlan(ctx,selectedPlan.code);const openingBalanceBatchId=await finalizeBalances(ctx);const sectorIds=await finalizeSectors(ctx);const workerIds=await finalizeWorkers(ctx);const activityIds=await finalizeActivities(ctx);await finalizeFileAssociations(ctx);

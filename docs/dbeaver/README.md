@@ -17,6 +17,16 @@ Los archivos son SQL plano UTF-8. Abrirlos directamente desde DBeaver y usar
 **Execute SQL Script**; no copiar una representación JSON que muestre `\n`, ya
 que esos caracteres literales no son saltos de línea válidos en PostgreSQL.
 
+## Responsables operativos y roles laborales (2026-09-21)
+
+Para habilitar responsables de actividad que puedan ser Director, Instructor o
+Trabajador, ejecutar completo
+[`2026-09-21-responsables-trabajadores.sql`](2026-09-21-responsables-trabajadores.sql).
+El archivo recupera primero cualquier transacción abortada, crea la columna antes
+de diagnosticar el backfill y termina con validaciones dentro de la misma
+transacción. Ante cualquier excepción PostgreSQL no confirma cambios: corregir la
+causa y volver a ejecutar **todo** el archivo, no sólo la sentencia que falló.
+
 ## Procedimientos históricos de Fernando (no usar en instalaciones nuevas)
 
 > **HISTÓRICO — REPARACIÓN LEGACY.** Los pasos 01/02/03/08 y el backfill

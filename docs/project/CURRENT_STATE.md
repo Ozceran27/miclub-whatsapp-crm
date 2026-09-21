@@ -308,14 +308,30 @@ La navegación principal presenta Inicio, Administración, Tesorería, Sectores,
 CRM y Migración. Administración/Tesorería siguen sujetos a RBAC pero nunca se
 duplican dentro de Sectores; Áreas Comunes y los sectores personalizados activos
 se agrupan en el menú accesible Sectores.
+El submenú se renderiza mediante un portal en `document.body` y se posiciona
+contra el botón; por eso no aumenta el ancho ni queda recortado por el scroll de
+la barra principal. Recalcula su posición al desplazar o redimensionar la ventana.
 
 `employees.position` es el rol laboral canónico aun sin cuenta. La edición usa
 `updatedAt`, persiste identidad/contacto/sector/remuneración y separa el correo de
-contacto del correo global de acceso. Las actividades nuevas usan
+contacto del correo global de acceso. La migración normaliza sus valores y deja
+la columna obligatoria. Las actividades nuevas y el upsert histórico usan
 `activities.responsible_employee_id`; cualquier trabajador activo del tenant puede
 ser responsable operativo. `activity_terms.responsible_person_id` conserva el
 receptor económico histórico y, por defecto, sigue a la persona del responsable.
 
 La migración `202609210001_worker_activity_responsibility.sql` y el script manual
 `docs/dbeaver/2026-09-21-responsables-trabajadores.sql` realizan el backfill con
-diagnóstico de ambigüedad. No se aplicaron escrituras sobre la base auditada.
+diagnóstico de ambigüedad. El script manual crea idempotentemente
+`responsible_employee_id` antes de consultarla, comienza con `ROLLBACK` para
+recuperar una sesión DBeaver abortada y valida todas sus tablas dependientes.
+La aplicación detecta la instalación por la capacidad estructural real, no por
+una entrada artificial en el ledger, por lo que este procedimiento manual
+habilita las mutaciones al terminar el `COMMIT`. No se aplicaron escrituras sobre
+la base auditada.
+Hasta que el operador aplique esa migración, las listas de Actividades,
+Trabajadores y referencias XLSX detectan la capacidad del esquema y leen la
+relación histórica de Instructor sin provocar un error 500. Las escrituras que
+requieren responsables generales y el onboarding con actividades fallan cerrado
+con un error 503 de esquema pendiente; no simulan soporte que PostgreSQL aún no
+posee.

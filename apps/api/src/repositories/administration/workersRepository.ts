@@ -1,5 +1,6 @@
 import { getPostgresPool } from "../../db/postgres.js";
 import { withTenantTransaction } from "../../db/transaction.js";
+import { hasActivityResponsibleEmployee } from "../../db/schemaCapabilities.js";
 
 type WorkerRow = {
   id: string;
@@ -52,6 +53,10 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
   return withTenantTransaction(clubId,async db=>{
   const exists = await db.query<{ employees: string | null }>("select to_regclass('miclub.employees')::text as employees");
   const hasEmployees = Boolean(exists.rows[0]?.employees);
+  const hasCanonicalResponsibility = hasEmployees && await hasActivityResponsibleEmployee(db);
+  const activityOwnerPredicate = hasCanonicalResponsibility
+    ? "(a.responsible_employee_id = e.id or (a.responsible_employee_id is null and a.instructor_id = i.id))"
+    : "a.instructor_id = i.id";
 
   const result = hasEmployees
     ? await db.query<WorkerRow>(`
@@ -80,7 +85,7 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
           select json_agg(json_build_object('id', a.id::text, 'name', a.name, 'status', a.status) order by a.name) as items
           from miclub.activities a
           where a.club_id = e.club_id
-            and (a.responsible_employee_id = e.id or (a.responsible_employee_id is null and a.instructor_id = i.id))
+            and ${activityOwnerPredicate}
             and a.archived_at is null
         ) activities on true
         where e.club_id = $1 and e.archived_at is null

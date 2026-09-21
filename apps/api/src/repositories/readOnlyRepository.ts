@@ -1,4 +1,5 @@
 import { tenantExecutor } from "../db/transaction.js";
+import { hasActivityResponsibleEmployee } from "../db/schemaCapabilities.js";
 
 export type ReadOnlyRow = Record<string, unknown>;
 
@@ -199,6 +200,12 @@ export type ReadOnlyResource = keyof typeof listDefinitions;
 
 export const readOnlyResources = Object.keys(listDefinitions) as ReadOnlyResource[];
 
+const legacyActivityDefinition = (): ListDefinition => ({
+  ...listDefinitions.actividades,
+  from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join lateral (select e.id,e.person_id from miclub.employees e where e.person_id=i.person_id and e.club_id=a.club_id and e.archived_at is null order by e.created_at,e.id limit 1) responsible_employee on true left join miclub.people operational_responsible on operational_responsible.id=responsible_employee.person_id and operational_responsible.club_id=a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id",
+  select: listDefinitions.actividades.select.replace("a.responsible_employee_id", "responsible_employee.id as responsible_employee_id"),
+});
+
 const buildWhere = (definition: ListDefinition, query: PageQuery): { sql: string; params: unknown[] } => {
   const params: unknown[] = [query.clubId];
   const clauses = [`${definition.clubColumn} = $1`];
@@ -221,8 +228,9 @@ const buildWhere = (definition: ListDefinition, query: PageQuery): { sql: string
 };
 
 export const getReadOnlyPage = async (resource: ReadOnlyResource, query: PageQuery): Promise<ReadOnlyPage> => {
-  const definition = listDefinitions[resource];
   const pool = tenantExecutor(query.clubId);
+  let definition: ListDefinition = listDefinitions[resource];
+  if (resource === "actividades" && !await hasActivityResponsibleEmployee(pool)) definition = legacyActivityDefinition();
   const where = buildWhere(definition, query);
   const limitParam = where.params.length + 1;
   const offsetParam = where.params.length + 2;

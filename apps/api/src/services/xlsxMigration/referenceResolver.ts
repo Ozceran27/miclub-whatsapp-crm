@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { withTenantTransaction } from "../../db/transaction.js";
 import { normalizeComparableText } from "../../importers/normalizers.js";
 import type { MigrationIssue } from "./validator.js";
+import { hasActivityResponsibleEmployee } from "../../db/schemaCapabilities.js";
 
 export type ImportReference = { id:string; name:string; code?:string|null; aliases?:string[] };
 /** instructorId is retained as a wire-compatible alias for responsibleEmployeeId during the v4 import transition. */
@@ -59,9 +60,17 @@ export function resolveReferenceRows(rows:ReferenceRow[], catalog:ReferenceCatal
 
 export async function loadReferenceCatalog(clubId:string):Promise<ReferenceCatalog> {
   return withTenantTransaction(clubId,async(db)=>{
+    const canonicalResponsibility=await hasActivityResponsibleEmployee(db);
+    const activitiesSql=canonicalResponsibility
+      ? `select id,name,code,sector_id,responsible_employee_id,modality from miclub.activities where club_id=$1 and archived_at is null`
+      : `select a.id,a.name,a.code,a.sector_id,legacy_employee.id as responsible_employee_id,a.modality
+         from miclub.activities a
+         left join miclub.instructors i on i.id=a.instructor_id and i.club_id=a.club_id
+         left join lateral (select e.id from miclub.employees e where e.club_id=a.club_id and e.person_id=i.person_id and e.archived_at is null order by e.created_at limit 1) legacy_employee on true
+         where a.club_id=$1 and a.archived_at is null`;
     const [sectors,activities,instructors,categories,paymentMethods,people,accounts]=await Promise.all([
       db.query<ImportReference>(`select id,name,code from miclub.sectors where club_id=$1`,[clubId]),
-      db.query<{id:string;name:string;code:string|null;sector_id:string;responsible_employee_id:string|null;modality:string|null}>(`select id,name,code,sector_id,responsible_employee_id,modality from miclub.activities where club_id=$1 and archived_at is null`,[clubId]),
+      db.query<{id:string;name:string;code:string|null;sector_id:string;responsible_employee_id:string|null;modality:string|null}>(activitiesSql,[clubId]),
       db.query<ImportReference>(`select e.id,concat_ws(' ',p.first_name,p.last_name) as name,null::text as code from miclub.employees e join miclub.people p on p.club_id=e.club_id and p.id=e.person_id where e.club_id=$1 and e.status='active' and e.archived_at is null`,[clubId]),
       db.query<ImportReference>(`select mc.id,mc.name,cc.code,coalesce(array_agg(cia.normalized_alias) filter (where cia.normalized_alias is not null),'{}') as aliases from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id left join miclub.category_import_aliases cia on cia.catalog_id=cc.id where mc.club_id=$1 and mc.is_active=true and cc.is_active=true group by mc.id,mc.name,cc.code`,[clubId]),
       db.query<ImportReference>(`select id,name,null::text as code from miclub.payment_methods where club_id=$1 and is_active=true`,[clubId]),

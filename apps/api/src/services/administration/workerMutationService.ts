@@ -4,6 +4,7 @@ import { hashPassword } from "../../auth/passwordHasher.js";
 import { validatePublicPassword } from "../../auth/registrationService.js";
 import { getPostgresPool, type QueryExecutor } from "../../db/postgres.js";
 import { withTenantTransaction, withTransaction } from "../../db/transaction.js";
+import { hasActivityResponsibleEmployee } from "../../db/schemaCapabilities.js";
 import { auditService } from "../auditService.js";
 import { syncEmployeeCompensationTerm } from "../employeeCompensationService.js";
 
@@ -214,7 +215,11 @@ export const archiveWorker = async (actor: WorkerActor, id: string) => {
     if (!current) throw new WorkerMutationError("not_found", "Trabajador inexistente.");
     if (current.role_code === "DIRECTOR") { const other = await db.query(`select 1 from miclub.user_club_memberships m join miclub.roles r on r.id=m.role_id where m.club_id=$1 and r.code='DIRECTOR' and m.status='active' and m.id<>$2 limit 1`,[actor.clubId,current.membership_id]); if (!other.rows[0]) throw new WorkerMutationError("last_director", "No se puede archivar al último Director activo."); }
     const instructor = (await db.query<{ id: string }>(`select id::text from miclub.instructors where club_id=$1 and person_id=$2 for update`, [actor.clubId, current.person_id])).rows[0];
-    if ((await db.query(`select 1 from miclub.activities where club_id=$1 and responsible_employee_id=$2 and archived_at is null limit 1`, [actor.clubId, id])).rows[0]) throw new WorkerMutationError("worker_has_activities", "Primero reasigne las actividades vigentes del trabajador.");
+    const canonicalResponsibility = await hasActivityResponsibleEmployee(db);
+    const linkedActivity = canonicalResponsibility
+      ? await db.query(`select 1 from miclub.activities where club_id=$1 and responsible_employee_id=$2 and archived_at is null limit 1`, [actor.clubId, id])
+      : instructor ? await db.query(`select 1 from miclub.activities where club_id=$1 and instructor_id=$2 and archived_at is null limit 1`, [actor.clubId, instructor.id]) : { rows: [] };
+    if (linkedActivity.rows[0]) throw new WorkerMutationError("worker_has_activities", "Primero reasigne las actividades vigentes del trabajador.");
     const after=(await db.query<Record<string,unknown>>(`update miclub.employees set status='archived',archived_at=now(),updated_at=now(),updated_by=$3 where club_id=$1 and id=$2 returning *`,[actor.clubId,id,actor.userId])).rows[0];
     if (current.membership_id) await db.query(`update miclub.user_club_memberships set status='disabled',updated_at=now() where club_id=$1 and id=$2`,[actor.clubId,current.membership_id]);
     if (instructor) await db.query(`update miclub.instructors set status='cancelada',updated_at=now() where club_id=$1 and id=$2`, [actor.clubId,instructor.id]);

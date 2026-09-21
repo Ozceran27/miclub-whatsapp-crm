@@ -74,6 +74,7 @@ void test("las actividades archivadas no reaparecen en el catálogo administrati
     query: <T>(sql: string) => {
       if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql) || sql.includes("set_config")) return Promise.resolve({ rows: [] });
       calls.push(sql);
+      if (sql.includes("pg_attribute")) return Promise.resolve({ rows: [{ available: true }] as T[] });
       return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "0" }] : []) as T[] });
     },
     connect: () => Promise.reject(new Error("connect no esperado")),
@@ -84,8 +85,31 @@ void test("las actividades archivadas no reaparecen en el catálogo administrati
 
   await getReadOnlyPage("actividades", { clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", limit: 20, offset: 0, filters: {} });
 
-  assert.match(calls[0] ?? "", /a\.archived_at is null/);
   assert.match(calls[1] ?? "", /a\.archived_at is null/);
+  assert.match(calls[2] ?? "", /a\.archived_at is null/);
+});
+
+void test("actividades conserva lectura legacy mientras la migración de responsable está pendiente", async () => {
+  const calls: string[] = [];
+  const pool: PgPool = {
+    query: <T>(sql: string) => {
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql) || sql.includes("set_config")) return Promise.resolve({ rows: [] });
+      calls.push(sql);
+      if (sql.includes("pg_attribute")) return Promise.resolve({ rows: [{ available: false }] as T[] });
+      return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "0" }] : []) as T[] });
+    },
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
+  };
+  pool.connect = () => Promise.resolve({ query: pool.query, release: () => undefined });
+  setPostgresPoolForTests(pool);
+
+  await getReadOnlyPage("actividades", { clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", limit: 20, offset: 0, filters: {} });
+
+  assert.match(calls[1] ?? "", /responsible_employee\.id as responsible_employee_id/);
+  assert.match(calls[1] ?? "", /e\.person_id=i\.person_id/);
+  assert.match(calls[1] ?? "", /order by e\.created_at,e\.id limit 1/);
+  assert.doesNotMatch(calls[1] ?? "", /a\.responsible_employee_id/);
 });
 
 void test("movimientos toma activity_id de la tabla base y no de la vista enriquecida", async () => {

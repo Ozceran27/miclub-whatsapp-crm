@@ -4,9 +4,9 @@ import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 import type { ActivitySettlementMutation } from "@miclub/shared";
 import { storedEntityStatus } from "./entityStatusRepository.js";
+import { hasActivityResponsibleEmployee } from "../db/schemaCapabilities.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
-export const ACTIVITY_MUTATION_MODEL_MIGRATION = "202609210001_worker_activity_responsibility.sql";
 
 export type ActivityActor = {
   userId: string; membershipId: string; clubId: string; sectorIds: readonly string[]; canAccessAnySector: boolean;
@@ -33,8 +33,10 @@ const activityColumns = `id, club_id, sector_id, manager_person_id, instructor_i
   monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, archived_at, created_at, updated_at`;
 
 const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean> => {
-  const result = await executor.query("select 1 from public.miclub_schema_migrations where name=$1 or name='202609080001_clean_install.sql'", [ACTIVITY_MUTATION_MODEL_MIGRATION]);
-  return Boolean(result.rows[0]);
+  // The supported production rollout is a reviewed DBeaver script. It changes
+  // the schema atomically but intentionally does not forge a migration-ledger
+  // entry, so runtime readiness must be derived from the installed capability.
+  return hasActivityResponsibleEmployee(executor);
 };
 
 const validReferences = async (executor: { query: Pool["query"] }, actor: ActivityActor, input: Pick<ActivityInput, "sectorId" | "managerPersonId" | "responsibleEmployeeId" | "instructorId" | "economicResponsiblePersonId" | "responsiblePersonId">): Promise<{ failure: ActivityValidationFailure | null; employeeId: string | null; employeePersonId: string | null; legacyInstructorId: string | null }> => {
@@ -216,7 +218,14 @@ export const upsertActivity = async (pool: Pool, input: {
   const activityName = input.name.trim() || "Sin actividad";
   const hasNormalizedMonthlyFee = input.monthlyFee !== undefined && Number.isFinite(input.monthlyFee);
   const result = await pool.query<{ id: string }>(
-    `with previous_activity as (
+    `with responsible_worker as (
+       select i.person_id, e.id as employee_id
+       from miclub.instructors i
+       join miclub.employees e on e.club_id=i.club_id and e.person_id=i.person_id
+         and e.status='active' and e.archived_at is null
+       where i.club_id=$1 and i.id=$5
+       limit 1
+     ), previous_activity as (
        select id, monthly_fee
        from miclub.activities
        where club_id = $1
@@ -225,10 +234,11 @@ export const upsertActivity = async (pool: Pool, input: {
          and coalesce(modality, ''::text) = coalesce($4::text, ''::text)
        for update
      ), upserted_activity as (
-       insert into miclub.activities (club_id, sector_id, name, modality, instructor_id, manager_person_id, monthly_fee, enrollment_fee_frequency, club_commission_percent, notes)
-       values ($1, $2, $3, $4, $5, (select person_id from miclub.instructors where club_id=$1 and id=$5), $6, $7, 'Importado desde lote XLSX')
+       insert into miclub.activities (club_id, sector_id, name, modality, instructor_id, responsible_employee_id, manager_person_id, monthly_fee, enrollment_fee_frequency, club_commission_percent, notes)
+       values ($1, $2, $3, $4, $5, (select employee_id from responsible_worker), (select person_id from responsible_worker), $6, $7, 'Importado desde lote XLSX')
        on conflict (club_id, sector_id, lower(name), coalesce(modality, ''::text)) do update
          set instructor_id = excluded.instructor_id,
+             responsible_employee_id = excluded.responsible_employee_id,
              manager_person_id = coalesce(miclub.activities.manager_person_id, excluded.manager_person_id),
              monthly_fee = case
                when $8::boolean then excluded.monthly_fee

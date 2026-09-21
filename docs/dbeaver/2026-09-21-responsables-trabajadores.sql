@@ -1,7 +1,10 @@
 -- miClub Gestión - trabajadores y responsables de actividades
 -- EJECUCIÓN MANUAL EXCLUSIVA EN DBEAVER. Hacer backup antes de comenzar.
 -- El script es transaccional, no borra historia y aborta ante mapeos ambiguos.
+-- El ROLLBACK inicial recupera una sesión que haya quedado abortada por un
+-- intento anterior. PostgreSQL sólo emite un aviso si no había transacción.
 
+ROLLBACK;
 BEGIN;
 
 DO $$
@@ -9,10 +12,20 @@ BEGIN
   IF current_setting('transaction_read_only')::boolean THEN
     RAISE EXCEPTION 'La conexión es read-only. Use una conexión administrativa controlada.';
   END IF;
-  IF to_regclass('miclub.employees') IS NULL OR to_regclass('miclub.activities') IS NULL THEN
-    RAISE EXCEPTION 'Esquema incompatible: faltan miclub.employees o miclub.activities.';
+  IF to_regclass('miclub.employees') IS NULL
+     OR to_regclass('miclub.activities') IS NULL
+     OR to_regclass('miclub.instructors') IS NULL
+     OR to_regclass('miclub.user_club_memberships') IS NULL
+     OR to_regclass('miclub.roles') IS NULL
+     OR to_regclass('miclub.sectors') IS NULL THEN
+    RAISE EXCEPTION 'Esquema incompatible: faltan tablas requeridas de trabajadores, actividades, membresías, roles o sectores.';
   END IF;
 END $$;
+
+-- Debe existir antes de cualquier diagnóstico o backfill que la consulte.
+-- ADD COLUMN IF NOT EXISTS permite reintentar el archivo completo si una
+-- ejecución anterior fue interrumpida después de crearla.
+ALTER TABLE miclub.activities ADD COLUMN IF NOT EXISTS responsible_employee_id uuid;
 
 DO $$
 DECLARE ambiguous integer;
@@ -46,12 +59,12 @@ WHERE membership_id IS NULL OR position IS NULL OR position<>upper(trim(position
 
 ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_position_role_check;
 ALTER TABLE miclub.employees ADD CONSTRAINT employees_position_role_check CHECK(position IN ('DIRECTOR','INSTRUCTOR','TRABAJADOR'));
+ALTER TABLE miclub.employees ALTER COLUMN position SET NOT NULL;
 ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_sector_id_fkey;
 ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_sector_tenant_fkey;
 ALTER TABLE miclub.employees ADD CONSTRAINT employees_sector_tenant_fkey
   FOREIGN KEY(sector_id,club_id) REFERENCES miclub.sectors(id,club_id) ON DELETE RESTRICT;
 
-ALTER TABLE miclub.activities ADD COLUMN IF NOT EXISTS responsible_employee_id uuid;
 UPDATE miclub.activities a SET responsible_employee_id=e.id
 FROM miclub.instructors i
 JOIN miclub.employees e ON e.club_id=i.club_id AND e.person_id=i.person_id AND e.archived_at IS NULL
@@ -96,5 +109,6 @@ COMMIT;
 -- ALTER TABLE miclub.activities ALTER COLUMN instructor_id SET NOT NULL;
 -- ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_sector_tenant_fkey;
 -- ALTER TABLE miclub.employees DROP CONSTRAINT IF EXISTS employees_position_role_check;
+-- ALTER TABLE miclub.employees ALTER COLUMN position DROP NOT NULL;
 -- ALTER TABLE miclub.employees ADD CONSTRAINT employees_sector_id_fkey FOREIGN KEY(sector_id) REFERENCES miclub.sectors(id) ON DELETE SET NULL;
 -- COMMIT;

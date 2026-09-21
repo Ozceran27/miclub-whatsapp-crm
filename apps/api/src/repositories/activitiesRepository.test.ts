@@ -25,6 +25,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
       queries.push({ sql, params });
       if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
       if (sql.includes('miclub_schema_migrations')) return { rows: [{ '?column?': 1 }] };
+      if (sql.includes('pg_attribute')) return { rows: [{ available: true }] };
       if (sql.includes('from miclub.activities') && sql.includes('for update')) {
         const sectors = params?.[3] as string[];
         const visible = stored.club_id === params?.[0] && stored.id === params?.[1]
@@ -55,6 +56,7 @@ const createPool = (settlement: ActivityInput['settlement'], failAudit = false) 
     queries.push({ sql, params });
     if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
     if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
+    if (sql.includes('pg_attribute')) return { rows: [{ available: true }] };
     if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, responsible: true, employee_id: EMPLOYEE_ID, employee_person_id: PERSON_ID, legacy_instructor_id: INSTRUCTOR_ID }] };
     if (sql.includes('insert into miclub.activities')) return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] };
     if (sql.includes('insert into miclub.activity_terms')) return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] };
@@ -82,6 +84,7 @@ for (const settlement of [
   const references = queries.find(({ sql }) => sql.includes('select exists(select 1 from miclub.sectors'));
   assert.match(references?.sql ?? '', /miclub\.instructors[\s\S]*status='activa'/);
   assert.doesNotMatch(references?.sql ?? '', /is_active/);
+  assert.equal(queries.some(({ sql }) => sql.includes('miclub_schema_migrations')), false, 'la instalación manual se detecta por capacidad estructural');
   assert.equal(queries.at(-1)?.sql, 'COMMIT');
 });
 
@@ -125,6 +128,8 @@ test('upsertActivity permite que una importación normalizada baje monthly_fee y
   assert.equal(query.params?.[12], 'scale_adjustment:300000->30000');
   assert.match(query.sql, /monthly_fee = case\s+when \$8::boolean then excluded\.monthly_fee\s+else miclub\.activities\.monthly_fee/s);
   assert.match(query.sql, /insert into miclub\.activity_fee_history/);
+  assert.match(query.sql, /responsible_employee_id/);
+  assert.match(query.sql, /join miclub\.employees e on e\.club_id=i\.club_id and e\.person_id=i\.person_id/);
   assert.match(query.sql, /lower\(name\) = lower\(\$3\)/);
   assert.match(query.sql, /on conflict \(club_id, sector_id, lower\(name\), coalesce\(modality, ''::text\)\)/);
   assert.doesNotMatch(query.sql, /greatest\(miclub\.activities\.monthly_fee, excluded\.monthly_fee\)/);
