@@ -4,7 +4,7 @@ import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 import type { ActivitySettlementMutation } from "@miclub/shared";
 import { storedEntityStatus } from "./entityStatusRepository.js";
-import { hasActivityResponsibleEmployee } from "../db/schemaCapabilities.js";
+import { hasActivityResponsibleEmployee, hasCanonicalActivityMutationGuard } from "../db/schemaCapabilities.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 
@@ -26,8 +26,15 @@ export type ActivityMutationResult =
   | { kind: "missing" | "conflict" | "model_not_applied" | "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible" | "dependencies" | "invalid_terms" | "settled_history"; dependencies?: Record<string, number> };
 type ActivityValidationFailure = "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible";
 class InvalidActivityTermsError extends Error {}
-const isTermsConstraintError = (error: unknown) => error instanceof InvalidActivityTermsError
-  || (typeof error === "object" && error !== null && "code" in error && ["23P01", "23514"].includes(String(error.code)));
+const isTermsConstraintError = (error: unknown) => {
+  if (error instanceof InvalidActivityTermsError) return true;
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  const postgresError = error as { code?: unknown; constraint?: unknown; message?: unknown };
+  const constraint = typeof postgresError.constraint === "string" ? postgresError.constraint : "";
+  const message = typeof postgresError.message === "string" ? postgresError.message : "";
+  return (postgresError.code === "23P01" && constraint === "activity_terms_no_overlap")
+    || (postgresError.code === "23514" && (constraint.startsWith("activity_terms_") || message.includes("activity terms must be contiguous")));
+};
 
 const activityColumns = `id, club_id, sector_id, manager_person_id, instructor_id, responsible_employee_id, code, name, modality, color, icon_key,
   monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, archived_at, created_at, updated_at`;
@@ -36,7 +43,7 @@ const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean
   // The supported production rollout is a reviewed DBeaver script. It changes
   // the schema atomically but intentionally does not forge a migration-ledger
   // entry, so runtime readiness must be derived from the installed capability.
-  return hasActivityResponsibleEmployee(executor);
+  return await hasActivityResponsibleEmployee(executor) && hasCanonicalActivityMutationGuard(executor);
 };
 
 const validReferences = async (executor: { query: Pool["query"] }, actor: ActivityActor, input: Pick<ActivityInput, "sectorId" | "managerPersonId" | "responsibleEmployeeId" | "instructorId" | "economicResponsiblePersonId" | "responsiblePersonId">): Promise<{ failure: ActivityValidationFailure | null; employeeId: string | null; employeePersonId: string | null; legacyInstructorId: string | null }> => {

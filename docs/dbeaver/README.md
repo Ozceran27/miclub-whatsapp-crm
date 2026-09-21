@@ -27,6 +27,12 @@ de diagnosticar el backfill y termina con validaciones dentro de la misma
 transacción. Ante cualquier excepción PostgreSQL no confirma cambios: corregir la
 causa y volver a ejecutar **todo** el archivo, no sólo la sentencia que falló.
 
+Si el archivo anterior ya fue confirmado antes de incorporar la guarda canónica,
+ejecutar solamente
+[`2026-09-21-correccion-responsable-canonico.sql`](2026-09-21-correccion-responsable-canonico.sql).
+Esta corrección reemplaza la función usada por el trigger existente para validar
+`responsible_employee_id`, sin modificar actividades ni términos económicos.
+
 ## Procedimientos históricos de Fernando (no usar en instalaciones nuevas)
 
 > **HISTÓRICO — REPARACIÓN LEGACY.** Los pasos 01/02/03/08 y el backfill

@@ -85,6 +85,28 @@ ALTER TABLE miclub.activities VALIDATE CONSTRAINT activities_new_writes_require_
 COMMENT ON COLUMN miclub.activities.responsible_employee_id IS 'Canonical tenant-scoped operational responsible. Any active employee role is valid.';
 COMMENT ON COLUMN miclub.activities.instructor_id IS 'Legacy optional Instructor relation retained for compatibility; not the operational responsibility authority.';
 
+-- Replace the legacy active-activity guard. The existing trigger keeps calling
+-- this function, now against the canonical employee relationship.
+CREATE OR REPLACE FUNCTION miclub.validate_activity_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.club_commission_percent < 0 OR NEW.club_commission_percent > 100 THEN
+    RAISE EXCEPTION 'club_commission_percent must be between 0 and 100' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.status::text IN ('active', 'activa') AND NEW.responsible_employee_id IS NULL THEN
+    RAISE EXCEPTION 'active activity requires responsible_employee_id' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.archived_at IS NOT NULL AND NEW.status::text NOT IN ('archived', 'cancelada') THEN
+    RAISE EXCEPTION 'archived activity must have archived status' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS activities_validate_mutation ON miclub.activities;
+CREATE TRIGGER activities_validate_mutation
+BEFORE INSERT OR UPDATE ON miclub.activities
+FOR EACH ROW EXECUTE FUNCTION miclub.validate_activity_mutation();
+
 DO $$
 BEGIN
   IF EXISTS(SELECT 1 FROM miclub.activities WHERE archived_at IS NULL AND responsible_employee_id IS NULL) THEN RAISE EXCEPTION 'Post-validación fallida: actividad vigente sin responsable'; END IF;

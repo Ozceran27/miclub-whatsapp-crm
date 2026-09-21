@@ -58,3 +58,14 @@ void test('la foto temporal del trabajador sólo se descarta si el formulario no
   assert.match(modal, /await onSave\([\s\S]+temporaryPhotoRef\.current=null/);
   assert.match(modal, /temporaryPhotoRef\.current=null; if\(previewUrlRef\.current\)\{URL\.revokeObjectURL/);
 });
+
+void test('los badges pendientes y las condiciones económicas usan la presentación compacta solicitada', () => {
+  const activity = read('./ActivityCreateEditModal.tsx');
+  const styles = read('../../styles.css');
+
+  assert.match(activity, /<NumberInput suffix="%" name="clubSharePercentage"/);
+  assert.match(activity, /activity-terms__modes/);
+  assert.match(activity, /activity-terms__details/);
+  assert.match(styles, /\.administration-action-card__badge[\s\S]*font-weight: 500;[\s\S]*right:7px;[\s\S]*top:7px;/);
+  assert.match(styles, /\.activity-terms__percentage \{ max-width:180px; \}/);
+});

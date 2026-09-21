@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const manualSqlUrl = new URL("../../../../docs/dbeaver/2026-09-21-responsables-trabajadores.sql", import.meta.url);
+const correctionSqlUrl = new URL("../../../../docs/dbeaver/2026-09-21-correccion-responsable-canonico.sql", import.meta.url);
+const canonicalGuardUrl = new URL("../../db/migrations/202609210002_canonical_activity_responsible_guard.sql", import.meta.url);
 
 void test("el SQL manual crea responsible_employee_id antes de diagnosticarla", async () => {
   const sql = await readFile(manualSqlUrl, "utf8");
@@ -22,4 +24,12 @@ void test("el SQL manual recupera reintentos y valida todas sus dependencias", a
     assert.match(sql, new RegExp(`to_regclass\\('miclub\\.${table}'\\)`));
   }
   assert.match(sql, /COMMIT;/);
+});
+
+void test("la guarda operativa usa al trabajador canónico y retira la exigencia legacy de Instructor", async () => {
+  for (const url of [manualSqlUrl, correctionSqlUrl, canonicalGuardUrl]) {
+    const sql = await readFile(url, "utf8");
+    assert.match(sql, /active activity requires responsible_employee_id/);
+    assert.doesNotMatch(sql, /active activity requires canonical instructor_id/);
+  }
 });

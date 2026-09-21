@@ -26,6 +26,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
       if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
       if (sql.includes('miclub_schema_migrations')) return { rows: [{ '?column?': 1 }] };
       if (sql.includes('pg_attribute')) return { rows: [{ available: true }] };
+      if (sql.includes('pg_proc')) return { rows: [{ available: true }] };
       if (sql.includes('from miclub.activities') && sql.includes('for update')) {
         const sectors = params?.[3] as string[];
         const visible = stored.club_id === params?.[0] && stored.id === params?.[1]
@@ -50,16 +51,17 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
 
 test.afterEach(() => setPostgresPoolForTests(undefined));
 
-const createPool = (settlement: ActivityInput['settlement'], failAudit = false) => {
+const createPool = (settlement: ActivityInput['settlement'], failAudit = false, injected?: { target: 'activity'|'term'; error: Error }, canonicalGuard = true) => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = { query: async (sql: string, params?: unknown[]) => {
     queries.push({ sql, params });
     if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
     if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
     if (sql.includes('pg_attribute')) return { rows: [{ available: true }] };
+    if (sql.includes('pg_proc')) return { rows: [{ available: canonicalGuard }] };
     if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, responsible: true, employee_id: EMPLOYEE_ID, employee_person_id: PERSON_ID, legacy_instructor_id: INSTRUCTOR_ID }] };
-    if (sql.includes('insert into miclub.activities')) return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] };
-    if (sql.includes('insert into miclub.activity_terms')) return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] };
+    if (sql.includes('insert into miclub.activities')) { if (injected?.target === 'activity') throw injected.error; return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] }; }
+    if (sql.includes('insert into miclub.activity_terms')) { if (injected?.target === 'term') throw injected.error; return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] }; }
     if (sql.includes('INSERT INTO miclub.audit_log')) {
       if (failAudit) throw new Error('audit unavailable');
       return { rows: [{ id: 'audit-1' }] };
@@ -94,6 +96,24 @@ test('revierte atómicamente actividad y término cuando falla la auditoría', a
   await assert.rejects(createActivity(limitedActor, { ...input(SECTOR_A), settlement }), /audit unavailable/);
   assert.equal(queries.some(({ sql }) => sql === 'ROLLBACK'), true);
   assert.equal(queries.some(({ sql }) => sql === 'COMMIT'), false);
+});
+
+test('no presenta un CHECK operativo como si fuera un solapamiento económico', async () => {
+  const settlement = input(SECTOR_A).settlement;
+  const operationalError = Object.assign(new Error('active activity requires responsible_employee_id'), { code: '23514', constraint: 'activities_new_writes_require_responsible_employee' });
+  createPool(settlement, false, { target: 'activity', error: operationalError });
+  await assert.rejects(createActivity(limitedActor, { ...input(SECTOR_A), settlement }), /requires responsible_employee_id/);
+
+  const termError = Object.assign(new Error('violates activity terms'), { code: '23514', constraint: 'activity_terms_values_check' });
+  createPool(settlement, false, { target: 'term', error: termError });
+  assert.deepEqual(await createActivity(limitedActor, { ...input(SECTOR_A), settlement }), { kind: 'invalid_terms' });
+});
+
+test('falla cerrado antes de escribir cuando PostgreSQL conserva la guarda legacy de Instructor', async () => {
+  const settlement = input(SECTOR_A).settlement;
+  const queries = createPool(settlement, false, undefined, false);
+  assert.deepEqual(await createActivity(limitedActor, { ...input(SECTOR_A), settlement }), { kind: 'model_not_applied' });
+  assert.equal(queries.some(({ sql }) => sql.includes('insert into miclub.activities')), false);
 });
 
 test('upsertActivity permite que una importación normalizada baje monthly_fee y audita el cambio', async () => {

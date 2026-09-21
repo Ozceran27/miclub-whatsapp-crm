@@ -319,6 +319,10 @@ la columna obligatoria. Las actividades nuevas y el upsert histórico usan
 `activities.responsible_employee_id`; cualquier trabajador activo del tenant puede
 ser responsable operativo. `activity_terms.responsible_person_id` conserva el
 receptor económico histórico y, por defecto, sigue a la persona del responsable.
+La guarda PostgreSQL de actividades activas también valida esa relación canónica:
+`instructor_id` permanece nullable y exclusivamente como compatibilidad histórica.
+Los errores de constraints operativas ya no se presentan como un falso conflicto
+de vigencias; sólo las constraints propias de `activity_terms` generan ese mensaje.
 
 La migración `202609210001_worker_activity_responsibility.sql` y el script manual
 `docs/dbeaver/2026-09-21-responsables-trabajadores.sql` realizan el backfill con
@@ -335,3 +339,8 @@ relación histórica de Instructor sin provocar un error 500. Las escrituras que
 requieren responsables generales y el onboarding con actividades fallan cerrado
 con un error 503 de esquema pendiente; no simulan soporte que PostgreSQL aún no
 posee.
+
+La corrección append-only `202609210002_canonical_activity_responsible_guard.sql`
+y su equivalente manual
+`docs/dbeaver/2026-09-21-correccion-responsable-canonico.sql` corrigen instalaciones
+que alcanzaron la primera migración con la función legacy todavía activa.

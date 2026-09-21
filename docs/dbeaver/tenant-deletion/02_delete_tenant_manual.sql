@@ -125,7 +125,8 @@ INSERT INTO _expected_manifest(name,checksum) VALUES
     ('202609090003_initial_obligation_applications.sql', 'b7e6f505f03e11c9cb1a7539c2585cb05feb81f400c9195e0c7c9da02ede458d'),
     ('202609190001_administration_configuration.sql', 'c1002a3a9451f008bf59bd0245db3c9991f86ed878ea383ae77af10d6e18035e'),
     ('202609200001_required_system_sectors.sql', '432c12148fdcd6a65f7d96614507a09f73f81e776e96b9eef45a083b19e91ac0'),
-    ('202609210001_worker_activity_responsibility.sql', '57e10ac34afff6fe9bd410a02f14948f07cafe251924a30f6612ae57eb099dd7')
+    ('202609210001_worker_activity_responsibility.sql', '57e10ac34afff6fe9bd410a02f14948f07cafe251924a30f6612ae57eb099dd7'),
+    ('202609210002_canonical_activity_responsible_guard.sql', 'b0a2bc281f9c17e3d04f907403532138289e148eb8b7ce6c5af30ba2e35857be')
 -- MIGRATION_MANIFEST_VALUES:END
 ;
 DO $$ DECLARE v_mismatches bigint; BEGIN
