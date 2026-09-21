@@ -30,6 +30,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
     const controller = new AbortController();
     void Promise.allSettled([getSectorActivities(sector.id, controller.signal), getAdministrationWorkers(controller.signal)])
       .then(([activityResult, workerResult]) => {
+        if (controller.signal.aborted) return;
         if (activityResult.status === 'fulfilled') setActivities(activityResult.value.items);
         if (workerResult.status === 'fulfilled') setManagers(workerResult.value.items.filter(worker => worker.isActive && Boolean(worker.personId)));
         if (activityResult.status === 'rejected' || workerResult.status === 'rejected') setError('Parte de la información relacionada no pudo cargarse. La configuración disponible puede editarse igualmente.');
@@ -81,7 +82,10 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
     ? 'Sin datos'
     : `${number.format(sector.currentUsage ?? 0)} / ${number.format(sector.maximumCapacity)}`;
   const idle = sector.capacityDataStatus === 'AVAILABLE' && sector.idlePercentage != null ? `${number.format(sector.idlePercentage)}%` : 'Sin datos';
-  const profitability = money(sector.annualOperatingProfitability ?? 0, sector.operatingCurrencyCode || 'ARS');
+  const profitability = sector.annualOperatingProfitabilityStatus === 'INCOMPLETE_EXCHANGE_RATE' || sector.annualOperatingProfitability == null
+    ? 'Sin cotización'
+    : money(sector.annualOperatingProfitability, sector.operatingCurrencyCode || 'ARS');
+  const currentManagerMissing = sector.managerPersonId && !managers.some(({ personId }) => personId === sector.managerPersonId);
 
   return <ConfigurationEditorModal
     size="large"
@@ -90,7 +94,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
     description="Resumen operativo, identidad visual y parámetros de funcionamiento."
     busy={saving}
     onClose={onClose}
-    footer={<><button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>Cancelar</button>{canEdit && <button type="submit" className="primary-btn" form="administration-sector-edit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>}</>}
+    footer={<><button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>{canEdit ? 'Cancelar' : 'Cerrar'}</button>{canEdit && <button type="submit" className="primary-btn" form="administration-sector-edit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>}</>}
   >
     <div className="sector-editor__hero">
       <span className="sector-editor__visual" style={{ '--sector-color': color } as CSSProperties}><span aria-hidden="true">{getSectorVisualMeta({ ...sector, iconKey }).icon}</span></span>
@@ -111,7 +115,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
     </section>
 
     {canEdit && <form id="administration-sector-edit" className="draft-form sector-editor__form" onSubmit={event => void edit(event)}>
-      <fieldset><legend>Identidad del sector</legend><div className="draft-form__grid"><label>Nombre<input name="name" defaultValue={sector.name} disabled={sector.isSystem} required /></label><label>Responsable<select name="managerPersonId" defaultValue={sector.managerPersonId ?? ''}><option value="">Sin asignar</option>{managers.map(manager => <option key={manager.id} value={manager.personId ?? ''}>{manager.displayName}</option>)}</select></label></div><label>Descripción<textarea name="description" rows={3} defaultValue={sector.description ?? ''} /></label></fieldset>
+      <fieldset><legend>Identidad del sector</legend><div className="draft-form__grid"><label>Nombre<input name="name" defaultValue={sector.name} disabled={sector.isSystem} required /></label><label>Responsable<select name="managerPersonId" defaultValue={sector.managerPersonId ?? ''}><option value="">Sin asignar</option>{currentManagerMissing && <option value={sector.managerPersonId ?? ''}>{sector.managerName || 'Responsable actual'} (actual)</option>}{managers.map(manager => <option key={manager.id} value={manager.personId ?? ''}>{manager.displayName}</option>)}</select></label></div><label>Descripción<textarea name="description" rows={3} defaultValue={sector.description ?? ''} /></label></fieldset>
       <fieldset><legend>Apariencia</legend>{sector.isSystem ? <div className="sector-editor__locked-icon"><span aria-hidden="true">{getSectorVisualMeta(sector).icon}</span><div><strong>Ícono del sistema</strong><small>Este ícono identifica una función estructural del club.</small></div></div> : <SectorIconPicker value={iconKey} onChange={setIconKey} />}<ConfigurationColorPicker value={color} onChange={setColor} label="Color del sector" /></fieldset>
       <fieldset><legend>Capacidad</legend><div className="sector-editor__choice"><label><input type="radio" name="capacityMode" value="INCOME" checked={capacityMode === 'INCOME'} onChange={() => { setCapacityMode('INCOME'); setConfiguredCapacity(null); }} /> Basada en ingresos históricos</label><label><input type="radio" name="capacityMode" value="ENROLLMENTS" checked={capacityMode === 'ENROLLMENTS'} onChange={() => { setCapacityMode('ENROLLMENTS'); setConfiguredCapacity(value => value ?? 1); }} /> Basada en inscripciones</label></div>{capacityMode === 'ENROLLMENTS' && <label>Capacidad máxima<input type="number" min="1" step="1" required value={configuredCapacity ?? ''} onChange={event => setConfiguredCapacity(event.currentTarget.value === '' ? null : Number(event.currentTarget.value))} /></label>}</fieldset>
     </form>}

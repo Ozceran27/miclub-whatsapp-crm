@@ -1,5 +1,25 @@
 # Testing
 
+## Auditoría integral posterior a Administración — 2026-09-20
+
+- API: 429/429 PASS; web: 75/75 PASS; shared: 7/7 PASS.
+- Typecheck y build: PASS. Vite conserva la advertencia conocida por el chunk
+  principal, actualmente 860,19 kB (240,76 kB gzip).
+- Lint focalizado de los archivos funcionales modificados: PASS; el gate global
+  continúa afectado por la deuda histórica: 196 errores y 578 advertencias.
+- `npm run deadcode`: FAIL con 2 archivos, 116 exports, 93 tipos exportados y
+  7 exports duplicados candidatos, además de binarios/configuración pendientes.
+  El inventario no se eliminó automáticamente porque incluye contratos y
+  entrypoints que requieren revisión funcional por dominio.
+- Navegador local: portada, login y registro inspeccionados en escritorio y móvil.
+  Se reprodujo y corrigió el enlace móvil de Registro superpuesto por la tarjeta.
+  Una recarga limpia confirmó el árbol de sesión operativo; los errores de
+  contexto observados durante HMR no reaparecieron tras la recarga completa.
+- Regresiones nuevas: conversión/fallo cerrado de rentabilidad multimoneda,
+  exclusión de actividades archivadas, preservación del responsable al editar,
+  error visible dentro del modal y reserva de foto durante invitaciones.
+- Sin escrituras en PostgreSQL, ejecución de SQL real ni cambios de esquema.
+
 ## Cierre de organización y auditoría — 2026-09-19
 
 - `npm run docs:check`: PASS.

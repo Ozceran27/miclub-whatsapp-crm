@@ -60,8 +60,32 @@ void test("el contador de sectores incluye sólo actividades canónicamente acti
   assert.match(calls[0] ?? "", /movement\.club_id = s\.club_id and movement\.sector_id = s\.id/);
   assert.match(calls[0] ?? "", /movement\.operational_status = 'COMPLETADO'/);
   assert.match(calls[0] ?? "", /catalog\.classification = 'OPERATIONAL'/);
+  assert.match(calls[0] ?? "", /miclub\.exchange_rates/);
+  assert.match(calls[0] ?? "", /INCOMPLETE_EXCHANGE_RATE/);
+  assert.match(calls[0] ?? "", /movement\.amount \* rate\.rate/);
+  assert.match(calls[0] ?? "", /movement\.amount \/ rate\.rate/);
   assert.match(calls[0] ?? "", /make_timestamptz/);
   assert.match(calls[0] ?? "", /club\.base_currency_code as operating_currency_code/);
+});
+
+void test("las actividades archivadas no reaparecen en el catálogo administrativo", async () => {
+  const calls: string[] = [];
+  const pool: PgPool = {
+    query: <T>(sql: string) => {
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql) || sql.includes("set_config")) return Promise.resolve({ rows: [] });
+      calls.push(sql);
+      return Promise.resolve({ rows: (sql.includes("count(*) as total_count") ? [{ total_count: "0" }] : []) as T[] });
+    },
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
+  };
+  pool.connect = () => Promise.resolve({ query: pool.query, release: () => undefined });
+  setPostgresPoolForTests(pool);
+
+  await getReadOnlyPage("actividades", { clubId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", limit: 20, offset: 0, filters: {} });
+
+  assert.match(calls[0] ?? "", /a\.archived_at is null/);
+  assert.match(calls[1] ?? "", /a\.archived_at is null/);
 });
 
 void test("movimientos toma activity_id de la tabla base y no de la vista enriquecida", async () => {

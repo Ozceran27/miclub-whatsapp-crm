@@ -7,24 +7,24 @@ import { setPostgresPoolForTests, type PgPool } from "../../db/postgres.js";
 import { createWorker, resolveWorkerInvitation, validateWorkerMutation, WorkerMutationError } from "./workerMutationService.js";
 
 const base = { firstName: " Ana ", lastName: " Pérez ", dni: "12.345.678", email: "ANA@EXAMPLE.COM", password: "segura12345", role: "TRABAJADOR", hasFixedCompensation: false, fixedCompensationAmount: null, fixedCompensationFrequency: null };
-test("normaliza DNI/correo y exige las reglas públicas de contraseña", async () => {
+void test("normaliza DNI/correo y exige las reglas públicas de contraseña", async () => {
   const input = validateWorkerMutation(base, true);
   assert.equal(input.dni, "12345678"); assert.equal(input.email, "ana@example.com");
   assert.throws(() => validateWorkerMutation({ ...base, password: "demasiadocorta" }, true), WorkerMutationError);
   const hash = await hashPassword(input.password!); assert.notEqual(hash, input.password); assert.equal(await verifyPassword(input.password!, hash), true);
 });
-test("FIXED y VARIABLE respetan la invariantes de monto", () => {
+void test("FIXED y VARIABLE respetan la invariantes de monto", () => {
   assert.equal(validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: 0, fixedCompensationFrequency: "MONTHLY", currencyCode: "ARS" }, true).fixedCompensationAmount, 0);
   assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: true, fixedCompensationAmount: -1, fixedCompensationFrequency: "MONTHLY", currencyCode: "ARS" }, true));
   assert.throws(() => validateWorkerMutation({ ...base, hasFixedCompensation: false, fixedCompensationAmount: 1, fixedCompensationFrequency: null }, true));
 });
-test("roles operativos no heredan privilegios administrativos de Director", () => {
+void test("roles operativos no heredan privilegios administrativos de Director", () => {
   for (const role of ["TRABAJADOR", "INSTRUCTOR"] as const) {
     assert.ok(!ROLE_DEFAULT_PERMISSIONS[role].includes("workers.manage" as never));
     assert.ok(!ROLE_DEFAULT_PERMISSIONS[role].includes("club:manage" as never));
   }
 });
-test("SQL contiene auditoría previa, gate, compatibilidad y verificaciones", () => {
+void test("SQL contiene auditoría previa, gate, compatibilidad y verificaciones", () => {
   const sql=readFileSync(new URL("../../../../../docs/dbeaver/diagnostics/workers-payment-and-roles.sql",import.meta.url),"utf8");
   assert.match(sql,/AUDITORÍA \(solo lectura\)/); assert.match(sql,/AUDIT_GATE_FAILED/); assert.match(sql,/COMPATIBILIDAD TEMPORAL/);
   assert.match(sql,/upper\(role\.code\) in \('TRABAJADOR', 'INSTRUCTOR'\)/); assert.match(sql,/club:manage/);
@@ -48,11 +48,11 @@ const actor = { userId: "10000000-0000-4000-8000-000000000001", membershipId: "1
 const existingBody = { ...base, password: undefined };
 const mockPool = (respond: (sql: string, params: unknown[]) => Record<string, unknown>[]) => {
   const statements: Array<{ sql: string; params: unknown[] }> = [];
-  const client = { query: async (sql: string, params: unknown[] = []) => { statements.push({ sql, params }); return { rows: respond(sql, params) }; }, release: () => undefined };
-  return { pool: { ...client, connect: async () => client, end: async () => undefined } as PgPool, statements };
+  const client = { query: (sql: string, params: unknown[] = []) => { statements.push({ sql, params }); return Promise.resolve({ rows: respond(sql, params) }); }, release: () => undefined };
+  return { pool: { ...client, connect: () => Promise.resolve(client), end: () => Promise.resolve() } as PgPool, statements };
 };
 
-test("un email existente en otro club sólo crea una invitación tenant-scoped", async () => {
+void test("un email existente en otro club sólo crea una invitación tenant-scoped", async () => {
   const { pool, statements } = mockPool((sql) => {
     if (sql.includes("from miclub.users where lower")) return [{ id: "20000000-0000-4000-8000-000000000001" }];
     if (sql.includes("from miclub.roles")) return [{ id: "30000000-0000-4000-8000-000000000001" }];
@@ -71,7 +71,29 @@ test("un email existente en otro club sólo crea una invitación tenant-scoped",
   } finally { setPostgresPoolForTests(undefined); }
 });
 
-test("una invitación expirada no activa membresía ni permisos", async () => {
+void test("una foto de un invitado permanece reservada durante toda la vigencia de la invitación", async () => {
+  const photoFileId = "60000000-0000-4000-8000-000000000001";
+  const { pool, statements } = mockPool((sql) => {
+    if (sql.includes("from miclub.users where lower")) return [{ id: "20000000-0000-4000-8000-000000000001" }];
+    if (sql.includes("from miclub.roles")) return [{ id: "30000000-0000-4000-8000-000000000001" }];
+    if (sql.includes("update miclub.employee_photos set expires_at")) return [{ id: photoFileId }];
+    if (sql.includes("insert into miclub.worker_invitations")) return [{ id: "40000000-0000-4000-8000-000000000001" }];
+    if (sql.includes("INSERT INTO miclub.audit_log")) return [{ id: "50000000-0000-4000-8000-000000000001" }];
+    return [];
+  });
+  setPostgresPoolForTests(pool);
+  try {
+    assert.deepEqual(await createWorker(actor, { ...existingBody, photoFileId }), { invitationPending: true });
+    const reservation = statements.find(({ sql }) => sql.includes("update miclub.employee_photos set expires_at"));
+    const invitation = statements.find(({ sql }) => sql.includes("insert into miclub.worker_invitations"));
+    assert.equal(reservation?.params[0], photoFileId);
+    assert.equal(reservation?.params[1], actor.clubId);
+    assert.equal((reservation?.params[2] as Date).getTime(), (invitation?.params[4] as Date).getTime());
+    assert.ok((reservation?.params[2] as Date).getTime() > Date.now() + 71 * 60 * 60 * 1000);
+  } finally { setPostgresPoolForTests(undefined); }
+});
+
+void test("una invitación expirada no activa membresía ni permisos", async () => {
   const { pool, statements } = mockPool((sql) => sql.includes("from miclub.worker_invitations") ? [{ id: "40000000-0000-4000-8000-000000000001", club_id: actor.clubId, user_id: actor.userId, role_id: "30000000-0000-4000-8000-000000000001", invited_by: actor.userId, expires_at: new Date(Date.now() - 1_000), status: "pending", worker_data: existingBody }] : []);
   setPostgresPoolForTests(pool);
   try {
@@ -81,7 +103,7 @@ test("una invitación expirada no activa membresía ni permisos", async () => {
   } finally { setPostgresPoolForTests(undefined); }
 });
 
-test("el rechazo consume la invitación y audita sin crear membership", async () => {
+void test("el rechazo consume la invitación y audita sin crear membership", async () => {
   const { pool, statements } = mockPool((sql) => {
     if (sql.includes("from miclub.worker_invitations")) return [{ id: "40000000-0000-4000-8000-000000000001", club_id: actor.clubId, user_id: actor.userId, role_id: "30000000-0000-4000-8000-000000000001", invited_by: "10000000-0000-4000-8000-000000000009", expires_at: new Date(Date.now() + 60_000), status: "pending", worker_data: existingBody }];
     if (sql.includes("INSERT INTO miclub.audit_log")) return [{ id: "50000000-0000-4000-8000-000000000001" }];

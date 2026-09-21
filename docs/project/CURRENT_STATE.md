@@ -7,7 +7,10 @@ estado localizado, capacidad utilizada y ociosa, conteos operativos y
 rentabilidad operativa acumulada del año en curso. La rentabilidad se calcula en
 PostgreSQL por tenant y sector con movimientos `COMPLETADO`, tipos ingreso/egreso
 y la clasificación persistida `OPERATIONAL`, respetando la zona horaria y moneda
-operativa del club. Los sectores archivados quedan fuera del catálogo visible.
+operativa del club. Los movimientos en otra moneda se convierten con la última
+cotización oficial disponible a su fecha; si falta una cotización, la UI informa
+“Sin cotización” en lugar de mezclar nominales. Sectores y actividades archivados
+quedan fuera de los catálogos visibles.
 
 El editor permanente de sectores reutiliza el modal de configuración, permite
 seleccionar ícono y color, resume su operación y expone eliminación como
@@ -19,6 +22,16 @@ La edición y el archivado de trabajadores bloquean exclusivamente la fila de
 `employees` en las consultas con joins opcionales. Esto evita el error PostgreSQL
 `0A000` al cambiar un Trabajador a Instructor y conserva la sincronización
 tenant-scoped de rol, permisos e Instructor.
+
+Las fotos temporales asociadas a invitaciones de trabajadores conservan la misma
+vigencia de 72 horas que la invitación y no se eliminan al cerrar un alta guardada.
+El selector de responsable de sector preserva también al responsable actual si
+dejó de estar operativo, evitando borrarlo al editar otro campo.
+
+El desarrollo local redirige al API los paths `/auth`, `/api` y los endpoints
+legacy de CRM. `npm run dev` ya no interpreta el HTML de Vite como respuesta de
+sesión. En móvil, Registro reserva espacio para “Volver al inicio” y evita que la
+tarjeta tape el enlace.
 
 ## Tesorería y sectores obligatorios — 2026-09-20
 

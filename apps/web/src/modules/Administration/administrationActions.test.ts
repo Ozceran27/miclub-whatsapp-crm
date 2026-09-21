@@ -47,4 +47,14 @@ void test('la administración de sectores presenta el nuevo resumen y editor vis
   assert.match(modal, /<ConfigurationColorPicker value=\{color\}/);
   assert.match(modal, /Eliminar sector/);
   assert.match(modal, /sector\.isSystem \? \{\} : \{ iconKey \}/);
+  assert.match(modal, /currentManagerMissing/);
+  assert.match(list, /creationError && <p className="activity-form__error" role="alert">/);
+  assert.match(list, /annualOperatingProfitability == null/);
+});
+
+void test('la foto temporal del trabajador sólo se descarta si el formulario no se guardó', () => {
+  const modal = read('./WorkerDetailModal.tsx');
+  assert.match(modal, /if\(temporaryPhotoRef\.current\)void deleteOnboardingPhoto/);
+  assert.match(modal, /await onSave\([\s\S]+temporaryPhotoRef\.current=null/);
+  assert.match(modal, /temporaryPhotoRef\.current=null; if\(previewUrlRef\.current\)\{URL\.revokeObjectURL/);
 });

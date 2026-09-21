@@ -22,6 +22,7 @@ const idleCapacity = ({ capacityDataStatus, idlePercentage }: AdministrationSect
   capacityDataStatus === 'AVAILABLE' && idlePercentage != null ? `${integer.format(idlePercentage)}%` : 'Sin datos';
 
 const annualProfitability = ({ annualOperatingProfitability, operatingCurrencyCode }: AdministrationSectorDto) => {
+  if (annualOperatingProfitability == null) return 'Sin cotización';
   const currency = operatingCurrencyCode || 'ARS';
   try {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(annualOperatingProfitability ?? 0);
@@ -38,13 +39,14 @@ export function SectorList() {
   const [response, setResponse] = useState<AdministrationSectorsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creationError, setCreationError] = useState<string | null>(null);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newColor, setNewColor] = useState('#2563EB');
   const [newIconKey, setNewIconKey] = useState(DEFAULT_SECTOR_ICON_KEY);
   const [capacityMode, setCapacityMode] = useState<'ENROLLMENTS'|'INCOME'>('INCOME');
   const [configuredCapacity, setConfiguredCapacity] = useState<number | null>(null);
-  const openCreation = useCallback(() => { setNewColor('#2563EB'); setNewIconKey(DEFAULT_SECTOR_ICON_KEY); setCapacityMode('INCOME'); setConfiguredCapacity(null); setCreating(true); }, []);
+  const openCreation = useCallback(() => { setNewColor('#2563EB'); setNewIconKey(DEFAULT_SECTOR_ICON_KEY); setCapacityMode('INCOME'); setConfiguredCapacity(null); setCreationError(null); setCreating(true); }, []);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -72,14 +74,14 @@ export function SectorList() {
   }, [canCreate, openCreation]);
 
   const create = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget); setLoading(true); setError(null);
+    event.preventDefault(); const data = new FormData(event.currentTarget); setLoading(true); setCreationError(null);
     const status = formText(data,'status');
-    if (!newColor || !status || !newIconKey || (capacityMode === 'ENROLLMENTS' && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) { setError('Datos de sector inválidos.'); setLoading(false); return; }
+    if (!newColor || !status || !newIconKey || (capacityMode === 'ENROLLMENTS' && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) { setCreationError('Revisá los datos del sector antes de continuar.'); setLoading(false); return; }
     try {
       await createAdministrationSector({name:formText(data,'name'),description:formText(data,'description')||null,iconKey:newIconKey,color:newColor,status:status as 'active'|'inactive'|'under_repair',capacityMode,configuredCapacity:capacityMode==='ENROLLMENTS'?configuredCapacity:null});
       setCreating(false); await load(); window.dispatchEvent(new Event('miclub:navigation-changed'));
     }
-    catch (e) { setError(e instanceof Error ? e.message : 'No se pudo crear el sector.'); setLoading(false); }
+    catch (e) { setCreationError(e instanceof Error ? e.message : 'No se pudo crear el sector.'); setLoading(false); }
   };
 
   const sectors = response?.items ?? [];
@@ -139,6 +141,7 @@ export function SectorList() {
         footer={<><button type="button" className="ghost-btn" onClick={() => setCreating(false)} disabled={loading}>Cancelar</button><button type="submit" className="primary-btn" form="administration-sector-create" disabled={loading}>{loading ? 'Creando…' : 'Crear sector'}</button></>}
       >
         <form id="administration-sector-create" className="draft-form" onSubmit={(event) => void create(event)}>
+          {creationError && <p className="activity-form__error" role="alert">{creationError}</p>}
           <label>Nombre<input name="name" required /></label>
           <SectorIconPicker value={newIconKey} onChange={setNewIconKey} />
           <ConfigurationColorPicker value={newColor} onChange={setNewColor} label="Color del sector" />

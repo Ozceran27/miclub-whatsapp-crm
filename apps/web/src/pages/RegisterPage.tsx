@@ -18,13 +18,13 @@ export default function RegisterPage() {
     finally { setIsLoading(false); }
   };
 
-  return <main className="login-page">
+  return <main className="login-page login-page--register">
     <Link className="auth-back" to="/">← Volver al inicio</Link>
     <section className="login-card" aria-labelledby="register-title">
       <div className="login-brand"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="login-logo" />
         {created ? <><h1 id="register-title">¡Usuario creado de manera exitosa!</h1><p>Ya podés ingresar con tu correo y contraseña.</p></> : <><p className="eyebrow">Empezá hoy</p><h1 id="register-title">Creá tu cuenta</h1><p>Prepará un espacio de gestión para tu comunidad.</p></>}
       </div>
-      {created ? <Link className="login-submit" to="/login">Volver al Login</Link> : <form className="login-form" onSubmit={handleSubmit}>
+      {created ? <Link className="login-submit" to="/login">Volver al Login</Link> : <form className="login-form" onSubmit={event => void handleSubmit(event)}>
         <label>Nombre<input autoFocus autoComplete="given-name" value={form.firstName} onChange={field('firstName')} disabled={isLoading} required /></label>
         <label>Apellido<input autoComplete="family-name" value={form.lastName} onChange={field('lastName')} disabled={isLoading} required /></label>
         <label>DNI<input inputMode="numeric" value={form.dni} onChange={field('dni')} disabled={isLoading} required /></label>

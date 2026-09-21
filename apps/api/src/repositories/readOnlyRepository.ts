@@ -55,13 +55,41 @@ const listDefinitions = {
         join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
         where e.club_id = s.club_id and a.sector_id = s.id
           and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as active_enrollments_count,
-      coalesce((select sum(case
-        when movement.movement_type = 'INGRESOS' then abs(movement.amount)
-        when movement.movement_type = 'EGRESOS' then -abs(movement.amount)
-        else 0 end)
+      profitability.amount::float8 as annual_operating_profitability,
+      profitability.status as annual_operating_profitability_status,
+      extract(year from (now() at time zone coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires')))::integer as annual_operating_profitability_year,
+      club.base_currency_code as operating_currency_code,
+      s.is_system`,
+    from: `miclub.sectors s
+      join miclub.clubs club on club.id=s.club_id
+      left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id
+      left join miclub.v_sector_capacity_metrics capacity on capacity.club_id=s.club_id and capacity.sector_id=s.id
+      left join lateral (
+        select
+          case when count(*) filter (
+            where coalesce(movement.currency_code, club.base_currency_code) <> club.base_currency_code and rate.id is null
+          ) > 0 then null else coalesce(sum(
+            (case when movement.movement_type = 'INGRESOS' then 1 else -1 end) * abs(
+              case
+                when coalesce(movement.currency_code, club.base_currency_code) = club.base_currency_code then movement.amount
+                when rate.base_currency_code = movement.currency_code and rate.quote_currency_code = club.base_currency_code then movement.amount * rate.rate
+                when rate.quote_currency_code = movement.currency_code and rate.base_currency_code = club.base_currency_code then movement.amount / rate.rate
+              end
+            )
+          ), 0) end as amount,
+          case when count(*) filter (
+            where coalesce(movement.currency_code, club.base_currency_code) <> club.base_currency_code and rate.id is null
+          ) > 0 then 'INCOMPLETE_EXCHANGE_RATE' else 'AVAILABLE' end as status
         from miclub.movements movement
         join miclub.movement_categories category on category.id = movement.category_id and category.club_id = movement.club_id
         join miclub.category_catalog catalog on catalog.id = category.catalog_id
+        left join lateral (
+          select exchange_rate.* from miclub.exchange_rates exchange_rate
+          where exchange_rate.rate_date <= movement.movement_date::date and exchange_rate.rate_type = 'official'
+            and ((exchange_rate.base_currency_code = movement.currency_code and exchange_rate.quote_currency_code = club.base_currency_code)
+              or (exchange_rate.quote_currency_code = movement.currency_code and exchange_rate.base_currency_code = club.base_currency_code))
+          order by exchange_rate.rate_date desc, exchange_rate.created_at desc limit 1
+        ) rate on movement.currency_code is distinct from club.base_currency_code
         where movement.club_id = s.club_id and movement.sector_id = s.id
           and movement.operational_status = 'COMPLETADO'
           and movement.movement_type in ('INGRESOS', 'EGRESOS')
@@ -70,11 +98,8 @@ const listDefinitions = {
             extract(year from (now() at time zone coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires')))::integer,
             1, 1, 0, 0, 0,
             coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires'))
-          and movement.movement_date < now()), 0)::float8 as annual_operating_profitability,
-      extract(year from (now() at time zone coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires')))::integer as annual_operating_profitability_year,
-      club.base_currency_code as operating_currency_code,
-      s.is_system`,
-    from: "miclub.sectors s join miclub.clubs club on club.id=s.club_id left join miclub.people manager on manager.id = s.manager_person_id and manager.club_id = s.club_id left join miclub.v_sector_capacity_metrics capacity on capacity.club_id=s.club_id and capacity.sector_id=s.id",
+          and movement.movement_date < now()
+      ) profitability on true`,
     orderBy: "s.name asc, s.id asc",
     baseWhere: "s.archived_at is null",
     filters: {
@@ -98,6 +123,7 @@ const listDefinitions = {
         and e.activity_id = a.id and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as current_enrollments,
       a.status, a.notes, a.created_at, a.updated_at`,
     orderBy: "a.name asc, a.id asc",
+    baseWhere: "a.archived_at is null",
     filters: {
       search: textSearch(["a.code", "a.name", "a.modality", "a.notes", "s.name", "i.display_name"]),
       sectorId: { column: "a.sector_id", cast: "uuid" },

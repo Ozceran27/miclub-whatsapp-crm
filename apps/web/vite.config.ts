@@ -10,5 +10,19 @@ export default defineConfig({
     },
     extensions: ['.tsx', '.ts', '.jsx', '.js', '.json']
   },
-  server: { port: 5173 }
+  server: {
+    port: 5173,
+    proxy: {
+      '/auth': 'http://localhost:4000',
+      '/api': 'http://localhost:4000',
+      '/members': 'http://localhost:4000',
+      '/debtors': 'http://localhost:4000',
+      '/templates': 'http://localhost:4000',
+      '/sync-status': 'http://localhost:4000',
+      '/summary': 'http://localhost:4000',
+      '/contacted-recent': 'http://localhost:4000',
+      '/history': 'http://localhost:4000',
+      '/prepare-messages': 'http://localhost:4000'
+    }
+  }
 });

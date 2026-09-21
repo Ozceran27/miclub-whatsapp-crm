@@ -191,3 +191,12 @@ test('regresión visual: Sectores, Trabajadores y Actividades cubren temas y vie
   assert.match(styles, /\.draft-modal-backdrop\s*\{[^}]*z-index:\s*1100/s, 'El diálogo debe apilarse sobre contenido contrastante');
   assert.match(styles, /\.draft-modal-backdrop\s*\{\s*align-items:flex-end; padding:0;/s);
 });
+
+test('el registro móvil reserva espacio para volver al inicio', async () => {
+  const [register, styles] = await Promise.all([
+    readFile(new URL('./pages/RegisterPage.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./styles.css', import.meta.url), 'utf8'),
+  ]);
+  assert.match(register, /login-page login-page--register/);
+  assert.match(styles, /\.login-page--register \{ place-items: start center; padding-top: 64px; \}/);
+});

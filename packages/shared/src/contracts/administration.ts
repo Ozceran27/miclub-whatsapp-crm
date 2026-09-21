@@ -190,8 +190,9 @@ export interface AdministrationSectorDto {
   occupancyRate?: number | null;
   activitiesCount?: number;
   activeEnrollmentsCount?: number;
-  annualOperatingProfitability?: number;
+  annualOperatingProfitability?: number | null;
   annualOperatingProfitabilityYear?: number;
+  annualOperatingProfitabilityStatus?: "AVAILABLE" | "INCOMPLETE_EXCHANGE_RATE";
   operatingCurrencyCode?: string;
   isSystem?: boolean;
   status: AdministrationRecordStatus;

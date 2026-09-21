@@ -80,9 +80,13 @@ Bajo `/api/economy`: summary, evolution, by-sector, rankings, categories, paymen
 - `/api/administration/workers`
 
 `GET /api/sectores` excluye archivados y agrega por sector
-`annualOperatingProfitability`, `annualOperatingProfitabilityYear` y
-`operatingCurrencyCode`. El importe representa el resultado de categorías
-operativas completadas desde el inicio del año local del club hasta hoy.
+`annualOperatingProfitability`, `annualOperatingProfitabilityStatus`,
+`annualOperatingProfitabilityYear` y `operatingCurrencyCode`. El importe
+representa el resultado de categorías operativas completadas desde el inicio
+del año local del club hasta hoy, convertido con la última cotización oficial
+disponible a la fecha de cada movimiento. Si falta una cotización requerida, el
+importe es `null` y el estado es `INCOMPLETE_EXCHANGE_RATE`; no se suman importes
+nominales de monedas distintas ni se presenta un cero inventado.
 
 `PATCH /api/sectors/:id` usa `iconKey` como entrada canónica y sincroniza la
 metadata visual persistida. Nombre e ícono permanecen protegidos para sectores
