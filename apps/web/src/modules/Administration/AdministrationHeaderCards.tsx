@@ -56,7 +56,7 @@ export function AdministrationHeaderCards({ summary }: Props) {
     },
     {
       label: 'Trabajadores y roles',
-      icon: '🧑‍💼',
+      icon: '🧑',
       subtitle: `${formatInteger(summary.totals?.workers?.value)} trabajadores`,
       value: formatInteger(summary.cards?.find((card) => card.id === 'roles')?.value),
       detail: 'roles activos configurados',

@@ -12,7 +12,8 @@ type WorkerRow = {
   display_name: string;
   dni: string | null;
   phone: string | null;
-  email: string | null;
+  contact_email: string | null;
+  account_email: string | null;
   role: string | null;
   sector: string | null;
   salary: string | number | null;
@@ -57,15 +58,15 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
         select e.id::text, e.club_id::text, e.person_id::text,
           (select ep.id::text from miclub.employee_photos ep where ep.club_id=e.club_id and ep.employee_id=e.id and ep.status='active' and ep.deleted_at is null order by ep.updated_at desc,ep.id limit 1) as photo_file_id,
           null::text as code,
-          p.first_name, p.last_name, p.dni, p.phone, p.email,
+          p.first_name, p.last_name, p.dni, p.phone, p.email as contact_email, u.email::text as account_email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), 'Sin nombre') as display_name,
-          r.code as role, s.name as sector, e.salary, e.has_fixed_compensation, e.fixed_compensation_amount, e.fixed_compensation_frequency, e.currency_code, e.status,
+          coalesce(r.code, upper(e.position)) as role, s.name as sector, e.salary, e.has_fixed_compensation, e.fixed_compensation_amount, e.fixed_compensation_frequency, e.currency_code, e.status,
           (e.user_id is not null and ucm.status = 'active' and coalesce(u.is_active, false) and u.status = 'active') as system_access,
           e.employment_start_date::text, e.employment_end_date::text, e.notes,
           coalesce(ucm.permissions, '{}'::text[]) as permissions,
           case when e.sector_id is null then '{}'::uuid[] else array[e.sector_id] end::text[] as sector_ids,
           coalesce(activities.items, '[]'::json) as activities,
-          count(*) filter (where r.code = 'DIRECTOR' and e.status = 'active' and ucm.status = 'active') over() as active_director_count,
+          count(*) filter (where coalesce(r.code, upper(e.position)) = 'DIRECTOR' and e.status = 'active' and (ucm.id is null or ucm.status = 'active')) over() as active_director_count,
           e.created_at::text, e.updated_at::text,
           count(*) over() as total_count
         from miclub.employees e
@@ -77,14 +78,17 @@ export const getWorkersPage = async (clubId: string, limit: number, offset: numb
         left join miclub.instructors i on i.person_id = e.person_id and i.club_id = e.club_id
         left join lateral (
           select json_agg(json_build_object('id', a.id::text, 'name', a.name, 'status', a.status) order by a.name) as items
-          from miclub.activities a where a.club_id = e.club_id and a.instructor_id = i.id and a.archived_at is null
+          from miclub.activities a
+          where a.club_id = e.club_id
+            and (a.responsible_employee_id = e.id or (a.responsible_employee_id is null and a.instructor_id = i.id))
+            and a.archived_at is null
         ) activities on true
         where e.club_id = $1 and e.archived_at is null
         order by p.last_name, p.first_name, e.id
         limit $2 offset $3`, [clubId, limit, offset])
     : await db.query<WorkerRow>(`
         select p.id::text, p.club_id::text, p.id::text as person_id, null::text as photo_file_id, null::text as code,
-          p.first_name, p.last_name, p.dni, p.phone, p.email,
+          p.first_name, p.last_name, p.dni, p.phone, p.email as contact_email, u.email::text as account_email,
           coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), i.display_name, 'Sin nombre') as display_name,
           coalesce(r.code, case when i.id is not null then 'INSTRUCTOR' end) as role,
           sectors.names as sector, null::numeric as salary, false as has_fixed_compensation, null::numeric as fixed_compensation_amount, null::text as fixed_compensation_frequency, null::text as currency_code,

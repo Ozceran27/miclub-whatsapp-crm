@@ -94,7 +94,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
     description="Resumen operativo, identidad visual y parámetros de funcionamiento."
     busy={saving}
     onClose={onClose}
-    footer={<><button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>{canEdit ? 'Cancelar' : 'Cerrar'}</button>{canEdit && <button type="submit" className="primary-btn" form="administration-sector-edit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>}</>}
+    footer={<>{canArchive && !sector.isSystem && <button type="button" className="danger-btn sector-editor__footer-delete" disabled={saving} onClick={() => void archive()}>Eliminar sector</button>}<button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>{canEdit ? 'Cancelar' : 'Cerrar'}</button>{canEdit && <button type="submit" className="primary-btn" form="administration-sector-edit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>}</>}
   >
     <div className="sector-editor__hero">
       <span className="sector-editor__visual" style={{ '--sector-color': color } as CSSProperties}><span aria-hidden="true">{getSectorVisualMeta({ ...sector, iconKey }).icon}</span></span>
@@ -126,6 +126,5 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
 
     {error && <p className="activity-form__error" role="alert">{error}</p>}
 
-    {canArchive && !sector.isSystem && <section className="sector-editor__danger"><div><h4>Eliminar sector</h4><p>Se archivará y desaparecerá de la operación diaria. Antes debe quedar sin trabajadores ni actividades vigentes.</p></div><button type="button" disabled={saving} onClick={() => void archive()}>Eliminar sector</button></section>}
   </ConfigurationEditorModal>;
 }

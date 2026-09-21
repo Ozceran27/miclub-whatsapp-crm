@@ -41,11 +41,11 @@ test("rechaza identificadores temporales repetidos y referencias cruzadas invál
   const dangling=completeRequest();dangling.draft.activities=[{clientId:"activity:1",sectorClientId:"sector:missing",instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",settlementMode:"FIXED",fixedClubFee:0,fixedFeeFrequency:"MONTHLY",currencyCode:"ARS",clubSharePercentage:null,status:"active"}];
   assert.equal(isCompleteOnboardingRequest(dangling),false);
 });
-test("sólo acepta responsables instructores y porcentajes VARIABLE entre cero y cien",()=>{
+test("acepta cualquier trabajador como responsable y porcentajes VARIABLE entre cero y cien",()=>{
   const request=completeRequest();request.draft.workers=[{clientId:"worker:1",firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"TRABAJADOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
   request.draft.activities=[{clientId:"activity:1",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:"worker:1",name:"Yoga",iconKey:"yoga",color:"#2563EB",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:101,status:"active"}];
   assert.equal(isCompleteOnboardingRequest(request),false);
-  request.draft.workers[0].role="INSTRUCTOR";request.draft.activities[0].clubSharePercentage=100;
+  request.draft.activities[0].clubSharePercentage=100;
   assert.equal(isCompleteOnboardingRequest(request),true);
 });
 test("rechaza montos fijos negativos, infinitos y referencias de importación mal formadas",()=>{
@@ -59,10 +59,12 @@ test("rechaza montos fijos negativos, infinitos y referencias de importación ma
 
 test("finaliza las modalidades FIXED y VARIABLE sin una cuota implícita",()=>{
   const fixed=completeRequest();
-  const common={clientId:"activity:fixed",sectorClientId:fixed.draft.sectors[0].clientId,instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",status:"active" as const};
+  fixed.draft.workers=[{clientId:"worker:responsible",firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"TRABAJADOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
+  const common={clientId:"activity:fixed",sectorClientId:fixed.draft.sectors[0].clientId,responsibleWorkerClientId:"worker:responsible",instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",status:"active" as const};
   fixed.draft.activities=[{...common,settlementMode:"FIXED",fixedClubFee:1250,fixedFeeFrequency:"WEEKLY",currencyCode:"ARS",clubSharePercentage:null}];
   assert.equal(isCompleteOnboardingRequest(fixed),true);
   const variable=completeRequest();
+  variable.draft.workers=[...fixed.draft.workers];
   variable.draft.activities=[{...common,clientId:"activity:variable",sectorClientId:variable.draft.sectors[0].clientId,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:35}];
   assert.equal(isCompleteOnboardingRequest(variable),true);
 });
@@ -70,7 +72,8 @@ test("finaliza las modalidades FIXED y VARIABLE sin una cuota implícita",()=>{
 test("permite finalizar con cada clave canónica de actividad y rechaza aliases o claves desconocidas",()=>{
   for(const visual of ACTIVITY_VISUAL_CATALOG){
     const request=completeRequest();
-    request.draft.activities=[{clientId:`activity:${visual.key}`,sectorClientId:request.draft.sectors[0].clientId,instructorClientId:null,name:visual.name,iconKey:visual.key,color:"#2563EB",status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:25}];
+    request.draft.workers=[{clientId:"worker:responsible",firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"DIRECTOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
+    request.draft.activities=[{clientId:`activity:${visual.key}`,sectorClientId:request.draft.sectors[0].clientId,responsibleWorkerClientId:"worker:responsible",instructorClientId:null,name:visual.name,iconKey:visual.key,color:"#2563EB",status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:25}];
     assert.equal(isCompleteOnboardingRequest(request),true,visual.key);
   }
   for(const iconKey of ["soccer","not-in-catalog"]){

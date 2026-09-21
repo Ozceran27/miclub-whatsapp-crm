@@ -111,11 +111,12 @@ const listDefinitions = {
   },
   actividades: {
     sectorColumn: "a.sector_id",
-    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id",
+    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.employees responsible_employee on responsible_employee.id=a.responsible_employee_id and responsible_employee.club_id=a.club_id left join miclub.people operational_responsible on operational_responsible.id=responsible_employee.person_id and operational_responsible.club_id=a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id",
     clubColumn: "a.club_id",
     select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name, a.instructor_id,
-      i.display_name as instructor_name, terms.responsible_person_id, nullif(trim(concat_ws(' ', responsible.first_name, responsible.last_name)), '') as responsible_person_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
+      i.display_name as instructor_name, a.responsible_employee_id, nullif(trim(concat_ws(' ', operational_responsible.first_name, operational_responsible.last_name)), '') as responsible_employee_name,
+      terms.responsible_person_id, nullif(trim(concat_ws(' ', responsible.first_name, responsible.last_name)), '') as responsible_person_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
       a.club_commission_percent, a.instructor_commission_percent, a.max_capacity,
       lower(terms.mode) as settlement_mode, terms.fixed_club_fee as settlement_fixed_amount, terms.fixed_fee_frequency, terms.currency_code,
       terms.club_share_percentage, terms.effective_from as terms_effective_from, terms.effective_to as terms_effective_to, a.generates_enrollments,
@@ -125,7 +126,7 @@ const listDefinitions = {
     orderBy: "a.name asc, a.id asc",
     baseWhere: "a.archived_at is null",
     filters: {
-      search: textSearch(["a.code", "a.name", "a.modality", "a.notes", "s.name", "i.display_name"]),
+      search: textSearch(["a.code", "a.name", "a.modality", "a.notes", "s.name", "i.display_name", "operational_responsible.first_name", "operational_responsible.last_name"]),
       sectorId: { column: "a.sector_id", cast: "uuid" },
       status: { column: "a.status" },
       modality: { column: "a.modality" }

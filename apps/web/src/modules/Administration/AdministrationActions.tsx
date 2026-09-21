@@ -68,8 +68,8 @@ function ActionCard({ action, run, permitted }: { action: AdministrationAction; 
 
   return <>
     <button ref={buttonRef} aria-describedby={open ? tooltipId : undefined} aria-disabled={disabled} className="administration-action-card" data-availability={comingSoon ? 'coming-soon' : !permitted ? 'forbidden' : 'enabled'} onBlur={() => setOpen(false)} onClick={() => { if (!disabled) run?.(); }} onFocus={() => setOpen(true)} onKeyDown={event => { if (event.key === 'Escape') setOpen(false); }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)} type="button">
-      <span ref={iconRef} className="administration-action-card__icon" aria-hidden="true">{action.icon}</span>
-      <span className="administration-action-card__title"><strong>{action.label}</strong>{status && <span className="administration-action-card__badge">{status}</span>}</span>
+      <span className="administration-action-card__muted-content"><span ref={iconRef} className="administration-action-card__icon" aria-hidden="true">{action.icon}</span><span className="administration-action-card__title"><strong>{action.label}</strong></span></span>
+      {status && <span className="administration-action-card__badge">{status}</span>}
     </button>
     {open && createPortal(<div ref={tooltipRef} id={tooltipId} className="administration-action-tooltip" role="tooltip" style={{ top: position.top, left: position.left }}>{tooltip}</div>, document.body)}
   </>;

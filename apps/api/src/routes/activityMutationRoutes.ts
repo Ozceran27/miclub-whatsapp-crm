@@ -22,12 +22,14 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "instructorId", "responsiblePersonId", "code", "name", "modality", "color", "iconKey", "instructorCommissionPercent", "maxCapacity", "status", "notes", "settlement"]);
+  const allowed = new Set(["updatedAt", "sectorId", "responsibleEmployeeId", "economicResponsiblePersonId", "instructorId", "responsiblePersonId", "code", "name", "modality", "color", "iconKey", "maxCapacity", "status", "notes", "settlement"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
-  if (typeof body.instructorId !== "string" || !UUID.test(body.instructorId)) { fail(res, 400, "ACTIVITY_REQUIRES_INSTRUCTOR", "Toda actividad requiere un instructor operativo."); return null; }
+  const hasResponsibleEmployee = typeof body.responsibleEmployeeId === "string" && UUID.test(body.responsibleEmployeeId);
+  const hasLegacyInstructor = typeof body.instructorId === "string" && UUID.test(body.instructorId);
+  if (!hasResponsibleEmployee && !hasLegacyInstructor) { fail(res, 400, "ACTIVITY_REQUIRES_RESPONSIBLE", "Toda actividad requiere un trabajador responsable activo."); return null; }
+  if (body.economicResponsiblePersonId !== undefined && body.economicResponsiblePersonId !== null && (typeof body.economicResponsiblePersonId !== "string" || !UUID.test(body.economicResponsiblePersonId))) { fail(res, 400, "VALIDATION_ERROR", "economicResponsiblePersonId debe ser UUID o null."); return null; }
   if (body.responsiblePersonId !== undefined && body.responsiblePersonId !== null && (typeof body.responsiblePersonId !== "string" || !UUID.test(body.responsiblePersonId))) { fail(res, 400, "VALIDATION_ERROR", "responsiblePersonId debe ser UUID o null."); return null; }
-  if (body.instructorCommissionPercent !== undefined && (typeof body.instructorCommissionPercent !== "number" || !Number.isFinite(body.instructorCommissionPercent) || body.instructorCommissionPercent < 0)) { fail(res, 400, "VALIDATION_ERROR", "instructorCommissionPercent debe ser un número no negativo."); return null; }
   const settlement = body.settlement as Record<string, unknown> | undefined;
   if (!settlement) { fail(res, 400, "VALIDATION_ERROR", "settlement es obligatorio."); return null; }
   const keys = Object.keys(settlement); const mode = settlement.mode;
@@ -49,7 +51,7 @@ const respond = (res: Response, result: ActivityMutationResult) => {
   const errors: Record<string, [number, string, string]> = {
     missing: [404, "ACTIVITY_NOT_FOUND", "Actividad no encontrada."], conflict: [409, "OPTIMISTIC_CONCURRENCY_CONFLICT", "La actividad fue modificada por otra operación; recargue los datos."],
     model_not_applied: [503, "ACTIVITY_MODEL_NOT_APPLIED", "El modelo de mutaciones de actividades todavía no fue aplicado."], invalid_manager: [404, "INVALID_MANAGER", "El responsable no fue encontrado."],
-    invalid_sector: [404, "INVALID_SECTOR", "El sector no fue encontrado."], invalid_instructor: [404, "INVALID_INSTRUCTOR", "El instructor no fue encontrado."],
+    invalid_sector: [404, "INVALID_SECTOR", "El sector no fue encontrado."], invalid_instructor: [404, "INVALID_RESPONSIBLE_WORKER", "El trabajador responsable no está activo o no pertenece al club."],
     invalid_responsible: [404, "INVALID_RESPONSIBLE", "El receptor económico no es una persona operativa activa del club."],
     dependencies: [409, "ACTIVITY_HAS_DEPENDENCIES", "La actividad tiene dependencias y no existe una regla segura para archivarla."],
     invalid_terms: [409, "INVALID_ACTIVITY_TERMS", "La nueva vigencia solapa o deja un hueco en las condiciones económicas."],

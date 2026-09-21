@@ -23,23 +23,20 @@ export const archiveAdministrationSector = (id:string,updatedAt:string) => apiJs
 export const getAdministrationActivities = (signal?: AbortSignal) =>
   apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100', { cache: 'no-store', signal });
 
-export type ActivityInstructorCatalogItem = { id: string; personId: string; displayName: string; isActive: boolean };
+export type ActivityWorkerCatalogItem = { id: string; personId: string; displayName: string; role: string | null };
 export type ActivityTermHistoryItem = { id:string; mode:'FIXED'|'VARIABLE'; fixedClubFee:number|null; fixedFeeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY'|null; clubSharePercentage:number|null; currencyCode:string|null; effectiveFrom:string; effectiveTo:string|null; responsiblePersonId:string|null; responsiblePersonName:string|null; revision:number };
 export type AdministrationActivityMutation = ActivityMutationContract;
 export type AdministrationActivityMutationResponse = { id: string; updatedAt: string } & Record<string, unknown>;
 
 export const getActivityFormCatalogs = async (signal?: AbortSignal) => {
-  const [sectors, instructors, workers] = await Promise.all([
+  const [sectors, workers] = await Promise.all([
     getAdministrationSectors(signal),
-    apiJson<{ items: Array<{ id: string; personId: string; displayName?: string; name?: string; isActive?: boolean; status?: string }> }>('/api/administration/activity-instructors', { cache: 'no-store', signal }),
     getAdministrationWorkers(signal),
   ]);
+  const activeWorkers = workers.items.filter((worker) => worker.isActive && worker.personId);
   return {
     sectors: sectors.items.filter((sector) => sector.status === 'active'),
-    instructors: instructors.items
-      .filter((instructor) => instructor.isActive !== false && instructor.status !== 'inactive')
-      .map((instructor) => ({ id: instructor.id, personId: instructor.personId, displayName: instructor.displayName ?? instructor.name ?? 'Instructor sin nombre', isActive: true })),
-    responsibles: workers.items.filter(worker=>worker.isActive && worker.personId).map(worker=>({id:worker.personId!,name:worker.displayName})),
+    workers: activeWorkers.map((worker) => ({ id: worker.id, personId: worker.personId!, displayName: worker.displayName, role: worker.role ?? null })),
   };
 };
 

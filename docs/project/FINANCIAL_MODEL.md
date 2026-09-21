@@ -1,5 +1,13 @@
 # Financial Model
 
+## Presentación de saldos operativos (2026-09-21)
+
+El circuito devuelve totales separados por moneda: `activityToPay` (saldo positivo
+de actividades), `activityToCollect` (valor absoluto de saldos negativos),
+`fixedCompensationToPay` (remuneraciones aprobadas) y `totalToPay`. No se convierten
+ni suman monedas sin cotización. La remuneración fija personal sigue siendo una
+obligación independiente del fee FIXED contractual de la actividad.
+
 ## Extensión administrativa — 2026-09-19
 
 Esta sección sustituye las menciones históricas inferiores a prorrateo o a una

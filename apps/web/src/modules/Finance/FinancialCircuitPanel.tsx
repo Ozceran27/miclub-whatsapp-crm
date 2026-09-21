@@ -70,6 +70,10 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
       <p>Saldo proyectado <strong>{money(p.projectedBalance, p.currencyCode)}</strong></p>
       <p>Estimación futura <strong>{money(p.futureEstimate, p.currencyCode)}</strong></p>
     </div>
+    <div className="finance-totals" aria-label="Saldos operativos separados">
+      {data.balanceTotals.map(total => <div key={total.currencyCode}><p>A liquidar <strong>{money(total.totalToPay, total.currencyCode)}</strong></p><p>A cobrar <strong>{money(total.activityToCollect, total.currencyCode)}</strong></p><small>Actividades: {money(total.activityToPay, total.currencyCode)} · Remuneraciones fijas aprobadas: {money(total.fixedCompensationToPay, total.currencyCode)}</small></div>)}
+      {!data.balanceTotals.length && <p>Sin saldos a liquidar ni a cobrar.</p>}
+    </div>
     {!p.complete && <p role="status">Total incompleto: revise acuerdos, cuentas y cotizaciones pendientes.</p>}
     <details><summary>Ver componentes y supuestos</summary>
       <dl><dt>Cobros pendientes</dt><dd>{money(p.pendingCollections, p.currencyCode)}</dd><dt>Pagos pendientes</dt><dd>{money(p.pendingPayments, p.currencyCode)}</dd><dt>Liquidaciones pendientes</dt><dd>{money(p.pendingSettlements, p.currencyCode)}</dd><dt>Liquidaciones previstas</dt><dd>{money(p.expectedSettlements, p.currencyCode)}</dd><dt>Participación adicional en cuotas</dt><dd>{money(p.additionalClubReceivables, p.currencyCode)}</dd></dl>

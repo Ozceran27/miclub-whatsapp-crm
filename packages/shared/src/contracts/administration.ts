@@ -215,6 +215,8 @@ export interface AdministrationActivityDto {
   managerPersonId?: string | null;
   instructorId?: string | null;
   instructorName?: string | null;
+  responsibleEmployeeId?: string | null;
+  responsibleEmployeeName?: string | null;
   responsiblePersonId?: string | null;
   responsiblePersonName?: string | null;
   managerName?: string | null;
@@ -259,6 +261,8 @@ export interface AdministrationWorkerDto {
   dni?: string | null;
   phone?: string | null;
   email?: string | null;
+  contactEmail?: string | null;
+  accountEmail?: string | null;
   employmentEndDate?: string | null;
   sectorIds?: string[];
   activityIds?: string[];
@@ -288,11 +292,14 @@ export interface AdministrationWorkerDto {
 }
 
 export interface AdministrationWorkerMutationDto {
+  updatedAt?: string;
   firstName: string;
   lastName: string;
   dni: string;
   phone?: string | null;
   email?: string | null;
+  contactEmail?: string | null;
+  accessEmail?: string | null;
   password?: string;
   /** Defaults to true for backwards-compatible onboarding payloads. */
   systemAccessEnabled?: boolean;

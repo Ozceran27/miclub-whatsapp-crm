@@ -4,12 +4,14 @@ import test from "node:test";
 import { ROLE_DEFAULT_PERMISSIONS } from "@miclub/shared";
 import { hashPassword, verifyPassword } from "../../auth/passwordHasher.js";
 import { setPostgresPoolForTests, type PgPool } from "../../db/postgres.js";
-import { createWorker, resolveWorkerInvitation, validateWorkerMutation, WorkerMutationError } from "./workerMutationService.js";
+import { createWorker, resolveWorkerInvitation, updateWorker, validateWorkerMutation, WorkerMutationError } from "./workerMutationService.js";
 
 const base = { firstName: " Ana ", lastName: " Pérez ", dni: "12.345.678", email: "ANA@EXAMPLE.COM", password: "segura12345", role: "TRABAJADOR", hasFixedCompensation: false, fixedCompensationAmount: null, fixedCompensationFrequency: null };
 void test("normaliza DNI/correo y exige las reglas públicas de contraseña", async () => {
   const input = validateWorkerMutation(base, true);
   assert.equal(input.dni, "12345678"); assert.equal(input.email, "ana@example.com");
+  const split = validateWorkerMutation({ ...base, contactEmail: "CONTACTO@EXAMPLE.COM", accessEmail: "ACCESO@EXAMPLE.COM" }, true);
+  assert.equal(split.contactEmail, "contacto@example.com"); assert.equal(split.accessEmail, "acceso@example.com");
   assert.throws(() => validateWorkerMutation({ ...base, password: "demasiadocorta" }, true), WorkerMutationError);
   const hash = await hashPassword(input.password!); assert.notEqual(hash, input.password); assert.equal(await verifyPassword(input.password!, hash), true);
 });
@@ -68,6 +70,39 @@ void test("un email existente en otro club sólo crea una invitación tenant-sco
     assert.ok(!statements.some(({ sql }) => sql.includes("insert into miclub.employees")));
     await assert.rejects(createWorker(actor, { ...existingBody, password: "segura12345" }), WorkerMutationError);
     assert.equal(statements.filter(({ sql }) => sql.includes("insert into miclub.worker_invitations")).length, 1);
+  } finally { setPostgresPoolForTests(undefined); }
+});
+
+void test("editar persiste rol laboral, DNI y contacto sin depender de Instructor", async () => {
+  const updatedAt = "2026-09-21T12:00:00.000Z";
+  const employeeId = "70000000-0000-4000-8000-000000000001";
+  const { pool, statements } = mockPool((sql) => {
+    if (sql.includes("select e.*,coalesce") && sql.includes("for update of e")) return [{ id: employeeId, person_id: "70000000-0000-4000-8000-000000000002", membership_id: "70000000-0000-4000-8000-000000000003", role_code: "INSTRUCTOR", position: "INSTRUCTOR", updated_at: updatedAt }];
+    if (sql.includes("from miclub.instructors") && sql.includes("for update")) return [{ id: "70000000-0000-4000-8000-000000000004" }];
+    if (sql.includes("from miclub.roles")) return [{ id: "70000000-0000-4000-8000-000000000005" }];
+    if (sql.includes("update miclub.employees set sector_id")) return [{ id: employeeId, position: "TRABAJADOR" }];
+    if (sql.includes("INSERT INTO miclub.audit_log")) return [{ id: "70000000-0000-4000-8000-000000000006" }];
+    return [];
+  });
+  setPostgresPoolForTests(pool);
+  try {
+    await updateWorker(actor, employeeId, { ...existingBody, updatedAt, role: "TRABAJADOR", contactEmail: "contacto@example.com", accessEmail: "ana@example.com", compensationEffectiveFrom: "2026-09-21" });
+    const personUpdate = statements.find(({ sql }) => sql.includes("update miclub.people set first_name"));
+    assert.match(personUpdate?.sql ?? "", /dni=\$5[\s\S]*email=\$7/);
+    assert.equal(personUpdate?.params[4], "12345678");
+    assert.equal(personUpdate?.params[6], "contacto@example.com");
+    assert.ok(statements.some(({ sql, params }) => sql.includes("update miclub.user_club_memberships") && params[2] === "70000000-0000-4000-8000-000000000005"));
+    assert.ok(statements.some(({ sql }) => sql.includes("status='suspendida'")));
+    assert.ok(!statements.some(({ sql }) => sql.includes("from miclub.activities")), "cambiar el rol no debe romper actividades cuyo responsable es el empleado");
+  } finally { setPostgresPoolForTests(undefined); }
+});
+
+void test("editar rechaza una versión obsoleta antes de escribir", async () => {
+  const { pool, statements } = mockPool((sql) => sql.includes("select e.*,coalesce") ? [{ id: "70000000-0000-4000-8000-000000000001", person_id: "70000000-0000-4000-8000-000000000002", membership_id: null, role_code: "TRABAJADOR", updated_at: "2026-09-21T12:00:00.000Z" }] : []);
+  setPostgresPoolForTests(pool);
+  try {
+    await assert.rejects(updateWorker(actor, "70000000-0000-4000-8000-000000000001", { ...existingBody, updatedAt: "2026-09-20T12:00:00.000Z", systemAccessEnabled: false }), (error: unknown) => error instanceof WorkerMutationError && error.code === "conflict");
+    assert.ok(!statements.some(({ sql }) => sql.startsWith("update miclub.people") || sql.startsWith("update miclub.employees")));
   } finally { setPostgresPoolForTests(undefined); }
 });
 

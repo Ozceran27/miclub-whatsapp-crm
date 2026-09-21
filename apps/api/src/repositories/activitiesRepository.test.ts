@@ -9,12 +9,15 @@ const CLUB_B = '22222222-2222-4222-8222-222222222222';
 const SECTOR_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SECTOR_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const ACTIVITY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const EMPLOYEE_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const PERSON_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const INSTRUCTOR_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const UPDATED_AT = '2026-08-05T12:00:00.000Z';
 const limitedActor: ActivityActor = { userId: 'user-limited', membershipId: 'membership-limited', clubId: CLUB_A, sectorIds: [SECTOR_A], canAccessAnySector: false };
 const anySectorActor: ActivityActor = { ...limitedActor, userId: 'user-any', membershipId: 'membership-any', sectorIds: [], canAccessAnySector: true };
-const input = (sectorId: string): ActivityInput => ({ sectorId, instructorId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
+const input = (sectorId: string): ActivityInput => ({ sectorId, responsibleEmployeeId: EMPLOYEE_ID, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
 
-type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; instructor_id?: string; updated_at: string; archived_at: null };
+type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; instructor_id?: string | null; responsible_employee_id?: string | null; updated_at: string; archived_at: null };
 const installActivityPool = (stored: StoredActivity, settlementLocked = false) => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = {
@@ -28,7 +31,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
           && (params?.[2] === true || sectors.includes(stored.sector_id));
         return { rows: visible ? [stored] : [] };
       }
-      if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true, responsible: true, instructor_person_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }] };
+      if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, responsible: true, employee_id: EMPLOYEE_ID, employee_person_id: PERSON_ID, legacy_instructor_id: INSTRUCTOR_ID }] };
       if (sql.includes('from miclub.activity_terms') && sql.includes('for update')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: null }] };
       if (sql.includes('from miclub.activity_settlements')) return { rows: [{ locked: settlementLocked }] };
       if (sql.includes('update miclub.activity_terms')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: '2026-08-31' }] };
@@ -52,7 +55,7 @@ const createPool = (settlement: ActivityInput['settlement'], failAudit = false) 
     queries.push({ sql, params });
     if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql) || sql.includes('set_config')) return { rows: [] };
     if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
-    if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, instructor: true, responsible: true, instructor_person_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }] };
+    if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, responsible: true, employee_id: EMPLOYEE_ID, employee_person_id: PERSON_ID, legacy_instructor_id: INSTRUCTOR_ID }] };
     if (sql.includes('insert into miclub.activities')) return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] };
     if (sql.includes('insert into miclub.activity_terms')) return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] };
     if (sql.includes('INSERT INTO miclub.audit_log')) {
@@ -131,7 +134,7 @@ for (const settlement of [
   { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 42, effectiveFrom: '2026-09-01' } as const,
   { mode: 'FIXED', fixedFeeFrequency: 'MONTHLY',currencyCode:"ARS", fixedClubFee: 250000, clubSharePercentage: null, effectiveFrom: '2026-09-01' } as const,
 ]) test(`versiona un cambio de ${settlement.mode === 'FIXED' ? 'monto' : 'porcentaje'} sin reescribir el término vigente`, async () => {
-  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, responsible_employee_id: EMPLOYEE_ID, updated_at: UPDATED_AT, archived_at: null };
   const queries = installActivityPool(stored);
   assert.equal((await updateActivity(limitedActor, ACTIVITY_ID, UPDATED_AT, { ...input(SECTOR_A), settlement })).kind, 'updated');
   const close = queries.find(({ sql }) => sql.includes('update miclub.activity_terms'));
@@ -143,7 +146,7 @@ for (const settlement of [
 });
 
 test('rechaza vigencias solapadas y preserva historia liquidada antes de escribir la actividad', async () => {
-  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, responsible_employee_id: EMPLOYEE_ID, updated_at: UPDATED_AT, archived_at: null };
   let queries = installActivityPool(stored);
   assert.equal((await updateActivity(limitedActor, ACTIVITY_ID, UPDATED_AT, { ...input(SECTOR_A), settlement: { ...input(SECTOR_A).settlement, effectiveFrom: '2026-08-01' } })).kind, 'invalid_terms');
   assert.equal(queries.some(({ sql }) => sql.includes('update miclub.activities')), false);
@@ -172,7 +175,7 @@ test('upsertActivity no pisa monthly_fee cuando la cuota del import viene en bla
 });
 
 test('el usuario limitado no puede hacer update, status ni archive en el segundo sector, pero sectors:any sí', async () => {
-  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_B, manager_person_id: null, instructor_id: input(SECTOR_B).instructorId, updated_at: UPDATED_AT, archived_at: null };
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_B, manager_person_id: null, responsible_employee_id: EMPLOYEE_ID, updated_at: UPDATED_AT, archived_at: null };
   const operations = [
     (actor: ActivityActor) => updateActivity(actor, ACTIVITY_ID, UPDATED_AT, input(SECTOR_B)),
     (actor: ActivityActor) => setActivityStatus(actor, ACTIVITY_ID, UPDATED_AT, 'inactive'),
@@ -190,7 +193,7 @@ test('el usuario limitado no puede hacer update, status ni archive en el segundo
 });
 
 test('una reasignación exige acceso simultáneo al sector actual y al destino', async () => {
-  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, updated_at: UPDATED_AT, archived_at: null };
+  const stored = { id: ACTIVITY_ID, club_id: CLUB_A, sector_id: SECTOR_A, manager_person_id: null, responsible_employee_id: EMPLOYEE_ID, updated_at: UPDATED_AT, archived_at: null };
   const deniedQueries = installActivityPool(stored);
   assert.deepEqual(await updateActivity(limitedActor, ACTIVITY_ID, UPDATED_AT, input(SECTOR_B)), { kind: 'missing' });
   assert.equal(deniedQueries.some(({ sql }) => sql.includes('select exists(select 1 from miclub.sectors')), false, 'no debe confirmar si el destino existe');

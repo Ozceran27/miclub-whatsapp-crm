@@ -6,16 +6,18 @@ import type { ActivitySettlementMutation } from "@miclub/shared";
 import { storedEntityStatus } from "./entityStatusRepository.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
-export const ACTIVITY_MUTATION_MODEL_MIGRATION = "202608060001_activity_mutation_model.sql";
+export const ACTIVITY_MUTATION_MODEL_MIGRATION = "202609210001_worker_activity_responsibility.sql";
 
 export type ActivityActor = {
   userId: string; membershipId: string; clubId: string; sectorIds: readonly string[]; canAccessAnySector: boolean;
   requestId?: string; ip?: string; userAgent?: string;
 };
 export type ActivityInput = {
-  sectorId: string; name: string; managerPersonId: string | null; instructorId: string; responsiblePersonId?: string | null; code?: string | null;
+  sectorId: string; name: string; managerPersonId: string | null; responsibleEmployeeId?: string | null; economicResponsiblePersonId?: string | null;
+  /** Legacy transition input. New clients must send responsibleEmployeeId. */ instructorId?: string | null;
+  /** Legacy alias for economicResponsiblePersonId. */ responsiblePersonId?: string | null; code?: string | null;
   modality?: string | null; color?: string | null; iconKey?: string | null; clubCommissionPercent: number;
-  instructorCommissionPercent?: number; maxCapacity?: number | null; status?: "active" | "inactive"; notes?: string | null;
+  maxCapacity?: number | null; status?: "active" | "inactive"; notes?: string | null;
   settlement: ActivitySettlementMutation;
 };
 export type ActivityRow = Record<string, unknown> & { id: string; updated_at: Date | string };
@@ -27,7 +29,7 @@ class InvalidActivityTermsError extends Error {}
 const isTermsConstraintError = (error: unknown) => error instanceof InvalidActivityTermsError
   || (typeof error === "object" && error !== null && "code" in error && ["23P01", "23514"].includes(String(error.code)));
 
-const activityColumns = `id, club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key,
+const activityColumns = `id, club_id, sector_id, manager_person_id, instructor_id, responsible_employee_id, code, name, modality, color, icon_key,
   monthly_fee, enrollment_fee_frequency, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, archived_at, created_at, updated_at`;
 
 const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean> => {
@@ -35,24 +37,30 @@ const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean
   return Boolean(result.rows[0]);
 };
 
-const validReferences = async (executor: { query: Pool["query"] }, actor: ActivityActor, input: Pick<ActivityInput, "sectorId" | "managerPersonId" | "instructorId" | "responsiblePersonId">): Promise<{ failure: ActivityValidationFailure | null; instructorPersonId: string | null }> => {
-  const result = await executor.query<{ sector: boolean; manager: boolean; instructor: boolean; responsible: boolean; instructor_person_id: string | null }>(`
+const validReferences = async (executor: { query: Pool["query"] }, actor: ActivityActor, input: Pick<ActivityInput, "sectorId" | "managerPersonId" | "responsibleEmployeeId" | "instructorId" | "economicResponsiblePersonId" | "responsiblePersonId">): Promise<{ failure: ActivityValidationFailure | null; employeeId: string | null; employeePersonId: string | null; legacyInstructorId: string | null }> => {
+  const economicPersonId = input.economicResponsiblePersonId ?? input.responsiblePersonId ?? null;
+  const result = await executor.query<{ sector: boolean; manager: boolean; employee_id: string | null; employee_person_id: string | null; legacy_instructor_id: string | null; responsible: boolean }>(`
+    with responsible_worker as (
+      select e.id::text employee_id,e.person_id::text employee_person_id,
+        (select i.id::text from miclub.instructors i where i.club_id=e.club_id and i.person_id=e.person_id and i.status='activa' limit 1) legacy_instructor_id
+      from miclub.employees e
+      left join miclub.instructors legacy_i on legacy_i.club_id=e.club_id and legacy_i.person_id=e.person_id and legacy_i.status='activa'
+      where e.club_id=$1 and e.status='active' and e.archived_at is null
+        and (($4::uuid is not null and e.id=$4) or ($4::uuid is null and $5::uuid is not null and legacy_i.id=$5))
+      limit 1
+    )
     select exists(select 1 from miclub.sectors where club_id=$1 and id=$2 and archived_at is null) sector,
       ($3::uuid is null or exists(select 1 from miclub.people where club_id=$1 and id=$3)) manager,
-      exists(select 1 from miclub.instructors where club_id=$1 and id=$4 and status='activa') instructor,
-      (select person_id from miclub.instructors where club_id=$1 and id=$4 and status='activa') instructor_person_id,
-      ($5::uuid is null or exists(
-        select 1 from miclub.people p where p.club_id=$1 and p.id=$5 and (
-          exists(select 1 from miclub.employees e where e.club_id=p.club_id and e.person_id=p.id and e.status='active' and e.archived_at is null)
-          or exists(select 1 from miclub.instructors i where i.club_id=p.club_id and i.person_id=p.id and i.status='activa')
-        ))) responsible`,
-  [actor.clubId, input.sectorId, input.managerPersonId, input.instructorId, input.responsiblePersonId ?? null]);
+      rw.employee_id,rw.employee_person_id,rw.legacy_instructor_id,
+      ($6::uuid is null or exists(select 1 from miclub.employees e where e.club_id=$1 and e.person_id=$6 and e.status='active' and e.archived_at is null)) responsible
+    from (select 1) seed left join responsible_worker rw on true`,
+  [actor.clubId, input.sectorId, input.managerPersonId, input.responsibleEmployeeId ?? null, input.instructorId ?? null, economicPersonId]);
   const row = result.rows[0];
-  if (!row?.sector) return { failure: "invalid_sector", instructorPersonId: null };
-  if (!row.manager) return { failure: "invalid_manager", instructorPersonId: null };
-  if (!row.instructor) return { failure: "invalid_instructor", instructorPersonId: null };
-  if (!row.responsible) return { failure: "invalid_responsible", instructorPersonId: null };
-  return { failure: null, instructorPersonId: row.instructor_person_id };
+  if (!row?.sector) return { failure: "invalid_sector", employeeId: null, employeePersonId: null, legacyInstructorId: null };
+  if (!row.manager) return { failure: "invalid_manager", employeeId: null, employeePersonId: null, legacyInstructorId: null };
+  if (!row.employee_id) return { failure: "invalid_instructor", employeeId: null, employeePersonId: null, legacyInstructorId: null };
+  if (!row.responsible) return { failure: "invalid_responsible", employeeId: null, employeePersonId: null, legacyInstructorId: null };
+  return { failure: null, employeeId: row.employee_id, employeePersonId: row.employee_person_id, legacyInstructorId: row.legacy_instructor_id };
 };
 
 const auditActivity = (actor: ActivityActor, action: string, before: ActivityRow | null, after: ActivityRow, executor: Parameters<typeof auditService.sensitiveChange>[1]) =>
@@ -73,15 +81,15 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
     const references = await validReferences(executor, actor, input);
     if (references.failure) return { kind: references.failure };
     const result = await executor.query<ActivityRow>(`insert into miclub.activities
-      (club_id, sector_id, manager_person_id, instructor_id, code, name, modality, color, icon_key, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::uuid) returning ${activityColumns}`,
-    [actor.clubId, input.sectorId, input.managerPersonId, input.instructorId ?? null, input.code ?? null, input.name, input.modality ?? null,
-      input.color ?? null, input.iconKey ?? null, input.clubCommissionPercent, input.instructorCommissionPercent ?? 0, input.maxCapacity ?? null,
+      (club_id, sector_id, manager_person_id, instructor_id, responsible_employee_id, code, name, modality, color, icon_key, club_commission_percent, instructor_commission_percent, max_capacity, status, notes, updated_by)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::uuid) returning ${activityColumns}`,
+    [actor.clubId, input.sectorId, input.managerPersonId, references.legacyInstructorId, references.employeeId, input.code ?? null, input.name, input.modality ?? null,
+      input.color ?? null, input.iconKey ?? null, input.clubCommissionPercent, 0, input.maxCapacity ?? null,
       storedEntityStatus(input.status ?? "inactive"), input.notes ?? null, actor.userId]);
     const term = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
       (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, responsible_person_id, effective_from, created_by, updated_by)
-      values ($1,$2,$3,$4,$5,$6,$7,coalesce($8,(select person_id from miclub.instructors where club_id=$1 and id=$9)),$10::date,$11::uuid,$11::uuid) returning ${termColumns}`,
-    [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.currencyCode, input.settlement.clubSharePercentage, input.responsiblePersonId ?? null, input.instructorId, input.settlement.effectiveFrom, actor.userId]);
+      values ($1,$2,$3,$4,$5,$6,$7,coalesce($8,$9::uuid),$10::date,$11::uuid,$11::uuid) returning ${termColumns}`,
+    [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.currencyCode, input.settlement.clubSharePercentage, input.economicResponsiblePersonId ?? input.responsiblePersonId ?? null, references.employeePersonId, input.settlement.effectiveFrom, actor.userId]);
     await auditActivity(actor, "activity.create", null, result.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", result.rows[0].id, null, term.rows[0], executor);
     return { kind: "created", activity: result.rows[0] };
@@ -109,7 +117,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     }
     if (operation === "status") {
       const status = (input as { status: "active" | "inactive" }).status;
-      if (!before.instructor_id) return { kind: "invalid_instructor" };
+      if (!before.responsible_employee_id) return { kind: "invalid_instructor" };
       const result = await executor.query<ActivityRow>(`update miclub.activities set status=$3, updated_at=now(), updated_by=$4::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`, [actor.clubId, id, storedEntityStatus(status), actor.userId]);
       if (!result.rows[0]) return { kind: "conflict" };
       await auditActivity(actor, "activity.status", before, result.rows[0], executor);
@@ -125,7 +133,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
       where club_id=$1 and activity_id=$2 order by effective_from for update`, [actor.clubId, id]);
     const latest = terms.rows.at(-1);
     if (!latest || latest.effective_to !== null) return { kind: "invalid_terms" };
-    const responsiblePersonId = value.responsiblePersonId ?? references.instructorPersonId;
+    const responsiblePersonId = value.economicResponsiblePersonId ?? value.responsiblePersonId ?? references.employeePersonId;
     const sameNumber = (a: unknown, b: unknown) => (a == null && b == null) || Number(a) === Number(b);
     const termsChanged = latest.mode !== value.settlement.mode
       || !sameNumber(latest.fixed_club_fee, value.settlement.fixedClubFee)
@@ -138,8 +146,8 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
       where club_id=$1 and activity_id=$2 and voided_at is null and status='COMPLETADO' and period_to >= $3::date) locked`,
     [actor.clubId, id, value.settlement.effectiveFrom]);
     if (termsChanged && settled.rows[0]?.locked) return { kind: "settled_history" };
-    const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, code=$6, name=$7, modality=$8, color=$9, icon_key=$10, club_commission_percent=$11, instructor_commission_percent=$12, max_capacity=$13, status=$14, notes=$15, updated_at=now(), updated_by=$16::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
-    [actor.clubId, id, value.sectorId, value.managerPersonId, value.instructorId ?? null, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.instructorCommissionPercent ?? 0, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
+    const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, responsible_employee_id=$6, code=$7, name=$8, modality=$9, color=$10, icon_key=$11, club_commission_percent=$12, instructor_commission_percent=0, max_capacity=$13, status=$14, notes=$15, updated_at=now(), updated_by=$16::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
+    [actor.clubId, id, value.sectorId, value.managerPersonId, references.legacyInstructorId, references.employeeId, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
     if (!result.rows[0]) return { kind: "conflict" };
     if (termsChanged) {
     const closed = await executor.query<ActivityTermRow>(`update miclub.activity_terms set effective_to=$3::date - 1,

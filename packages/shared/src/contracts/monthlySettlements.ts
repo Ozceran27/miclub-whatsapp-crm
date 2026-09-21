@@ -85,6 +85,7 @@ export interface FinancialCircuit {
   month: string;
   today: string;
   settlements: PersistedSettlement[];
+  balanceTotals: { currencyCode: string; activityToPay: number; activityToCollect: number; fixedCompensationToPay: number; totalToPay: number }[];
   compensationObligations?: EmployeeCompensationObligation[];
   payoutGroups?: { id: string; personId: string; personName: string; currencyCode: string; direction: 'PAY' | 'COLLECT'; amount: number; status: 'COMPLETED' | 'VOIDED'; createdAt: string; reason: string; voidedAt: string | null }[];
   diagnostics: FinanceDiagnostic[];

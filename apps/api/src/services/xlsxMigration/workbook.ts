@@ -5,7 +5,7 @@ import type { QueryExecutor } from "../../db/postgres.js";
 import { auditService } from "../auditService.js";
 import type { MigrationIssue, ParsedWorkbookRow } from "./validator.js";
 
-export type ResolvedWorkbookRow = { sheet:string; rowNumber:number; sectorId:string|null; activityId:string|null; instructorId:string|null; categoryId:string|null; paymentMethodId:string|null; personId:string|null; accountId?:string|null; currencyCode?:string|null; externalReference:string|null; rowFingerprint:string };
+export type ResolvedWorkbookRow = { sheet:string; rowNumber:number; sectorId:string|null; activityId:string|null; instructorId:string|null; responsibleEmployeeId?:string|null; categoryId:string|null; paymentMethodId:string|null; personId:string|null; accountId?:string|null; currencyCode?:string|null; externalReference:string|null; rowFingerprint:string };
 export type WorkbookActor = { clubId:string; userId:string; membershipId:string; requestId?:string; ip?:string; userAgent?:string };
 export type WorkbookInput = { actor:WorkbookActor; sha256:string; batchIdentity:string; templateVersion:string; sourceFile:string; idempotencyKey:string|null; referenceConfigHash:string; dryRunOfBatchId:string|null; rows:ParsedWorkbookRow[]; resolvedRows:ResolvedWorkbookRow[]; projectedWrites:number; errors:MigrationIssue[]; metadata:Record<string,unknown> };
 type Dependencies={transaction:typeof withTenantTransaction; audit:typeof auditService.sensitiveChange};
@@ -33,8 +33,9 @@ export async function dryRunWorkbook(input:WorkbookInput,deps:Dependencies=defau
   return {batchId,status:errorCount?"failed":"dry_run",dryRun:true,persistedWrites:0};
 }
 
-const enrollmentStatus=(value:unknown)=>{const key=String(value??"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"_"); return ({activa:"al_dia",al_dia:"al_dia",nuevo_inscripto:"nuevo_inscripto",adeudando:"adeudando",abandonado:"abandonado",cancelada:"cancelado"} as Record<string,string>)[key]??"otro";};
-const movementType=(value:unknown)=>{const key=String(value??"").trim().toUpperCase(); return key.startsWith("ING")?"INGRESOS":key.startsWith("EGR")?"EGRESOS":"CAPITAL";};
+const scalarText=(value:unknown)=>typeof value==='string'||typeof value==='number'||typeof value==='boolean'?String(value):'';
+const enrollmentStatus=(value:unknown)=>{const key=scalarText(value).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"_"); return ({activa:"al_dia",al_dia:"al_dia",nuevo_inscripto:"nuevo_inscripto",adeudando:"adeudando",abandonado:"abandonado",cancelada:"cancelado"} as Record<string,string>)[key]??"otro";};
+const movementType=(value:unknown)=>{const key=scalarText(value).trim().toUpperCase(); return key.startsWith("ING")?"INGRESOS":key.startsWith("EGR")?"EGRESOS":"CAPITAL";};
 const movementStatus=(value:unknown)=>{
   const key=typeof value==='string'?value.trim().toUpperCase():'';
   if(!isEconomyOperationalStatus(key)) throw error('INVALID_MOVEMENT_STATUS','Estado operacional no reconocido.');
@@ -75,9 +76,9 @@ export async function applyWorkbook(input:WorkbookInput,deps:Dependencies=defaul
           const result = await db.query<{id:string}>(`insert into miclub.initial_obligations(club_id,person_id,activity_id,kind,currency_code,amount,source_key,due_date,review_state) values($1,$2,$3,$4,$5,$6,$7,$8,'DRAFT') returning id`, [input.actor.clubId, person.id, resolved.activityId, row.values.kind, row.values.currency, row.values.amount, resolved.externalReference, row.values.date]);
           entityId = result.rows[0].id;
         } else {
-          if(!resolved.activityId||!resolved.instructorId) throw error("UNRESOLVED_ROW",`Actividad o instructor derivado no resuelto en fila ${row.rowNumber}`);
+          if(!resolved.activityId||!(resolved.responsibleEmployeeId??resolved.instructorId)) throw error("UNRESOLVED_ROW",`Actividad o responsable derivado no resuelto en fila ${row.rowNumber}`);
           const person=await db.query<{id:string}>(`insert into miclub.people(club_id,first_name,last_name,dni,phone) values($1,$2,$3,$4,$5) on conflict (club_id,normalized_dni) where normalized_dni is not null do update set first_name=excluded.first_name,last_name=excluded.last_name,phone=coalesce(excluded.phone,miclub.people.phone),updated_at=now() returning id`,[input.actor.clubId,row.values.firstName,row.values.lastName,String(row.values.document),row.values.phone]);
-          const result=await db.query<{id:string}>(`insert into miclub.enrollments(club_id,sequence_number,external_id,person_id,activity_id,fee_amount,modality,status,status_override,due_date,enrollment_date,source,notes) values($1,miclub.next_tenant_sequence($1,'enrollment'),$2,$3,$4,$5,$6,$7::miclub.enrollment_status,$8,null,$9,'xlsx_import',$10) returning id`,[input.actor.clubId,resolved.externalReference??`xlsx:${resolved.rowFingerprint}`,person.rows[0].id,resolved.activityId,row.values.fee,row.values.modality,enrollmentStatus(row.values.status),["abandonado","cancelado"].includes(enrollmentStatus(row.values.status)),row.values.date,JSON.stringify({sheet:row.sheet,rowNumber:row.rowNumber,fingerprint:resolved.rowFingerprint,instructorId:resolved.instructorId})]); entityId=result.rows[0].id;
+          const result=await db.query<{id:string}>(`insert into miclub.enrollments(club_id,sequence_number,external_id,person_id,activity_id,fee_amount,modality,status,status_override,due_date,enrollment_date,source,notes) values($1,miclub.next_tenant_sequence($1,'enrollment'),$2,$3,$4,$5,$6,$7::miclub.enrollment_status,$8,null,$9,'xlsx_import',$10) returning id`,[input.actor.clubId,resolved.externalReference??`xlsx:${resolved.rowFingerprint}`,person.rows[0].id,resolved.activityId,row.values.fee,row.values.modality,enrollmentStatus(row.values.status),["abandonado","cancelado"].includes(enrollmentStatus(row.values.status)),row.values.date,JSON.stringify({sheet:row.sheet,rowNumber:row.rowNumber,fingerprint:resolved.rowFingerprint,responsibleEmployeeId:resolved.responsibleEmployeeId??resolved.instructorId})]); entityId=result.rows[0].id;
         }
         await db.query(`insert into miclub.xlsx_import_rows(club_id,batch_id,sheet,row_fingerprint,external_reference,source_row_number,entity_id) values($1,$2,$3,$4,$5,$6,$7)`,[input.actor.clubId,batchId,row.sheet,resolved.rowFingerprint,resolved.externalReference,row.rowNumber,entityId]); writes+=2;
       }

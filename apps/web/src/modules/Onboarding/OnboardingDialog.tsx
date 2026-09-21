@@ -41,7 +41,7 @@ export function OnboardingDialog({ step,direction,draft,updateDraft,migrationAva
   const optional = isSkippableStep(step);
   const skipBlocked = step===3
     ? draft.activities.some(activity=>draft.sectors.some(sector=>sector.clientId===activity.sectorClientId&&!sector.isSystem))
-    : step===4&&draft.activities.some(activity=>activity.instructorClientId!==null);
+    : step===4&&draft.activities.some(activity=>Boolean(activity.responsibleWorkerClientId??activity.instructorClientId));
   const status = success ? '¡Configuración creada! Elegí cómo continuar.' : pending ? 'Enviando configuración definitiva…' : error ? 'Error recuperable: no se pudo finalizar' : 'Listo para revisar; todavía no se envió';
   const nextLabel=step===1?'Empezar Configuración':'Siguiente';
   return <div className="onboarding-backdrop" data-testid="onboarding-backdrop">

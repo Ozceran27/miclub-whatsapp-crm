@@ -149,9 +149,18 @@ void test("recorre el alta del primer club sobre PostgreSQL migrado desde cero",
     assert.equal(sectorCreated.response.status, 201);
     const workerCreated = await request("/api/administration/workers", json({ firstName: "Inés", lastName: "Instructora", dni: "32999888", email: `instructor-${databaseName}@integration.invalid`, password: "Instructor-12345", role: "INSTRUCTOR", sectorId: sectorCreated.body.id, paymentMode: "VARIABLE" }), cookie);
     assert.equal(workerCreated.response.status, 201);
-    const instructorCatalog = await request("/api/instructors", {}, cookie);
-    assert.ok(instructorCatalog.body.length > 0);
-    const activityCreated = await request("/api/activities", json({ sectorId: sectorCreated.body.id, instructorId: instructorCatalog.body[0].id, managerPersonId: null, name: "Actividad inicial", iconKey: "other", color: "#2563EB", enrollmentFee: 1000, clubCommissionPercent: 25, instructorCommissionPercent: 75, status: "active", notes: "Término económico VARIABLE" }), cookie);
+    const activityCreated = await request("/api/activities", json({
+      sectorId: sectorCreated.body.id,
+      responsibleEmployeeId: workerCreated.body.id,
+      economicResponsiblePersonId: null,
+      name: "Actividad inicial",
+      iconKey: "other",
+      color: "#2563EB",
+      maxCapacity: 30,
+      status: "active",
+      notes: "Término económico VARIABLE",
+      settlement: { mode: "VARIABLE", fixedClubFee: null, fixedFeeFrequency: null, currencyCode: null, clubSharePercentage: 25, effectiveFrom: "2026-09-01" },
+    }), cookie);
     assert.equal(activityCreated.response.status, 201);
     const persistedEntities = await database.query<{ sectors: string; workers: string; activities: string }>(`select
       (select count(*) from miclub.sectors where club_id=(select id from miclub.clubs where name=$1) and archived_at is null)::text sectors,

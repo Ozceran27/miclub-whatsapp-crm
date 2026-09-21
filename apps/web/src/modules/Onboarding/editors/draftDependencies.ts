@@ -4,4 +4,4 @@ export const activitiesForSector = (activities: readonly OnboardingActivityDraft
   activities.filter(activity => activity.sectorClientId === sectorClientId);
 
 export const activitiesForInstructor = (activities: readonly OnboardingActivityDraft[], workerClientId: string) =>
-  activities.filter(activity => activity.instructorClientId === workerClientId);
+  activities.filter(activity => (activity.responsibleWorkerClientId ?? activity.instructorClientId) === workerClientId);

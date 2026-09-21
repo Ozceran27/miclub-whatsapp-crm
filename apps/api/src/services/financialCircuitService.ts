@@ -49,6 +49,16 @@ export async function financeTransaction<T>(auth: RequestAuthContext, key: strin
 type Term = MonthlyActivityTerm & { activityName: string; personName: string; revision: number };
 export type FinanceScope = Pick<RequestAuthContext, 'clubId' | 'permissions' | 'sectorIds'>;
 type RawSettlement = { id: string; revision: number; review_state: PersistedSettlement['reviewState']; closed_at: Date | null; calculation_hash: string };
+export const calculateBalanceTotals = (settlements: Pick<PersistedSettlement, 'currencyCode'|'balance'>[], compensationObligations: Pick<NonNullable<FinancialCircuit['compensationObligations']>[number], 'currencyCode'|'reviewState'|'balance'>[]): FinancialCircuit['balanceTotals'] => {
+  const currencies = new Set([...settlements.map(item => item.currencyCode), ...compensationObligations.map(item => item.currencyCode)]);
+  return [...currencies].sort().map(currencyCode => {
+    const activityBalances = settlements.filter(item => item.currencyCode === currencyCode).map(item => item.balance);
+    const activityToPay = Math.round(activityBalances.filter(value => value > 0).reduce((sum, value) => sum + value, 0) * 100) / 100;
+    const activityToCollect = Math.round(Math.abs(activityBalances.filter(value => value < 0).reduce((sum, value) => sum + value, 0)) * 100) / 100;
+    const fixedCompensationToPay = Math.round(compensationObligations.filter(item => item.currencyCode === currencyCode && item.reviewState === 'APPROVED' && item.balance > 0).reduce((sum, item) => sum + item.balance, 0) * 100) / 100;
+    return { currencyCode, activityToPay, activityToCollect, fixedCompensationToPay, totalToPay: Math.round((activityToPay + fixedCompensationToPay) * 100) / 100 };
+  });
+};
 export async function loadCircuit(db: QueryExecutor, auth: FinanceScope, selectedMonth?: string): Promise<FinancialCircuit> {
   await assertFinancialSchema(db);
   await db.query('select miclub.finance_lock($1)', [auth.clubId]);
@@ -150,7 +160,9 @@ export async function loadCircuit(db: QueryExecutor, auth: FinanceScope, selecte
     (o.amount-coalesce((select sum(x.amount) from miclub.employee_compensation_allocations x where x.club_id=o.club_id and x.obligation_id=o.id and x.status='COMPLETADO' and x.voided_at is null),0)-coalesce((select sum(c.amount) from miclub.settlement_compensations c where c.club_id=o.club_id and c.credit_employee_compensation_obligation_id=o.id and c.status='ACTIVE'),0))::float8 balance,
     o.review_state "reviewState",o.revision,o.sector_id "sectorId" from miclub.employee_compensation_obligations o join miclub.people p on p.id=o.person_id and p.club_id=o.club_id where o.club_id=$1 and o.due_date<=($2||'-01')::date+interval '1 month'-interval '1 day' order by o.due_date,o.id`, [auth.clubId, month])).rows;
   const payoutGroups = (await db.query<NonNullable<FinancialCircuit['payoutGroups']>[number]>(`select g.id,g.person_id "personId",concat_ws(' ',p.first_name,p.last_name) "personName",g.currency_code "currencyCode",g.direction,g.amount::float8 amount,g.status,g.created_at "createdAt",g.reason,g.voided_at "voidedAt" from miclub.payout_groups g join miclub.people p on p.id=g.person_id and p.club_id=g.club_id where g.club_id=$1 order by g.created_at desc limit 100`,[auth.clubId])).rows;
-  return { month, today: club.today, settlements: settlements.filter(s => s.month <= month), compensationObligations, payoutGroups, diagnostics, projection, accounts, people,
+  const visibleSettlements = settlements.filter(s => s.month <= month);
+  const balanceTotals = calculateBalanceTotals(visibleSettlements, compensationObligations);
+  return { month, today: club.today, settlements: visibleSettlements, balanceTotals, compensationObligations, payoutGroups, diagnostics, projection, accounts, people,
     terms: terms.map(t => ({ id: t.id, activityId: t.activityId, activityName: t.activityName, personId: t.personId ?? null, revision: t.revision, mode: t.mode, effectiveFrom: t.effectiveFrom, effectiveTo: t.effectiveTo ?? null, fixedClubFee: t.fixedClubFee ?? null, partialMonthPolicy: t.partialMonthPolicy ?? null })) };
 }
 

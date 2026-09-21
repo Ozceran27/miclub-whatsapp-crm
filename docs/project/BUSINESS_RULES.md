@@ -93,7 +93,7 @@ Una actividad tenant debe relacionarse con:
 
 - club;
 - sector;
-- responsable/instructor cuando el modelo lo exige;
+- trabajador responsable operativo activo;
 - términos económicos vigentes.
 
 Responsable y sector deben pertenecer al mismo club.
@@ -206,8 +206,10 @@ Los cálculos deben respetar timezone del club cuando el modelo permita personal
 
 - Archivar reemplaza eliminar para sectores, trabajadores, actividades y hechos
   financieros con historia.
-- Toda actividad nueva o modificada exige Instructor operativo. El Instructor es
-  responsable operativo; `responsible_person_id` identifica al receptor económico.
+- Toda actividad nueva o modificada exige un trabajador activo como responsable
+  operativo mediante `responsible_employee_id`; puede ser Director, Instructor o
+  Trabajador. `activity_terms.responsible_person_id` identifica al receptor
+  económico versionado y sigue al responsable operativo por defecto.
 - Un Instructor operativo se identifica con `instructors.status = 'activa'`; el
   esquema canónico no duplica ese estado mediante un booleano `is_active`.
 - VARIABLE guarda el porcentaje del club. FIXED guarda el importe del club y su

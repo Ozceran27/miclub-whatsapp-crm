@@ -14,6 +14,7 @@ import { hasAdministrationCapability, visibleModules } from '../administrationCa
 import { OnboardingGate } from '../modules/Onboarding/OnboardingGate';
 import { getNavigation, type BackendNavigation } from '../services/api/navigationApi';
 import { apiJson } from '../api';
+import { buildSectorModules, CORE_ORDER } from './navigationModel';
 
 const CORE_LABELS: Record<CoreModuleId, string> = { home: 'INICIO', economy: 'TESORERÍA', crm: 'CRM', administration: 'ADMINISTRACIÓN', dataMigration: 'MIGRACIÓN' };
 const isCoreModule = (value: string): value is CoreModuleId => value in CORE_LABELS;
@@ -32,10 +33,11 @@ export default function ProtectedAppShell() {
     window.addEventListener('miclub:navigation-changed', refresh);
     return () => window.removeEventListener('miclub:navigation-changed', refresh);
   }, [clubId]);
-  const modules = useMemo(() => visibleModules([
-    ...navigation.modules.map((id) => ({ id, label: CORE_LABELS[id] })),
-    ...navigation.sectors.map((sector) => ({ id: `sector:${sector.id}` as const, label: sector.name.toLocaleUpperCase('es-AR') })),
-  ] satisfies ModuleDefinition[], permissions, navigation.capabilities), [navigation, permissions]);
+  const coreModules = useMemo(() => visibleModules(CORE_ORDER
+    .filter(id => navigation.modules.includes(id))
+    .map((id) => ({ id, label: CORE_LABELS[id] })) satisfies ModuleDefinition[], permissions, navigation.capabilities), [navigation, permissions]);
+  const sectorModules = useMemo(() => buildSectorModules(navigation.sectors), [navigation.sectors]);
+  const modules = useMemo(() => [...coreModules, ...sectorModules], [coreModules, sectorModules]);
   const segment = decodeURIComponent(path.split('/')[2] ?? 'home');
   const requested: ModuleId = segment === 'migration' ? 'dataMigration' : isCoreModule(segment) ? segment : segment.startsWith('sector:') ? segment as `sector:${string}` : 'home';
   const currentModule = modules.some(({ id }) => id === requested) ? requested : 'home';
@@ -51,7 +53,7 @@ export default function ProtectedAppShell() {
     if (currentModule === 'dataMigration') return <DataMigrationModule />;
     return <PlaceholderModule title={sector?.name ?? 'Sector'} description="Sector configurado para este club desde el catálogo persistido." futureItems={['Actividades.', 'Inscriptos.', 'Movimientos.', 'Liquidaciones.']} />;
   };
-  return <OnboardingGate onNavigationReady={setNavigation}><div className="container app-shell"><header className="app-header"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" /><div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div><div className="app-header__actions"><button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>{theme === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}</button><button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}</button></div></header>{logoutError && <p className="login-error" role="alert">{logoutError}</p>}<InvitationInbox/><ModuleNav modules={modules} currentModule={currentModule} onSelect={selectModule} /><div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div></div></OnboardingGate>;
+  return <OnboardingGate onNavigationReady={setNavigation}><div className="container app-shell"><header className="app-header"><img src="/logo/miClub - Logo trans.png" alt="miClub" className="club-logo" /><div><h1>miClub Gestión</h1><p>App operativa y de Gestión para tu club</p></div><div className="app-header__actions"><button className="ghost-btn theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'}>{theme === 'dark' ? '☀️ Modo claro' : '🌙 Modo oscuro'}</button><button className="ghost-btn logout-btn" type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Cerrando sesión…' : `Cerrar sesión${username ? ` · ${username}` : ''}`}</button></div></header>{logoutError && <p className="login-error" role="alert">{logoutError}</p>}<InvitationInbox/><ModuleNav modules={coreModules} sectors={sectorModules} currentModule={currentModule} onSelect={selectModule} /><div key={tenantModuleKey(clubId, currentModule)}>{renderModule()}</div></div></OnboardingGate>;
 }
 
 function InvitationInbox(){const[items,setItems]=useState<Array<{id:string;clubName:string;role:string;expiresAt:string}>>([]);const[message,setMessage]=useState('');const load=useCallback(()=>apiJson<{items:Array<{id:string;clubName:string;role:string;expiresAt:string}>}>('/auth/worker-invitations').then(r=>setItems(r.items)).catch(()=>undefined),[]);useEffect(()=>{void load();},[load]);if(!items.length)return null;return <section className="section-panel" aria-label="Invitaciones pendientes"><h2>Invitaciones a clubes</h2>{items.map(item=><article key={item.id}><strong>{item.clubName}</strong><span> · {item.role} · vence {new Date(item.expiresAt).toLocaleDateString('es-AR')}</span><button onClick={()=>void apiJson(`/auth/worker-invitations/${item.id}/accept` as `/${string}`,{method:'POST'}).then(()=>{setMessage('Invitación aceptada.');return load();})}>Aceptar</button><button onClick={()=>void apiJson(`/auth/worker-invitations/${item.id}/reject` as `/${string}`,{method:'POST'}).then(()=>load())}>Rechazar</button></article>)}{message&&<p role="status">{message}</p>}</section>}

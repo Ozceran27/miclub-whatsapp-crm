@@ -302,3 +302,20 @@ de tareas y límites se mantiene en [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md)
 La corrección del error de saldos fue reproducida y validada en PostgreSQL aislado;
 requiere SQL manual en la base real, detallado en [ONBOARDING.md](ONBOARDING.md).
 No se ejecutó reset ni SQL modificador en la base real.
+# Navegación, responsables y trabajadores — 2026-09-21
+
+La navegación principal presenta Inicio, Administración, Tesorería, Sectores,
+CRM y Migración. Administración/Tesorería siguen sujetos a RBAC pero nunca se
+duplican dentro de Sectores; Áreas Comunes y los sectores personalizados activos
+se agrupan en el menú accesible Sectores.
+
+`employees.position` es el rol laboral canónico aun sin cuenta. La edición usa
+`updatedAt`, persiste identidad/contacto/sector/remuneración y separa el correo de
+contacto del correo global de acceso. Las actividades nuevas usan
+`activities.responsible_employee_id`; cualquier trabajador activo del tenant puede
+ser responsable operativo. `activity_terms.responsible_person_id` conserva el
+receptor económico histórico y, por defecto, sigue a la persona del responsable.
+
+La migración `202609210001_worker_activity_responsibility.sql` y el script manual
+`docs/dbeaver/2026-09-21-responsables-trabajadores.sql` realizan el backfill con
+diagnóstico de ambigüedad. No se aplicaron escrituras sobre la base auditada.

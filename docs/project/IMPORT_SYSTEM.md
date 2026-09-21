@@ -20,7 +20,10 @@ Archivo: apps/api/data/db/Modelo_Import_miClub.xlsx. Hojas exactas (orden no con
 - INSCRIPCIONES A:V: Fecha, Nombre, Apellido, D.N.I., Telefono, Actividad, Modalidad, Cuota, Estado, Identificador de origen (V).
 - SALDOS_INICIALES A:G: Identificador de origen, D.N.I., Actividad, Tipo, Moneda, Monto, Fecha de vencimiento.
 
-Separadores vacíos son parte de la firma. Sector e instructor de inscripción se derivan de actividad.
+Separadores vacíos son parte de la firma. Sector y responsable operativo de la
+inscripción se derivan de actividad. Durante la transición, el contrato interno
+acepta el nombre histórico `Instructor`, pero resuelve contra cualquier trabajador
+activo y persiste `responsibleEmployeeId`.
 
 En movimientos, Actividad acepta nombre o código exacto normalizado del club.
 Si Sector está vacío, se deriva de la actividad; si se informan ambos, deben

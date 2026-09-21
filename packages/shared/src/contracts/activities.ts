@@ -8,15 +8,19 @@ import type { ActivityFeeFrequency, OperationalCurrency } from './onboarding.js'
 export interface ActivityMutationContract {
   updatedAt?: string;
   sectorId: string;
-  instructorId: string;
-  /** Person who receives (or owes) the economic result. Defaults to the instructor's person. */
+  /** Canonical operational owner. Must identify an active employee in this club. */
+  responsibleEmployeeId: string;
+  /** Person who receives (or owes) the economic result. Defaults to the operational responsible. */
+  economicResponsiblePersonId?: string | null;
+  /** @deprecated Compatibility input only. New writes use responsibleEmployeeId. */
+  instructorId?: string | null;
+  /** @deprecated Compatibility alias for economicResponsiblePersonId. */
   responsiblePersonId?: string | null;
   code?: string | null;
   name: string;
   modality?: string | null;
   color?: string | null;
   iconKey?: string | null;
-  instructorCommissionPercent?: number;
   maxCapacity?: number | null;
   status?: "active" | "inactive";
   notes?: string | null;
