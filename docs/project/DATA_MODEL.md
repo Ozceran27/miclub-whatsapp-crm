@@ -23,6 +23,7 @@ Audit log admite contexto de identidad/tenant según evento. Las tablas históri
 
 - PK UUID donde corresponde; CRM conserva identificadores de compatibilidad propios.
 - Activity→sector/instructor/manager usa FKs compuestas con club_id, ON DELETE RESTRICT e índices alineados.
+- `activities.updated_by` presenta dos variantes históricas instaladas: FK a `people(id)` en el schema original y FK a `users(id)` cuando la migración de mutaciones creó la columna. El runtime resuelve la FK instalada y usa la identidad correspondiente; User y Person nunca se tratan como UUID equivalentes.
 - Settlement→activity/term y allocation→movement conservan tenant por FK compuesta.
 - activity_terms: exclusión GiST de rangos solapados y constraint trigger diferido de continuidad.
 - tenant_sequences: upsert atómico por club/entity; UNIQUE (club_id, sequence_number) en movimientos e inscripciones.

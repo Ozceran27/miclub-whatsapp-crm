@@ -4,12 +4,12 @@ import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 import type { ActivitySettlementMutation } from "@miclub/shared";
 import { storedEntityStatus } from "./entityStatusRepository.js";
-import { hasActivityResponsibleEmployee, hasCanonicalActivityMutationGuard } from "../db/schemaCapabilities.js";
+import { hasActivityResponsibleEmployee, hasCanonicalActivityMutationGuard, resolveActivityMutationActorId } from "../db/schemaCapabilities.js";
 
 type Pool = Awaited<ReturnType<typeof getPostgresPool>>;
 
 export type ActivityActor = {
-  userId: string; membershipId: string; clubId: string; sectorIds: readonly string[]; canAccessAnySector: boolean;
+  userId: string; personId: string; membershipId: string; clubId: string; sectorIds: readonly string[]; canAccessAnySector: boolean;
   requestId?: string; ip?: string; userAgent?: string;
 };
 export type ActivityInput = {
@@ -87,6 +87,8 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
   const pool = await getPostgresPool();
   try { return await withTenantTransaction(actor.clubId, async (executor) => {
     if (!await modelApplied(executor)) return { kind: "model_not_applied" };
+    const mutationActorId = await resolveActivityMutationActorId(executor, actor);
+    if (!mutationActorId) return { kind: "model_not_applied" };
     const references = await validReferences(executor, actor, input);
     if (references.failure) return { kind: references.failure };
     const result = await executor.query<ActivityRow>(`insert into miclub.activities
@@ -94,7 +96,7 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::uuid) returning ${activityColumns}`,
     [actor.clubId, input.sectorId, input.managerPersonId, references.legacyInstructorId, references.employeeId, input.code ?? null, input.name, input.modality ?? null,
       input.color ?? null, input.iconKey ?? null, input.clubCommissionPercent, 0, input.maxCapacity ?? null,
-      storedEntityStatus(input.status ?? "inactive"), input.notes ?? null, actor.userId]);
+      storedEntityStatus(input.status ?? "inactive"), input.notes ?? null, mutationActorId]);
     const term = await executor.query<ActivityTermRow>(`insert into miclub.activity_terms
       (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, responsible_person_id, effective_from, created_by, updated_by)
       values ($1,$2,$3,$4,$5,$6,$7,coalesce($8,$9::uuid),$10::date,$11::uuid,$11::uuid) returning ${termColumns}`,
@@ -112,6 +114,8 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
   const pool = await getPostgresPool();
   try { return await withTenantTransaction(actor.clubId, async (executor) => {
     if (!await modelApplied(executor)) return { kind: "model_not_applied" };
+    const mutationActorId = await resolveActivityMutationActorId(executor, actor);
+    if (!mutationActorId) return { kind: "model_not_applied" };
     const current = await executor.query<ActivityRow>(`select ${activityColumns} from miclub.activities
       where club_id=$1 and id=$2 and ($3::boolean or sector_id = any($4::uuid[])) for update`,
     [actor.clubId, id, actor.canAccessAnySector, actor.sectorIds]);
@@ -119,7 +123,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     if (!before) return { kind: "missing" };
     if (new Date(before.updated_at).toISOString() !== new Date(expectedUpdatedAt).toISOString()) return { kind: "conflict" };
     if (operation === "archive") {
-      const result = await executor.query<ActivityRow>(`update miclub.activities set status='cancelada', archived_at=now(), updated_at=now(), updated_by=$3::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`, [actor.clubId, id, actor.userId]);
+      const result = await executor.query<ActivityRow>(`update miclub.activities set status='cancelada', archived_at=now(), updated_at=now(), updated_by=$3::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`, [actor.clubId, id, mutationActorId]);
       if (!result.rows[0]) return { kind: "conflict" };
       await auditActivity(actor, "activity.archive", before, result.rows[0], executor);
       return { kind: "updated", activity: result.rows[0] };
@@ -127,7 +131,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     if (operation === "status") {
       const status = (input as { status: "active" | "inactive" }).status;
       if (!before.responsible_employee_id) return { kind: "invalid_instructor" };
-      const result = await executor.query<ActivityRow>(`update miclub.activities set status=$3, updated_at=now(), updated_by=$4::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`, [actor.clubId, id, storedEntityStatus(status), actor.userId]);
+      const result = await executor.query<ActivityRow>(`update miclub.activities set status=$3, updated_at=now(), updated_by=$4::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`, [actor.clubId, id, storedEntityStatus(status), mutationActorId]);
       if (!result.rows[0]) return { kind: "conflict" };
       await auditActivity(actor, "activity.status", before, result.rows[0], executor);
       return { kind: "updated", activity: result.rows[0] };
@@ -156,7 +160,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     [actor.clubId, id, value.settlement.effectiveFrom]);
     if (termsChanged && settled.rows[0]?.locked) return { kind: "settled_history" };
     const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, responsible_employee_id=$6, code=$7, name=$8, modality=$9, color=$10, icon_key=$11, club_commission_percent=$12, instructor_commission_percent=0, max_capacity=$13, status=$14, notes=$15, updated_at=now(), updated_by=$16::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
-    [actor.clubId, id, value.sectorId, value.managerPersonId, references.legacyInstructorId, references.employeeId, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, actor.userId]);
+    [actor.clubId, id, value.sectorId, value.managerPersonId, references.legacyInstructorId, references.employeeId, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.maxCapacity ?? null, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, mutationActorId]);
     if (!result.rows[0]) return { kind: "conflict" };
     if (termsChanged) {
     const closed = await executor.query<ActivityTermRow>(`update miclub.activity_terms set effective_to=$3::date - 1,

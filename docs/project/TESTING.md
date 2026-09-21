@@ -1,5 +1,27 @@
 # Testing
 
+## Regresión de alta de actividades — 2026-09-21
+
+- Auditoría PostgreSQL real exclusivamente read-only: `current_user=miclub_audit`
+  y `transaction_read_only=on`. Se confirmó que la base tiene
+  `activities_updated_by_fkey → people(id)`, la responsabilidad canónica por
+  empleado y el trigger canónico. No se consultaron datos personales ni se
+  ejecutaron escrituras.
+- API: 441/441 PASS. Incluye regresiones para FK de actor a `people`, FK a
+  `users`, schema desconocido fail-closed, atomicidad actividad+término,
+  aislamiento tenant y logging seguro de metadatos PostgreSQL.
+- Web: 78/78 PASS; shared: 7/7 PASS; `npm run docs:check`: PASS.
+- `npm run typecheck` y `npm run build`: PASS en los tres workspaces. Vite
+  conserva la advertencia conocida por el chunk principal de 864,65 kB
+  (242,10 kB gzip).
+- Lint focalizado de producción: 0 errores y 12 advertencias históricas en el
+  parseo Express de `activityMutationRoutes.ts`. El gate global continúa en
+  FAIL por deuda previa: 193 errores y 583 advertencias. `npm run deadcode`
+  también continúa en FAIL por candidatos históricos; no se eliminaron
+  contratos o entrypoints fuera del alcance.
+- Sin cambios de schema, SQL nuevo ni ejecución manual en DBeaver. La corrección
+  adapta el runtime a ambas variantes históricas ya instaladas.
+
 ## Auditoría integral posterior a Administración — 2026-09-20
 
 - API: 429/429 PASS; web: 75/75 PASS; shared: 7/7 PASS.

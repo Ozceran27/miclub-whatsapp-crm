@@ -9,6 +9,9 @@ type HttpError = Error & {
   retryable?: boolean;
   batchId?: string;
   details?: unknown;
+  constraint?: unknown;
+  table?: unknown;
+  column?: unknown;
 };
 
 const getStatusCode = (error: HttpError): number => {
@@ -23,8 +26,10 @@ export const errorHandler: ErrorRequestHandler = (error: HttpError, req, res, _n
   if (status >= 500) {
     // pg errors include failing rows and SQL parameters even in development.
     // Never log the raw error/cause/detail: they may contain hashes or PII.
+    const safeIdentifier = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9_]{1,128}$/.test(value) ? value : undefined;
     console.error({ requestId: req.requestId, status,
-      code: typeof error.code==='string' && /^[A-Z0-9_]{1,80}$/.test(error.code) ? error.code : 'UNEXPECTED' });
+      code: typeof error.code==='string' && /^[A-Z0-9_]{1,80}$/.test(error.code) ? error.code : 'UNEXPECTED',
+      constraint: safeIdentifier(error.constraint), table: safeIdentifier(error.table), column: safeIdentifier(error.column) });
   }
 
   const code = (error.code

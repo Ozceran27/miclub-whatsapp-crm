@@ -9,7 +9,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/;
 const fail = (res: Response, status: number, code: string, message: string, details?: unknown) => res.status(status).json({ ok: false, error: true, status, code, message, details });
 const actor = (req: Request): ActivityActor => ({
-  userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId,
+  userId: req.auth!.userId, personId: req.auth!.personId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId,
   sectorIds: req.auth!.sectorIds, canAccessAnySector: req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY),
   requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent"),
 });

@@ -13,7 +13,7 @@ const EMPLOYEE_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const PERSON_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const INSTRUCTOR_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const UPDATED_AT = '2026-08-05T12:00:00.000Z';
-const limitedActor: ActivityActor = { userId: 'user-limited', membershipId: 'membership-limited', clubId: CLUB_A, sectorIds: [SECTOR_A], canAccessAnySector: false };
+const limitedActor: ActivityActor = { userId: 'user-limited', personId: PERSON_ID, membershipId: 'membership-limited', clubId: CLUB_A, sectorIds: [SECTOR_A], canAccessAnySector: false };
 const anySectorActor: ActivityActor = { ...limitedActor, userId: 'user-any', membershipId: 'membership-any', sectorIds: [], canAccessAnySector: true };
 const input = (sectorId: string): ActivityInput => ({ sectorId, responsibleEmployeeId: EMPLOYEE_ID, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' } });
 
@@ -27,6 +27,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
       if (sql.includes('miclub_schema_migrations')) return { rows: [{ '?column?': 1 }] };
       if (sql.includes('pg_attribute')) return { rows: [{ available: true }] };
       if (sql.includes('pg_proc')) return { rows: [{ available: true }] };
+      if (sql.includes("constraint_definition.conname='activities_updated_by_fkey'")) return { rows: [{ referenced_table: 'people' }] };
       if (sql.includes('from miclub.activities') && sql.includes('for update')) {
         const sectors = params?.[3] as string[];
         const visible = stored.club_id === params?.[0] && stored.id === params?.[1]
@@ -51,7 +52,7 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
 
 test.afterEach(() => setPostgresPoolForTests(undefined));
 
-const createPool = (settlement: ActivityInput['settlement'], failAudit = false, injected?: { target: 'activity'|'term'; error: Error }, canonicalGuard = true) => {
+const createPool = (settlement: ActivityInput['settlement'], failAudit = false, injected?: { target: 'activity'|'term'; error: Error }, canonicalGuard = true, actorTarget: 'people'|'users'|null = 'people') => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = { query: async (sql: string, params?: unknown[]) => {
     queries.push({ sql, params });
@@ -59,6 +60,7 @@ const createPool = (settlement: ActivityInput['settlement'], failAudit = false, 
     if (sql.includes('miclub_schema_migrations')) return { rows: [{}] };
     if (sql.includes('pg_attribute')) return { rows: [{ available: true }] };
     if (sql.includes('pg_proc')) return { rows: [{ available: canonicalGuard }] };
+    if (sql.includes("constraint_definition.conname='activities_updated_by_fkey'")) return { rows: actorTarget ? [{ referenced_table: actorTarget }] : [] };
     if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, responsible: true, employee_id: EMPLOYEE_ID, employee_person_id: PERSON_ID, legacy_instructor_id: INSTRUCTOR_ID }] };
     if (sql.includes('insert into miclub.activities')) { if (injected?.target === 'activity') throw injected.error; return { rows: [{ id: ACTIVITY_ID, updated_at: UPDATED_AT }] }; }
     if (sql.includes('insert into miclub.activity_terms')) { if (injected?.target === 'term') throw injected.error; return { rows: [{ id: 'term-created', effective_from: settlement.effectiveFrom, effective_to: null }] }; }
@@ -87,7 +89,24 @@ for (const settlement of [
   assert.match(references?.sql ?? '', /miclub\.instructors[\s\S]*status='activa'/);
   assert.doesNotMatch(references?.sql ?? '', /is_active/);
   assert.equal(queries.some(({ sql }) => sql.includes('miclub_schema_migrations')), false, 'la instalación manual se detecta por capacidad estructural');
+  const activityInsert = queries.find(({ sql }) => sql.includes('insert into miclub.activities'));
+  assert.equal(activityInsert?.params?.at(-1), PERSON_ID, 'usa Person cuando la FK histórica referencia people');
   assert.equal(queries.at(-1)?.sql, 'COMMIT');
+});
+
+test('usa User como actor de actividad cuando la FK instalada referencia users', async () => {
+  const settlement = input(SECTOR_A).settlement;
+  const queries = createPool(settlement, false, undefined, true, 'users');
+  assert.equal((await createActivity(limitedActor, { ...input(SECTOR_A), settlement })).kind, 'created');
+  const activityInsert = queries.find(({ sql }) => sql.includes('insert into miclub.activities'));
+  assert.equal(activityInsert?.params?.at(-1), limitedActor.userId);
+});
+
+test('falla cerrado si updated_by no tiene una FK de identidad reconocida', async () => {
+  const settlement = input(SECTOR_A).settlement;
+  const queries = createPool(settlement, false, undefined, true, null);
+  assert.deepEqual(await createActivity(limitedActor, { ...input(SECTOR_A), settlement }), { kind: 'model_not_applied' });
+  assert.equal(queries.some(({ sql }) => sql.includes('insert into miclub.activities')), false);
 });
 
 test('revierte atómicamente actividad y término cuando falla la auditoría', async () => {

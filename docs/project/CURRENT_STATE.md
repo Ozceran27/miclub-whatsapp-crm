@@ -1,5 +1,27 @@
 # Current State
 
+## Alta de actividades y actor de auditoría — 2026-09-21
+
+El error PostgreSQL `23503` observado al crear una actividad provenía de una
+divergencia histórica de schema: la base desplegada conserva
+`activities_updated_by_fkey → people(id)`, mientras que la migración posterior
+`202608060001_activity_mutation_model.sql` puede producir
+`activities_updated_by_fkey → users(id)` cuando crea la columna desde cero. El
+runtime enviaba siempre `userId`, por lo que una instalación basada en el schema
+histórico rechazaba el alta antes de insertar `activity_terms`.
+
+Las mutaciones permanentes y la finalización de onboarding ahora inspeccionan la
+FK instalada dentro de la misma transacción y seleccionan explícitamente
+`personId` o `userId`; nunca asumen que ambos UUID son intercambiables. Si la FK
+no apunta a una identidad reconocida, el flujo falla cerrado con `503` antes de
+escribir. No se requiere DDL ni SQL manual para esta corrección y la atomicidad
+actividad+término+auditoría se conserva.
+
+El manejador global continúa ocultando mensajes y detalles SQL al cliente, pero
+registra de forma segura `constraint`, `table` y `column` cuando son
+identificadores simples. Así, un nuevo error de integridad puede diagnosticarse
+por `requestId` sin volcar filas, parámetros, hashes ni datos personales.
+
 ## Sectores administrativos y edición de trabajadores — 2026-09-20
 
 La lista de Sectores de Administración presenta identidad en una sola línea,
