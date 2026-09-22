@@ -20,6 +20,10 @@ router.use(requireAuth, requireMembership, rejectClientClubId, requirePermission
 router.get("/summary", asyncHandler(async (req, res) => {
   res.json(await getAdministrationSummary(req.auth!.clubId));
 }));
+router.get("/club-currency", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async(req,res)=>{
+  const row=(await tenantExecutor(req.auth!.clubId).query<{base_currency_code:string}>("select base_currency_code from miclub.clubs where id=$1",[req.auth!.clubId])).rows[0];
+  res.json({currencyCode:row?.base_currency_code??null});
+}));
 
 router.get("/workers", asyncHandler(async (req, res) => {
   const { limit, offset } = parseListQuery(req, [], { defaultLimit: 50, maxLimit: 100 });
@@ -73,6 +77,18 @@ router.get("/activities/:id/terms", requirePermission(PERMISSIONS.ACTIVITIES_VIE
     join miclub.clubs c on c.id=t.club_id
     left join miclub.people p on p.id=t.responsible_person_id and p.club_id=t.club_id
     where t.club_id=$1 and t.activity_id=$2 and ($3::uuid[] is null or a.sector_id=any($3)) order by t.effective_from desc,t.id`,[req.auth!.clubId,id,sectors]);
+  res.json({items:result.rows});
+}));
+
+router.get("/activities/:id/prices", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async(req,res)=>{
+  const id=String(req.params.id);
+  if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de actividad inválido."});
+  const sectors=req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:req.auth!.sectorIds;
+  const result=await tenantExecutor(req.auth!.clubId).query(`select p.id,p.enrollment_price::float8 "enrollmentPrice",p.fee_price::float8 "feePrice",
+    p.fee_frequency "feeFrequency",p.currency_code "currencyCode",p.effective_from::text "effectiveFrom",p.effective_to::text "effectiveTo"
+    from miclub.activity_price_terms p join miclub.activities a on a.id=p.activity_id and a.club_id=p.club_id
+    where p.club_id=$1 and p.activity_id=$2 and ($3::uuid[] is null or a.sector_id=any($3))
+    order by p.effective_from desc,p.id`,[req.auth!.clubId,id,sectors]);
   res.json({items:result.rows});
 }));
 

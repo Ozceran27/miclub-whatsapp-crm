@@ -63,7 +63,7 @@ void test('los badges pendientes y las condiciones económicas usan la presentac
   const activity = read('./ActivityCreateEditModal.tsx');
   const styles = read('../../styles.css');
 
-  assert.match(activity, /<NumberInput suffix="%" name="clubSharePercentage"/);
+  assert.match(activity, /<FormattedValueInput kind="percent" name="clubSharePercentage"/);
   assert.match(activity, /activity-terms__modes/);
   assert.match(activity, /activity-terms__details/);
   assert.match(styles, /\.administration-action-card__badge[\s\S]*font-weight: 500;[\s\S]*right:7px;[\s\S]*top:7px;/);

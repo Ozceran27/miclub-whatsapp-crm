@@ -2,7 +2,7 @@ import { normalizeComparableText } from "../importers/normalizers.js";
 import { getPostgresPool } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
-import type { ActivitySettlementMutation } from "@miclub/shared";
+import type { ActivityPricingMutation, ActivityScheduleBlock, ActivitySettlementMutation } from "@miclub/shared";
 import { storedEntityStatus } from "./entityStatusRepository.js";
 import { hasActivityResponsibleEmployee, hasCanonicalActivityMutationGuard, resolveActivityMutationActorId } from "../db/schemaCapabilities.js";
 
@@ -19,13 +19,16 @@ export type ActivityInput = {
   modality?: string | null; color?: string | null; iconKey?: string | null; clubCommissionPercent: number | null;
   maxCapacity?: number | null; generatesEnrollments: boolean; status?: "active" | "inactive"; notes?: string | null;
   settlement?: ActivitySettlementMutation;
+  pricing?: ActivityPricingMutation;
+  schedules?: ActivityScheduleBlock[];
 };
 export type ActivityRow = Record<string, unknown> & { id: string; updated_at: Date | string };
 export type ActivityMutationResult =
   | { kind: "created" | "updated"; activity: ActivityRow }
-  | { kind: "missing" | "conflict" | "model_not_applied" | "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible" | "dependencies" | "invalid_terms" | "settled_history"; dependencies?: Record<string, number> };
+  | { kind: "missing" | "conflict" | "model_not_applied" | "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible" | "dependencies" | "invalid_terms" | "invalid_pricing" | "settled_history"; dependencies?: Record<string, number> };
 type ActivityValidationFailure = "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible";
 class InvalidActivityTermsError extends Error {}
+class InvalidActivityPricingError extends Error {}
 const isTermsConstraintError = (error: unknown) => {
   if (error instanceof InvalidActivityTermsError) return true;
   if (typeof error !== "object" || error === null || !("code" in error)) return false;
@@ -83,6 +86,43 @@ const auditTerms = (actor: ActivityActor, action: string, activityId: string, be
     entityType: "activity_terms", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent,
     oldData: before, newData: { ...after, activityId } }, executor);
 
+type Executor = { query: Pool["query"] };
+const priceColumns = "id,club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from,effective_to,created_at,updated_at";
+const auditPrice = (actor:ActivityActor, action:string, before:Record<string,unknown>|null, after:Record<string,unknown>, executor:Parameters<typeof auditService.sensitiveChange>[1]) =>
+  auditService.sensitiveChange({action,result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,
+    entityType:"activity_price_terms",entityId:String(after.id),requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,oldData:before,newData:after},executor);
+const savePrice = async (executor: Executor, actor: ActivityActor, activityId: string, pricing: ActivityPricingMutation, creating: boolean): Promise<"ok" | "invalid_pricing"> => {
+  const currency = await executor.query<{ base_currency_code: string }>("select base_currency_code from miclub.clubs where id=$1",[actor.clubId]);
+  const code=currency.rows[0]?.base_currency_code;
+  if (!code) return "invalid_pricing";
+  const history = creating ? [] : (await executor.query<Record<string,unknown>>(`select ${priceColumns} from miclub.activity_price_terms where club_id=$1 and activity_id=$2 order by effective_from for update`,[actor.clubId,activityId])).rows;
+  const latest=history.at(-1);
+  if (latest) {
+    const same=Number(latest.enrollment_price)===pricing.enrollmentPrice && Number(latest.fee_price)===pricing.feePrice && latest.fee_frequency===pricing.feeFrequency && latest.currency_code===code;
+    if (same) return "ok";
+    if (pricing.effectiveFrom <= String(latest.effective_from).slice(0,10) || latest.effective_to != null) return "invalid_pricing";
+    const closed=await executor.query<Record<string,unknown>>(`update miclub.activity_price_terms set effective_to=$3::date-1,updated_at=now(),updated_by=$4
+      where club_id=$1 and id=$2 and effective_to is null returning ${priceColumns}`,[actor.clubId,latest.id,pricing.effectiveFrom,actor.userId]);
+    if(!closed.rows[0])return "invalid_pricing";
+    await auditPrice(actor,"activity_price_terms.close",latest,closed.rows[0],executor);
+  }
+  const inserted=await executor.query<Record<string,unknown>>(`insert into miclub.activity_price_terms(club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from,created_by,updated_by)
+    values($1,$2,$3,$4,$5,$6,$7::date,$8,$8) returning ${priceColumns}`,[actor.clubId,activityId,pricing.enrollmentPrice,pricing.feePrice,pricing.feeFrequency,code,pricing.effectiveFrom,actor.userId]);
+  await auditPrice(actor,"activity_price_terms.create",null,inserted.rows[0],executor);
+  return "ok";
+};
+
+const saveSchedules = async (executor: Executor, actor: ActivityActor, activityId: string, schedules: ActivityScheduleBlock[]) => {
+  // Preserve IDs and historical room labels for unchanged blocks.
+  await executor.query(`delete from miclub.activity_schedules s where s.club_id=$1 and s.activity_id=$2
+    and not exists(select 1 from jsonb_to_recordset($3::jsonb) as wanted(weekday integer,"startTime" text,"endTime" text)
+      where wanted.weekday=s.weekday and wanted."startTime"::time=s.start_time and wanted."endTime"::time=s.end_time)`,[actor.clubId,activityId,JSON.stringify(schedules)]);
+  for (const block of schedules) await executor.query(`insert into miclub.activity_schedules(club_id,activity_id,weekday,start_time,end_time)
+    select $1,$2,$3,$4::time,$5::time where not exists(select 1 from miclub.activity_schedules
+      where club_id=$1 and activity_id=$2 and weekday=$3 and start_time=$4::time and end_time=$5::time)`,
+    [actor.clubId,activityId,block.weekday,block.startTime,block.endTime]);
+};
+
 export const createActivity = async (actor: ActivityActor, input: ActivityInput): Promise<ActivityMutationResult> => {
   const pool = await getPostgresPool();
   try { return await withTenantTransaction(actor.clubId, async (executor) => {
@@ -102,11 +142,14 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
       (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, responsible_person_id, effective_from, created_by, updated_by)
       values ($1,$2,$3,$4,$5,$6,$7,coalesce($8,$9::uuid),$10::date,$11::uuid,$11::uuid) returning ${termColumns}`,
     [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.currencyCode, input.settlement.clubSharePercentage, input.economicResponsiblePersonId ?? input.responsiblePersonId ?? null, references.employeePersonId, input.settlement.effectiveFrom, actor.userId]);
+    if (!input.pricing || !input.schedules || await savePrice(executor,actor,result.rows[0].id,input.pricing,true)==="invalid_pricing") throw new InvalidActivityPricingError();
+    await saveSchedules(executor,actor,result.rows[0].id,input.schedules);
     await auditActivity(actor, "activity.create", null, result.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", result.rows[0].id, null, term.rows[0], executor);
     return { kind: "created", activity: result.rows[0] };
   }, pool); } catch (error) {
     if (isTermsConstraintError(error)) return { kind: "invalid_terms" };
+    if (error instanceof InvalidActivityPricingError || (typeof error==="object" && error!==null && "constraint" in error && String(error.constraint).startsWith("activity_price_terms_"))) return {kind:"invalid_pricing"};
     throw error;
   }
 };
@@ -170,6 +213,8 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, responsible_employee_id=$6, code=$7, name=$8, modality=$9, color=$10, icon_key=$11, club_commission_percent=coalesce($12,club_commission_percent), instructor_commission_percent=0, max_capacity=$13, generates_enrollments=$14, status=$15, notes=$16, updated_at=now(), updated_by=$17::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
     [actor.clubId, id, value.sectorId, value.managerPersonId, references.legacyInstructorId, references.employeeId, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.maxCapacity ?? null, value.generatesEnrollments, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, mutationActorId]);
     if (!result.rows[0]) return { kind: "conflict" };
+    if (value.pricing && await savePrice(executor,actor,id,value.pricing,false)==="invalid_pricing") throw new InvalidActivityPricingError();
+    if (value.schedules) await saveSchedules(executor,actor,id,value.schedules);
     if (termsChanged && latest && value.settlement) {
     const closed = await executor.query<ActivityTermRow>(`update miclub.activity_terms set effective_to=$3::date - 1,
       updated_at=now(), updated_by=$4::uuid where club_id=$1 and id=$2 and effective_to is null returning ${termColumns}`,
@@ -186,6 +231,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     return { kind: "updated", activity: result.rows[0] };
   }, pool); } catch (error) {
     if (isTermsConstraintError(error)) return { kind: "invalid_terms" };
+    if (error instanceof InvalidActivityPricingError || (typeof error==="object" && error!==null && "constraint" in error && (String(error.constraint).startsWith("activity_price_terms_") || String(error.constraint).startsWith("activity_schedules_")))) return {kind:"invalid_pricing"};
     throw error;
   }
 };

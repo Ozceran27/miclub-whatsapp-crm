@@ -1,5 +1,9 @@
 # Business Rules
 
+## Precios y horarios de actividades
+
+Inscripción y cuota son cargos al alumno, no condiciones de reparto con el responsable. Ambos admiten `$0` y sólo enteros; la cuota requiere frecuencia diaria, semanal, mensual o anual. Los cambios de precio crean una vigencia nueva sólo cuando cambian los valores y nunca reescriben inscripciones previas. Un alta legacy sin precios permite inscripción manual con importes editables, por defecto cero. No se crean automáticamente movimientos ni cobros. Los horarios son locales a la zona del club, terminan el mismo día y no pueden solaparse dentro de una actividad.
+
 Sincronización del bootstrap aprobado (42b81a3, 2026-09-07). Se corrigen nombres técnicos y catálogo demostrados por código/migraciones. Los conflictos abiertos al final no autorizan cambios de reglas.
 
 ## 1. Multi-tenancy

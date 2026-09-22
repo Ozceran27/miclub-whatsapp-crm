@@ -121,6 +121,11 @@ const listDefinitions = {
       left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id
       left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and (now() at time zone coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires'))::date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true
       left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id
+      left join lateral (select p.id,p.enrollment_price,p.fee_price,p.fee_frequency,p.currency_code,p.effective_from
+        from miclub.activity_price_terms p where p.club_id=a.club_id and p.activity_id=a.id
+          and (now() at time zone coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires'))::date
+            between p.effective_from and coalesce(p.effective_to,'infinity'::date)
+        order by p.effective_from desc limit 1) price on true
       left join lateral (
         select case when count(movement.id)=0 then null
           when count(*) filter (where coalesce(movement.currency_code,activity_club.base_currency_code)<>activity_club.base_currency_code and rate.id is null)>0 then null
@@ -149,7 +154,11 @@ const listDefinitions = {
     select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name, a.instructor_id,
       i.display_name as instructor_name, a.responsible_employee_id, nullif(trim(concat_ws(' ', operational_responsible.first_name, operational_responsible.last_name)), '') as responsible_employee_name,
-      terms.responsible_person_id, nullif(trim(concat_ws(' ', responsible.first_name, responsible.last_name)), '') as responsible_person_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
+       terms.responsible_person_id, nullif(trim(concat_ws(' ', responsible.first_name, responsible.last_name)), '') as responsible_person_name, a.code, a.name, a.modality, a.color, a.icon_key, a.monthly_fee as enrollment_fee, a.monthly_fee,
+       (price.id is not null) as pricing_configured, price.enrollment_price::float8, price.fee_price::float8,
+       price.fee_frequency, price.currency_code as price_currency_code, price.effective_from as price_effective_from,
+       coalesce((select json_agg(json_build_object('id',schedule.id,'weekday',schedule.weekday,'startTime',to_char(schedule.start_time,'HH24:MI'),'endTime',to_char(schedule.end_time,'HH24:MI')) order by schedule.weekday,schedule.start_time)
+         from miclub.activity_schedules schedule where schedule.club_id=a.club_id and schedule.activity_id=a.id),'[]'::json) as schedules,
       a.club_commission_percent, a.instructor_commission_percent, a.max_capacity,
       lower(terms.mode) as settlement_mode, terms.fixed_club_fee as settlement_fixed_amount, terms.fixed_fee_frequency, terms.currency_code,
       terms.club_share_percentage, terms.effective_from as terms_effective_from, terms.effective_to as terms_effective_to, a.generates_enrollments,
@@ -219,7 +228,8 @@ const listDefinitions = {
     clubColumn: "e.club_id",
     select: `e.id, e.sequence_number, e.external_id, e.person_id, p.first_name, p.last_name, p.dni, p.phone,
       e.activity_id, a.name as activity_name, a.modality, a.sector_id, s.code as sector_code,
-      s.name as sector_name, i.display_name as instructor_name, e.fee_amount, e.status,
+      s.name as sector_name, i.display_name as instructor_name, e.fee_amount,
+      e.enrollment_price_snapshot, e.fee_price_snapshot, e.fee_frequency_snapshot, e.activity_price_term_id, e.status,
       e.due_date, e.enrollment_date, e.source, e.notes, e.created_at, e.updated_at`,
     orderBy: "coalesce(e.enrollment_date, e.created_at::date) desc nulls last, e.id desc",
     filters: {

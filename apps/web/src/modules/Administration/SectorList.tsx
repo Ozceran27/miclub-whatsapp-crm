@@ -6,6 +6,7 @@ import { getSectorVisualMeta } from '../sectorVisualMeta';
 import { useSession } from '../../session';
 import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
 import { ConfigurationColorPicker, SectorIconPicker } from '../shared/ConfigurationVisualFields';
+import { SectorCapacityFields } from '../shared/SectorCapacityFields';
 
 const integer = new Intl.NumberFormat('es-AR');
 const formText = (form: FormData, name: string) => { const value=form.get(name); return typeof value==='string' ? value.trim() : ''; };
@@ -145,8 +146,7 @@ export function SectorList() {
           <label>Nombre<input name="name" required /></label>
           <SectorIconPicker value={newIconKey} onChange={setNewIconKey} />
           <ConfigurationColorPicker value={newColor} onChange={setNewColor} label="Color del sector" />
-          <fieldset><legend>Modo de capacidad</legend><label><input type="radio" name="capacityMode" value="INCOME" checked={capacityMode === 'INCOME'} onChange={() => { setCapacityMode('INCOME'); setConfiguredCapacity(null); }}/> Ingresos</label><label><input type="radio" name="capacityMode" value="ENROLLMENTS" checked={capacityMode === 'ENROLLMENTS'} onChange={() => { setCapacityMode('ENROLLMENTS'); setConfiguredCapacity(value => value ?? 1); }}/> Espacio Disponible</label></fieldset>
-          {capacityMode === 'ENROLLMENTS' && <label>Cant. Máx.<input name="configuredCapacity" type="number" min="1" step="1" required value={configuredCapacity ?? ''} onChange={event => setConfiguredCapacity(event.currentTarget.value === '' ? null : Number(event.currentTarget.value))}/></label>}
+          <SectorCapacityFields mode={capacityMode} capacity={configuredCapacity} onModeChange={mode=>{setCapacityMode(mode);setConfiguredCapacity(mode==='INCOME'?null:value=>value??1);}} onCapacityChange={setConfiguredCapacity}/>
           <label>Estado<select name="status" defaultValue="active"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="under_repair">En reparación</option></select></label>
           <fieldset><legend>Configuración avanzada</legend><label>Descripción<textarea name="description" rows={3}/></label></fieldset>
         </form>

@@ -3,11 +3,11 @@ import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 
 export type EnrollmentActor = { userId: string; membershipId: string; clubId: string; requestId?: string; ip?: string; userAgent?: string };
-export type EnrollmentInput = { personId: string; activityId: string; feeAmount: number; status: "al_dia" | "nuevo_inscripto" | "adeudando"; dueDate?: string | null; enrollmentDate: string };
+export type EnrollmentInput = { personId: string; activityId: string; feeAmount: number; enrollmentPrice?: number; status: "al_dia" | "nuevo_inscripto" | "adeudando"; dueDate?: string | null; enrollmentDate: string };
 export type EnrollmentResult = { kind: "created"; enrollment: Record<string, unknown> } | { kind: "duplicate"; enrollment: Record<string, unknown> } | { kind: "invalid_reference" };
 export type EnrollmentStatusResult = { kind: "updated"; enrollment: Record<string, unknown> } | { kind: "missing" } | { kind: "conflict" };
 
-const columns = "id, club_id, sequence_number, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source, created_at, updated_at";
+const columns = "id, club_id, sequence_number, external_id, person_id, activity_id, fee_amount, enrollment_price_snapshot, fee_price_snapshot, fee_frequency_snapshot, activity_price_term_id, status, due_date, enrollment_date, source, created_at, updated_at";
 
 /** Audits the tenant-owned person, activity and existing enrollment before inserting anything. */
 export const createEnrollment = async (actor: EnrollmentActor, input: EnrollmentInput): Promise<EnrollmentResult> => {
@@ -23,6 +23,9 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
       for update of p, a
     `, [actor.clubId, input.personId, input.activityId]);
     if (!references.rows[0]) return { kind: "invalid_reference" };
+    const price=(await db.query<{id:string;enrollment_price:string;fee_frequency:string}>(`select p.id,p.enrollment_price,p.fee_frequency from miclub.activity_price_terms p
+      where p.club_id=$1 and p.activity_id=$2 and p.effective_from<=$3::date
+      and (p.effective_to is null or p.effective_to>=$3::date) order by p.effective_from desc limit 1`,[actor.clubId,input.activityId,input.enrollmentDate])).rows[0];
 
     const existing = await db.query<Record<string, unknown>>(`
       select ${columns} from miclub.enrollments
@@ -34,10 +37,10 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
 
     const inserted = await db.query<Record<string, unknown>>(`
       insert into miclub.enrollments
-        (club_id, sequence_number, external_id, person_id, activity_id, fee_amount, status, due_date, enrollment_date, source)
-      values ($1, miclub.next_tenant_sequence($1, 'enrollment'), 'manual:'||gen_random_uuid(), $2, $3, $4, $5, $6, $7, 'manual')
+        (club_id, sequence_number, external_id, person_id, activity_id, fee_amount, enrollment_price_snapshot, fee_price_snapshot, fee_frequency_snapshot, activity_price_term_id, status, due_date, enrollment_date, source)
+      values ($1, miclub.next_tenant_sequence($1, 'enrollment'), 'manual:'||gen_random_uuid(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'manual')
       returning ${columns}
-    `, [actor.clubId, input.personId, input.activityId, input.feeAmount, input.status, input.dueDate ?? null, input.enrollmentDate]);
+    `, [actor.clubId, input.personId, input.activityId, input.feeAmount, input.enrollmentPrice ?? Number(price?.enrollment_price ?? 0), input.feeAmount, price?.fee_frequency ?? null, price?.id ?? null, input.status, input.dueDate ?? null, input.enrollmentDate]);
     const enrollment = inserted.rows[0];
     await auditService.enrollment({ action: "enrollment.create", result: "success", userId: actor.userId,
       membershipId: actor.membershipId, clubId: actor.clubId, entityType: "enrollment", entityId: String(enrollment.id),

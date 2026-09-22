@@ -1,5 +1,11 @@
 # Testing
 
+## Precios y horarios — 2026-09-22
+
+Revisar tests de contrato shared, rutas y repositorios API, editores web, manifiesto/checksum y SQL DBeaver. La verificación PostgreSQL real requiere backup y ejecución supervisada de la migración manual, seguida de pruebas con dos clubes y de UI en escritorio/móvil; ninguna escritura contra la base real se automatiza en este paquete.
+
+En esta rama: API 444/444, web 83/83, shared 9/9 y manifiesto 16/16; `docs:check`, typecheck y build pasan. El lint focalizado de los componentes y repositorios nuevos pasa; el lint global sigue con deuda previa (incluido `shared/src/moneyNormalization.ts`). No hay `MIGRATION_GATE_DATABASE_URL`, `AUDIT_DATABASE_URL` ni `psql` disponibles en este entorno, por lo que instalación limpia, replay y pruebas PostgreSQL de dos tenants quedan pendientes de un entorno aislado. La revisión visual con sesión autenticada también queda pendiente.
+
 ## Regresión de alta de actividades — 2026-09-21
 
 - Auditoría PostgreSQL real exclusivamente read-only: `current_user=miclub_audit`

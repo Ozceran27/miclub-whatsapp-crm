@@ -9,7 +9,7 @@ import { getOnboardingSteps, isSkippableStep } from './steps';
 import { OpeningBalancesStep } from './OpeningBalancesStep';
 import { CurrencyFlag } from './CurrencyFlag';
 import { CURRENCY_PRESENTATIONS, formatCurrencyLabel, getCurrencyAfterKey, getCurrencyPrefix } from './currencyPresentation';
-const draft={contractVersion:2 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[]};
+const draft={contractVersion:3 as const,idempotencyKey:'test-key',selectedPlanCode:'FREE' as const,openingBalances:{currency:'ARS' as const,cash:0,bank:0,usdCash:0},sectors:[],workers:[],activities:[]};
 const ONBOARDING_STEPS=getOnboardingSteps(true,draft,()=>undefined);
 
 test('define siete pasos y solo permite omitir los pasos opcionales', () => {

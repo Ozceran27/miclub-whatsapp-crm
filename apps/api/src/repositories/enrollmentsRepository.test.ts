@@ -37,6 +37,7 @@ const installPool = (fixture: ActivityFixture) => {
         return Promise.resolve({ rows: (eligible ? [{ person_id: PERSON_ID, activity_id: ACTIVITY_ID }] : []) as T[] });
       }
       if (sql.includes("from miclub.enrollments")) return Promise.resolve({ rows: [] });
+      if (sql.includes("from miclub.activity_price_terms p")) return Promise.resolve({ rows: [] });
       if (sql.includes("insert into miclub.enrollments")) {
         const enrollment = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", club_id: CLUB_A, person_id: params?.[1], activity_id: params?.[2] };
         enrollments.push(enrollment);

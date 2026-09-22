@@ -42,7 +42,7 @@ void test('opening balances: real HTTP completion, sequences, retries, reversals
   const login=await post('/auth/login',{username:'opening@test.invalid',password:'OpeningTest123!'});
   assert.equal(login.status,200,JSON.stringify(login.body));assert.ok(login.cookie);
   const club=(await db.query<{id:string}>('select id from miclub.clubs')).rows[0].id;
-  const draft={contractVersion:2,idempotencyKey:'opening-complete-regression',selectedPlanCode:'CLUB',
+  const draft={contractVersion:3,idempotencyKey:'opening-complete-regression',selectedPlanCode:'CLUB',
    openingBalances:{currency:'ARS',cash:100000,bank:200000,usdCash:0},
    sectors:PROVISIONED_ONBOARDING_SECTORS.map(s=>({...s,color:'#2563EB',status:'active',capacityMode:'INCOME',configuredCapacity:null})),workers:[],activities:[]};
   await t.test('completes and replays without duplicating capital or sequences',async()=>{

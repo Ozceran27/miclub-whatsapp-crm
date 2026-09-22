@@ -5,7 +5,7 @@ export const ONBOARDING_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"] a
 export type OnboardingStatus = typeof ONBOARDING_STATUSES[number];
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type OnboardingStepOutcome = "COMPLETED" | "SKIPPED";
-export const ONBOARDING_DRAFT_CONTRACT_VERSION = 2 as const;
+export const ONBOARDING_DRAFT_CONTRACT_VERSION = 3 as const;
 export type OnboardingStepRequirement = "WELCOME" | "OPENING_BALANCES" | "SECTORS" | "WORKERS" | "ACTIVITIES" | "MIGRATION" | "FINISH";
 
 /**
@@ -88,6 +88,8 @@ export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; responsibleWorkerClientId?: string | null; /** @deprecated v2 draft compatibility */ instructorClientId?: string | null; name: string; iconKey: string; color: string;
   status: "active" | "inactive";
   generatesEnrollments: boolean;
+  pricing: { enrollmentPrice: number; feePrice: number; feeFrequency: ActivityFeeFrequency };
+  schedules: Array<{ weekday: number; startTime: string; endTime: string }>;
 } & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; currencyCode: OperationalCurrency; clubSharePercentage: null }
   | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; currencyCode: null; clubSharePercentage: number });
 /** Complete, client-owned draft. No field in this object is persisted before completion. */

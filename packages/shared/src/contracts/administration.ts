@@ -229,6 +229,13 @@ export interface AdministrationActivityDto {
   enrollmentFee: number | null;
   /** @deprecated Usar enrollmentFee. */
   monthlyFee: number | null;
+  pricingConfigured: boolean;
+  enrollmentPrice: number | null;
+  feePrice: number | null;
+  feeFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
+  priceCurrencyCode: 'ARS' | 'USD' | 'BRL' | 'EUR' | null;
+  priceEffectiveFrom: string | null;
+  schedules: Array<{ id: string; weekday: number; startTime: string; endTime: string }>;
   clubCommissionPercent: number;
   clubSharePercentage?: number | null;
   instructorCommissionPercent: number;
@@ -413,6 +420,9 @@ export interface AdministrationEnrollmentDto {
   sectorId?: string | null;
   sectorName?: string | null;
   feeAmount: number;
+  enrollmentPriceSnapshot?: number | null;
+  feePriceSnapshot?: number | null;
+  feeFrequencySnapshot?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
   status: AdministrationEnrollmentStatus;
   dueDate?: string | null;
   source?: string | null;

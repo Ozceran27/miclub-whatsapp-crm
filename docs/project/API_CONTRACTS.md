@@ -1,5 +1,9 @@
 # API Contracts
 
+## Actividades, precios e inscripciones — 2026-09-22
+
+`POST /api/activities` exige `pricing: {enrollmentPrice, feePrice, feeFrequency, effectiveFrom}` y `schedules: [{weekday,startTime,endTime}]` (admite `[]`), además del contrato económico anterior. En `PATCH /api/activities/:id`, omitir cualquiera de esas dos propiedades la conserva; enviarla sincroniza su configuración. `GET /api/actividades` expone precio vigente, `pricingConfigured` y bloques semanales. `GET /api/administration/activities/:id/prices` devuelve historial tenant-scoped; `GET /api/administration/club-currency` devuelve la moneda base. `POST /api/inscripciones` admite `enrollmentPrice` editable, usa `feeAmount` para la cuota y deriva el término por club/actividad/fecha en el servidor. No admite autoridad tenant ni término de precio desde el cliente.
+
 Resumen. El inventario detallado canónico es `docs/reference/api-routes.md`.
 
 Auditado sobre 42b81a3. Una ruta presente no implica flujo E2E certificado. Ver CURRENT_STATE para bugs RLS y revocación en invitaciones.

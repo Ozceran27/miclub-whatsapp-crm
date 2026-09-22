@@ -1,5 +1,9 @@
 # Onboarding
 
+## Contrato v3 de actividades
+
+El borrador `contractVersion: 3` incluye precios de inscripción y cuota, frecuencia y bloques semanales por actividad. La finalización crea actividad, condiciones económicas, precio y agenda en la transacción atómica existente. El editor reutiliza los controles de moneda/porcentaje y horarios de Administración. Los borradores v2 deben actualizarse antes de completar.
+
 ## Ajustes de interfaz — 2026-09-17
 
 La respuesta de `POST /api/onboarding/complete` confirma la creación y aporta

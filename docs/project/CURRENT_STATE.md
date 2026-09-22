@@ -1,5 +1,9 @@
 # Current State
 
+## Precios y horarios de actividades — 2026-09-22
+
+El código ya incorpora precios de inscripción y cuota versionados, frecuencia, agenda semanal y snapshots al inscribir. La migración `202609220001_activity_pricing_and_schedules.sql` está versionada pero requiere ejecución manual supervisada en DBeaver antes de desplegar el backend y la web. No se aplicó SQL a la base real. Actividades anteriores sin términos de precio siguen operativas y se señalan como «Sin configurar»; `monthly_fee` legacy no se infiere como precio. La cuota e inscripción pueden ser cero. Crear actividad exige precios y una agenda explícita (posiblemente vacía); editar sin enviar esas secciones las conserva.
+
 ## Trabajadores y actividades: edición, vigencias y rentabilidad — 2026-09-22
 
 La edición de trabajadores usa ahora un token opaco `version`, obtenido sin

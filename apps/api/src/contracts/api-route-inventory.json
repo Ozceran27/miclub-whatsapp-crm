@@ -2142,6 +2142,34 @@
       ]
     },
     {
+      "id": "GET /api/administration/club-currency",
+      "method": "GET",
+      "path": "/api/administration/club-currency",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"]
+    },
+    {
+      "id": "GET /api/administration/activities/:id/prices",
+      "method": "GET",
+      "path": "/api/administration/activities/:id/prices",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "activities.view",
+      "role": "any-with-permission",
+      "sectorScope": "restricted",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"]
+    },
+    {
       "id": "GET /api/administration/activities/:id/terms",
       "method": "GET",
       "path": "/api/administration/activities/:id/terms",

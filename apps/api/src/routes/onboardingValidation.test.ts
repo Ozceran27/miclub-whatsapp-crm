@@ -15,7 +15,7 @@ test("rechaza importes negativos y campos adicionales",()=>{
 });
 
 const completeRequest=():CompleteOnboardingRequest=>({selectedPlanCode:"FREE",draft:{
-  contractVersion:2,idempotencyKey:"retry-complete-1",openingBalances:{currency:"ARS",cash:0,bank:0,usdCash:0},
+  contractVersion:3,idempotencyKey:"retry-complete-1",openingBalances:{currency:"ARS",cash:0,bank:0,usdCash:0},
   selectedPlanCode:"FREE",
   sectors:PROVISIONED_ONBOARDING_SECTORS.map(sector=>({...sector,color:"#2563EB",status:"active",capacityMode:"INCOME" as const,configuredCapacity:null})),
   workers:[],activities:[],
@@ -38,12 +38,12 @@ test("exige una clave semántica del catálogo para cada sector",()=>{
 test("rechaza identificadores temporales repetidos y referencias cruzadas inválidas",()=>{
   const duplicate=completeRequest();duplicate.draft.workers=[{clientId:duplicate.draft.sectors[0].clientId,firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"INSTRUCTOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
   assert.equal(isCompleteOnboardingRequest(duplicate),false);
-  const dangling=completeRequest();dangling.draft.activities=[{clientId:"activity:1",sectorClientId:"sector:missing",instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",generatesEnrollments:true,settlementMode:"FIXED",fixedClubFee:0,fixedFeeFrequency:"MONTHLY",currencyCode:"ARS",clubSharePercentage:null,status:"active"}];
+  const dangling=completeRequest();dangling.draft.activities=[{clientId:"activity:1",sectorClientId:"sector:missing",instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",generatesEnrollments:true,settlementMode:"FIXED",fixedClubFee:0,fixedFeeFrequency:"MONTHLY",currencyCode:"ARS",clubSharePercentage:null,status:"active",pricing:{enrollmentPrice:0,feePrice:0,feeFrequency:"MONTHLY"},schedules:[]}];
   assert.equal(isCompleteOnboardingRequest(dangling),false);
 });
 test("acepta cualquier trabajador como responsable y porcentajes VARIABLE entre cero y cien",()=>{
   const request=completeRequest();request.draft.workers=[{clientId:"worker:1",firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"TRABAJADOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
-  request.draft.activities=[{clientId:"activity:1",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:"worker:1",name:"Yoga",iconKey:"yoga",color:"#2563EB",generatesEnrollments:true,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:101,status:"active"}];
+  request.draft.activities=[{clientId:"activity:1",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:"worker:1",name:"Yoga",iconKey:"yoga",color:"#2563EB",generatesEnrollments:true,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:101,status:"active",pricing:{enrollmentPrice:0,feePrice:0,feeFrequency:"MONTHLY"},schedules:[]}];
   assert.equal(isCompleteOnboardingRequest(request),false);
   request.draft.activities[0].clubSharePercentage=100;
   assert.equal(isCompleteOnboardingRequest(request),true);
@@ -60,7 +60,7 @@ test("rechaza montos fijos negativos, infinitos y referencias de importación ma
 test("finaliza las modalidades FIXED y VARIABLE sin una cuota implícita",()=>{
   const fixed=completeRequest();
   fixed.draft.workers=[{clientId:"worker:responsible",firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"TRABAJADOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
-  const common={clientId:"activity:fixed",sectorClientId:fixed.draft.sectors[0].clientId,responsibleWorkerClientId:"worker:responsible",instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",generatesEnrollments:true,status:"active" as const};
+  const common={clientId:"activity:fixed",sectorClientId:fixed.draft.sectors[0].clientId,responsibleWorkerClientId:"worker:responsible",instructorClientId:null,name:"Yoga",iconKey:"yoga",color:"#2563EB",generatesEnrollments:true,status:"active" as const,pricing:{enrollmentPrice:0,feePrice:0,feeFrequency:"MONTHLY" as const},schedules:[]};
   fixed.draft.activities=[{...common,settlementMode:"FIXED",fixedClubFee:1250,fixedFeeFrequency:"WEEKLY",currencyCode:"ARS",clubSharePercentage:null}];
   assert.equal(isCompleteOnboardingRequest(fixed),true);
   const variable=completeRequest();
@@ -75,12 +75,12 @@ test("permite finalizar con cada clave canónica de actividad y rechaza aliases 
   for(const visual of ACTIVITY_VISUAL_CATALOG){
     const request=completeRequest();
     request.draft.workers=[{clientId:"worker:responsible",firstName:"Ana",lastName:"Pérez",dni:"12345678",email:"ana@example.com",password:"segura12345",role:"DIRECTOR",hasFixedCompensation:false,fixedCompensationAmount:null,fixedCompensationFrequency:null,currencyCode:null}];
-    request.draft.activities=[{clientId:`activity:${visual.key}`,sectorClientId:request.draft.sectors[0].clientId,responsibleWorkerClientId:"worker:responsible",instructorClientId:null,name:visual.name,iconKey:visual.key,color:"#2563EB",generatesEnrollments:true,status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:25}];
+    request.draft.activities=[{clientId:`activity:${visual.key}`,sectorClientId:request.draft.sectors[0].clientId,responsibleWorkerClientId:"worker:responsible",instructorClientId:null,name:visual.name,iconKey:visual.key,color:"#2563EB",generatesEnrollments:true,status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:25,pricing:{enrollmentPrice:0,feePrice:0,feeFrequency:"MONTHLY"},schedules:[]}];
     assert.equal(isCompleteOnboardingRequest(request),true,visual.key);
   }
   for(const iconKey of ["soccer","not-in-catalog"]){
     const request=completeRequest();
-    request.draft.activities=[{clientId:"activity:invalid",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:null,name:"Inválida",iconKey,color:"#2563EB",generatesEnrollments:false,status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:25}];
+    request.draft.activities=[{clientId:"activity:invalid",sectorClientId:request.draft.sectors[0].clientId,instructorClientId:null,name:"Inválida",iconKey,color:"#2563EB",generatesEnrollments:false,status:"inactive",settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:25,pricing:{enrollmentPrice:0,feePrice:0,feeFrequency:"MONTHLY"},schedules:[]}];
     assert.equal(isCompleteOnboardingRequest(request),false,iconKey);
   }
 });

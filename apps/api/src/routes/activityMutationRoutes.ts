@@ -1,4 +1,4 @@
-import { PERMISSIONS, type ActivityMutationContract } from "@miclub/shared";
+import { areActivitySchedulesValid, isActivityPrice, PERMISSIONS, type ActivityMutationContract } from "@miclub/shared";
 import { Router, type Request, type Response } from "express";
 import { requirePermission, requireSectorAccess } from "../middleware/authorization.js";
 import { archiveActivity, createActivity, setActivityStatus, updateActivity, type ActivityActor, type ActivityInput, type ActivityMutationResult } from "../repositories/activitiesRepository.js";
@@ -22,7 +22,7 @@ const version = (body: Record<string, unknown>, res: Response): string | null =>
 };
 
 const parseInput = (body: Record<string, unknown>, res: Response, requireSettlement: boolean): ActivityInput | null => {
-  const allowed = new Set(["updatedAt", "sectorId", "responsibleEmployeeId", "economicResponsiblePersonId", "instructorId", "responsiblePersonId", "code", "name", "modality", "color", "iconKey", "maxCapacity", "generatesEnrollments", "status", "notes", "settlement"]);
+  const allowed = new Set(["updatedAt", "sectorId", "responsibleEmployeeId", "economicResponsiblePersonId", "instructorId", "responsiblePersonId", "code", "name", "modality", "color", "iconKey", "maxCapacity", "generatesEnrollments", "status", "notes", "settlement", "pricing", "schedules"]);
   if (Object.keys(body).some((key) => !allowed.has(key))) { fail(res, 400, "VALIDATION_ERROR", "La solicitud contiene campos no editables."); return null; }
   if (typeof body.sectorId !== "string" || !UUID.test(body.sectorId) || typeof body.name !== "string" || !body.name.trim()) { fail(res, 400, "VALIDATION_ERROR", "sectorId y name son obligatorios."); return null; }
   const hasResponsibleEmployee = typeof body.responsibleEmployeeId === "string" && UUID.test(body.responsibleEmployeeId);
@@ -34,6 +34,23 @@ const parseInput = (body: Record<string, unknown>, res: Response, requireSettlem
   if (!settlement && requireSettlement) { fail(res, 400, "VALIDATION_ERROR", "settlement es obligatorio al crear una actividad."); return null; }
   if (!settlement && (body.economicResponsiblePersonId !== undefined || body.responsiblePersonId !== undefined)) { fail(res, 400, "VALIDATION_ERROR", "Cambiar el receptor económico exige nuevas condiciones económicas y una vigencia."); return null; }
   if (typeof body.generatesEnrollments !== "boolean") { fail(res, 400, "VALIDATION_ERROR", "Debe indicar explícitamente si la actividad admite inscripciones."); return null; }
+  if ((requireSettlement && (body.pricing === undefined || body.schedules === undefined))
+    || (body.schedules !== undefined && !areActivitySchedulesValid(body.schedules))) {
+    fail(res, 400, "VALIDATION_ERROR", "Los precios y horarios iniciales son obligatorios; los horarios deben ser válidos y no solaparse."); return null;
+  }
+  if (body.pricing !== undefined) {
+    const price = body.pricing;
+    if (!price || typeof price !== "object" || Array.isArray(price)) { fail(res,400,"VALIDATION_ERROR","Precios inválidos."); return null; }
+    const value = price as Record<string,unknown>;
+    const date = typeof value.effectiveFrom === "string" ? new Date(`${value.effectiveFrom}T00:00:00Z`) : null;
+    if (Object.keys(value).some(key => !["enrollmentPrice","feePrice","feeFrequency","effectiveFrom"].includes(key))
+      || !isActivityPrice(value.enrollmentPrice) || !isActivityPrice(value.feePrice)
+      || !["DAILY","WEEKLY","MONTHLY","YEARLY"].includes(String(value.feeFrequency))
+      || typeof value.effectiveFrom !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value.effectiveFrom)
+      || Number.isNaN(date?.getTime()) || date?.toISOString().slice(0,10) !== value.effectiveFrom) {
+      fail(res,400,"VALIDATION_ERROR","Los precios deben ser enteros no negativos, con frecuencia y vigencia válidas."); return null;
+    }
+  }
   const color = body.color == null ? null : typeof body.color === "string" ? body.color.trim().toUpperCase() : "";
   if (color !== null && !/^#[0-9A-F]{6}$/.test(color)) { fail(res, 400, "VALIDATION_ERROR", "color debe ser hexadecimal de seis dígitos."); return null; }
   if (body.maxCapacity !== undefined && body.maxCapacity !== null && (!Number.isInteger(body.maxCapacity) || Number(body.maxCapacity) < 0)) { fail(res, 400, "VALIDATION_ERROR", "maxCapacity debe ser entero no negativo."); return null; }
@@ -46,8 +63,8 @@ const parseInput = (body: Record<string, unknown>, res: Response, requireSettlem
   const parsedEffectiveFrom = typeof settlement.effectiveFrom === "string" ? new Date(`${settlement.effectiveFrom}T00:00:00Z`) : null;
   const effectiveFromValid = typeof settlement.effectiveFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(settlement.effectiveFrom)
     && !Number.isNaN(parsedEffectiveFrom?.getTime()) && parsedEffectiveFrom?.toISOString().slice(0, 10) === settlement.effectiveFrom;
-  const fixedValid = mode === "FIXED" && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(settlement.fixedFeeFrequency)) && typeof settlement.fixedClubFee === "number" && Number.isFinite(settlement.fixedClubFee) && settlement.fixedClubFee >= 0 && ["ARS","USD","BRL","EUR"].includes(String(settlement.currencyCode)) && settlement.clubSharePercentage === null;
-  const variableValid = mode === "VARIABLE" && settlement.fixedFeeFrequency === null && settlement.fixedClubFee === null && settlement.currencyCode === null && typeof settlement.clubSharePercentage === "number" && Number.isFinite(settlement.clubSharePercentage) && settlement.clubSharePercentage >= 0 && settlement.clubSharePercentage <= 100;
+  const fixedValid = mode === "FIXED" && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(settlement.fixedFeeFrequency)) && isActivityPrice(settlement.fixedClubFee) && ["ARS","USD","BRL","EUR"].includes(String(settlement.currencyCode)) && settlement.clubSharePercentage === null;
+  const variableValid = mode === "VARIABLE" && settlement.fixedFeeFrequency === null && settlement.fixedClubFee === null && settlement.currencyCode === null && typeof settlement.clubSharePercentage === "number" && Number.isFinite(settlement.clubSharePercentage) && settlement.clubSharePercentage >= 0 && settlement.clubSharePercentage <= 100 && Math.abs(Math.round(settlement.clubSharePercentage * 100) - settlement.clubSharePercentage * 100) < 1e-8;
   if (keys.some((key) => !["mode", "fixedClubFee", "fixedFeeFrequency", "currencyCode", "clubSharePercentage", "effectiveFrom"].includes(key)) || !effectiveFromValid || (!fixedValid && !variableValid)) { fail(res, 400, "VALIDATION_ERROR", "La liquidación FIXED o VARIABLE no es válida."); return null; }
   const contract = body as unknown as ActivityMutationContract;
   return { ...contract, color, managerPersonId: null, clubCommissionPercent: settlement.mode === "VARIABLE" ? Number(settlement.clubSharePercentage) : 0, name: body.name.trim() };
@@ -63,6 +80,7 @@ const respond = (res: Response, result: ActivityMutationResult) => {
     invalid_responsible: [404, "INVALID_RESPONSIBLE", "El receptor económico no es una persona operativa activa del club."],
     dependencies: [409, "ACTIVITY_HAS_DEPENDENCIES", "La actividad tiene dependencias y no existe una regla segura para archivarla."],
     invalid_terms: [409, "INVALID_ACTIVITY_TERMS", "La nueva vigencia solapa o deja un hueco en las condiciones económicas."],
+    invalid_pricing: [409, "INVALID_ACTIVITY_PRICING", "La vigencia de precios o los horarios no son válidos."],
     settled_history: [409, "SETTLED_ACTIVITY_TERMS", "No se puede alterar historia económica ya liquidada."],
   };
   const [status, code, message] = errors[result.kind]; return fail(res, status, code, message, "dependencies" in result ? result.dependencies : undefined);

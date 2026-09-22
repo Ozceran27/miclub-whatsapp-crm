@@ -4,6 +4,10 @@ export type ActivitySettlementMutation =
 
 import type { ActivityFeeFrequency, OperationalCurrency } from './onboarding.js';
 
+export type ActivityPricingMutation = { enrollmentPrice: number; feePrice: number; feeFrequency: ActivityFeeFrequency; effectiveFrom: string };
+/** 0=Sunday, 1=Monday ... 6=Saturday; times are local to the club. */
+export type ActivityScheduleBlock = { weekday: number; startTime: string; endTime: string };
+
 /** Canonical write contract. Economic values only live under `settlement`. */
 export interface ActivityMutationContract {
   updatedAt?: string;
@@ -28,4 +32,8 @@ export interface ActivityMutationContract {
   notes?: string | null;
   /** Required on create; omitted on operational-only updates. */
   settlement?: ActivitySettlementMutation;
+  /** Required on creation; omitted on edits that do not change member-facing prices. */
+  pricing?: ActivityPricingMutation;
+  /** Required on creation, including [] for an activity with no recurring hours. */
+  schedules?: ActivityScheduleBlock[];
 }

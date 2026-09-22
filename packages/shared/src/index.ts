@@ -22,3 +22,4 @@ export * from "./contracts/activities.js";
 export * from "./contracts/monthlySettlements.js";
 export * from "./sectorVisualCatalog.js";
 export * from "./activityVisualCatalog.js";
+export * from './activityConfiguration.js';

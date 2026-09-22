@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const source = readFile(new URL('./ActivityDraftList.tsx', import.meta.url), 'utf8');
 const visualFields = readFile(new URL('../../shared/ConfigurationVisualFields.tsx', import.meta.url), 'utf8');
-const numberInputSource = readFile(new URL('../MoneyInput.tsx', import.meta.url), 'utf8');
+const numberInputSource = readFile(new URL('../../shared/FormattedValueInput.tsx', import.meta.url), 'utf8');
 const styles = readFile(new URL('../../../styles.css', import.meta.url), 'utf8');
 const catalog = readFile(new URL('../../../../../../packages/shared/src/activityVisualCatalog.ts', import.meta.url), 'utf8');
 
@@ -29,11 +29,10 @@ test('el color elegido continúa formando parte del borrador guardado', async ()
 test('usa el control numérico compartido y conserva los afijos de cada modalidad', async () => {
   const [activityEditor, numberInput] = await Promise.all([source, numberInputSource]);
 
-  assert.match(activityEditor, /<NumberInput suffix="%" name="clubSharePercentage" min="0" max="100"/);
-  assert.match(activityEditor, /<NumberInput prefix=\{money\} name="fixedClubFee" min="0"/);
-  assert.match(activityEditor, /const money=currencySymbol\(currency\)/);
-  assert.match(numberInput, /prefix\?: string/);
-  assert.match(numberInput, /suffix\?: string/);
+  assert.match(activityEditor, /<FormattedValueInput kind="percent" name="clubSharePercentage"/);
+  assert.match(activityEditor, /<FormattedValueInput kind="money" currency=\{currency\} name="fixedClubFee"/);
+  assert.match(numberInput, /Intl\.NumberFormat\('es-AR'/);
+  assert.match(numberInput, /setCustomValidity\(error\)/);
 });
 
 test('cada rama guardada limpia los valores incompatibles de la unión', async () => {
