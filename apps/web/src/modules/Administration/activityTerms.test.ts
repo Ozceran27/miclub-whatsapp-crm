@@ -17,5 +17,8 @@ void test('al editar conserva moneda y frecuencia cargadas', () => {
   const source = readFileSync(new URL('./ActivityCreateEditModal.tsx', import.meta.url), 'utf8');
   assert.match(source, /useState<'ARS'\|'USD'\|'BRL'\|'EUR'>\(\(activity\?\.currencyCode/);
   assert.match(source, /name="currencyCode" value=\{currency\}/);
-  assert.match(source, /name="fixedFeeFrequency" defaultValue=\{activity\?\.fixedFeeFrequency \?\? 'MONTHLY'\}/);
+  assert.match(source, /name="fixedFeeFrequency" defaultValue=\{latestTerm\?\.fixedFeeFrequency\?\?activity\?\.fixedFeeFrequency\?\?'MONTHLY'\}/);
+  assert.match(source, /getActivityTermHistory\(activityId/);
+  assert.match(source, /Programar nuevas condiciones/);
+  assert.match(source, /includeTerms=!activity\|\|editTerms/);
 });

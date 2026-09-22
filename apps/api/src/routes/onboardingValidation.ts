@@ -72,13 +72,14 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
   const sectorIds = new Set(draft.sectors.map((sector) => sector.clientId));
   const workerIds = new Set(draft.workers.map((worker) => worker.clientId));
   if (!draft.activities.every((activity) =>
-    !Object.keys(activity).some((key) => !["clientId","sectorClientId","responsibleWorkerClientId","instructorClientId","name","iconKey","color","status","settlementMode","fixedClubFee","fixedFeeFrequency","currencyCode","clubSharePercentage"].includes(key))
+    !Object.keys(activity).some((key) => !["clientId","sectorClientId","responsibleWorkerClientId","instructorClientId","name","iconKey","color","status","generatesEnrollments","settlementMode","fixedClubFee","fixedFeeFrequency","currencyCode","clubSharePercentage"].includes(key))
     && typeof activity.name === "string" && Boolean(activity.name.trim())
     && isActivityIconKey(activity.iconKey)
     && typeof activity.color === "string" && /^#[0-9a-f]{6}$/i.test(activity.color)
     && typeof activity.sectorClientId === "string" && sectorIds.has(activity.sectorClientId)
     && typeof (activity.responsibleWorkerClientId ?? activity.instructorClientId) === "string"
     && workerIds.has((activity.responsibleWorkerClientId ?? activity.instructorClientId) as string)
+    && typeof activity.generatesEnrollments === "boolean"
     && ["FIXED", "VARIABLE"].includes(String(activity.settlementMode))
     && (activity.settlementMode === "VARIABLE" ? activity.fixedClubFee === null && activity.fixedFeeFrequency === null && activity.currencyCode === null && finiteNonNegative(activity.clubSharePercentage) && activity.clubSharePercentage <= 100 : activity.clubSharePercentage === null && finiteNonNegative(activity.fixedClubFee) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.fixedFeeFrequency)) && SUPPORTED_OPERATIONAL_CURRENCIES.includes(activity.currencyCode as never))
     && ["active", "inactive"].includes(String(activity.status)))) return false;

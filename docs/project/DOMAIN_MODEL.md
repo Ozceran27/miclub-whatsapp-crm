@@ -13,9 +13,9 @@
 
 Sector es tenant, con UUID, metadata visual, capacidad ENROLLMENTS/INCOME, estado y archivo. Administración/administracion, Tesorería/tesoreria y Áreas Comunes/areas-comunes son system. sector_templates es catálogo global de 30 plantillas. Alta desde plantilla en Administración y draft libre en onboarding son caminos diferentes.
 
-Employee/Worker relaciona Person, User y membership. Tiene remuneración fija opcional (has_fixed_compensation, amount, frequency, currency), no un porcentaje VARIABLE personal. Instructor tiene relación propia con Person; las actividades lo referencian. Invitaciones de 72 horas para identidades existentes se modelan aparte; entrega/sincronización pendientes (C02).
+Employee/Worker relaciona Person, User y membership. Tiene remuneración fija opcional; `employee_compensation_terms` versiona monto, frecuencia, moneda y vigencia. `employees.updated_at` se expone como versión opaca para concurrencia, sin usar la fecha presentada al usuario. Instructor tiene relación propia con Person; las actividades lo referencian. Invitaciones de 72 horas para identidades existentes se modelan aparte; entrega/sincronización pendientes (C02).
 
-Activity relaciona club, sector e instructor/responsable según estado/validación. Activity Terms versiona VARIABLE (share del club) o FIXED (monto, frecuencia, moneda), con vigencia y continuidad. monthly_fee/comisiones antiguas no son autoridad de liquidación moderna.
+Activity relaciona club, sector y trabajador responsable. `generates_enrollments` controla únicamente la admisión de nuevas inscripciones. Activity Terms versiona VARIABLE (share del club) o FIXED (monto, frecuencia, moneda), receptor económico, vigencia y continuidad; puede contener cambios futuros programados. `monthly_fee` y comisiones antiguas no son autoridad de liquidación moderna. La rentabilidad operativa anual se deriva de movimientos completados vinculados por `activity_id`, clasificación canónica y valoración FX a la fecha.
 
 Movement es hecho financiero con categoría, sector/actividad, persona/contraparte, medio de pago, origen y estados operacional/financiero. Enrollment relaciona Person con Activity; sector/instructor se derivan. Conserva estado, fee, fechas, override, UUID y secuencia tenant. Receivable, Payment y payment_allocations son objetos diferentes; las rutas de pagos inspeccionadas son lecturas.
 

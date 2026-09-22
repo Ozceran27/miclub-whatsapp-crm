@@ -79,6 +79,26 @@ Bajo `/api/economy`: summary, evolution, by-sector, rankings, categories, paymen
 - `/api/administration/summary`
 - `/api/administration/workers`
 
+`GET /api/administration/workers` devuelve un `version` opaco por trabajador.
+`PUT /api/administration/workers/:id` y `DELETE /api/administration/workers/:id`
+lo exigen y lo comparan en PostgreSQL sin normalizar el timestamp en JavaScript.
+Una colisión real devuelve `409 OPTIMISTIC_CONCURRENCY_CONFLICT`; un esquema sin
+`employees` devuelve `503 WORKER_MODEL_NOT_APPLIED`. La mutación admite
+`removePhoto: true`, aplicado atómicamente al guardar.
+
+Las mutaciones de actividades requieren `generatesEnrollments: boolean`.
+`POST /api/activities` exige además `settlement` con `effectiveFrom`;
+`PATCH /api/activities/:id` puede omitir `settlement` para una edición operativa.
+Enviar un receptor económico sin nuevas condiciones es inválido.
+`GET /api/administration/activities/:id/terms` devuelve todas las versiones con fase
+`FUTURE`, `CURRENT` o `HISTORICAL` según la fecha local del club.
+
+`GET /api/actividades` agrega `annualOperatingProfitability`,
+`annualOperatingProfitabilityYear`, `annualOperatingMovements`,
+`operatingCurrencyCode` y estado `AVAILABLE`, `NO_MOVEMENTS` o
+`INCOMPLETE_EXCHANGE_RATE`. La definición financiera coincide con la documentada
+en `BUSINESS_RULES.md`.
+
 `GET /api/sectores` excluye archivados y agrega por sector
 `annualOperatingProfitability`, `annualOperatingProfitabilityStatus`,
 `annualOperatingProfitabilityYear` y `operatingCurrencyCode`. El importe
@@ -100,6 +120,7 @@ Además mutaciones de sectors, activities, tasks, requests, movements y enrollme
 El inventario vigente documenta:
 
 - `updatedAt` en mutaciones con control optimista;
+- `version` opaca en edición y archivado de trabajadores;
 - `Idempotency-Key` al crear movimientos.
 
 No uniformar nombres sin revisar el handler: inscripciones usa expectedUpdatedAt; tareas/sectores usan updatedAt; onboarding usa clave dentro del draft. Parte de los DTO permanece local a repositories; otras respuestas son registros normalizados genéricos.

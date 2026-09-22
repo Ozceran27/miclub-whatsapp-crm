@@ -87,6 +87,7 @@ export type ActivityFeeFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; responsibleWorkerClientId?: string | null; /** @deprecated v2 draft compatibility */ instructorClientId?: string | null; name: string; iconKey: string; color: string;
   status: "active" | "inactive";
+  generatesEnrollments: boolean;
 } & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; currencyCode: OperationalCurrency; clubSharePercentage: null }
   | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; currencyCode: null; clubSharePercentage: number });
 /** Complete, client-owned draft. No field in this object is persisted before completion. */

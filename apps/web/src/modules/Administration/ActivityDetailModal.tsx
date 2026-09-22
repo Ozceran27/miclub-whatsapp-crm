@@ -1,67 +1,48 @@
-import type { AdministrationActivityDto, AdministrationEnrollmentDto, AdministrationMovementDto } from '@miclub/shared';
-import { useEffect, useId, useRef, useState } from 'react';
+import { getActivityVisual, type AdministrationActivityDto, type AdministrationEnrollmentDto, type AdministrationMovementDto } from '@miclub/shared';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { getActivityEnrollments, getActivityMovements, getActivityTermHistory, type ActivityTermHistoryItem } from '../../services/api/administrationApi';
-import { describeActivityTerms } from './activityTerms';
+import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
+import { activityStatusLabel, describeActivityTerms, formatActivityDate, formatActivityProfitability, formatFrequency, formatMoney, formatPercentage } from './activityPresentation';
 
-type Props = { activity: AdministrationActivityDto; onClose: () => void };
-const focusable = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
-const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
-const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-const displayDate = (value?: string | null) => value ? dateTime.format(new Date(value)) : 'Sin registro';
+type Props = {
+  activity: AdministrationActivityDto; canEdit: boolean; canArchive: boolean; busy: boolean;
+  onClose: () => void; onEdit: () => void; onStatus: () => Promise<void>; onArchive: () => Promise<void>;
+};
 const displayStatus = (value?: string | null) => value?.replaceAll('_', ' ').toLocaleLowerCase('es-AR') || 'Sin estado';
+const termValue=(term:ActivityTermHistoryItem)=>term.mode==='FIXED'?`${formatMoney(term.fixedClubFee??0,term.currencyCode??'ARS')} · ${formatFrequency(term.fixedFeeFrequency)}`:`${formatPercentage(term.clubSharePercentage??0)} para el club`;
 
-export function ActivityDetailModal({ activity, onClose }: Props) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
+export function ActivityDetailModal({ activity, canEdit, canArchive, busy, onClose, onEdit, onStatus, onArchive }: Props) {
   const [enrollments, setEnrollments] = useState<AdministrationEnrollmentDto[]>([]);
   const [movements, setMovements] = useState<AdministrationMovementDto[]>([]);
   const [terms,setTerms]=useState<ActivityTermHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadState,setLoadState]=useState({enrollments:'loading',movements:'loading',terms:'loading'} as Record<'enrollments'|'movements'|'terms','loading'|'ready'|'error'>);
+  const [loadErrors,setLoadErrors]=useState<Partial<Record<'enrollments'|'movements'|'terms',string>>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
+  const visual=getActivityVisual(activity.iconKey);
+  const color=activity.color||'#2563EB';
+  const futureTerms=terms.filter(term=>term.phase==='FUTURE');
+  const pastAndCurrentTerms=terms.filter(term=>term.phase!=='FUTURE');
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([getActivityEnrollments(activity.id, controller.signal), getActivityMovements(activity.id, controller.signal),getActivityTermHistory(activity.id,controller.signal)])
-      .then(([enrollmentResponse, movementResponse,termResponse]) => { setEnrollments(enrollmentResponse.items); setMovements(movementResponse.items);setTerms(termResponse.items); })
-      .catch((loadError) => { if (!controller.signal.aborted) setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el detalle relacionado.'); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    const loadPart=<K extends 'enrollments'|'movements'|'terms'>(key:K,request:Promise<{items:K extends 'enrollments'?AdministrationEnrollmentDto[]:K extends 'movements'?AdministrationMovementDto[]:ActivityTermHistoryItem[]}>,save:(items:never[])=>void)=>request.then(response=>{if(!controller.signal.aborted){save(response.items as never[]);setLoadState(current=>({...current,[key]:'ready'}));}}).catch(reason=>{if(!controller.signal.aborted){setLoadState(current=>({...current,[key]:'error'}));setLoadErrors(current=>({...current,[key]:reason instanceof Error?reason.message:'No se pudo cargar esta sección.'}));}});
+    void loadPart('enrollments',getActivityEnrollments(activity.id,controller.signal),items=>setEnrollments(items as AdministrationEnrollmentDto[]));
+    void loadPart('movements',getActivityMovements(activity.id,controller.signal),items=>setMovements(items as AdministrationMovementDto[]));
+    void loadPart('terms',getActivityTermHistory(activity.id,controller.signal),items=>setTerms(items as ActivityTermHistoryItem[]));
     return () => controller.abort();
   }, [activity.id]);
 
-  useEffect(() => {
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const dialog = dialogRef.current;
-    dialog?.querySelector<HTMLElement>(focusable)?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
-      if (event.key !== 'Tab' || !dialog) return;
-      const elements = Array.from(dialog.querySelectorAll<HTMLElement>(focusable));
-      if (!elements.length) { event.preventDefault(); dialog.focus(); return; }
-      const first = elements[0]; const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', onKeyDown); previouslyFocused?.focus(); };
-  }, [onClose]);
-
-  const mode = activity.settlementMode?.toLowerCase();
-  const settlement = mode === 'fixed' ? 'Fijo' : mode === 'variable' ? 'Variable por porcentaje' : 'Sin términos vigentes';
-  const settlementValue = mode === 'fixed' || mode === 'variable' ? describeActivityTerms(activity) : 'No aplica';
-
-  return <div className="sector-modal__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="sector-modal activity-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={dialogRef} tabIndex={-1}>
-    <header className="sector-modal__header"><div><p className="eyebrow">Detalle de actividad</p><h2 id={titleId}>{activity.name}</h2><p id={descriptionId}>Información operativa y financiera de solo lectura.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${activity.name}`}>×</button></header>
-    <section aria-labelledby={`${titleId}-general`}><h3 id={`${titleId}-general`}>Actividad</h3><dl className="sector-modal__facts">
-      <div><dt>Sector</dt><dd>{activity.sectorName || 'Sin sector'}</dd></div><div><dt>Responsable operativo</dt><dd>{activity.responsibleEmployeeName || activity.instructorName || 'Sin asignar'}</dd></div><div><dt>Receptor económico</dt><dd>{activity.responsiblePersonName || activity.responsibleEmployeeName || 'Sin asignar'}</dd></div><div><dt>Estado</dt><dd>{displayStatus(activity.status)}</dd></div>
-      <div><dt>Modalidad de liquidación</dt><dd>{settlement}</dd></div><div><dt>Vigencia actual</dt><dd>{activity.termsEffectiveFrom || 'Sin definir'} — {activity.termsEffectiveTo || 'vigente'}</dd></div><div><dt>Cuota de inscripción (legado)</dt><dd>{activity.enrollmentFee == null ? 'No configurada' : money.format(activity.enrollmentFee)}</dd></div><div><dt>Valor de liquidación</dt><dd>{settlementValue}</dd></div>
-    </dl></section>
-    <section aria-labelledby={`${titleId}-terms`}><h3 id={`${titleId}-terms`}>Historia económica <span>{terms.length}</span></h3>{terms.length?<ul className="sector-modal__items">{terms.map(term=><li key={term.id}><div><strong>{term.mode==='FIXED'?`${term.currencyCode??''} ${term.fixedClubFee??0} · ${term.fixedFeeFrequency}`:`Club ${term.clubSharePercentage??0}%`}</strong><small>{term.effectiveFrom} — {term.effectiveTo||'vigente'} · receptor {term.responsiblePersonName||'pendiente de revisión'}</small></div><span>v{term.revision}</span></li>)}</ul>:<p>No hay términos económicos disponibles.</p>}</section>
-    <section aria-labelledby={`${titleId}-enrollments`}><h3 id={`${titleId}-enrollments`}>Inscriptos <span>{enrollments.length}</span></h3>{loading ? <p role="status">Cargando inscriptos y movimientos…</p> : enrollments.length ? <ul className="sector-modal__items">{enrollments.map((item) => <li key={item.id}><div><strong>{item.displayName || `${item.firstName || ''} ${item.lastName || ''}`.trim() || 'Persona sin nombre'}</strong><small>{displayStatus(item.status)} · Vence {item.dueDate ? displayDate(item.dueDate) : 'sin fecha'}</small></div><span>{money.format(item.feeAmount)}</span></li>)}</ul> : <p>No hay inscriptos asociados.</p>}</section>
-    <section aria-labelledby={`${titleId}-movements`}><h3 id={`${titleId}-movements`}>Movimientos asociados <span>{movements.length}</span></h3>{!loading && (movements.length ? <ul className="sector-modal__items">{movements.map((item) => <li key={item.id}><div><strong>{item.concept || item.category || 'Sin concepto'}</strong><small>{displayDate(item.date)} · {displayStatus(item.status)}</small></div><span className={item.type === 'EGRESOS' ? 'sector-modal__amount--expense' : ''}>{money.format(item.amount)}</span></li>)}</ul> : <p>No hay movimientos asociados directamente a esta actividad.</p>)}{error && <p className="sector-modal__error" role="alert">{error}</p>}</section>
-    <section aria-labelledby={`${titleId}-audit`}><h3 id={`${titleId}-audit`}>Auditoría</h3><dl className="sector-modal__facts activity-modal__audit"><div><dt>Creada</dt><dd>{displayDate(activity.createdAt)}</dd></div><div><dt>Última actualización</dt><dd>{displayDate(activity.updatedAt)}</dd></div><div><dt>Identificador</dt><dd><code>{activity.id}</code></dd></div></dl></section>
-    <p className="activity-modal__notice" role="note">Este detalle es de solo lectura. Abrirlo no genera movimientos automáticos.</p>
-  </div></div>;
+  const run=async(action:()=>Promise<void>)=>{setActionError(null);try{await action();}catch(reason){setActionError(reason instanceof Error?reason.message:'No se pudo modificar la actividad.');}};
+  return <ConfigurationEditorModal size="large" eyebrow="Ficha de actividad" title={activity.name} description="Resumen operativo, económico y trazabilidad de la actividad." busy={busy} onClose={onClose}
+    footer={<>{canArchive&&<button className="danger-btn activity-detail__archive" type="button" disabled={busy} onClick={()=>void run(onArchive)}>Archivar actividad</button>}<button className="ghost-btn" type="button" disabled={busy} onClick={onClose}>Cerrar</button>{canEdit&&<button className="ghost-btn" type="button" disabled={busy} onClick={()=>void run(onStatus)}>{activity.status==='active'?'Desactivar':'Activar'}</button>}{canEdit&&<button className="primary-btn" type="button" disabled={busy} onClick={onEdit}>Editar actividad</button>}</>}>
+    <div className="activity-detail__hero" style={{'--activity-color':color} as CSSProperties}><span className="activity-detail__icon" aria-hidden="true">{visual.glyph}</span><div><strong>{activity.name}</strong><span>{activity.modality||'Sin modalidad operativa'} · {activity.sectorName||'Sin sector'}</span></div><span className="activity-list__status" data-active={activity.status==='active'}>{activityStatusLabel(activity.status)}</span></div>
+    <section className="activity-detail__summary" aria-label="Resumen de actividad"><div><small>Responsable operativo</small><strong>{activity.responsibleEmployeeName||activity.instructorName||'Sin asignar'}</strong></div><div><small>Receptor económico</small><strong>{activity.responsiblePersonName||activity.responsibleEmployeeName||'Sin asignar'}</strong></div><div><small>Inscripciones</small><strong>{activity.generatesEnrollments?'Habilitadas':'No habilitadas'}</strong><span>{activity.currentEnrollments??0} activas</span></div><div><small>Rentabilidad operativa {activity.annualOperatingProfitabilityYear??''}</small><strong data-negative={(activity.annualOperatingProfitability??0)<0}>{formatActivityProfitability(activity)}</strong><span>{activity.annualOperatingMovements??0} movimientos</span></div><div><small>Color</small><strong className="activity-detail__color"><i style={{backgroundColor:color}}/>{color.toUpperCase()}</strong></div></section>
+    <section className="activity-detail__terms"><div><p className="eyebrow">Condiciones vigentes</p><h4>{describeActivityTerms(activity)}</h4><span>{activity.termsEffectiveFrom?`Desde ${formatActivityDate(activity.termsEffectiveFrom)}`:'Sin vigencia actual'}{activity.termsEffectiveTo?` hasta ${formatActivityDate(activity.termsEffectiveTo)}`:''}</span></div><div><small>Modalidad</small><strong>{activity.settlementMode?.toUpperCase()==='FIXED'?'Monto fijo':'Porcentaje del club'}</strong></div></section>
+    {loadState.terms==='ready'&&futureTerms.length>0&&<section className="activity-detail__section activity-detail__section--future"><header><div><h4>Próximas vigencias</h4><p>Cambios programados que todavía no están activos.</p></div><span>{futureTerms.length}</span></header><ol className="activity-detail__timeline">{futureTerms.map(term=><li key={term.id}><i/><div><strong>{termValue(term)}</strong><small>Desde {formatActivityDate(term.effectiveFrom)} · {term.responsiblePersonName||'receptor automático'}</small></div><span>v{term.revision}</span></li>)}</ol></section>}
+    <section className="activity-detail__section"><header><div><h4>Historia económica</h4><p>La condición vigente y las versiones anteriores permanecen intactas.</p></div><span>{pastAndCurrentTerms.length}</span></header>{loadState.terms==='loading'?<p role="status">Cargando vigencias…</p>:loadState.terms==='error'?<p className="activity-form__error" role="alert">{loadErrors.terms}</p>:pastAndCurrentTerms.length?<ol className="activity-detail__timeline">{pastAndCurrentTerms.map(term=><li key={term.id} data-current={term.phase==='CURRENT'}><i/><div><strong>{termValue(term)}</strong><small>{formatActivityDate(term.effectiveFrom)} — {term.effectiveTo?formatActivityDate(term.effectiveTo):'vigente'} · {term.responsiblePersonName||'receptor automático'}</small></div><span>v{term.revision}</span></li>)}</ol>:<p className="activity-detail__empty">No hay términos económicos disponibles.</p>}</section>
+    <div className="activity-detail__related"><section className="activity-detail__section"><header><div><h4>Inscriptos</h4><p>Personas vinculadas a la actividad.</p></div><span>{enrollments.length}</span></header>{loadState.enrollments==='loading'?<p role="status">Cargando inscriptos…</p>:loadState.enrollments==='error'?<p className="activity-form__error" role="alert">{loadErrors.enrollments}</p>:enrollments.length?<ul className="sector-modal__items">{enrollments.map(item=><li key={item.id}><div><strong>{item.displayName||`${item.firstName||''} ${item.lastName||''}`.trim()||'Persona sin nombre'}</strong><small>{displayStatus(item.status)} · vence {item.dueDate?formatActivityDate(item.dueDate):'sin fecha'}</small></div><span>{formatMoney(item.feeAmount)}</span></li>)}</ul>:<p className="activity-detail__empty">No hay inscriptos asociados.</p>}</section>
+      <section className="activity-detail__section"><header><div><h4>Movimientos asociados</h4><p>Impacto financiero directo.</p></div><span>{movements.length}</span></header>{loadState.movements==='loading'?<p role="status">Cargando movimientos…</p>:loadState.movements==='error'?<p className="activity-form__error" role="alert">{loadErrors.movements}</p>:movements.length?<ul className="sector-modal__items">{movements.map(item=><li key={item.id}><div><strong>{item.concept||item.category||'Sin concepto'}</strong><small>{formatActivityDate(item.date)} · {displayStatus(item.status)}</small></div><span className={item.type==='EGRESOS'?'sector-modal__amount--expense':''}>{formatMoney(item.amount)}</span></li>)}</ul>:<p className="activity-detail__empty">No hay movimientos asociados.</p>}</section></div>
+    <section className="activity-detail__audit"><small>Creada {formatActivityDate(activity.createdAt)}</small><small>Actualizada {formatActivityDate(activity.updatedAt)}</small><code>{activity.id}</code></section>
+    {actionError&&<p className="activity-form__error" role="alert">{actionError}</p>}
+  </ConfigurationEditorModal>;
 }

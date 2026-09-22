@@ -25,7 +25,7 @@ export function WorkerList() {
   const [response, setResponse] = useState<AdministrationWorkersResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedWorker, setSelectedWorker] = useState<AdministrationWorkerDto | null>(null);
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -47,24 +47,27 @@ export function WorkerList() {
   }, [load]);
 
   useEffect(() => {
-    const openCreation = () => { if (canManage) setCreating(true); };
+    const openCreation = () => { if (canManage && response?.dataSource !== 'legacy') setCreating(true); };
     window.addEventListener('miclub:create-worker', openCreation);
     return () => window.removeEventListener('miclub:create-worker', openCreation);
-  }, [canManage]);
+  }, [canManage, response?.dataSource]);
 
   const workers = response?.items ?? [];
+  const selectedWorker=workers.find(worker=>worker.id===selectedWorkerId)??null;
+  const mutationsAvailable=response?.dataSource!=='legacy';
   return (
     <section className="section-panel worker-list" aria-labelledby="worker-list-title" aria-busy={loading}>
       <div className="section-header worker-list__header">
         <div><p className="eyebrow">Equipo</p><h3 id="worker-list-title">Trabajadores</h3><p>{response ? `${response.total} integrantes` : 'Información laboral y acceso al sistema.'}</p></div>
-        <div>{canManage && <button className="primary-btn" type="button" onClick={() => setCreating(true)}>Nuevo trabajador</button>} <button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar equipo'}</button></div>
+        <div>{canManage && response?.dataSource !== 'legacy' && <button className="primary-btn" type="button" onClick={() => setCreating(true)}>Nuevo trabajador</button>} <button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>{loading ? 'Actualizando…' : 'Actualizar equipo'}</button></div>
       </div>
       {response?.limitations.map((limitation) => <p className="worker-list__notice" key={limitation}>{limitation}</p>)}
       {error && <div className="sector-list__state sector-list__state--error" role="alert"><span>{error}</span><button type="button" onClick={() => void load()}>Reintentar</button></div>}
       {!error && loading && workers.length === 0 && <p className="sector-list__state" role="status">Cargando trabajadores…</p>}
       {!error && !loading && workers.length === 0 && <p className="sector-list__state">Todavía no hay trabajadores registrados.</p>}
-      {workers.length > 0 && <div className="worker-list__table-wrap"><table className="worker-list__table"><thead><tr><th>Nombre</th><th>Rol</th><th>Sector</th><th>Remuneración</th><th>Estado</th><th>Acceso al sistema</th><th>Fecha de ingreso</th></tr></thead><tbody>{workers.map((worker) => <tr className="worker-list__row" key={worker.id} tabIndex={0} role="button" aria-label={`Ver ficha de ${worker.displayName}`} onClick={() => setSelectedWorker(worker)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedWorker(worker); } }}><td><strong>{worker.displayName}</strong></td><td>{worker.role || 'Sin asignar'}</td><td>{worker.sector || 'Sin asignar'}</td><td>{compensation(worker)}</td><td><span className="worker-list__badge" data-active={worker.isActive}>{statusLabel(worker.status)}</span></td><td><span className="worker-list__badge" data-active={worker.systemAccess}>{worker.systemAccess ? 'Habilitado' : 'Sin acceso'}</span></td><td>{startDate(worker)}</td></tr>)}</tbody></table></div>}
-      {canManage && creating && <WorkerDetailModal onClose={() => setCreating(false)} onSave={async input => { await createAdministrationWorker(input); await load(); }}/>} {selectedWorker && <WorkerDetailModal worker={selectedWorker} onClose={() => setSelectedWorker(null)} onSave={canManage ? async input => { await updateAdministrationWorker(selectedWorker.id,input); await load(); } : undefined} onArchive={canManage ? async()=>{await archiveAdministrationWorker(selectedWorker.id);await load();} : undefined} />}
+      {workers.length > 0 && <div className="worker-list__table-wrap"><table className="worker-list__table"><thead><tr><th>Nombre</th><th>Rol</th><th>Sector</th><th>Remuneración</th><th>Estado</th><th>Acceso al sistema</th><th>Fecha de ingreso</th></tr></thead><tbody>{workers.map((worker) => <tr className="worker-list__row" key={worker.id} tabIndex={0} role="button" aria-label={`Ver ficha de ${worker.displayName}`} onClick={() => setSelectedWorkerId(worker.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedWorkerId(worker.id); } }}><td><strong>{worker.displayName}</strong></td><td>{worker.role || 'Sin asignar'}</td><td>{worker.sector || 'Sin asignar'}</td><td>{compensation(worker)}</td><td><span className="worker-list__badge" data-active={worker.isActive}>{statusLabel(worker.status)}</span></td><td><span className="worker-list__badge" data-active={worker.systemAccess}>{worker.systemAccess ? 'Habilitado' : 'Sin acceso'}</span></td><td>{startDate(worker)}</td></tr>)}</tbody></table></div>}
+      {canManage&&mutationsAvailable&&creating&&<WorkerDetailModal onClose={()=>setCreating(false)} onSave={async input=>{await createAdministrationWorker(input);await load();}}/>}
+      {selectedWorker&&<WorkerDetailModal key={`${selectedWorker.id}:${selectedWorker.version}`} worker={selectedWorker} onClose={()=>setSelectedWorkerId(null)} onReload={async()=>{await load();}} onSave={canManage&&mutationsAvailable?async input=>{await updateAdministrationWorker(selectedWorker.id,input);await load();}:undefined} onArchive={canManage&&mutationsAvailable?async()=>{await archiveAdministrationWorker(selectedWorker.id,selectedWorker.version);await load();setSelectedWorkerId(null);}:undefined}/>}
     </section>
   );
 }

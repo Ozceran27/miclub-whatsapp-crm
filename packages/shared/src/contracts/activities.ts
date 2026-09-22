@@ -22,7 +22,10 @@ export interface ActivityMutationContract {
   color?: string | null;
   iconKey?: string | null;
   maxCapacity?: number | null;
+  /** Explicit operational decision. There is deliberately no implicit default in write contracts. */
+  generatesEnrollments: boolean;
   status?: "active" | "inactive";
   notes?: string | null;
-  settlement: ActivitySettlementMutation;
+  /** Required on create; omitted on operational-only updates. */
+  settlement?: ActivitySettlementMutation;
 }

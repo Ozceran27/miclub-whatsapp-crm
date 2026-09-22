@@ -1,5 +1,37 @@
 # Current State
 
+## Trabajadores y actividades: edición, vigencias y rentabilidad — 2026-09-22
+
+La edición de trabajadores usa ahora un token opaco `version`, obtenido sin
+reducir la precisión de `employees.updated_at`. PostgreSQL compara ese token
+dentro de la misma transacción que bloquea la fila; sólo una desigualdad real
+produce `OPTIMISTIC_CONCURRENCY_CONFLICT`. El modal conserva los cambios ante el
+conflicto y permite recargar la ficha. La fotografía activa se elimina al guardar,
+no al pulsar el control del formulario, y los cambios de remuneración fija crean
+una vigencia nueva únicamente cuando cambian activación, importe, frecuencia o
+moneda. En instalaciones `legacy` sin `employees`, las mutaciones quedan
+deshabilitadas explícitamente.
+
+Las altas y ediciones de actividades requieren una decisión explícita sobre
+`generates_enrollments`; deshabilitarla bloquea altas futuras sin alterar
+inscripciones existentes. Las ediciones operativas no recrean términos
+económicos. Un cambio económico exige una nueva fecha, preserva la historia y el
+editor consulta también las vigencias futuras antes de proponer la siguiente.
+
+La lista y la ficha de actividad usan una presentación común para porcentajes,
+monedas, frecuencias, estados y fechas. Las acciones se concentran en la ficha,
+mientras la tabla expone identidad visual, responsables, inscripciones,
+condición económica y rentabilidad operativa anual. Esta última es ingresos
+menos egresos de categorías `OPERATIONAL`, movimientos `COMPLETADO` y
+`activity_id` explícito desde el inicio del año local; la conversión usa la última
+cotización oficial a la fecha de cada movimiento y devuelve “Sin cotización” si
+no puede producir un total homogéneo. La tabla y su ranking derivado consumen el
+mismo resultado.
+
+No se agregó migración: las columnas y tablas necesarias ya forman parte del
+modelo canónico. La auditoría de la base local sigue pendiente mientras
+`AUDIT_DATABASE_URL` no esté disponible.
+
 ## Alta de actividades y actor de auditoría — 2026-09-21
 
 El error PostgreSQL `23503` observado al crear una actividad provenía de una

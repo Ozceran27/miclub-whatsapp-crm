@@ -239,6 +239,11 @@ export interface AdministrationActivityDto {
   termsEffectiveFrom?: string | null;
   termsEffectiveTo?: string | null;
   generatesEnrollments: boolean;
+  annualOperatingProfitability?: number | null;
+  annualOperatingProfitabilityYear?: number;
+  annualOperatingProfitabilityStatus?: "AVAILABLE" | "NO_MOVEMENTS" | "INCOMPLETE_EXCHANGE_RATE";
+  annualOperatingMovements?: number;
+  operatingCurrencyCode?: string;
   maxCapacity?: number | null;
   currentEnrollments?: number | null;
   occupancyRate?: number | null;
@@ -274,6 +279,7 @@ export interface AdministrationWorkerDto {
   hasFixedCompensation: boolean;
   fixedCompensationAmount: number | null;
   fixedCompensationFrequency: FixedCompensationFrequency | null;
+  fixedCompensationEffectiveFrom?: string | null;
   currencyCode: import("./onboarding.js").OperationalCurrency | null;
   status: string;
   systemAccess: boolean;
@@ -289,10 +295,12 @@ export interface AdministrationWorkerDto {
   };
   createdAt: string;
   updatedAt: string;
+  /** Opaque concurrency token. It must be returned unchanged on update/archive. */
+  version: string;
 }
 
 export interface AdministrationWorkerMutationDto {
-  updatedAt?: string;
+  version?: string;
   firstName: string;
   lastName: string;
   dni: string;
@@ -312,6 +320,7 @@ export interface AdministrationWorkerMutationDto {
   employmentStartDate?: string | null;
   compensationEffectiveFrom?: string | null;
   photoFileId?: string | null;
+  removePhoto?: boolean;
   notes?: string | null;
 }
 

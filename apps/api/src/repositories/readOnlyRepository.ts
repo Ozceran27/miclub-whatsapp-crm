@@ -112,7 +112,39 @@ const listDefinitions = {
   },
   actividades: {
     sectorColumn: "a.sector_id",
-    from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join miclub.employees responsible_employee on responsible_employee.id=a.responsible_employee_id and responsible_employee.club_id=a.club_id left join miclub.people operational_responsible on operational_responsible.id=responsible_employee.person_id and operational_responsible.club_id=a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id",
+    from: `miclub.activities a
+      join miclub.clubs activity_club on activity_club.id=a.club_id
+      left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id
+      left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id
+      left join miclub.employees responsible_employee on responsible_employee.id=a.responsible_employee_id and responsible_employee.club_id=a.club_id
+      left join miclub.people operational_responsible on operational_responsible.id=responsible_employee.person_id and operational_responsible.club_id=a.club_id
+      left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id
+      left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and (now() at time zone coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires'))::date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true
+      left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id
+      left join lateral (
+        select case when count(movement.id)=0 then null
+          when count(*) filter (where coalesce(movement.currency_code,activity_club.base_currency_code)<>activity_club.base_currency_code and rate.id is null)>0 then null
+          else coalesce(sum((case when movement.movement_type='INGRESOS' then 1 else -1 end)*abs(case
+            when coalesce(movement.currency_code,activity_club.base_currency_code)=activity_club.base_currency_code then movement.amount
+            when rate.base_currency_code=movement.currency_code and rate.quote_currency_code=activity_club.base_currency_code then movement.amount*rate.rate
+            when rate.quote_currency_code=movement.currency_code and rate.base_currency_code=activity_club.base_currency_code then movement.amount/rate.rate end)),0) end amount,
+          count(movement.id)::integer movements,
+          case when count(movement.id)=0 then 'NO_MOVEMENTS'
+            when count(*) filter (where coalesce(movement.currency_code,activity_club.base_currency_code)<>activity_club.base_currency_code and rate.id is null)>0 then 'INCOMPLETE_EXCHANGE_RATE'
+            else 'AVAILABLE' end status
+        from miclub.movements movement
+        join miclub.movement_categories category on category.id=movement.category_id and category.club_id=movement.club_id
+        join miclub.category_catalog catalog on catalog.id=category.catalog_id
+        left join lateral (select exchange_rate.* from miclub.exchange_rates exchange_rate
+          where exchange_rate.rate_date<=movement.movement_date::date and exchange_rate.rate_type='official'
+            and ((exchange_rate.base_currency_code=movement.currency_code and exchange_rate.quote_currency_code=activity_club.base_currency_code)
+              or (exchange_rate.quote_currency_code=movement.currency_code and exchange_rate.base_currency_code=activity_club.base_currency_code))
+          order by exchange_rate.rate_date desc,exchange_rate.created_at desc limit 1) rate on movement.currency_code is distinct from activity_club.base_currency_code
+        where movement.club_id=a.club_id and movement.activity_id=a.id and movement.operational_status='COMPLETADO'
+          and movement.movement_type in ('INGRESOS','EGRESOS') and catalog.classification='OPERATIONAL'
+          and movement.movement_date>=make_timestamptz(extract(year from (now() at time zone coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires')))::integer,1,1,0,0,0,coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires'))
+          and movement.movement_date<now()
+      ) activity_profitability on true`,
     clubColumn: "a.club_id",
     select: `a.id, a.sector_id, s.name as sector_name, a.manager_person_id,
       nullif(trim(concat_ws(' ', manager.first_name, manager.last_name)), '') as manager_name, a.instructor_id,
@@ -121,6 +153,11 @@ const listDefinitions = {
       a.club_commission_percent, a.instructor_commission_percent, a.max_capacity,
       lower(terms.mode) as settlement_mode, terms.fixed_club_fee as settlement_fixed_amount, terms.fixed_fee_frequency, terms.currency_code,
       terms.club_share_percentage, terms.effective_from as terms_effective_from, terms.effective_to as terms_effective_to, a.generates_enrollments,
+      activity_profitability.amount::float8 as annual_operating_profitability,
+      activity_profitability.status as annual_operating_profitability_status,
+      activity_profitability.movements as annual_operating_movements,
+      extract(year from (now() at time zone coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires')))::integer as annual_operating_profitability_year,
+      activity_club.base_currency_code as operating_currency_code,
       (select count(*)::integer from miclub.enrollments e where e.club_id = a.club_id
         and e.activity_id = a.id and e.status in ('al_dia', 'nuevo_inscripto', 'adeudando')) as current_enrollments,
       a.status, a.notes, a.created_at, a.updated_at`,
@@ -202,7 +239,7 @@ export const readOnlyResources = Object.keys(listDefinitions) as ReadOnlyResourc
 
 const legacyActivityDefinition = (): ListDefinition => ({
   ...listDefinitions.actividades,
-  from: "miclub.activities a left join miclub.sectors s on s.id = a.sector_id and s.club_id = a.club_id left join miclub.instructors i on i.id = a.instructor_id and i.club_id = a.club_id left join lateral (select e.id,e.person_id from miclub.employees e where e.person_id=i.person_id and e.club_id=a.club_id and e.archived_at is null order by e.created_at,e.id limit 1) responsible_employee on true left join miclub.people operational_responsible on operational_responsible.id=responsible_employee.person_id and operational_responsible.club_id=a.club_id left join miclub.people manager on manager.id = a.manager_person_id and manager.club_id = a.club_id left join lateral (select t.mode, t.fixed_club_fee, t.fixed_fee_frequency, t.currency_code, t.club_share_percentage, t.responsible_person_id, t.effective_from, t.effective_to from miclub.activity_terms t where t.club_id=a.club_id and t.activity_id=a.id and current_date between t.effective_from and coalesce(t.effective_to, 'infinity'::date) order by t.effective_from desc limit 1) terms on true left join miclub.people responsible on responsible.id=terms.responsible_person_id and responsible.club_id=a.club_id",
+  from: listDefinitions.actividades.from.replace("left join miclub.employees responsible_employee on responsible_employee.id=a.responsible_employee_id and responsible_employee.club_id=a.club_id", "left join lateral (select e.id,e.person_id from miclub.employees e where e.person_id=i.person_id and e.club_id=a.club_id and e.archived_at is null order by e.created_at,e.id limit 1) responsible_employee on true"),
   select: listDefinitions.actividades.select.replace("a.responsible_employee_id", "responsible_employee.id as responsible_employee_id"),
 });
 

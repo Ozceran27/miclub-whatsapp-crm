@@ -69,3 +69,18 @@ void test('los badges pendientes y las condiciones económicas usan la presentac
   assert.match(styles, /\.administration-action-card__badge[\s\S]*font-weight: 500;[\s\S]*right:7px;[\s\S]*top:7px;/);
   assert.match(styles, /\.activity-terms__percentage \{ max-width:180px; \}/);
 });
+
+void test('la lista de actividades abre filas accesibles y concentra mutaciones en la ficha', () => {
+  const list = read('./ActivityList.tsx');
+  const detail = read('./ActivityDetailModal.tsx');
+  assert.match(list, /className="activity-list__row" tabIndex=\{0\} role="button"/);
+  assert.match(list, /event\.key==='Enter'\|\|event\.key===' '/);
+  assert.doesNotMatch(list, /<th>Acciones<\/th>/);
+  assert.match(detail, /Editar actividad/);
+  assert.match(detail, /Archivar actividad/);
+  assert.match(detail, /Desactivar':'Activar/);
+  assert.match(detail, /Próximas vigencias/);
+  assert.match(detail, /loadState\.enrollments==='error'/);
+  assert.match(detail, /loadState\.movements==='error'/);
+  assert.match(detail, /loadState\.terms==='error'/);
+});

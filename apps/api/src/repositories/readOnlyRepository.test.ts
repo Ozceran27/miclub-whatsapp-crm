@@ -87,6 +87,16 @@ void test("las actividades archivadas no reaparecen en el catálogo administrati
 
   assert.match(calls[1] ?? "", /a\.archived_at is null/);
   assert.match(calls[2] ?? "", /a\.archived_at is null/);
+  const query = calls[1] ?? "";
+  assert.match(query, /movement\.activity_id=a\.id/);
+  assert.match(query, /movement\.operational_status='COMPLETADO'/);
+  assert.match(query, /catalog\.classification='OPERATIONAL'/);
+  assert.match(query, /movement\.amount\*rate\.rate/);
+  assert.match(query, /movement\.amount\/rate\.rate/);
+  assert.match(query, /INCOMPLETE_EXCHANGE_RATE/);
+  assert.match(query, /NO_MOVEMENTS/);
+  assert.match(query, /make_timestamptz/);
+  assert.match(query, /activity_club\.base_currency_code as operating_currency_code/);
 });
 
 void test("actividades conserva lectura legacy mientras la migración de responsable está pendiente", async () => {

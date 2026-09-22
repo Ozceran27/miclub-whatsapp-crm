@@ -10,7 +10,7 @@ import { syncEmployeeCompensationTerm } from "../employeeCompensationService.js"
 
 export type WorkerActor = { userId: string; membershipId: string; clubId: string; requestId?: string; ip?: string; userAgent?: string };
 export class WorkerMutationError extends Error {
-  constructor(public readonly code: "invalid_input" | "conflict" | "dni_conflict" | "worker_exists" | "not_found" | "last_director" | "worker_has_activities" | "invitation_invalid", message: string) { super(message); }
+  constructor(public readonly code: "invalid_input" | "conflict" | "concurrency_conflict" | "dni_conflict" | "worker_exists" | "not_found" | "last_director" | "worker_has_activities" | "invitation_invalid" | "model_not_applied", message: string) { super(message); }
 }
 
 export type WorkerInvitationResult = { invitationPending: true };
@@ -39,6 +39,8 @@ export const validateWorkerMutation = (body: unknown, requirePassword: boolean):
   const validCurrency = SUPPORTED_OPERATIONAL_CURRENCIES.includes(currencyCode as never);
   const validFrequency = ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(frequency));
   if ((raw.hasFixedCompensation && (amount == null || !Number.isFinite(amount) || amount < 0 || !validFrequency || !validCurrency)) || (!raw.hasFixedCompensation && (amount !== null || frequency !== null || currencyCode !== null))) throw new WorkerMutationError("invalid_input", "La remuneración fija habilitada exige monto no negativo, frecuencia y moneda; deshabilitada exige los tres valores nulos.");
+  if (raw.removePhoto !== undefined && typeof raw.removePhoto !== "boolean") throw new WorkerMutationError("invalid_input", "removePhoto debe ser booleano.");
+  if (raw.removePhoto && raw.photoFileId) throw new WorkerMutationError("invalid_input", "No se puede reemplazar y eliminar la foto en la misma operación.");
   return { ...raw, firstName, lastName, dni, email: accessEmail, contactEmail, accessEmail, password: systemAccessEnabled ? raw.password : undefined, systemAccessEnabled, phone: cleanText(raw.phone) || null, role: raw.role, hasFixedCompensation: raw.hasFixedCompensation, fixedCompensationAmount: amount, fixedCompensationFrequency: frequency, currencyCode } as AdministrationWorkerMutationDto;
 };
 
@@ -46,6 +48,10 @@ const assertSectorBelongsToClub = async (db: QueryExecutor, clubId: string, sect
   if (!sectorId) return;
   const sector = await db.query(`select 1 from miclub.sectors where club_id=$1 and id=$2 and archived_at is null`, [clubId, sectorId]);
   if (!sector.rows[0]) throw new WorkerMutationError("invalid_input", "El sector seleccionado no pertenece al club o ya no está disponible.");
+};
+const assertWorkerModel = async (db: QueryExecutor) => {
+  const result = await db.query<{ employees: string | null }>("select to_regclass('miclub.employees')::text employees");
+  if (!result.rows[0]?.employees) throw new WorkerMutationError("model_not_applied", "El modelo de trabajadores todavía no fue aplicado en PostgreSQL.");
 };
 
 const audit = (executor: QueryExecutor, actor: WorkerActor, action: string, id: string, oldData: Record<string, unknown> | null, newData: Record<string, unknown> | null) => auditService.sensitiveChange({
@@ -58,6 +64,10 @@ const attachPhoto = async (db: QueryExecutor, actor: WorkerActor, employeeId: st
   if (!photo.rows[0]) throw new WorkerMutationError('invalid_input','La foto temporal no existe, expiró o no pertenece al club.');
   await db.query(`update miclub.employee_photos set status='deleted',deleted_at=now(),updated_at=now() where club_id=$1 and employee_id=$2 and id<>$3 and status='active'`, [actor.clubId, employeeId, fileId]);
 };
+const applyPhotoMutation = async (db: QueryExecutor, actor: WorkerActor, employeeId: string, input: Pick<AdministrationWorkerMutationDto, "photoFileId" | "removePhoto">) => {
+  if (input.removePhoto) await db.query(`update miclub.employee_photos set status='deleted',deleted_at=now(),updated_at=now() where club_id=$1 and employee_id=$2 and status='active' and deleted_at is null`, [actor.clubId, employeeId]);
+  await attachPhoto(db, actor, employeeId, input.photoFileId);
+};
 const reservePhotoForInvitation = async (db: QueryExecutor, actor: WorkerActor, fileId: string | null | undefined, expiresAt: Date) => {
   if (!fileId) return;
   const photo = await db.query(`update miclub.employee_photos set expires_at=$3,updated_at=now() where id=$1 and club_id=$2 and status='temporary' and expires_at>now() returning id`, [fileId, actor.clubId, expiresAt]);
@@ -67,6 +77,7 @@ const reservePhotoForInvitation = async (db: QueryExecutor, actor: WorkerActor, 
 export const createWorker = async (actor: WorkerActor, body: unknown): Promise<Record<string, unknown>> => {
   const input = validateWorkerMutation(body, false); const pool = await getPostgresPool();
   return withTenantTransaction(actor.clubId, async (db) => {
+    await assertWorkerModel(db);
     await assertSectorBelongsToClub(db, actor.clubId, input.sectorId);
     const personResult = await db.query<Record<string, unknown>>(`select * from miclub.people where club_id=$1 and normalized_dni=$2 for update`, [actor.clubId, input.dni]);
     let person = personResult.rows[0];
@@ -84,7 +95,7 @@ export const createWorker = async (actor: WorkerActor, body: unknown): Promise<R
       const employee = (await db.query<Record<string, unknown>>(`insert into miclub.employees(club_id,person_id,user_id,membership_id,sector_id,status,has_fixed_compensation,fixed_compensation_amount,fixed_compensation_frequency,currency_code,employment_start_date,position,notes,created_by,updated_by) values($1,$2,null,null,$3,'active',$4,$5,$6,$7,$8,$9,$10,$11,$11) returning *`, [actor.clubId, person.id, input.sectorId ?? null, input.hasFixedCompensation, input.fixedCompensationAmount, input.fixedCompensationFrequency, input.currencyCode, input.employmentStartDate ?? null, input.role, input.notes ?? null, actor.userId])).rows[0];
       if (input.role === "INSTRUCTOR") await db.query(`insert into miclub.instructors(club_id,person_id,display_name,status,notes) values($1,$2,$3,'activa',$4) on conflict (club_id,person_id) do update set display_name=excluded.display_name,status='activa',updated_at=now()`, [actor.clubId, person.id, `${input.firstName} ${input.lastName}`, input.notes ?? null]);
       await syncEmployeeCompensationTerm(db, actor, String(employee.id), input);
-      await attachPhoto(db, actor, String(employee.id), input.photoFileId);
+      await applyPhotoMutation(db, actor, String(employee.id), input);
       await audit(db, actor, "worker.create", String(employee.id), null, employee);
       return employee;
     }
@@ -115,7 +126,7 @@ export const createWorker = async (actor: WorkerActor, body: unknown): Promise<R
     const employee = (await db.query<Record<string, unknown>>(`insert into miclub.employees(club_id,person_id,user_id,membership_id,sector_id,status,has_fixed_compensation,fixed_compensation_amount,fixed_compensation_frequency,currency_code,employment_start_date,position,notes,created_by,updated_by) values($1,$2,$3,$4,$5,'active',$6,$7,$8,$9,$10,$11,$12,$13,$13) returning *`, [actor.clubId, person.id, user.id, membership.id, input.sectorId ?? null, input.hasFixedCompensation, input.fixedCompensationAmount, input.fixedCompensationFrequency, input.currencyCode, input.employmentStartDate ?? null, input.role, input.notes ?? null, actor.userId])).rows[0];
     if (input.role === "INSTRUCTOR") await db.query(`insert into miclub.instructors(club_id,person_id,display_name,status,notes) values($1,$2,$3,'activa',$4) on conflict (club_id,person_id) do update set status='activa',updated_at=now()`, [actor.clubId, person.id, `${input.firstName} ${input.lastName}`, input.notes ?? null]);
     await syncEmployeeCompensationTerm(db, actor, String(employee.id), input);
-    await attachPhoto(db, actor, String(employee.id), input.photoFileId);
+    await applyPhotoMutation(db, actor, String(employee.id), input);
     await audit(db, actor, "worker.create", String(employee.id), null, employee);
     return employee;
   }, pool);
@@ -173,11 +184,12 @@ export const resolveWorkerInvitationById=(userId:string,id:string,decision:'acce
 export const updateWorker = async (actor: WorkerActor, id: string, body: unknown) => {
   const input = validateWorkerMutation(body, false); const pool = await getPostgresPool();
   return withTenantTransaction(actor.clubId, async (db) => {
-    if (!input.updatedAt || Number.isNaN(Date.parse(input.updatedAt))) throw new WorkerMutationError("invalid_input", "La versión del trabajador es obligatoria para guardar cambios.");
+    await assertWorkerModel(db);
+    if (!input.version || Number.isNaN(Date.parse(input.version))) throw new WorkerMutationError("invalid_input", "La versión del trabajador es obligatoria para guardar cambios.");
     await assertSectorBelongsToClub(db, actor.clubId, input.sectorId);
-    const current = (await db.query<Record<string, unknown>>(`select e.*,coalesce(r.code,upper(e.position)) as role_code from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update of e`, [actor.clubId, id])).rows[0];
+    const current = (await db.query<Record<string, unknown>>(`select e.*,coalesce(r.code,upper(e.position)) as role_code,(e.updated_at=$3::timestamptz) version_matches from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update of e`, [actor.clubId, id, input.version])).rows[0];
     if (!current) throw new WorkerMutationError("not_found", "Trabajador inexistente.");
-    if (new Date(String(current.updated_at)).getTime() !== new Date(input.updatedAt).getTime()) throw new WorkerMutationError("conflict", "El trabajador fue modificado por otra sesión. Recargue y vuelva a intentar.");
+    if (!current.version_matches) throw new WorkerMutationError("concurrency_conflict", "El trabajador fue modificado por otra sesión. Recargue la ficha y vuelva a intentar.");
     const duplicateDni = await db.query(`select 1 from miclub.people where club_id=$1 and normalized_dni=$2 and id<>$3 limit 1`, [actor.clubId, input.dni, current.person_id]);
     if (duplicateDni.rows[0]) throw new WorkerMutationError("dni_conflict", "El DNI ya corresponde a otra persona dentro del club.");
     if (current.role_code === "DIRECTOR" && input.role !== "DIRECTOR") {
@@ -204,15 +216,19 @@ export const updateWorker = async (actor: WorkerActor, id: string, body: unknown
     if (input.role === "INSTRUCTOR") await db.query(`insert into miclub.instructors(club_id,person_id,display_name,status,notes) values($1,$2,$3,'activa',$4) on conflict (club_id,person_id) do update set display_name=excluded.display_name,status='activa',notes=excluded.notes,updated_at=now()`, [actor.clubId, current.person_id, `${input.firstName} ${input.lastName}`, input.notes ?? null]);
     else if (instructor) await db.query(`update miclub.instructors set status='suspendida',updated_at=now() where club_id=$1 and id=$2`, [actor.clubId, instructor.id]);
     await syncEmployeeCompensationTerm(db, actor, id, input);
-    await attachPhoto(db, actor, id, input.photoFileId);
+    await applyPhotoMutation(db, actor, id, input);
     await audit(db, actor, "worker.update", id, current, after); return { ...after, invitationPending: !current.membership_id && input.systemAccessEnabled !== false };
   }, pool);
 };
 
-export const archiveWorker = async (actor: WorkerActor, id: string) => {
+export const archiveWorker = async (actor: WorkerActor, id: string, body: unknown) => {
   const pool = await getPostgresPool(); return withTenantTransaction(actor.clubId, async (db) => {
-    const current = (await db.query<Record<string, unknown>>(`select e.*,coalesce(r.code,upper(e.position)) as role_code from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update of e`, [actor.clubId,id])).rows[0];
+    await assertWorkerModel(db);
+    const raw=(body&&typeof body==='object'?body:{}) as {version?:unknown};
+    if(typeof raw.version!=="string"||Number.isNaN(Date.parse(raw.version))) throw new WorkerMutationError("invalid_input","La versión del trabajador es obligatoria para archivar.");
+    const current = (await db.query<Record<string, unknown>>(`select e.*,coalesce(r.code,upper(e.position)) as role_code,(e.updated_at=$3::timestamptz) version_matches from miclub.employees e left join miclub.user_club_memberships m on m.id=e.membership_id left join miclub.roles r on r.id=m.role_id where e.club_id=$1 and e.id=$2 for update of e`, [actor.clubId,id,raw.version])).rows[0];
     if (!current) throw new WorkerMutationError("not_found", "Trabajador inexistente.");
+    if(!current.version_matches) throw new WorkerMutationError("concurrency_conflict","El trabajador fue modificado por otra sesión. Recargue la ficha y vuelva a intentar.");
     if (current.role_code === "DIRECTOR") { const other = await db.query(`select 1 from miclub.user_club_memberships m join miclub.roles r on r.id=m.role_id where m.club_id=$1 and r.code='DIRECTOR' and m.status='active' and m.id<>$2 limit 1`,[actor.clubId,current.membership_id]); if (!other.rows[0]) throw new WorkerMutationError("last_director", "No se puede archivar al último Director activo."); }
     const instructor = (await db.query<{ id: string }>(`select id::text from miclub.instructors where club_id=$1 and person_id=$2 for update`, [actor.clubId, current.person_id])).rows[0];
     const canonicalResponsibility = await hasActivityResponsibleEmployee(db);

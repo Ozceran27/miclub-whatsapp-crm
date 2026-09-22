@@ -28,6 +28,7 @@ export const getAdministrationWorkers = async (clubId: string, limit: number, of
       hasFixedCompensation: worker.has_fixed_compensation,
       fixedCompensationAmount: worker.fixed_compensation_amount == null ? null : Number(worker.fixed_compensation_amount),
       fixedCompensationFrequency: worker.fixed_compensation_frequency,
+      fixedCompensationEffectiveFrom: worker.fixed_compensation_effective_from,
       currencyCode: worker.currency_code,
       status: worker.status,
       systemAccess: worker.system_access,
@@ -44,7 +45,8 @@ export const getAdministrationWorkers = async (clubId: string, limit: number, of
           : {})
       },
       createdAt: worker.created_at,
-      updatedAt: worker.updated_at
+      updatedAt: worker.updated_at,
+      version: worker.version
     })),
     page: Math.floor(offset / limit) + 1,
     pageSize: limit,

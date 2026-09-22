@@ -98,6 +98,21 @@ Una actividad tenant debe relacionarse con:
 
 Responsable y sector deben pertenecer al mismo club.
 
+`generates_enrollments` expresa si la actividad admite **nuevas** inscripciones.
+Debe elegirse explícitamente al crear y editar. Desactivarlo no elimina ni cambia
+inscripciones históricas; el backend rechaza cualquier alta nueva mientras esté
+desactivado.
+
+La rentabilidad operativa anual de una actividad es:
+
+`ingresos operativos COMPLETADO - egresos operativos COMPLETADO`
+
+Sólo se consideran movimientos vinculados por `activity_id`, desde el inicio del
+año civil en la zona horaria del club hasta el instante actual. Cada moneda se
+convierte a la moneda operativa con la última cotización oficial disponible a la
+fecha del movimiento. Si falta una cotización necesaria, el importe agregado no
+está disponible; nunca se suman nominales incompatibles.
+
 ## 8. Términos económicos
 
 Los términos deben versionarse temporalmente cuando afectan historia.
@@ -108,6 +123,11 @@ La documentación actual indica `activity_terms` con:
 - `effective_to`.
 
 No aplicar una comisión actual retroactivamente a períodos históricos.
+
+El primer término exige `effective_from`. Una edición puramente operativa no
+envía ni crea términos. Cambiar modalidad, porcentaje, importe, frecuencia,
+moneda o receptor económico crea una versión nueva y exige una vigencia posterior
+a la última versión, incluidas las versiones futuras ya programadas.
 
 ## 9. Modalidad VARIABLE
 

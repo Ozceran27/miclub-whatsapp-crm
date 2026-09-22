@@ -27,9 +27,13 @@ router.get("/workers", asyncHandler(async (req, res) => {
 }));
 
 const workerActor = (req: Request): WorkerActor => ({ userId: req.auth!.userId, membershipId: req.auth!.membershipId, clubId: req.auth!.clubId, requestId: req.requestId, ip: req.ip, userAgent: req.get("user-agent") });
+const workerErrorResponse = (error: WorkerMutationError) => ({
+  status: error.code === "not_found" ? 404 : error.code === "invalid_input" ? 400 : error.code === "model_not_applied" ? 503 : 409,
+  code: error.code === "concurrency_conflict" ? "OPTIMISTIC_CONCURRENCY_CONFLICT" : error.code === "model_not_applied" ? "WORKER_MODEL_NOT_APPLIED" : error.code.toUpperCase(),
+});
 const workerMutation = (operation: (actor: WorkerActor, id: string, body: unknown) => Promise<unknown>) => asyncHandler(async (req, res) => {
   try { res.json(await operation(workerActor(req), String(req.params.id), req.body)); }
-  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; const status = error.code === "not_found" ? 404 : error.code === "invalid_input" ? 400 : 409; res.status(status).json({ error: true, code: error.code.toUpperCase(), message: error.message }); }
+  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; const response=workerErrorResponse(error); res.status(response.status).json({ error: true, code: response.code, message: error.message }); }
 });
 router.post("/workers", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHandler(async (req, res) => {
   try {
@@ -37,7 +41,7 @@ router.post("/workers", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHand
     if (result.invitationPending === true) return res.status(202).json({ invitationPending: true, message: "La invitación quedó pendiente de aceptación por la cuenta existente." });
     return res.status(201).json(result);
   }
-  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; res.status(error.code === "invalid_input" ? 400 : 409).json({ error: true, code: error.code === "invalid_input" ? "INVALID_INPUT" : "CONFLICT", message: error.code === "invalid_input" ? error.message : "No se pudo completar el alta." }); }
+  catch (error) { if (!(error instanceof WorkerMutationError)) throw error; const response=workerErrorResponse(error); res.status(response.status).json({ error: true, code: response.code, message: error.code === "invalid_input" || error.code === "model_not_applied" ? error.message : "No se pudo completar el alta." }); }
 }));
 router.put("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id, body) => updateWorker(actor, id, body)));
 router.delete("/workers/:id/photo", requirePermission(PERMISSIONS.WORKERS_MANAGE), asyncHandler(async (req, res) => {
@@ -45,7 +49,7 @@ router.delete("/workers/:id/photo", requirePermission(PERMISSIONS.WORKERS_MANAGE
   if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de trabajador inválido."});
   res.json(await deleteEmployeePhoto(req.auth!.clubId, id));
 }));
-router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id) => archiveWorker(actor, id)));
+router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id, body) => archiveWorker(actor, id, body)));
 
 router.get("/activity-icons", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (_req, res) => {
   const pool = await getPostgresPool();
@@ -63,8 +67,10 @@ router.get("/activities/:id/terms", requirePermission(PERMISSIONS.ACTIVITIES_VIE
   const id=String(req.params.id);
   if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de actividad inválido."});
   const sectors=req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:req.auth!.sectorIds;
-  const result=await tenantExecutor(req.auth!.clubId).query(`select t.id,t.mode,t.fixed_club_fee::float8 "fixedClubFee",t.fixed_fee_frequency "fixedFeeFrequency",t.club_share_percentage::float8 "clubSharePercentage",t.currency_code "currencyCode",t.effective_from::text "effectiveFrom",t.effective_to::text "effectiveTo",t.responsible_person_id "responsiblePersonId",concat_ws(' ',p.first_name,p.last_name) "responsiblePersonName",t.revision
+  const result=await tenantExecutor(req.auth!.clubId).query(`select t.id,t.mode,t.fixed_club_fee::float8 "fixedClubFee",t.fixed_fee_frequency "fixedFeeFrequency",t.club_share_percentage::float8 "clubSharePercentage",t.currency_code "currencyCode",t.effective_from::text "effectiveFrom",t.effective_to::text "effectiveTo",t.responsible_person_id "responsiblePersonId",concat_ws(' ',p.first_name,p.last_name) "responsiblePersonName",t.revision,
+    case when t.effective_from>(now() at time zone coalesce(nullif(trim(c.timezone),''),'America/Argentina/Buenos_Aires'))::date then 'FUTURE' when (now() at time zone coalesce(nullif(trim(c.timezone),''),'America/Argentina/Buenos_Aires'))::date between t.effective_from and coalesce(t.effective_to,'infinity'::date) then 'CURRENT' else 'HISTORICAL' end phase
     from miclub.activity_terms t join miclub.activities a on a.id=t.activity_id and a.club_id=t.club_id
+    join miclub.clubs c on c.id=t.club_id
     left join miclub.people p on p.id=t.responsible_person_id and p.club_id=t.club_id
     where t.club_id=$1 and t.activity_id=$2 and ($3::uuid[] is null or a.sector_id=any($3)) order by t.effective_from desc,t.id`,[req.auth!.clubId,id,sectors]);
   res.json({items:result.rows});
