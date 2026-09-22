@@ -97,6 +97,10 @@ void test("las actividades archivadas no reaparecen en el catálogo administrati
   assert.match(query, /NO_MOVEMENTS/);
   assert.match(query, /make_timestamptz/);
   assert.match(query, /activity_club\.base_currency_code as operating_currency_code/);
+  assert.match(query, /case a\.status::text when 'activa' then 'active' when 'suspendida' then 'inactive'/);
+  assert.match(query, /p\.cancelled_at is null/);
+  assert.match(query, /terms\.effective_from::text as terms_effective_from/);
+  assert.match(query, /price\.effective_from::text as price_effective_from/);
 });
 
 void test("actividades conserva lectura legacy mientras la migración de responsable está pendiente", async () => {

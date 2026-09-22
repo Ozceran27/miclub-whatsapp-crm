@@ -18,8 +18,8 @@ const anySectorActor: ActivityActor = { ...limitedActor, userId: 'user-any', mem
 type ActivityInputWithSettlement = ActivityInput & { settlement: NonNullable<ActivityInput['settlement']> };
 const input = (sectorId: string): ActivityInputWithSettlement => ({ sectorId, responsibleEmployeeId: EMPLOYEE_ID, name: 'Natación', managerPersonId: null, clubCommissionPercent: 10, generatesEnrollments: true, status: 'inactive', settlement: { mode: 'VARIABLE', fixedFeeFrequency: null,currencyCode:null, fixedClubFee: null, clubSharePercentage: 10, effectiveFrom: '2026-09-01' }, pricing:{enrollmentPrice:0,feePrice:25000,feeFrequency:'MONTHLY',effectiveFrom:'2026-09-01'}, schedules:[] });
 
-type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; instructor_id?: string | null; responsible_employee_id?: string | null; updated_at: string; archived_at: null };
-const installActivityPool = (stored: StoredActivity, settlementLocked = false) => {
+type StoredActivity = { id: string; club_id: string; sector_id: string; manager_person_id: string | null; instructor_id?: string | null; responsible_employee_id?: string | null; generates_enrollments?: boolean; status?: string; updated_at: string; archived_at: null };
+const installActivityPool = (stored: StoredActivity, settlementLocked = false, options?: { prices?: Record<string,unknown>[]; currentPriceAvailable?: boolean; termStart?: Date }) => {
   const queries: Array<{ sql: string; params?: unknown[] }> = [];
   const client = {
     query: async (sql: string, params?: unknown[]) => {
@@ -33,12 +33,15 @@ const installActivityPool = (stored: StoredActivity, settlementLocked = false) =
         const sectors = params?.[3] as string[];
         const visible = stored.club_id === params?.[0] && stored.id === params?.[1]
           && (params?.[2] === true || sectors.includes(stored.sector_id));
-        return { rows: visible ? [stored] : [] };
+        return { rows: visible ? [{generates_enrollments:true,status:'suspendida',...stored}] : [] };
       }
       if (sql.includes('select exists(select 1 from miclub.sectors')) return { rows: [{ sector: true, manager: true, responsible: true, employee_id: EMPLOYEE_ID, employee_person_id: PERSON_ID, legacy_instructor_id: INSTRUCTOR_ID }] };
-      if (sql.includes('from miclub.activity_terms') && sql.includes('for update')) return { rows: [{ id: 'term-1', effective_from: '2026-08-01', effective_to: null }] };
+      if (sql.includes('from miclub.activity_terms') && sql.includes('for update')) return { rows: [{ id: 'term-1', effective_from: options?.termStart ?? '2026-08-01', effective_to: null }] };
       if (sql.includes('select base_currency_code from miclub.clubs')) return { rows: [{ base_currency_code:'ARS' }] };
-      if (sql.includes('from miclub.activity_price_terms') && sql.includes('for update')) return { rows: [{ id:'price-1', enrollment_price:0, fee_price:25000, fee_frequency:'MONTHLY', currency_code:'ARS', effective_from:'2026-08-01', effective_to:null }] };
+      if (sql.includes('::date::text today from miclub.clubs')) return { rows: [{ today:'2026-09-22' }] };
+      if (sql.includes('select exists(select 1 from miclub.activity_price_terms')) return { rows: [{ available:options?.currentPriceAvailable ?? true }] };
+      if (sql.includes('from miclub.activity_price_terms') && sql.includes('for update')) return { rows: options?.prices ?? [{ id:'price-1', enrollment_price:0, fee_price:25000, fee_frequency:'MONTHLY', currency_code:'ARS', effective_from:'2026-08-01', effective_to:null }] };
+      if (sql.includes('update miclub.activity_price_terms')) return { rows: [{ id:'price-1', effective_from:'2026-08-01', effective_to:null }] };
       if (sql.includes('insert into miclub.activity_price_terms')) return { rows: [{ id:'price-2' }] };
       if (sql.includes('delete from miclub.activity_schedules')) return { rows: [] };
       if (sql.includes('from miclub.activity_settlements')) return { rows: [{ locked: settlementLocked }] };
@@ -229,6 +232,84 @@ test('una edición operativa conserva los términos económicos y la decisión d
   assert.equal(queries.some(({ sql }) => sql.includes('insert into miclub.activity_price_terms')), false);
   const update = queries.find(({ sql }) => sql.includes('update miclub.activities'));
   assert.equal(update?.params?.[13], false);
+});
+
+test('editar una actividad activa sin status conserva el estado almacenado', async () => {
+  const stored: StoredActivity = { id:ACTIVITY_ID, club_id:CLUB_A, sector_id:SECTOR_A, manager_person_id:null,
+    responsible_employee_id:EMPLOYEE_ID, status:'activa', generates_enrollments:true, updated_at:UPDATED_AT, archived_at:null };
+  const queries = installActivityPool(stored);
+  const { settlement:_settlement, pricing:_pricing, schedules:_schedules, status:_status, ...operational } = input(SECTOR_A);
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,operational)).kind,'updated');
+  assert.equal(queries.find(({sql})=>sql.includes('update miclub.activities'))?.params?.[14],'activa');
+});
+
+test('crea una actividad sin inscripciones sin término de precios', async () => {
+  const queries = createPool(input(SECTOR_A).settlement);
+  const { pricing:_pricing, ...withoutPricing } = input(SECTOR_A);
+  assert.equal((await createActivity(limitedActor,{...withoutPricing,generatesEnrollments:false})).kind,'created');
+  assert.equal(queries.some(({sql})=>sql.includes('insert into miclub.activity_price_terms')),false);
+});
+
+test('inserta una vigencia histórica entre dos precios con fechas PostgreSQL Date', async () => {
+  const stored: StoredActivity = { id:ACTIVITY_ID, club_id:CLUB_A, sector_id:SECTOR_A, manager_person_id:null,
+    responsible_employee_id:EMPLOYEE_ID, generates_enrollments:true, updated_at:UPDATED_AT, archived_at:null };
+  const prices = [
+    {id:'old',enrollment_price:0,fee_price:25000,fee_frequency:'MONTHLY',currency_code:'ARS',effective_from:new Date('2026-08-01T00:00:00Z'),effective_to:new Date('2026-09-14T00:00:00Z')},
+    {id:'future',enrollment_price:0,fee_price:40000,fee_frequency:'MONTHLY',currency_code:'ARS',effective_from:new Date('2026-09-15T00:00:00Z'),effective_to:null},
+  ];
+  const queries = installActivityPool(stored,false,{prices});
+  const {settlement:_settlement,...value}=input(SECTOR_A);
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,{...value,pricing:{...value.pricing!,feePrice:30000,effectiveFrom:'2026-09-10'}})).kind,'updated');
+  assert.equal(queries.find(({sql})=>sql.includes('update miclub.activity_price_terms'))?.params?.[2],'2026-09-09');
+  const insert=queries.find(({sql})=>sql.includes('insert into miclub.activity_price_terms'));
+  assert.equal(insert?.params?.[6],'2026-09-10');
+  assert.equal(insert?.params?.[7],'2026-09-14');
+});
+
+test('compara condiciones económicas con fecha civil aunque el driver devuelva Date', async () => {
+  const stored: StoredActivity = { id:ACTIVITY_ID, club_id:CLUB_A, sector_id:SECTOR_A, manager_person_id:null,
+    responsible_employee_id:EMPLOYEE_ID, generates_enrollments:true, updated_at:UPDATED_AT, archived_at:null };
+  const queries=installActivityPool(stored,false,{termStart:new Date('2026-08-01T00:00:00Z')});
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,input(SECTOR_A))).kind,'updated');
+  assert.ok(queries.some(({sql})=>sql.includes('insert into miclub.activity_terms')));
+});
+
+test('no duplica un precio igual y rechaza un inicio histórico ya ocupado', async () => {
+  const stored: StoredActivity = { id:ACTIVITY_ID, club_id:CLUB_A, sector_id:SECTOR_A, manager_person_id:null,
+    responsible_employee_id:EMPLOYEE_ID, generates_enrollments:true, updated_at:UPDATED_AT, archived_at:null };
+  const prices=[{id:'current',enrollment_price:0,fee_price:25000,fee_frequency:'MONTHLY',currency_code:'ARS',effective_from:new Date('2026-08-01T00:00:00Z'),effective_to:null}];
+  let queries=installActivityPool(stored,false,{prices});
+  const {settlement:_settlement,...value}=input(SECTOR_A);
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,{...value,pricing:{...value.pricing!,effectiveFrom:'2026-09-10'}})).kind,'updated');
+  assert.equal(queries.some(({sql})=>sql.includes('insert into miclub.activity_price_terms')),false);
+  queries=installActivityPool(stored,false,{prices});
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,{...value,pricing:{...value.pricing!,feePrice:30000,effectiveFrom:'2026-08-01'}})).kind,'duplicate_price_date');
+  assert.ok(queries.some(({sql})=>sql==='ROLLBACK'));
+});
+
+test('reactivar inscripciones sin un precio vigente revierte la edición', async () => {
+  const stored: StoredActivity = { id:ACTIVITY_ID, club_id:CLUB_A, sector_id:SECTOR_A, manager_person_id:null,
+    responsible_employee_id:EMPLOYEE_ID, generates_enrollments:false, updated_at:UPDATED_AT, archived_at:null };
+  const queries=installActivityPool(stored,false,{prices:[],currentPriceAvailable:false});
+  const {settlement:_settlement,pricing:_pricing,schedules:_schedules,...operational}=input(SECTOR_A);
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,operational)).kind,'pricing_required');
+  assert.ok(queries.some(({sql})=>sql==='ROLLBACK'));
+});
+
+test('al deshabilitar inscripciones cancela precios futuros y reabre el vigente', async () => {
+  const stored: StoredActivity = { id:ACTIVITY_ID, club_id:CLUB_A, sector_id:SECTOR_A, manager_person_id:null,
+    responsible_employee_id:EMPLOYEE_ID, generates_enrollments:true, updated_at:UPDATED_AT, archived_at:null };
+  const prices = [
+    {id:'current',enrollment_price:0,fee_price:25000,fee_frequency:'MONTHLY',currency_code:'ARS',effective_from:'2026-08-01',effective_to:'2026-09-30'},
+    {id:'future',enrollment_price:0,fee_price:40000,fee_frequency:'MONTHLY',currency_code:'ARS',effective_from:'2026-10-01',effective_to:null},
+  ];
+  const queries=installActivityPool(stored,false,{prices});
+  const {settlement:_settlement,pricing:_pricing,schedules:_schedules,...operational}=input(SECTOR_A);
+  assert.equal((await updateActivity(limitedActor,ACTIVITY_ID,UPDATED_AT,{...operational,generatesEnrollments:false})).kind,'updated');
+  assert.equal(queries.filter(({sql})=>sql.includes('update miclub.activity_price_terms')).length,2);
+  assert.ok(queries.some(({sql,params})=>sql.includes('cancelled_at=now()')&&params?.[1]==='future'));
+  assert.ok(queries.some(({sql,params})=>sql.includes('effective_to=null')&&params?.[1]==='current'));
+  assert.equal(queries.some(({sql})=>sql.includes('delete from miclub.activity_price_terms')),false);
 });
 
 test('upsertActivity no pisa monthly_fee cuando la cuota del import viene en blanco', async () => {

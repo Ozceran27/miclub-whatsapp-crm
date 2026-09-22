@@ -24,7 +24,7 @@ export const createEnrollment = async (actor: EnrollmentActor, input: Enrollment
     `, [actor.clubId, input.personId, input.activityId]);
     if (!references.rows[0]) return { kind: "invalid_reference" };
     const price=(await db.query<{id:string;enrollment_price:string;fee_frequency:string}>(`select p.id,p.enrollment_price,p.fee_frequency from miclub.activity_price_terms p
-      where p.club_id=$1 and p.activity_id=$2 and p.effective_from<=$3::date
+      where p.club_id=$1 and p.activity_id=$2 and p.cancelled_at is null and p.effective_from<=$3::date
       and (p.effective_to is null or p.effective_to>=$3::date) order by p.effective_from desc limit 1`,[actor.clubId,input.activityId,input.enrollmentDate])).rows[0];
 
     const existing = await db.query<Record<string, unknown>>(`

@@ -85,7 +85,7 @@ router.get("/activities/:id/prices", requirePermission(PERMISSIONS.ACTIVITIES_VI
   if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de actividad inválido."});
   const sectors=req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:req.auth!.sectorIds;
   const result=await tenantExecutor(req.auth!.clubId).query(`select p.id,p.enrollment_price::float8 "enrollmentPrice",p.fee_price::float8 "feePrice",
-    p.fee_frequency "feeFrequency",p.currency_code "currencyCode",p.effective_from::text "effectiveFrom",p.effective_to::text "effectiveTo"
+    p.fee_frequency "feeFrequency",p.currency_code "currencyCode",p.effective_from::text "effectiveFrom",p.effective_to::text "effectiveTo",p.cancelled_at "cancelledAt"
     from miclub.activity_price_terms p join miclub.activities a on a.id=p.activity_id and a.club_id=p.club_id
     where p.club_id=$1 and p.activity_id=$2 and ($3::uuid[] is null or a.sector_id=any($3))
     order by p.effective_from desc,p.id`,[req.auth!.clubId,id,sectors]);

@@ -23,6 +23,12 @@ export const formatActivityDate = (value?: string | null): string => {
   return (isDateOnly ? dateOnly : dateTime).format(parsed);
 };
 
+export const formatActivityCivilDate = (value?: string | null): string => {
+  if (!value) return 'Sin registro';
+  const civil = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(civil) ? formatActivityDate(civil) : 'Fecha no disponible';
+};
+
 export const describeActivityTerms = (activity: AdministrationActivityDto): string => {
   const mode = activity.settlementMode?.toUpperCase();
   if (mode === 'FIXED') return `Fijo ${formatMoney(activity.settlementFixedAmount ?? 0, activity.currencyCode ?? 'ARS')} ${formatFrequency(activity.fixedFeeFrequency)}`;

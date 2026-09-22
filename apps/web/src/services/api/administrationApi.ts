@@ -25,7 +25,7 @@ export const getAdministrationActivities = (signal?: AbortSignal) =>
 
 export type ActivityWorkerCatalogItem = { id: string; personId: string; displayName: string; role: string | null };
 export type ActivityTermHistoryItem = { id:string; mode:'FIXED'|'VARIABLE'; fixedClubFee:number|null; fixedFeeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY'|null; clubSharePercentage:number|null; currencyCode:string|null; effectiveFrom:string; effectiveTo:string|null; responsiblePersonId:string|null; responsiblePersonName:string|null; revision:number; phase:'FUTURE'|'CURRENT'|'HISTORICAL' };
-export type ActivityPriceHistoryItem={id:string;enrollmentPrice:number;feePrice:number;feeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY';currencyCode:string;effectiveFrom:string;effectiveTo:string|null};
+export type ActivityPriceHistoryItem={id:string;enrollmentPrice:number;feePrice:number;feeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY';currencyCode:string;effectiveFrom:string;effectiveTo:string|null;cancelledAt:string|null};
 export type AdministrationActivityMutation = ActivityMutationContract;
 export type AdministrationActivityMutationResponse = { id: string; updatedAt: string } & Record<string, unknown>;
 

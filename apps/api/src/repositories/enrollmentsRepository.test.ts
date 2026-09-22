@@ -74,6 +74,7 @@ void test("inscribe una persona del club en una actividad activa que genera insc
   assert.match(referenceQuery?.sql ?? "", /a\.status='activa'::miclub\.entity_status/);
   assert.match(referenceQuery?.sql ?? "", /a\.archived_at is null/);
   assert.deepEqual(referenceQuery?.params, [CLUB_A, PERSON_ID, ACTIVITY_ID]);
+  assert.match(state.queries.find(({sql})=>sql.includes('from miclub.activity_price_terms p'))?.sql??'', /p\.cancelled_at is null/);
 });
 
 void test("rechaza actividades suspendidas, archivadas o pertenecientes a otro club", async () => {

@@ -8,6 +8,7 @@ type Props = {
   description?: string;
   size?: 'medium' | 'large';
   busy?: boolean;
+  bodyClassName?: string;
   onClose: () => void;
 };
 
@@ -19,6 +20,7 @@ export function ConfigurationEditorModal({
   description,
   size = 'medium',
   busy = false,
+  bodyClassName,
   onClose,
 }: Props) {
   const titleId = useId();
@@ -58,7 +60,7 @@ export function ConfigurationEditorModal({
         <div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h3 id={titleId}>{title}</h3>{description && <p id={descriptionId}>{description}</p>}</div>
         <button className="draft-icon-button" type="button" onClick={onClose} disabled={busy} aria-label="Cerrar modal">×</button>
       </header>
-      <div className="draft-modal__body">{children}</div>
+      <div className={`draft-modal__body${bodyClassName ? ` ${bodyClassName}` : ''}`}>{children}</div>
       {footer && <footer className="draft-modal__footer">{footer}</footer>}
     </div>
   </div>;

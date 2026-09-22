@@ -1,5 +1,9 @@
 # Testing
 
+## Regresión de precios de actividades — 2026-09-22
+
+`activitiesRepository.test.ts` cubre estado conservado en edición, alta sin precios cuando no hay inscripciones, fechas PostgreSQL `Date`, inserción histórica, fecha inicial duplicada, reactivación sin precio y cancelación auditable de vigencias futuras. `readOnlyRepository.test.ts` y `enrollmentsRepository.test.ts` comprueban que sólo los precios no cancelados se aplican; `activityPresentation.test.ts` comprueba fecha civil y frecuencia. La validación SQL real requiere las migraciones manuales y acceso de auditoría de sólo lectura.
+
 ## Precios y horarios — 2026-09-22
 
 Revisar tests de contrato shared, rutas y repositorios API, editores web, manifiesto/checksum y SQL DBeaver. La verificación PostgreSQL real requiere backup y ejecución supervisada de la migración manual, seguida de pruebas con dos clubes y de UI en escritorio/móvil; ninguna escritura contra la base real se automatiza en este paquete.

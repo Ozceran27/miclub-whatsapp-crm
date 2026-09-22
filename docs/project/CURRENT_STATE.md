@@ -1,8 +1,14 @@
 # Current State
 
+## Correcciones de actividades y precios — 2026-09-22
+
+El código normaliza `activa`/`suspendida` al contrato público `active`/`inactive` y conserva el estado al editar sin modificarlo. Los precios sólo son obligatorios cuando la actividad admite inscripciones, tanto en Administración como en onboarding. Una nueva vigencia puede insertarse en una fecha pasada sin reescribir snapshots de inscripciones ni vigencias posteriores. Deshabilitar inscripciones cancela las vigencias futuras de forma auditable y mantiene la vigente. Las fechas civiles se envían a la web sin horario.
+
+La migración adicional `202609220002_cancel_future_activity_prices.sql` depende de `202609220001_activity_pricing_and_schedules.sql`; ambas requieren aplicación manual y validación en DBeaver antes de desplegar este runtime. `AUDIT_DATABASE_URL` no estuvo disponible durante la implementación, por lo que el esquema y los datos locales reales no están certificados aquí.
+
 ## Precios y horarios de actividades — 2026-09-22
 
-El código ya incorpora precios de inscripción y cuota versionados, frecuencia, agenda semanal y snapshots al inscribir. La migración `202609220001_activity_pricing_and_schedules.sql` está versionada pero requiere ejecución manual supervisada en DBeaver antes de desplegar el backend y la web. No se aplicó SQL a la base real. Actividades anteriores sin términos de precio siguen operativas y se señalan como «Sin configurar»; `monthly_fee` legacy no se infiere como precio. La cuota e inscripción pueden ser cero. Crear actividad exige precios y una agenda explícita (posiblemente vacía); editar sin enviar esas secciones las conserva.
+El código ya incorpora precios de inscripción y cuota versionados, frecuencia, agenda semanal y snapshots al inscribir. La migración `202609220001_activity_pricing_and_schedules.sql` está versionada pero requiere ejecución manual supervisada en DBeaver antes de desplegar el backend y la web. No se aplicó SQL a la base real. Actividades anteriores sin términos de precio siguen operativas y se señalan como «Sin configurar»; `monthly_fee` legacy no se infiere como precio. La cuota e inscripción pueden ser cero. Crear actividad exige precios sólo si admite inscripciones y siempre exige una agenda explícita (posiblemente vacía); editar sin enviar esas secciones las conserva.
 
 ## Trabajadores y actividades: edición, vigencias y rentabilidad — 2026-09-22
 

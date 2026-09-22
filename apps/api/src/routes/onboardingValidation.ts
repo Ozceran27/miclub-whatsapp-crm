@@ -82,9 +82,11 @@ export const isCompleteOnboardingRequest = (body: unknown): body is CompleteOnbo
     && typeof (activity.responsibleWorkerClientId ?? activity.instructorClientId) === "string"
     && workerIds.has((activity.responsibleWorkerClientId ?? activity.instructorClientId) as string)
     && typeof activity.generatesEnrollments === "boolean"
-    && record(activity.pricing) && Object.keys(activity.pricing).every(key=>["enrollmentPrice","feePrice","feeFrequency"].includes(key))
-    && isActivityPrice(activity.pricing.enrollmentPrice) && isActivityPrice(activity.pricing.feePrice)
-    && ["DAILY","WEEKLY","MONTHLY","YEARLY"].includes(String(activity.pricing.feeFrequency))
+    && (activity.generatesEnrollments
+      ? record(activity.pricing) && Object.keys(activity.pricing).every(key=>["enrollmentPrice","feePrice","feeFrequency"].includes(key))
+        && isActivityPrice(activity.pricing.enrollmentPrice) && isActivityPrice(activity.pricing.feePrice)
+        && ["DAILY","WEEKLY","MONTHLY","YEARLY"].includes(String(activity.pricing.feeFrequency))
+      : activity.pricing === undefined)
     && areActivitySchedulesValid(activity.schedules)
     && ["FIXED", "VARIABLE"].includes(String(activity.settlementMode))
     && (activity.settlementMode === "VARIABLE" ? activity.fixedClubFee === null && activity.fixedFeeFrequency === null && activity.currencyCode === null && finiteNonNegative(activity.clubSharePercentage) && activity.clubSharePercentage <= 100 : activity.clubSharePercentage === null && finiteNonNegative(activity.fixedClubFee) && ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(String(activity.fixedFeeFrequency)) && SUPPORTED_OPERATIONAL_CURRENCIES.includes(activity.currencyCode as never))

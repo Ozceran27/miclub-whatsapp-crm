@@ -5,6 +5,7 @@ import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
 import { ConfigurationColorPicker, SectorIconPicker } from '../shared/ConfigurationVisualFields';
 import { SectorCapacityFields } from '../shared/SectorCapacityFields';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
+import { activityStatusLabel } from './activityPresentation';
 
 type Props = { sector: AdministrationSectorDto; canEdit: boolean; canArchive: boolean; onClose: () => void; onChanged: () => Promise<void> };
 const number = new Intl.NumberFormat('es-AR');
@@ -94,6 +95,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
     eyebrow="Configuración del sector"
     description="Resumen operativo, identidad visual y parámetros de funcionamiento."
     busy={saving}
+    bodyClassName="sector-editor__body"
     onClose={onClose}
     footer={<>{canArchive && !sector.isSystem && <button type="button" className="danger-btn sector-editor__footer-delete" disabled={saving} onClick={() => void archive()}>Eliminar sector</button>}<button type="button" className="ghost-btn" onClick={onClose} disabled={saving}>{canEdit ? 'Cancelar' : 'Cerrar'}</button>{canEdit && <button type="submit" className="primary-btn" form="administration-sector-edit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</button>}</>}
   >
@@ -123,7 +125,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
 
     {canEdit && <section className="sector-editor__operations"><div><h4>Estado operativo</h4><p>Cambiá la disponibilidad del sector sin alterar su historia.</p></div><div className="sector-editor__status-actions"><button type="button" disabled={saving || sector.status === 'active'} onClick={() => void changeStatus('active')}>Activar</button><button type="button" disabled={saving || sector.status === 'inactive'} onClick={() => void changeStatus('inactive')}>Desactivar</button><button type="button" disabled={saving || sector.status === 'under_repair'} onClick={() => void changeStatus('under_repair')}>En reparación</button></div></section>}
 
-    <section className="sector-editor__related"><div><h4>Actividades vinculadas</h4><span>{loadingRelated ? 'Cargando…' : `${activities.length} activas`}</span></div>{!loadingRelated && (activities.length ? <ul className="sector-modal__items">{activities.slice(0, 6).map(activity => <li key={activity.id}><strong>{activity.name}</strong><span>{activity.status}</span></li>)}</ul> : <p>No hay actividades vigentes asociadas.</p>)}</section>
+    <section className="sector-editor__related"><div><h4>Actividades vinculadas</h4><span>{loadingRelated ? 'Cargando…' : `${activities.length} vinculadas`}</span></div>{!loadingRelated && (activities.length ? <ul className="sector-modal__items">{activities.slice(0, 6).map(activity => <li key={activity.id}><strong>{activity.name}</strong><span>{activityStatusLabel(activity.status)}</span></li>)}</ul> : <p>No hay actividades asociadas.</p>)}</section>
 
     {error && <p className="activity-form__error" role="alert">{error}</p>}
 

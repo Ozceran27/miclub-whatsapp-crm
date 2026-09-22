@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AdministrationActivityDto } from '@miclub/shared';
-import { formatActivityDate, formatActivityProfitability, formatMoney, formatPercentage } from './activityPresentation';
+import { formatActivityCivilDate, formatActivityDate, formatActivityProfitability, formatFrequency, formatMoney, formatPercentage } from './activityPresentation';
 
 void test('normaliza porcentajes sin ceros sobrantes y limita la precisión visual', () => {
   assert.equal(formatPercentage(40), '40%');
@@ -24,4 +24,7 @@ void test('distingue ausencia de movimientos, cotización incompleta y rentabili
 
 void test('las fechas civiles no retroceden por la zona horaria del navegador', () => {
   assert.match(formatActivityDate('2026-09-22'), /22\/9\/2026/);
+  assert.match(formatActivityCivilDate('2026-09-22T03:00:00.000Z'), /22\/9\/2026/);
+  assert.doesNotMatch(formatActivityCivilDate('2026-09-22T03:00:00.000Z'), /\d+:\d+/);
+  assert.equal(formatFrequency('MONTHLY'), 'mensual');
 });

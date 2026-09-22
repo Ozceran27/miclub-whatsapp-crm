@@ -88,7 +88,7 @@ export type OnboardingActivityDraft = {
   clientId: string; sectorClientId: string; responsibleWorkerClientId?: string | null; /** @deprecated v2 draft compatibility */ instructorClientId?: string | null; name: string; iconKey: string; color: string;
   status: "active" | "inactive";
   generatesEnrollments: boolean;
-  pricing: { enrollmentPrice: number; feePrice: number; feeFrequency: ActivityFeeFrequency };
+  pricing?: { enrollmentPrice: number; feePrice: number; feeFrequency: ActivityFeeFrequency };
   schedules: Array<{ weekday: number; startTime: string; endTime: string }>;
 } & ({ settlementMode: "FIXED"; fixedClubFee: number; fixedFeeFrequency: ActivityFeeFrequency; currencyCode: OperationalCurrency; clubSharePercentage: null }
   | { settlementMode: "VARIABLE"; fixedClubFee: null; fixedFeeFrequency: null; currencyCode: null; clubSharePercentage: number });

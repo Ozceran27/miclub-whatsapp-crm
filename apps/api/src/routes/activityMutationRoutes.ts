@@ -34,9 +34,14 @@ const parseInput = (body: Record<string, unknown>, res: Response, requireSettlem
   if (!settlement && requireSettlement) { fail(res, 400, "VALIDATION_ERROR", "settlement es obligatorio al crear una actividad."); return null; }
   if (!settlement && (body.economicResponsiblePersonId !== undefined || body.responsiblePersonId !== undefined)) { fail(res, 400, "VALIDATION_ERROR", "Cambiar el receptor económico exige nuevas condiciones económicas y una vigencia."); return null; }
   if (typeof body.generatesEnrollments !== "boolean") { fail(res, 400, "VALIDATION_ERROR", "Debe indicar explícitamente si la actividad admite inscripciones."); return null; }
-  if ((requireSettlement && (body.pricing === undefined || body.schedules === undefined))
-    || (body.schedules !== undefined && !areActivitySchedulesValid(body.schedules))) {
-    fail(res, 400, "VALIDATION_ERROR", "Los precios y horarios iniciales son obligatorios; los horarios deben ser válidos y no solaparse."); return null;
+  if (requireSettlement && body.schedules === undefined || body.schedules !== undefined && !areActivitySchedulesValid(body.schedules)) {
+    fail(res, 400, "INVALID_ACTIVITY_SCHEDULES", "Los horarios iniciales son obligatorios y no deben solaparse."); return null;
+  }
+  if (body.generatesEnrollments === false && body.pricing !== undefined) {
+    fail(res, 400, "INVALID_ACTIVITY_PRICING", "Una actividad sin inscripciones no puede configurar precios."); return null;
+  }
+  if (requireSettlement && body.generatesEnrollments === true && body.pricing === undefined) {
+    fail(res, 400, "ACTIVITY_PRICING_REQUIRED", "Configurá inscripción y cuota para habilitar inscripciones."); return null;
   }
   if (body.pricing !== undefined) {
     const price = body.pricing;
@@ -80,7 +85,10 @@ const respond = (res: Response, result: ActivityMutationResult) => {
     invalid_responsible: [404, "INVALID_RESPONSIBLE", "El receptor económico no es una persona operativa activa del club."],
     dependencies: [409, "ACTIVITY_HAS_DEPENDENCIES", "La actividad tiene dependencias y no existe una regla segura para archivarla."],
     invalid_terms: [409, "INVALID_ACTIVITY_TERMS", "La nueva vigencia solapa o deja un hueco en las condiciones económicas."],
-    invalid_pricing: [409, "INVALID_ACTIVITY_PRICING", "La vigencia de precios o los horarios no son válidos."],
+    invalid_pricing: [409, "INVALID_ACTIVITY_PRICING", "La vigencia de precios no es válida."],
+    duplicate_price_date: [409, "ACTIVITY_PRICE_DATE_EXISTS", "Ya existe un precio que comienza en esa fecha. Elegí otra fecha."],
+    pricing_required: [409, "ACTIVITY_PRICING_REQUIRED", "Configurá un precio vigente antes de habilitar inscripciones."],
+    invalid_schedules: [409, "INVALID_ACTIVITY_SCHEDULES", "Los horarios no son válidos o se superponen."],
     settled_history: [409, "SETTLED_ACTIVITY_TERMS", "No se puede alterar historia económica ya liquidada."],
   };
   const [status, code, message] = errors[result.kind]; return fail(res, status, code, message, "dependencies" in result ? result.dependencies : undefined);

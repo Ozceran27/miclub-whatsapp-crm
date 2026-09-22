@@ -65,7 +65,8 @@ test("finaliza las modalidades FIXED y VARIABLE sin una cuota implícita",()=>{
   assert.equal(isCompleteOnboardingRequest(fixed),true);
   const variable=completeRequest();
   variable.draft.workers=[...fixed.draft.workers];
-  variable.draft.activities=[{...common,clientId:"activity:variable",sectorClientId:variable.draft.sectors[0].clientId,generatesEnrollments:false,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:35}];
+  const {pricing:_pricing,...withoutPricing}=common;
+  variable.draft.activities=[{...withoutPricing,clientId:"activity:variable",sectorClientId:variable.draft.sectors[0].clientId,generatesEnrollments:false,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:35}];
   assert.equal(isCompleteOnboardingRequest(variable),true);
   const missing=completeRequest();missing.draft.workers=[...fixed.draft.workers];missing.draft.activities=[{...common,settlementMode:"VARIABLE",fixedClubFee:null,fixedFeeFrequency:null,currencyCode:null,clubSharePercentage:35}];delete (missing.draft.activities[0] as Partial<typeof missing.draft.activities[0]>).generatesEnrollments;
   assert.equal(isCompleteOnboardingRequest(missing),false);

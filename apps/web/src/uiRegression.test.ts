@@ -186,7 +186,7 @@ test('regresión visual: Sectores, Trabajadores y Actividades cubren temas y vie
   assert.match(activities, /title=\{editing\?'Editar actividad':'Agregar Nueva Actividad'\}/);
   assert.match(modal, /className="draft-modal-backdrop"/);
   assert.match(modal, /className=\{`draft-modal draft-modal--\$\{size\}`\}/);
-  assert.match(modal, /className="draft-modal__body"/);
+  assert.match(modal, /className=\{`draft-modal__body\$\{bodyClassName/);
   assert.match(modal, /className="draft-modal__footer"/);
   assert.match(styles, /\.draft-modal-backdrop\s*\{[^}]*z-index:\s*1100/s, 'El diálogo debe apilarse sobre contenido contrastante');
   assert.match(styles, /\.draft-modal-backdrop\s*\{\s*align-items:flex-end; padding:0;/s);

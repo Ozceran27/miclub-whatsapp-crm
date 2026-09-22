@@ -25,10 +25,12 @@ export type ActivityInput = {
 export type ActivityRow = Record<string, unknown> & { id: string; updated_at: Date | string };
 export type ActivityMutationResult =
   | { kind: "created" | "updated"; activity: ActivityRow }
-  | { kind: "missing" | "conflict" | "model_not_applied" | "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible" | "dependencies" | "invalid_terms" | "invalid_pricing" | "settled_history"; dependencies?: Record<string, number> };
+  | { kind: "missing" | "conflict" | "model_not_applied" | "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible" | "dependencies" | "invalid_terms" | "invalid_pricing" | "duplicate_price_date" | "pricing_required" | "invalid_schedules" | "settled_history"; dependencies?: Record<string, number> };
 type ActivityValidationFailure = "invalid_manager" | "invalid_sector" | "invalid_instructor" | "invalid_responsible";
 class InvalidActivityTermsError extends Error {}
 class InvalidActivityPricingError extends Error {}
+class DuplicatePriceDateError extends Error {}
+class MissingActivityPricingError extends Error {}
 const isTermsConstraintError = (error: unknown) => {
   if (error instanceof InvalidActivityTermsError) return true;
   if (typeof error !== "object" || error === null || !("code" in error)) return false;
@@ -46,7 +48,10 @@ const modelApplied = async (executor: { query: Pool["query"] }): Promise<boolean
   // The supported production rollout is a reviewed DBeaver script. It changes
   // the schema atomically but intentionally does not forge a migration-ledger
   // entry, so runtime readiness must be derived from the installed capability.
-  return await hasActivityResponsibleEmployee(executor) && hasCanonicalActivityMutationGuard(executor);
+  if (!await hasActivityResponsibleEmployee(executor) || !await hasCanonicalActivityMutationGuard(executor)) return false;
+  const pricing = await executor.query<{ available: boolean }>(`select exists(select 1 from pg_attribute
+    where attrelid=to_regclass('miclub.activity_price_terms') and attname='cancelled_at' and not attisdropped) available`);
+  return pricing.rows[0]?.available === true;
 };
 
 const validReferences = async (executor: { query: Pool["query"] }, actor: ActivityActor, input: Pick<ActivityInput, "sectorId" | "managerPersonId" | "responsibleEmployeeId" | "instructorId" | "economicResponsiblePersonId" | "responsiblePersonId">): Promise<{ failure: ActivityValidationFailure | null; employeeId: string | null; employeePersonId: string | null; legacyInstructorId: string | null }> => {
@@ -80,36 +85,77 @@ const auditActivity = (actor: ActivityActor, action: string, before: ActivityRow
     entityType: "activity", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent, oldData: before, newData: after }, executor);
 
 type ActivityTermRow = Record<string, unknown> & { id: string; effective_from: string | Date; effective_to: string | Date | null };
-const termColumns = "id, club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, responsible_person_id, effective_from, effective_to, created_at, updated_at";
+const termColumns = "id, club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, responsible_person_id, effective_from::text as effective_from, effective_to::text as effective_to, created_at, updated_at";
 const auditTerms = (actor: ActivityActor, action: string, activityId: string, before: ActivityTermRow | null, after: ActivityTermRow, executor: Parameters<typeof auditService.sensitiveChange>[1]) =>
   auditService.sensitiveChange({ action, result: "success", userId: actor.userId, membershipId: actor.membershipId, clubId: actor.clubId,
     entityType: "activity_terms", entityId: after.id, requestId: actor.requestId, ip: actor.ip, userAgent: actor.userAgent,
     oldData: before, newData: { ...after, activityId } }, executor);
 
 type Executor = { query: Pool["query"] };
-const priceColumns = "id,club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from,effective_to,created_at,updated_at";
+const priceColumns = "id,club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from::text as effective_from,effective_to::text as effective_to,cancelled_at,created_at,updated_at";
+const civilDate = (value: unknown): string => value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+const previousDay = (value: string): string => {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+};
+const clubToday = async (executor: Executor, clubId: string): Promise<string> => {
+  const result = await executor.query<{ today: string }>(`select (now() at time zone coalesce(nullif(trim(timezone),''),'America/Argentina/Buenos_Aires'))::date::text today from miclub.clubs where id=$1`, [clubId]);
+  if (!result.rows[0]?.today) throw new Error("El club no tiene una zona horaria disponible para precios.");
+  return result.rows[0].today;
+};
 const auditPrice = (actor:ActivityActor, action:string, before:Record<string,unknown>|null, after:Record<string,unknown>, executor:Parameters<typeof auditService.sensitiveChange>[1]) =>
   auditService.sensitiveChange({action,result:"success",userId:actor.userId,membershipId:actor.membershipId,clubId:actor.clubId,
     entityType:"activity_price_terms",entityId:String(after.id),requestId:actor.requestId,ip:actor.ip,userAgent:actor.userAgent,oldData:before,newData:after},executor);
-const savePrice = async (executor: Executor, actor: ActivityActor, activityId: string, pricing: ActivityPricingMutation, creating: boolean): Promise<"ok" | "invalid_pricing"> => {
+const savePrice = async (executor: Executor, actor: ActivityActor, activityId: string, pricing: ActivityPricingMutation, creating: boolean): Promise<"ok" | "invalid_pricing" | "duplicate_price_date"> => {
   const currency = await executor.query<{ base_currency_code: string }>("select base_currency_code from miclub.clubs where id=$1",[actor.clubId]);
   const code=currency.rows[0]?.base_currency_code;
   if (!code) return "invalid_pricing";
-  const history = creating ? [] : (await executor.query<Record<string,unknown>>(`select ${priceColumns} from miclub.activity_price_terms where club_id=$1 and activity_id=$2 order by effective_from for update`,[actor.clubId,activityId])).rows;
-  const latest=history.at(-1);
-  if (latest) {
-    const same=Number(latest.enrollment_price)===pricing.enrollmentPrice && Number(latest.fee_price)===pricing.feePrice && latest.fee_frequency===pricing.feeFrequency && latest.currency_code===code;
-    if (same) return "ok";
-    if (pricing.effectiveFrom <= String(latest.effective_from).slice(0,10) || latest.effective_to != null) return "invalid_pricing";
-    const closed=await executor.query<Record<string,unknown>>(`update miclub.activity_price_terms set effective_to=$3::date-1,updated_at=now(),updated_by=$4
-      where club_id=$1 and id=$2 and effective_to is null returning ${priceColumns}`,[actor.clubId,latest.id,pricing.effectiveFrom,actor.userId]);
-    if(!closed.rows[0])return "invalid_pricing";
-    await auditPrice(actor,"activity_price_terms.close",latest,closed.rows[0],executor);
+  const history = creating ? [] : (await executor.query<Record<string,unknown>>(`select ${priceColumns} from miclub.activity_price_terms where club_id=$1 and activity_id=$2 and cancelled_at is null order by effective_from for update`,[actor.clubId,activityId])).rows;
+  const next = history.find(row => civilDate(row.effective_from) >= pricing.effectiveFrom);
+  const previous = [...history].reverse().find(row => civilDate(row.effective_from) < pricing.effectiveFrom);
+  const same = (row: Record<string, unknown>) => Number(row.enrollment_price) === pricing.enrollmentPrice
+    && Number(row.fee_price) === pricing.feePrice && row.fee_frequency === pricing.feeFrequency && row.currency_code === code;
+  if (next && civilDate(next.effective_from) === pricing.effectiveFrom) return same(next) ? "ok" : "duplicate_price_date";
+  const previousEnd = previous?.effective_to == null ? null : civilDate(previous.effective_to);
+  const previousCoversDate = previous && (previousEnd === null || previousEnd >= pricing.effectiveFrom);
+  if (previousCoversDate && same(previous)) return "ok";
+  if (previousCoversDate) {
+    const closed = await executor.query<Record<string,unknown>>(`update miclub.activity_price_terms set effective_to=$3::date,updated_at=now(),updated_by=$4
+      where club_id=$1 and id=$2 and cancelled_at is null returning ${priceColumns}`,[actor.clubId,previous.id,previousDay(pricing.effectiveFrom),actor.userId]);
+    if (!closed.rows[0]) return "invalid_pricing";
+    await auditPrice(actor,"activity_price_terms.close",previous,closed.rows[0],executor);
   }
-  const inserted=await executor.query<Record<string,unknown>>(`insert into miclub.activity_price_terms(club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from,created_by,updated_by)
-    values($1,$2,$3,$4,$5,$6,$7::date,$8,$8) returning ${priceColumns}`,[actor.clubId,activityId,pricing.enrollmentPrice,pricing.feePrice,pricing.feeFrequency,code,pricing.effectiveFrom,actor.userId]);
+  const end = previousCoversDate ? previousEnd : next ? previousDay(civilDate(next.effective_from)) : null;
+  const inserted=await executor.query<Record<string,unknown>>(`insert into miclub.activity_price_terms(club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from,effective_to,created_by,updated_by)
+    values($1,$2,$3,$4,$5,$6,$7::date,$8::date,$9,$9) returning ${priceColumns}`,[actor.clubId,activityId,pricing.enrollmentPrice,pricing.feePrice,pricing.feeFrequency,code,pricing.effectiveFrom,end,actor.userId]);
   await auditPrice(actor,"activity_price_terms.create",null,inserted.rows[0],executor);
   return "ok";
+};
+
+const cancelFuturePrices = async (executor: Executor, actor: ActivityActor, activityId: string) => {
+  const today = await clubToday(executor, actor.clubId);
+  const history = (await executor.query<Record<string,unknown>>(`select ${priceColumns} from miclub.activity_price_terms
+    where club_id=$1 and activity_id=$2 and cancelled_at is null order by effective_from for update`,[actor.clubId,activityId])).rows;
+  const current = history.find(row => civilDate(row.effective_from) <= today && (row.effective_to == null || civilDate(row.effective_to) >= today));
+  for (const row of history.filter(item => civilDate(item.effective_from) > today)) {
+    const cancelled = await executor.query<Record<string,unknown>>(`update miclub.activity_price_terms set cancelled_at=now(),updated_at=now(),updated_by=$3
+      where club_id=$1 and id=$2 and cancelled_at is null returning ${priceColumns}`,[actor.clubId,row.id,actor.userId]);
+    if (cancelled.rows[0]) await auditPrice(actor,"activity_price_terms.cancel",row,cancelled.rows[0],executor);
+  }
+  if (current && current.effective_to != null) {
+    const reopened = await executor.query<Record<string,unknown>>(`update miclub.activity_price_terms set effective_to=null,updated_at=now(),updated_by=$3
+      where club_id=$1 and id=$2 and cancelled_at is null returning ${priceColumns}`,[actor.clubId,current.id,actor.userId]);
+    if (reopened.rows[0]) await auditPrice(actor,"activity_price_terms.reopen",current,reopened.rows[0],executor);
+  }
+};
+
+const hasCurrentPrice = async (executor: Executor, actor: ActivityActor, activityId: string): Promise<boolean> => {
+  const today = await clubToday(executor, actor.clubId);
+  const result = await executor.query<{ available: boolean }>(`select exists(select 1 from miclub.activity_price_terms
+    where club_id=$1 and activity_id=$2 and cancelled_at is null and effective_from<=$3::date
+      and (effective_to is null or effective_to>=$3::date)) available`,[actor.clubId,activityId,today]);
+  return result.rows[0]?.available === true;
 };
 
 const saveSchedules = async (executor: Executor, actor: ActivityActor, activityId: string, schedules: ActivityScheduleBlock[]) => {
@@ -132,6 +178,8 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
     const references = await validReferences(executor, actor, input);
     if (references.failure) return { kind: references.failure };
     if (!input.settlement) return { kind: "invalid_terms" };
+    if (input.generatesEnrollments && !input.pricing) return { kind: "pricing_required" };
+    if (!input.schedules) return { kind: "invalid_schedules" };
     const result = await executor.query<ActivityRow>(`insert into miclub.activities
       (club_id, sector_id, manager_person_id, instructor_id, responsible_employee_id, code, name, modality, color, icon_key, club_commission_percent, instructor_commission_percent, max_capacity, generates_enrollments, status, notes, updated_by)
       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::uuid) returning ${activityColumns}`,
@@ -142,13 +190,14 @@ export const createActivity = async (actor: ActivityActor, input: ActivityInput)
       (club_id, activity_id, mode, fixed_club_fee, fixed_fee_frequency, currency_code, club_share_percentage, responsible_person_id, effective_from, created_by, updated_by)
       values ($1,$2,$3,$4,$5,$6,$7,coalesce($8,$9::uuid),$10::date,$11::uuid,$11::uuid) returning ${termColumns}`,
     [actor.clubId, result.rows[0].id, input.settlement.mode, input.settlement.fixedClubFee, input.settlement.fixedFeeFrequency, input.settlement.currencyCode, input.settlement.clubSharePercentage, input.economicResponsiblePersonId ?? input.responsiblePersonId ?? null, references.employeePersonId, input.settlement.effectiveFrom, actor.userId]);
-    if (!input.pricing || !input.schedules || await savePrice(executor,actor,result.rows[0].id,input.pricing,true)==="invalid_pricing") throw new InvalidActivityPricingError();
+    if (input.pricing && await savePrice(executor,actor,result.rows[0].id,input.pricing,true)!=="ok") throw new InvalidActivityPricingError();
     await saveSchedules(executor,actor,result.rows[0].id,input.schedules);
     await auditActivity(actor, "activity.create", null, result.rows[0], executor);
     await auditTerms(actor, "activity_terms.create", result.rows[0].id, null, term.rows[0], executor);
     return { kind: "created", activity: result.rows[0] };
   }, pool); } catch (error) {
     if (isTermsConstraintError(error)) return { kind: "invalid_terms" };
+    if (typeof error==="object" && error!==null && "constraint" in error && String(error.constraint).startsWith("activity_schedules_")) return {kind:"invalid_schedules"};
     if (error instanceof InvalidActivityPricingError || (typeof error==="object" && error!==null && "constraint" in error && String(error.constraint).startsWith("activity_price_terms_"))) return {kind:"invalid_pricing"};
     throw error;
   }
@@ -203,7 +252,7 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
         || !sameNumber(latest.club_share_percentage, value.settlement.clubSharePercentage)
         || latest.responsible_person_id !== responsiblePersonId;
       if (termsChanged) {
-        if (value.settlement.effectiveFrom <= String(latest.effective_from).slice(0, 10)) return { kind: "invalid_terms" };
+        if (value.settlement.effectiveFrom <= civilDate(latest.effective_from)) return { kind: "invalid_terms" };
         const settled = await executor.query<{ locked: boolean }>(`select exists(select 1 from miclub.activity_settlements
           where club_id=$1 and activity_id=$2 and voided_at is null and status='COMPLETADO' and period_to >= $3::date) locked`,
         [actor.clubId, id, value.settlement.effectiveFrom]);
@@ -211,9 +260,15 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
       }
     }
     const result = await executor.query<ActivityRow>(`update miclub.activities set sector_id=$3, manager_person_id=$4, instructor_id=$5, responsible_employee_id=$6, code=$7, name=$8, modality=$9, color=$10, icon_key=$11, club_commission_percent=coalesce($12,club_commission_percent), instructor_commission_percent=0, max_capacity=$13, generates_enrollments=$14, status=$15, notes=$16, updated_at=now(), updated_by=$17::uuid where club_id=$1 and id=$2 and archived_at is null returning ${activityColumns}`,
-    [actor.clubId, id, value.sectorId, value.managerPersonId, references.legacyInstructorId, references.employeeId, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.maxCapacity ?? null, value.generatesEnrollments, storedEntityStatus(value.status ?? "inactive"), value.notes ?? null, mutationActorId]);
+    [actor.clubId, id, value.sectorId, value.managerPersonId, references.legacyInstructorId, references.employeeId, value.code ?? null, value.name, value.modality ?? null, value.color ?? null, value.iconKey ?? null, value.clubCommissionPercent, value.maxCapacity ?? null, value.generatesEnrollments, value.status ? storedEntityStatus(value.status) : before.status, value.notes ?? null, mutationActorId]);
     if (!result.rows[0]) return { kind: "conflict" };
-    if (value.pricing && await savePrice(executor,actor,id,value.pricing,false)==="invalid_pricing") throw new InvalidActivityPricingError();
+    if (value.pricing) {
+      const priceResult = await savePrice(executor,actor,id,value.pricing,false);
+      if (priceResult === "duplicate_price_date") throw new DuplicatePriceDateError();
+      if (priceResult !== "ok") throw new InvalidActivityPricingError();
+    }
+    if (!value.generatesEnrollments) await cancelFuturePrices(executor,actor,id);
+    if (!before.generates_enrollments && value.generatesEnrollments && !await hasCurrentPrice(executor,actor,id)) throw new MissingActivityPricingError();
     if (value.schedules) await saveSchedules(executor,actor,id,value.schedules);
     if (termsChanged && latest && value.settlement) {
     const closed = await executor.query<ActivityTermRow>(`update miclub.activity_terms set effective_to=$3::date - 1,
@@ -231,7 +286,10 @@ const mutateExisting = async (actor: ActivityActor, id: string, expectedUpdatedA
     return { kind: "updated", activity: result.rows[0] };
   }, pool); } catch (error) {
     if (isTermsConstraintError(error)) return { kind: "invalid_terms" };
-    if (error instanceof InvalidActivityPricingError || (typeof error==="object" && error!==null && "constraint" in error && (String(error.constraint).startsWith("activity_price_terms_") || String(error.constraint).startsWith("activity_schedules_")))) return {kind:"invalid_pricing"};
+    if (error instanceof DuplicatePriceDateError) return {kind:"duplicate_price_date"};
+    if (error instanceof MissingActivityPricingError) return {kind:"pricing_required"};
+    if (typeof error==="object" && error!==null && "constraint" in error && String(error.constraint).startsWith("activity_schedules_")) return {kind:"invalid_schedules"};
+    if (error instanceof InvalidActivityPricingError || (typeof error==="object" && error!==null && "constraint" in error && String(error.constraint).startsWith("activity_price_terms_"))) return {kind:"invalid_pricing"};
     throw error;
   }
 };

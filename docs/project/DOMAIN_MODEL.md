@@ -2,7 +2,7 @@
 
 ## Precios de alumnos y agenda
 
-`activity_price_terms` pertenece a club y actividad, conserva vigencias no superpuestas y guarda inscripción y cuota enteras no negativas, frecuencia DAILY/WEEKLY/MONTHLY/YEARLY y moneda base del club. Es independiente de `activity_terms`, que define la liquidación con el responsable, y de `activities.monthly_fee`, legado de importación. `activity_schedules` admite varios bloques semanales por día (`0–6`), con inicio anterior a fin y sin solaparse; `room_label` histórico se preserva al sincronizar bloques sin cambios. Las inscripciones nuevas congelan inscripción, cuota, frecuencia y término de origen, si existe; la historia no cambia al actualizar precios.
+`activity_price_terms` pertenece a club y actividad, conserva vigencias operativas no superpuestas y guarda inscripción y cuota enteras no negativas, frecuencia DAILY/WEEKLY/MONTHLY/YEARLY y moneda base del club. `cancelled_at` retiene vigencias futuras anuladas para auditoría y claves foráneas, pero las excluye de precios aplicables. Es independiente de `activity_terms`, que define la liquidación con el responsable, y de `activities.monthly_fee`, legado de importación. `activity_schedules` admite varios bloques semanales por día (`0–6`), con inicio anterior a fin y sin solaparse; `room_label` histórico se preserva al sincronizar bloques sin cambios. Las inscripciones nuevas congelan inscripción, cuota, frecuencia y término de origen, si existe; la historia no cambia al actualizar precios.
 
 ## Identidad y ownership
 
