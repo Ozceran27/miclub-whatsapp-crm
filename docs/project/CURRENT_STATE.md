@@ -1,6 +1,31 @@
 # Current State
 
+## Reversión de densidad visual — 2026-09-24
+
+Se retiró la capa experimental `density.css` por inconsistencias entre
+componentes y un badge «PRÓXIMAMENTE» demasiado grande. La tipografía,
+espaciado y componentes vuelven a la hoja previa. Se conserva el ajuste global
+de márgenes: a 1707 px CSS, aproximadamente 232 px a la izquierda y 60 px a la
+derecha; a 1366 px, 12 y 48 px. La reducción visual equivalente al zoom del
+navegador al 80 % sigue pendiente de un nuevo diseño y comparación real.
+
 ## Auditoría de Administración y espacio de trabajo — 2026-09-24
+
+Corrección posterior del ancho global: el breakpoint de 1450 px centraba el
+shell y su límite de 1314 px impedía llegar al borde solicitado. Ahora conserva
+el origen izquierdo en escritorio ancho y deja un margen derecho de 3,5 vw
+(acotado entre 24 y 64 px). En viewport CSS de 1707 px se midieron 232 px a la
+izquierda y 60 px a la derecha; a 1366 px, 12 y 48 px respectivamente; a 390 px,
+12 px por lado, sin overflow horizontal.
+
+`AUDIT_DATABASE_URL` sí está definido en `.env` y `.env.codex.local`; no se
+cargaba automáticamente en el proceso shell anterior. La conexión comprobada
+usa `miclub_audit` con `transaction_read_only=on`. El resumen se ejecutó contra
+la base local de solo lectura para el único club disponible: las dos posiciones
+de tendencia conservan importes financieros `null` y la consulta no produjo
+error. Esa base tiene un club, cero sectores, doce trabajadores, cero actividades,
+inscripciones y movimientos; no permite certificar aislamiento entre dos clubes
+ni recorridos con datos financieros reales.
 
 El resumen administrativo distingue cero real de indicador no calculado: los
 campos financieros y los totales de tareas/solicitudes que este read model no
@@ -23,13 +48,11 @@ carga de fallo de acción y no muestran una lista antigua tras una recarga
 fallida; el formulario de Tareas conserva el elemento antes de esperar la API.
 El circuito financiero informa fallos de su workbench y de saldos de apertura.
 
-El contenedor autenticado se amplió sólo hacia la derecha en escritorio ancho,
-con anchura máxima de 1314 px. El estándar de tablas futuras se
+El contenedor autenticado se amplió hacia la derecha en escritorio ancho. El estándar de tablas futuras se
 documentó en `docs/operations/ui-regression-checklist.md` usando Sectores,
 Trabajadores y Actividades; no se aplicó a otras tablas. No hubo cambios de
-esquema ni SQL real. El entorno no ofrece `AUDIT_DATABASE_URL`,
-`MIGRATION_GATE_DATABASE_URL` ni `DATABASE_URL`: siguen pendientes la revisión
-visual autenticada y la integración PostgreSQL de dos clubes. Los tests
+esquema ni SQL real. Siguen pendientes la revisión visual autenticada y la
+integración PostgreSQL de dos clubes. Los tests
 unitarios y de contrato no sustituyen esa certificación.
 
 ## Administración: listas de Actividades y Sectores — 2026-09-24

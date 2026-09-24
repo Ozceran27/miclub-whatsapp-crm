@@ -47,11 +47,15 @@ sin copiar tamaños de columnas que sólo tienen sentido para otro dominio.
 ## Área de trabajo global
 
 En escritorio ancho, el contenedor autenticado conserva el origen horizontal
-previo y extiende su borde derecho aproximadamente al 90,5 % del viewport de la
-captura de referencia. El ajuste pertenece a la estructura global, por lo que
-se revisan Inicio, Administración, Tesorería, CRM, Migración y navegación. En
-anchos menores el contenedor vuelve a centrarse y nunca debe provocar scroll
-horizontal de página.
+previo y deja un margen derecho de 3,5 vw, limitado a 24–64 px. A 1366 px CSS
+el margen izquierdo es de 12 px y el derecho de unos 48 px; a 1707 px son
+aproximadamente 232 y 60 px. Desde 1100 px el contenedor usa 12 px a ambos
+lados. El ajuste pertenece a la estructura global: revisar Inicio,
+Administración, Tesorería, CRM, Migración y navegación sin scroll horizontal.
+
+La capa experimental de densidad se retiró. Antes de intentar otra reducción
+de escala, comparar los mismos recorridos con el zoom real del navegador al
+80 % y al 100 %, incluidos badges, menús, modales y tablas.
 
 ## Onboarding: matriz de viewports
 

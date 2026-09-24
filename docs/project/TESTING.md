@@ -1,6 +1,28 @@
 # Testing
 
+## Reversión de densidad visual — 2026-09-24
+
+La capa `density.css`, su importación y los breakpoints experimentales de las
+listas se retiraron. En navegador local, el shell recuperó márgenes
+izquierda/derecha de 232/60 px a 1707 px, 12/48 px a 1366 px y 12/12 px a
+1024, 390 y 360 px, sin desbordamiento horizontal en la vista de verificación.
+El título volvió a 30 px en escritorio. La comparación visual autenticada con
+zoom real de Chrome al 80 % y al 100 % sigue pendiente.
+
+`npm run typecheck`, `npm run build`, `npm run test -w @miclub/web` (87/87),
+`npm run docs:check` y `git diff --check` pasaron. El lint web global conserva
+30 errores y 75 advertencias previos. El build mantiene el aviso del chunk
+principal grande. No hubo cambios de DB ni SQL.
+
 ## Auditoría de Administración y área global — 2026-09-24
+
+Corrección posterior: se comprobó el contenido de `.env` y `.env.codex.local`
+sin mostrar secretos y se conectó `miclub_audit` con
+`transaction_read_only=on`. El resumen completo respondió para el único club
+disponible; hay cero sectores, actividades, inscripciones y movimientos, por lo
+que no cubre datos financieros ni aislamiento de dos tenants. El shell ampliado
+se midió en navegador: 1707 px → margen izquierdo 232 px y derecho 60 px;
+1366 px → 12 y 48 px; 390 px → 12 px por lado, sin overflow horizontal.
 
 - API: 468/468, web: 87/87 y shared: 9/9. Incluye regresiones de
   autorización, ocultación de rentabilidad sin `finance:read`, estado vacío
@@ -10,11 +32,8 @@
 - Lint focalizado de los archivos modificados: 0 errores. El lint web global
   sigue fallando por deuda anterior (32 errores, 75 advertencias tras las
   correcciones de esta tarea; línea inicial 41/77).
-- Geometría del shell validada en navegador con estilos reales: en 1707 px,
-  borde derecho 90,54 %; en 1024 y 390 px, margen de 12 px y sin overflow
-  horizontal. Se verificó contraste del título en tema claro. No hubo sesión
-  autenticada para recorridos visuales completos ni `AUDIT_DATABASE_URL` para
-  validar SQL y datos de dos clubes contra PostgreSQL real.
+- No hubo sesión autenticada para recorridos visuales completos ni un segundo
+  club con datos para comprobar aislamiento entre tenants.
 
 ## Administración: sectores, trabajadores y actividades — 2026-09-23
 
