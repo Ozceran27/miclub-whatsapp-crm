@@ -1,5 +1,31 @@
 # Current State
 
+## Administración: listas de Actividades y Sectores — 2026-09-24
+
+Actividades presenta filas independientes sin encabezado visible, conserva
+encabezados semánticos y etiquetas en tarjetas compactas, y muestra sólo el
+nombre junto al ícono. La columna de inscripciones distingue mediante ícono y
+etiqueta accesible si admite altas nuevas; sólo cuando están habilitadas muestra
+el conteo de inscriptos activos recibido de la API. La distribución fija anchos
+para ambas variantes de permiso financiero, amplía condición económica y ajusta
+color al tamaño de su muestra.
+
+Sectores ordena sus datos como nombre, responsable, capacidad utilizada,
+estado, actividades, inscriptos y rentabilidad, también en tarjetas compactas.
+El ícono de identidad es ligeramente mayor. Son cambios de presentación: no
+modifican contratos, reglas de negocio ni esquema de PostgreSQL.
+
+## Administración: distribución de columnas — 2026-09-24
+
+Las listas de Trabajadores y Sectores ajustan la distribución horizontal de sus
+filas. Trabajadores fija los anchos con `colgroup`, porque el encabezado oculto
+no participa del cálculo de columnas: amplía el nombre, reduce rol y sector, y
+separa ligeramente remuneración del saldo. Remuneración,
+estado, acceso y fecha se centran. Sectores reduce espacios entre columnas y
+centra estado, actividades, inscriptos y rentabilidad. Los campos descriptivos
+permanecen alineados a la izquierda; la presentación en tarjetas para
+contenedores estrechos conserva su alineación de lectura.
+
 ## Administración: pulido de listas y alta de sectores — 2026-09-24
 
 La lista de Sectores muestra sólo capacidad utilizada y conserva los demás

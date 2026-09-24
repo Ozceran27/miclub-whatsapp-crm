@@ -132,9 +132,9 @@ export function SectorList() {
                 <span className="sector-list__color" style={{ backgroundColor: sector.color || '#91a4c8' }} aria-label={`Color ${sector.color || 'no configurado'}`} />
                 <strong>{sector.name}</strong>
               </span>
-              <span className="sector-list__status" data-status={sector.status}>{statusLabel(sector)}</span>
                <span className="sector-list__datum" title={sector.managerName || 'Sin asignar'}><small>Responsable</small><strong>{sector.managerName || 'Sin asignar'}</strong></span>
               <span className="sector-list__datum"><small>Capacidad utilizada</small><strong>{usedCapacity(sector)}</strong></span>
+              <span className="sector-list__status" data-status={sector.status}>{statusLabel(sector)}</span>
               <span className="sector-list__datum"><small>Actividades</small><strong>{integer.format(sector.activitiesCount ?? 0)}</strong></span>
               <span className="sector-list__datum"><small>Inscriptos activos</small><strong>{integer.format(sector.activeEnrollmentsCount ?? 0)}</strong></span>
               <span className="sector-list__datum sector-list__profitability"><small>Rentabilidad operativa anual</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0} title={`Acumulado ${sector.annualOperatingProfitabilityYear ?? new Date().getFullYear()} hasta hoy`}>{annualProfitability(sector)}</strong></span>
