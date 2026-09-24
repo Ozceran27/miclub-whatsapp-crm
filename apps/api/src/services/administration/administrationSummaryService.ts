@@ -5,7 +5,7 @@ import { getLastCompleteMonthWindows } from "../economyDomain.js";
 
 const toNumber = (value: string | number | null | undefined): number => Number(value ?? 0);
 
-const metric = (value: number, comparison: AdministrationMetricComparison | null = null) => ({ value, comparison });
+const metric = (value: number | null, comparison: AdministrationMetricComparison | null = null) => ({ value, comparison });
 
 export type SectorCapacityInput =
   | { capacityMode: "ENROLLMENTS"; configuredCapacity: number; activeEnrollments: number }
@@ -55,14 +55,14 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
       { id: "roles", label: "Roles", value: rows.entities.roles, tone: "neutral" },
       { id: "active-activities", label: "Actividades activas", value: rows.entities.active_activities, tone: "neutral" },
     ],
-    balance: { cutoffDate: null, valuationStatus: "INCOMPLETE_EXCHANGE_RATE", unvaluedAccountCount: 0, missingPairs: [], valuationMode: "LIVE_RECALCULATED", liquidity: metric(0), cash: metric(0), bank: metric(0), dollars: metric(0) },
-    pending: { income: metric(0), expenses: metric(0), balance: metric(0), movements: metric(0) },
+    balance: { cutoffDate: null, valuationStatus: "INCOMPLETE_EXCHANGE_RATE", unvaluedAccountCount: 0, missingPairs: [], valuationMode: "LIVE_RECALCULATED", liquidity: metric(null), cash: metric(null), bank: metric(null), dollars: metric(null) },
+    pending: { income: metric(null), expenses: metric(null), balance: metric(null), movements: metric(null) },
     totals: {
-      sectors: metric(0),
+      sectors: metric(sectorCapacityRows.length),
       activities: metric(rows.entities.active_activities),
       workers: metric(rows.entities.workers),
-      tasks: metric(0),
-      requests: metric(0),
+      tasks: metric(null),
+      requests: metric(null),
       movements: metric(toNumber(currentGrowth?.movements), comparison(toNumber(currentGrowth?.movements), toNumber(previousGrowth?.movements))),
       enrollments: metric(rows.enrollments.active, comparison(toNumber(currentGrowth?.enrollments), toNumber(previousGrowth?.enrollments))),
     },
@@ -75,10 +75,10 @@ export const getAdministrationSummary = async (clubId: string): Promise<Administ
     },
     trends: {
       granularity: "month",
-      points: rows.growth.map((row) => ({ period: row.period, granularity: "month", income: toNumber(row.income), expenses: toNumber(row.expenses), balance: toNumber(row.balance), movements: row.movements, enrollments: row.enrollments })),
+      points: rows.growth.map((row) => ({ period: row.period, granularity: "month", income: null, expenses: null, balance: null, movements: row.movements, enrollments: row.enrollments })),
     },
     recentMovements: [],
     generatedAt: new Date().toISOString(),
-    metadata: { source: "postgres", warnings: [] },
+    metadata: { source: "postgres", warnings: ["Los indicadores financieros y los totales de tareas y solicitudes no forman parte de este resumen operativo."] },
   };
 };

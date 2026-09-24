@@ -89,14 +89,15 @@ export const getAdministrationSummaryRows = async (
         (select count(*)::integer from miclub.activities where club_id = $1 and status = 'activa'::miclub.entity_status and archived_at is null) as active_activities
     `, [clubId]),
     pool.query<AdministrationTopActivityRow>(`
-      select a.id::text, a.name as label, count(e.id)::integer as enrollments
+      select a.id::text, a.name as label, count(eos.enrollment_id)::integer as enrollments
       from miclub.activities a
       left join miclub.enrollments e on e.activity_id = a.id and e.club_id = a.club_id
+        and coalesce(e.inactive, false) = false and e.superseded_at is null
       left join miclub.v_enrollment_lifecycle_v2 eos on eos.enrollment_id = e.id and eos.club_id = e.club_id
+        and eos.effective_status not in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status)
       where a.club_id = $1
         and a.status = 'activa'::miclub.entity_status
         and a.archived_at is null
-        and (e.id is null or (coalesce(e.inactive, false) = false and e.superseded_at is null and eos.effective_status not in ('abandonado'::miclub.enrollment_status, 'cancelado'::miclub.enrollment_status)))
       group by a.id, a.name
       order by enrollments desc, a.name asc
       limit 3
@@ -110,9 +111,9 @@ export const getAdministrationSummaryRows = async (
       select
         to_char(months.month_start at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM') as period,
         coalesce((select count(*)::integer from miclub.enrollments e where e.club_id = $1 and coalesce(e.inactive, false) = false and e.superseded_at is null and coalesce(e.enrollment_date, e.start_date) >= (months.month_start at time zone 'America/Argentina/Buenos_Aires')::date and coalesce(e.enrollment_date, e.start_date) < (months.month_end at time zone 'America/Argentina/Buenos_Aires')::date), 0) as enrollments,
-        coalesce(sum(m.amount) filter (where m.movement_type = 'INGRESOS'), 0) as income,
-        coalesce(sum(m.amount) filter (where m.movement_type = 'EGRESOS'), 0) as expenses,
-        coalesce(sum(case when m.movement_type = 'INGRESOS' then m.amount when m.movement_type = 'EGRESOS' then -m.amount else 0 end), 0) as balance,
+        null::numeric as income,
+        null::numeric as expenses,
+        null::numeric as balance,
         count(m.id)::integer as movements
       from months
       left join miclub.movements m on m.club_id = $1 and m.movement_date >= months.month_start and m.movement_date < months.month_end and ${completedMovementPredicate("m")}

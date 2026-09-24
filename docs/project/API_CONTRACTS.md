@@ -1,5 +1,20 @@
 # API Contracts
 
+## Lecturas administrativas — 2026-09-24
+
+`GET /api/administration/workers` requiere `administration.view` y
+`workers.view`. El editor de Actividades consulta
+`GET /api/administration/activity-workers` con `administration.view` y
+`activities.view`; devuelve sólo `id`, `personId`, nombre y rol de empleados
+activos del tenant. `GET /api/administration/activity-sectors` entrega sólo
+sectores activos visibles para elegir el sector de la actividad. La lectura
+financiera legacy `GET /api/administration`
+requiere además `finance:read`. En `/summary`, el valor `null` significa que
+el read model no calcula ese indicador; no debe presentarse como cero.
+En `trends.points`, `income`, `expenses` y `balance` también son `null` hasta
+contar con una valoración homogénea por moneda; `movements` y `enrollments`
+siguen siendo conteos reales.
+
 ## Saldos de trabajadores — 2026-09-23
 
 `GET /api/administration/workers/balances?page=N&limit=20` requiere sesión, membresía, `administration.view`, `workers.view` y `finance:read`. Devuelve `{asOf,scope,items}`; cada elemento incluye `workerId`, `personId`, `status` (`AVAILABLE` o `INCOMPLETE`) y `amounts` por moneda con importe firmado y `pendingReview`. `scope` es `ALL_SECTORS` o `VISIBLE_SECTORS`. No admite `clubId` del cliente y se entrega con `Cache-Control: private, no-store`. Un estado `INCOMPLETE` impide presentar un cero supuesto. El endpoint laboral general no incluye importes financieros.
@@ -105,7 +120,8 @@ Enviar un receptor económico sin nuevas condiciones es inválido.
 `annualOperatingProfitabilityYear`, `annualOperatingMovements`,
 `operatingCurrencyCode` y estado `AVAILABLE`, `NO_MOVEMENTS` o
 `INCOMPLETE_EXCHANGE_RATE`. La definición financiera coincide con la documentada
-en `BUSINESS_RULES.md`.
+en `BUSINESS_RULES.md`. Estos campos de rentabilidad se omiten del JSON si la
+membresía no posee `finance:read`, aunque pueda consultar la actividad.
 
 `GET /api/sectores` excluye archivados y agrega por sector
 `annualOperatingProfitability`, `annualOperatingProfitabilityStatus`,
@@ -115,6 +131,8 @@ del año local del club hasta hoy, convertido con la última cotización oficial
 disponible a la fecha de cada movimiento. Si falta una cotización requerida, el
 importe es `null` y el estado es `INCOMPLETE_EXCHANGE_RATE`; no se suman importes
 nominales de monedas distintas ni se presenta un cero inventado.
+Los campos anuales de rentabilidad del sector también se omiten sin
+`finance:read`.
 
 `POST /api/administration/sectors` admite `managerPersonId` nulo u omitido; si
 se informa, debe identificar a una persona operativa activa del mismo club.

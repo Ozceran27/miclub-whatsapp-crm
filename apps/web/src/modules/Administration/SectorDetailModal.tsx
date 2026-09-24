@@ -6,7 +6,7 @@ import { getSectorVisualMeta } from '../sectorVisualMeta';
 import { activityStatusLabel } from './activityPresentation';
 import { SectorConfigurationFields } from './SectorConfigurationFields';
 
-type Props = { sector: AdministrationSectorDto; canEdit: boolean; canArchive: boolean; onClose: () => void; onChanged: () => Promise<void> };
+type Props = { sector: AdministrationSectorDto; canEdit: boolean; canArchive: boolean; canViewFinancials: boolean; canViewActivities: boolean; onClose: () => void; onChanged: () => Promise<void> };
 const number = new Intl.NumberFormat('es-AR');
 const statusLabels: Record<string, string> = { active: 'Activo', inactive: 'Inactivo', under_repair: 'En reparación', archived: 'Archivado' };
 const formText = (form: FormData, name: string) => { const value=form.get(name); return typeof value==='string' ? value.trim() : ''; };
@@ -16,7 +16,7 @@ const money = (value: number, currency = 'ARS') => {
   catch { return `${number.format(value)} ${currency}`; }
 };
 
-export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChanged }: Props) {
+export function SectorDetailModal({ sector, canEdit, canArchive, canViewFinancials, canViewActivities, onClose, onChanged }: Props) {
   const [activities, setActivities] = useState<AdministrationActivityDto[]>([]);
   const [managers, setManagers] = useState<SectorManagerCandidate[]>([]);
   const [managersError, setManagersError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
 
   useEffect(() => {
     const controller = new AbortController();
-    void Promise.allSettled([getSectorActivities(sector.id, controller.signal), getSectorManagerCandidates(controller.signal)])
+    void Promise.allSettled([canViewActivities ? getSectorActivities(sector.id, controller.signal) : Promise.resolve({ items: [] }), getSectorManagerCandidates(controller.signal)])
       .then(([activityResult, workerResult]) => {
         if (controller.signal.aborted) return;
         if (activityResult.status === 'fulfilled') setActivities(activityResult.value.items);
@@ -41,7 +41,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
       })
       .finally(() => { if (!controller.signal.aborted) setLoadingRelated(false); });
     return () => controller.abort();
-  }, [sector.id]);
+  }, [sector.id, canViewActivities]);
 
   const edit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -118,12 +118,12 @@ export function SectorDetailModal({ sector, canEdit, canArchive, onClose, onChan
       <div><small>Capacidad ociosa</small><strong>{idle}</strong></div>
       <div><small>Actividades</small><strong>{number.format(sector.activitiesCount ?? 0)}</strong></div>
       <div><small>Inscriptos activos</small><strong>{number.format(sector.activeEnrollmentsCount ?? 0)}</strong></div>
-      <div><small>Rentabilidad operativa {sector.annualOperatingProfitabilityYear ?? ''}</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0}>{profitability}</strong></div>
+      {canViewFinancials && <div><small>Rentabilidad operativa {sector.annualOperatingProfitabilityYear ?? ''}</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0}>{profitability}</strong></div>}
     </section>
 
     {canEdit && <section className="sector-editor__operations"><div><h4>Estado operativo</h4><p>Cambiá la disponibilidad del sector sin alterar su historia.</p></div><div className="sector-editor__status-actions"><button type="button" disabled={saving || sector.status === 'active'} onClick={() => void changeStatus('active')}>Activar</button><button type="button" disabled={saving || sector.status === 'inactive'} onClick={() => void changeStatus('inactive')}>Desactivar</button><button type="button" disabled={saving || sector.status === 'under_repair'} onClick={() => void changeStatus('under_repair')}>En reparación</button></div></section>}
 
-    <section className="sector-editor__related"><div><h4>Actividades vinculadas</h4><span>{loadingRelated ? 'Cargando…' : `${activities.length} vinculadas`}</span></div>{!loadingRelated && (activities.length ? <ul className="sector-modal__items">{activities.slice(0, 6).map(activity => <li key={activity.id}><strong>{activity.name}</strong><span>{activityStatusLabel(activity.status)}</span></li>)}</ul> : <p>No hay actividades asociadas.</p>)}</section>
+    {canViewActivities && <section className="sector-editor__related"><div><h4>Actividades vinculadas</h4><span>{loadingRelated ? 'Cargando…' : `${activities.length} vinculadas`}</span></div>{!loadingRelated && (activities.length ? <ul className="sector-modal__items">{activities.slice(0, 6).map(activity => <li key={activity.id}><strong>{activity.name}</strong><span>{activityStatusLabel(activity.status)}</span></li>)}</ul> : <p>No hay actividades asociadas.</p>)}</section>}
 
     {error && <p className="activity-form__error" role="alert">{error}</p>}
     </>}

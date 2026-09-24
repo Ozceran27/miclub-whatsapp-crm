@@ -65,6 +65,9 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
   const edit = wb?.movements.find(m => m.id === selected);
   return <section className="finance-circuit" aria-label="Circuito financiero">
     <h2>{summaryOnly ? 'Saldos financieros' : 'Liquidaciones y conciliación'}</h2>
+    {!summaryOnly && Boolean(workbench.error) && <p role="alert">No se pudieron cargar las herramientas financieras: {workbench.error instanceof Error ? workbench.error.message : 'Error desconocido.'} <button type="button" onClick={() => void workbench.refetch()}>Reintentar</button></p>}
+    {!summaryOnly && !wb && !workbench.error && <p role="status">Cargando herramientas financieras…</p>}
+    {canReconcile && Boolean(opening.error) && <p role="alert">No se pudieron cargar los saldos de apertura: {opening.error instanceof Error ? opening.error.message : 'Error desconocido.'} <button type="button" onClick={() => void opening.refetch()}>Reintentar</button></p>}
     <div className="finance-totals">
       <p>Liquidez <strong>{money(p.liquidity, p.currencyCode)}</strong></p>
       <p>Saldo proyectado <strong>{money(p.projectedBalance, p.currencyCode)}</strong></p>

@@ -301,6 +301,16 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 1314px;
+  margin-left: max(12px, calc((100vw - 1244px) / 2));
+  margin-right: 12px;
+}
+
+@media (max-width: 1450px) {
+  .app-shell {
+    max-width: calc(100% - 24px);
+    margin-inline: auto;
+  }
 }
 
 .module-nav {
@@ -2897,6 +2907,10 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 [data-theme='light'] .section-header h3,
 [data-theme='light'] .empty-state-title {
   color: var(--color-text-strong);
+}
+
+[data-theme='light'] .module-hero h2 {
+  color: #f4f8ff;
 }
 
 [data-theme='light'] .app-header p,

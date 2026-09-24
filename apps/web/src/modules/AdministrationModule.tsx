@@ -69,14 +69,15 @@ export default function AdministrationModule() {
         />
       )}
 
-      {dashboard.summary && dashboard.status === 'ready' && (
-        <section className="home-dashboard-stack" aria-label="Tablero administrativo del club">
+      <section className="home-dashboard-stack" aria-label="Tablero administrativo del club">
+        {dashboard.summary && dashboard.status === 'ready' && <>
           <AdministrationHeaderCards summary={dashboard.summary} />
           {dashboard.summary.balance.conversion && <MoneyPresentation
             usdNominal={dashboard.summary.balance.conversion.usdNominal}
             presentationCurrencyCode={dashboard.summary.balance.conversion.presentationCurrencyCode as PresentationCurrencyCode}
             quote={{ appliedRate: dashboard.summary.balance.conversion.appliedRate, rateDate: dashboard.summary.balance.conversion.rateDate, source: dashboard.summary.balance.conversion.source, convertedValue: dashboard.summary.balance.conversion.appliedRate === null ? null : dashboard.summary.balance.conversion.convertedValue }}
           />}
+        </>}
           <AdministrationActions
             onCreateMovement={()=>setMovementOpen(true)}
             onCreateEnrollment={()=>setEnrollmentOpen(true)}
@@ -89,8 +90,7 @@ export default function AdministrationModule() {
             canCreateWorker={canCreateWorker}
             canCreateActivity={canCreateActivity}
           />
-        </section>
-      )}
+      </section>
       </div>
       <div id="admin-sectors">{capabilities.sectors ? <SectorList /> : <UnavailableSurface capability="sectors" title="Sectores" />}</div>
       <div id="admin-workers">{capabilities.workers ? <WorkerList /> : <UnavailableSurface capability="workers" title="Trabajadores" />}</div>

@@ -9,33 +9,21 @@ import { useServerQuery } from '../../serverState/client';
 type AdministrationSummaryError = { message: string };
 export type AdministrationSummaryStatus = 'loading' | 'error' | 'empty' | 'ready';
 
-const hasKnownNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const hasSummaryData = (summary: AdministrationSummaryResponse | null) => summary !== null;
 
-const hasSummaryData = (summary: AdministrationSummaryResponse | null) => {
-  if (!summary) return false;
-  const values = [
-    summary.totals?.enrollments?.value,
-    summary.capacity?.totalCapacity,
-    summary.capacity?.occupied,
-    summary.totals?.workers?.value,
-    summary.totals?.activities?.value,
-    summary.rankings?.activitiesByEnrollments?.length,
-    summary.trends?.points?.length
-  ];
-  return values.some((value) => hasKnownNumber(value) ? value > 0 : Boolean(value));
-};
+export const administrationSummaryStatus = (summary: AdministrationSummaryResponse | null, loading: boolean, error: unknown): AdministrationSummaryStatus =>
+  loading ? 'loading' : error ? 'error' : hasSummaryData(summary) ? 'ready' : 'empty';
 
 export function useAdministrationSummary() {
   const { clubId } = useSession();
   const queryFn = useCallback(({signal}:{signal:AbortSignal}) => getAdministrationSummary(signal), []);
-  const query = useServerQuery({ key: keys.administrationSummary(clubId), queryFn, policy: policies.dashboard });
-  const summary = query.data ?? null;
-  const loading = query.loading;
-  const error: AdministrationSummaryError | null = query.error ? { message: query.error instanceof Error ? query.error.message : 'Error desconocido al cargar Administración.' } : null;
-  const loadAdministrationSummary = useCallback(async () => { await query.refetch(); }, [query.refetch]);
+  const { data, loading, error: queryError, refetch } = useServerQuery({ key: keys.administrationSummary(clubId), queryFn, policy: policies.dashboard });
+  const summary = data ?? null;
+  const loadAdministrationSummary = useCallback(async () => { await refetch(); }, [refetch]);
 
   return useMemo(() => {
-    const status: AdministrationSummaryStatus = loading ? 'loading' : error ? 'error' : hasSummaryData(summary) ? 'ready' : 'empty';
+    const error: AdministrationSummaryError | null = queryError ? { message: queryError instanceof Error ? queryError.message : 'Error desconocido al cargar Administración.' } : null;
+    const status = administrationSummaryStatus(summary, loading, error);
     return { summary, loading, error, status, loadAdministrationSummary };
-  }, [error, loadAdministrationSummary, loading, summary]);
+  }, [queryError, loadAdministrationSummary, loading, summary]);
 }

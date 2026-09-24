@@ -13,6 +13,46 @@ Ejecutar `npm run test -w @miclub/web`. La suite `uiRegression.test.ts` conviert
 
 La regla funcional es: **desconocido o fallido no equivale a cero**. Un cero se muestra únicamente cuando la respuesta fue exitosa y el valor fue realmente informado.
 
+## Estándar de tablas administrativas
+
+Las listas actuales de **Sectores, Trabajadores y Actividades** son la referencia
+para futuras tablas de la aplicación. Este estándar documenta su diseño; no
+autoriza a cambiar otras tablas durante esta tarea.
+
+- Cada registro es una fila o tarjeta compacta independiente, con superficie,
+  borde, radio y separación consistentes con los tokens de tema claro y oscuro.
+- La primera celda identifica la entidad mediante icono o inicial y nombre. Los
+  campos descriptivos se alinean a la izquierda; estados, conteos y cifras se
+  alinean según su función y conservan una jerarquía de texto principal/secundario.
+- Las tablas HTML conservan `thead` y `th` semánticos aun cuando el encabezado
+  esté oculto visualmente. La vista de tarjetas muestra etiquetas de campo.
+- Las columnas distribuyen el ancho disponible sin imponer scroll horizontal.
+  Los valores largos se acortan visualmente y su contenido completo está
+  disponible en la ficha; no se usa el truncamiento para ocultar la única vía
+  de consulta del dato.
+- La fila abre su ficha con puntero, Enter y Espacio, muestra foco visible y
+  mantiene nombre accesible. Los estados de carga, vacío y error son explícitos.
+- La adaptación depende del ancho real del contenedor: escritorio presenta
+  columnas compactas y los anchos estrechos pasan a tarjetas legibles. Verificar
+  ambas variantes de permisos financieros en Trabajadores y Actividades.
+- La ficha modal conserva nombre accesible, Escape, contención y restauración de
+  foco. La semántica, orden y ancho de columnas específicos de cada dominio se
+  mantienen en su propio componente.
+
+Revisión visual mínima: Sectores, Trabajadores y Actividades con datos largos,
+valores ausentes, cifras negativas y estados distintos; temas claro y oscuro;
+escritorio ancho, tablet y móvil. Al incorporar una tabla nueva, usar esta guía
+sin copiar tamaños de columnas que sólo tienen sentido para otro dominio.
+
+## Área de trabajo global
+
+En escritorio ancho, el contenedor autenticado conserva el origen horizontal
+previo y extiende su borde derecho aproximadamente al 90,5 % del viewport de la
+captura de referencia. El ajuste pertenece a la estructura global, por lo que
+se revisan Inicio, Administración, Tesorería, CRM, Migración y navegación. En
+anchos menores el contenedor vuelve a centrarse y nunca debe provocar scroll
+horizontal de página.
+
 ## Onboarding: matriz de viewports
 
 Validar siempre con el **zoom del navegador al 100%**, sin escalado CSS. En cada escenario, el encabezado de progreso y la barra de acciones deben permanecer visibles; cuando el paso exceda el espacio disponible, únicamente `.onboarding-viewport` debe desplazarse.

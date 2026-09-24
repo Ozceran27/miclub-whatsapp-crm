@@ -50,7 +50,8 @@ export interface AdministrationMetricComparison {
 }
 
 export interface AdministrationMetric {
-  value: number;
+  /** null means this read model does not provide a trustworthy value. */
+  value: number | null;
   comparison: AdministrationMetricComparison | null;
 }
 
@@ -111,9 +112,9 @@ export interface AdministrationRankings {
 export interface AdministrationTrendPoint {
   period: string;
   granularity: AdministrationTrendGranularity;
-  income: number;
-  expenses: number;
-  balance: number;
+  income: number | null;
+  expenses: number | null;
+  balance: number | null;
   movements: number;
   enrollments?: number;
   tasks?: number;

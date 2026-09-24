@@ -1,7 +1,7 @@
-import { areActivitySchedulesValid, DEFAULT_ACTIVITY_ICON_KEY, type ActivityScheduleBlock, type AdministrationActivityDto, type AdministrationSectorDto } from '@miclub/shared';
+import { areActivitySchedulesValid, DEFAULT_ACTIVITY_ICON_KEY, type ActivityScheduleBlock, type AdministrationActivityDto } from '@miclub/shared';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiError } from '../../api';
-import { createAdministrationActivity, getActivityFormCatalogs, getActivityPriceHistory, getActivityTermHistory, updateAdministrationActivity, type ActivityPriceHistoryItem, type ActivityTermHistoryItem, type ActivityWorkerCatalogItem, type AdministrationActivityMutation } from '../../services/api/administrationApi';
+import { createAdministrationActivity, getActivityFormCatalogs, getActivityPriceHistory, getActivityTermHistory, updateAdministrationActivity, type ActivityPriceHistoryItem, type ActivitySectorCatalogItem, type ActivityTermHistoryItem, type ActivityWorkerCatalogItem, type AdministrationActivityMutation } from '../../services/api/administrationApi';
 import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
 import { ActivityIconPicker, ConfigurationColorPicker } from '../shared/ConfigurationVisualFields';
 import { FormattedValueInput } from '../shared/FormattedValueInput';
@@ -14,7 +14,7 @@ const nextDay = (value: string) => { const date=new Date(`${value}T00:00:00Z`);d
 
 export function ActivityCreateEditModal({ activity, onClose, onSaved }: Props) {
   const activityId=activity?.id;
-  const [sectors, setSectors] = useState<AdministrationSectorDto[]>([]);
+  const [sectors, setSectors] = useState<ActivitySectorCatalogItem[]>([]);
   const [workers, setWorkers] = useState<ActivityWorkerCatalogItem[]>([]);
   const [terms, setTerms] = useState<ActivityTermHistoryItem[]>([]);
   const [prices,setPrices]=useState<ActivityPriceHistoryItem[]>([]);

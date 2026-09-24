@@ -33,6 +33,8 @@ export function SectorList() {
   const canCreate = permissions.includes(PERMISSIONS.SECTORS_CREATE);
   const canEdit = permissions.includes(PERMISSIONS.SECTORS_EDIT);
   const canArchive = permissions.includes(PERMISSIONS.SECTORS_ARCHIVE);
+  const canViewFinancials = permissions.includes(PERMISSIONS.FINANCE_READ);
+  const canViewActivities = permissions.includes(PERMISSIONS.ACTIVITIES_VIEW);
   const [response, setResponse] = useState<AdministrationSectorsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,14 +139,14 @@ export function SectorList() {
               <span className="sector-list__status" data-status={sector.status}>{statusLabel(sector)}</span>
               <span className="sector-list__datum"><small>Actividades</small><strong>{integer.format(sector.activitiesCount ?? 0)}</strong></span>
               <span className="sector-list__datum"><small>Inscriptos activos</small><strong>{integer.format(sector.activeEnrollmentsCount ?? 0)}</strong></span>
-              <span className="sector-list__datum sector-list__profitability"><small>Rentabilidad operativa anual</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0} title={`Acumulado ${sector.annualOperatingProfitabilityYear ?? new Date().getFullYear()} hasta hoy`}>{annualProfitability(sector)}</strong></span>
+              {canViewFinancials && <span className="sector-list__datum sector-list__profitability"><small>Rentabilidad operativa anual</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0} title={`Acumulado ${sector.annualOperatingProfitabilityYear ?? new Date().getFullYear()} hasta hoy`}>{annualProfitability(sector)}</strong></span>}
               <span className="sector-list__system-badge" data-visible={sector.isSystem || undefined} role={sector.isSystem ? 'img' : undefined} aria-label={sector.isSystem ? 'Sector del sistema' : undefined} title={sector.isSystem ? 'Sector del sistema' : undefined}>{sector.isSystem ? '🔒' : null}</span>
               <span className="sector-list__arrow" aria-hidden="true">›</span>
             </button>
           ))}
         </div>
       )}
-      {selectedSector && <SectorDetailModal sector={selectedSector} canEdit={canEdit} canArchive={canArchive} onClose={() => setSelectedSectorId(null)} onChanged={async()=>{setSelectedSectorId(null);await load();window.dispatchEvent(new Event('miclub:navigation-changed'));}} />}
+      {selectedSector && <SectorDetailModal sector={selectedSector} canEdit={canEdit} canArchive={canArchive} canViewFinancials={canViewFinancials} canViewActivities={canViewActivities} onClose={() => setSelectedSectorId(null)} onChanged={async()=>{setSelectedSectorId(null);await load();window.dispatchEvent(new Event('miclub:navigation-changed'));}} />}
       {canCreate && creating && <ConfigurationEditorModal
         title="Agregar Nuevo Sector"
         eyebrow="Configuración del club"

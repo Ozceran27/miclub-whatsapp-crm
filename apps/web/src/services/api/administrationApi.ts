@@ -1,4 +1,4 @@
-import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorCreateDto, AdministrationSectorUpdateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerBalancesResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
+import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationPaginatedResponse, AdministrationSectorCreateDto, AdministrationSectorDto, AdministrationSectorUpdateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerBalancesResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -11,8 +11,20 @@ export const getAdministrationResource = <T>(key: keyof typeof administrationEnd
 export const getAdministrationSummary = (signal?: AbortSignal) =>
   getAdministrationResource<AdministrationSummaryResponse>('summary', signal);
 
-export const getAdministrationSectors = (signal?: AbortSignal) =>
-  apiJson<AdministrationSectorsResponse>('/api/sectores?page=1&limit=100', { cache: 'no-store', signal });
+const getAllAdministrationRecords = async <T>(path: `/${string}`, signal?: AbortSignal): Promise<AdministrationPaginatedResponse<T>> => {
+  const request = (page: number) => apiJson<AdministrationPaginatedResponse<T>>(`${path}${path.includes('?') ? '&' : '?'}page=${page}&limit=100` as `/${string}`, { cache: 'no-store', signal });
+  const first = await request(1);
+  const items = [...first.items];
+  for (let page = 2, pages = Math.ceil(first.total / 100); page <= pages; page += 1) {
+    const next = await request(page);
+    if (!next.items.length) throw new Error('El listado cambió durante la carga. Actualizá para intentarlo de nuevo.');
+    items.push(...next.items);
+  }
+  return { ...first, items };
+};
+
+export const getAdministrationSectors = (signal?: AbortSignal): Promise<AdministrationSectorsResponse> =>
+  getAllAdministrationRecords('/api/sectores', signal);
 
 export type SectorManagerCandidate = { personId: string; displayName: string };
 export const getSectorManagerCandidates = (signal?: AbortSignal) =>
@@ -24,10 +36,15 @@ export const updateAdministrationSector = (id:string,input:AdministrationSectorU
 export const changeAdministrationSectorStatus = (id:string,updatedAt:string,status:'active'|'inactive'|'under_repair') => apiJson(`/api/sectors/${encodeURIComponent(id)}/status` as `/${string}`,{method:'PATCH',body:JSON.stringify({updatedAt,status})});
 export const archiveAdministrationSector = (id:string,updatedAt:string) => apiJson(`/api/sectors/${encodeURIComponent(id)}/archive` as `/${string}`,{method:'POST',body:JSON.stringify({updatedAt})});
 
-export const getAdministrationActivities = (signal?: AbortSignal) =>
-  apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100', { cache: 'no-store', signal });
+export const getAdministrationActivities = (signal?: AbortSignal): Promise<AdministrationActivitiesResponse> =>
+  getAllAdministrationRecords('/api/actividades', signal);
 
 export type ActivityWorkerCatalogItem = { id: string; personId: string; displayName: string; role: string | null };
+export type ActivitySectorCatalogItem = Pick<AdministrationSectorDto, 'id' | 'name' | 'status'>;
+export const getActivityWorkerCandidates = (signal?: AbortSignal) =>
+  apiJson<{ items: ActivityWorkerCatalogItem[] }>('/api/administration/activity-workers', { cache: 'no-store', signal });
+export const getActivitySectorCandidates = (signal?: AbortSignal) =>
+  apiJson<{ items: ActivitySectorCatalogItem[] }>('/api/administration/activity-sectors', { cache: 'no-store', signal });
 export type ActivityTermHistoryItem = { id:string; mode:'FIXED'|'VARIABLE'; fixedClubFee:number|null; fixedFeeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY'|null; clubSharePercentage:number|null; currencyCode:string|null; effectiveFrom:string; effectiveTo:string|null; responsiblePersonId:string|null; responsiblePersonName:string|null; revision:number; phase:'FUTURE'|'CURRENT'|'HISTORICAL' };
 export type ActivityPriceHistoryItem={id:string;enrollmentPrice:number;feePrice:number;feeFrequency:'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY';currencyCode:string;effectiveFrom:string;effectiveTo:string|null;cancelledAt:string|null};
 export type AdministrationActivityMutation = ActivityMutationContract;
@@ -35,14 +52,13 @@ export type AdministrationActivityMutationResponse = { id: string; updatedAt: st
 
 export const getActivityFormCatalogs = async (signal?: AbortSignal) => {
   const [sectors, workers, currency] = await Promise.all([
-    getAdministrationSectors(signal),
-    getAdministrationWorkers(signal),
+    getActivitySectorCandidates(signal),
+    getActivityWorkerCandidates(signal),
     apiJson<{currencyCode:string}>('/api/administration/club-currency',{signal}),
   ]);
-  const activeWorkers = workers.items.filter((worker) => worker.isActive && worker.personId);
   return {
-    sectors: sectors.items.filter((sector) => sector.status === 'active'),
-    workers: activeWorkers.map((worker) => ({ id: worker.id, personId: worker.personId!, displayName: worker.displayName, role: worker.role ?? null })),
+    sectors: sectors.items,
+    workers: workers.items,
     currencyCode:currency.currencyCode,
   };
 };
@@ -69,13 +85,13 @@ export const getAnnualActivityRanking = (signal?: AbortSignal) =>
   apiJson<EconomySectorRankings>('/api/economy/activity-rankings?limit=100', { cache: 'no-store', signal });
 
 export const getSectorActivities = (sectorId: string, signal?: AbortSignal) =>
-  apiJson<AdministrationActivitiesResponse>(`/api/actividades?page=1&limit=100&sectorId=${encodeURIComponent(sectorId)}`, { cache: 'no-store', signal });
+  getAllAdministrationRecords<AdministrationActivitiesResponse['items'][number]>(`/api/actividades?sectorId=${encodeURIComponent(sectorId)}`, signal);
 
 export const getActivityEnrollments = (activityId: string, signal?: AbortSignal) =>
-  apiJson<AdministrationEnrollmentsResponse>(`/api/inscripciones?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });
+  getAllAdministrationRecords<AdministrationEnrollmentsResponse['items'][number]>(`/api/inscripciones?activityId=${encodeURIComponent(activityId)}`, signal);
 
 export const getActivityMovements = (activityId: string, signal?: AbortSignal) =>
-  apiJson<AdministrationMovementsResponse>(`/api/movimientos?page=1&limit=100&activityId=${encodeURIComponent(activityId)}`, { cache: 'no-store', signal });
+  getAllAdministrationRecords<AdministrationMovementsResponse['items'][number]>(`/api/movimientos?activityId=${encodeURIComponent(activityId)}`, signal);
 export const getActivityTermHistory = (activityId:string,signal?:AbortSignal) =>
   apiJson<{items:ActivityTermHistoryItem[]}>(`/api/administration/activities/${encodeURIComponent(activityId)}/terms` as `/${string}`,{cache:'no-store',signal});
 export const getActivityPriceHistory = (activityId:string,signal?:AbortSignal) =>
@@ -108,10 +124,22 @@ export const createAdministrationMovement = (input: Record<string,unknown>, idem
   apiJson<Record<string,unknown>>('/api/finance/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify({ movement: input, reason: 'Registro de movimiento desde Administración' })});
 
 export type EnrollmentCatalogItem={id:string;name:string;status?:string;generatesEnrollments?:boolean;pricingConfigured?:boolean;enrollmentPrice?:number|null;feePrice?:number|null;feeFrequency?:string|null;currencyCode?:string|null};
+type EnrollmentPerson = { id:string; firstName?:string; lastName?:string; dni?:string };
+const getEnrollmentPeople = async (signal?:AbortSignal) => {
+  const items: EnrollmentPerson[] = [];
+  let total = 0;
+  do {
+    const response = await apiJson<{items:EnrollmentPerson[];total:number}>(`/api/people?limit=200&offset=${items.length}` as `/${string}`, {signal});
+    total = response.total;
+    if (!response.items.length && items.length < total) throw new Error('El catálogo de personas cambió durante la carga. Reintentá.');
+    items.push(...response.items);
+  } while (items.length < total);
+  return items;
+};
 export const getEnrollmentFormCatalogs=async(signal?:AbortSignal)=>{const [peopleResponse,activitiesResponse]=await Promise.all([
-  apiJson<{items:Array<{id:string;firstName?:string;lastName?:string;dni?:string}>}>('/api/people?limit=200',{signal}),
-  apiJson<AdministrationActivitiesResponse>('/api/actividades?page=1&limit=100',{signal})
+  getEnrollmentPeople(signal),
+  getAdministrationActivities(signal)
 ]);
-  return {people:peopleResponse.items.map(person=>({id:person.id,name:`${person.firstName??''} ${person.lastName??''}`.trim()+(person.dni?` · DNI ${person.dni}`:'')})),activities:activitiesResponse.items.map(activity=>({id:activity.id,name:activity.name,status:activity.status,generatesEnrollments:activity.generatesEnrollments,pricingConfigured:activity.pricingConfigured,enrollmentPrice:activity.enrollmentPrice,feePrice:activity.feePrice,feeFrequency:activity.feeFrequency,currencyCode:activity.priceCurrencyCode??activity.operatingCurrencyCode}))};
+  return {people:peopleResponse.map(person=>({id:person.id,name:`${person.firstName??''} ${person.lastName??''}`.trim()+(person.dni?` · DNI ${person.dni}`:'')})),activities:activitiesResponse.items.map(activity=>({id:activity.id,name:activity.name,status:activity.status,generatesEnrollments:activity.generatesEnrollments,pricingConfigured:activity.pricingConfigured,enrollmentPrice:activity.enrollmentPrice,feePrice:activity.feePrice,feeFrequency:activity.feeFrequency,currencyCode:activity.priceCurrencyCode??activity.operatingCurrencyCode}))};
 };
 export const createAdministrationEnrollment=(input:Record<string,unknown>)=>apiJson<Record<string,unknown>>('/api/inscripciones',{method:'POST',body:JSON.stringify(input)});

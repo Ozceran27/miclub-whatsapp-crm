@@ -22,6 +22,14 @@ const permissionsByResource = {
   movimientos: PERMISSIONS.FINANCE_READ, inscripciones: PERMISSIONS.ENROLLMENTS_VIEW
 } as const satisfies Record<ReadOnlyResource, KnownPermission>;
 
+export const redactReadOnlyFinancials = (resource: ReadOnlyResource, item: Record<string, unknown>, canReadFinance: boolean) => {
+  if (canReadFinance || (resource !== "sectores" && resource !== "actividades")) return item;
+  const { annualOperatingProfitability: _amount, annualOperatingProfitabilityStatus: _status,
+    annualOperatingMovements: _movements, annualOperatingProfitabilityYear: _year,
+    operatingCurrencyCode: _currency, ...publicItem } = item;
+  return publicItem;
+};
+
 const createReadOnlyHandler = (resource: ReadOnlyResource) => asyncHandler(async (req, res) => {
   const query = parseListQuery(req, filtersByResource[resource], { defaultLimit: 20, maxLimit: 100 });
   const { rows, total } = await getReadOnlyPage(resource, {
@@ -33,14 +41,14 @@ const createReadOnlyHandler = (resource: ReadOnlyResource) => asyncHandler(async
   });
 
   res.json({
-    items: rows.map(normalizeCatalogRow),
+    items: rows.map((row) => redactReadOnlyFinancials(resource, normalizeCatalogRow(row), req.auth!.permissions.includes(PERMISSIONS.FINANCE_READ))),
     page: Math.floor(query.offset / query.limit) + 1,
     pageSize: query.limit,
     total
   });
 });
 
-const csvCell = (value: unknown): string => `"${String(value ?? "").replaceAll('"', '""')}"`;
+const csvCell = (value: unknown): string => `"${(typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : "").replaceAll('"', '""')}"`;
 for (const resource of ["movimientos", "inscripciones"] as const) {
   router.get(`/${resource}/export.csv`, requirePermission(permissionsByResource[resource]), asyncHandler(async (req, res) => {
     const query = parseListQuery(req, filtersByResource[resource], { defaultLimit: 10_000, maxLimit: 10_000 });

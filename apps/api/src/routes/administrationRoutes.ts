@@ -26,7 +26,7 @@ router.get("/club-currency", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asy
   res.json({currencyCode:row?.base_currency_code??null});
 }));
 
-router.get("/workers", asyncHandler(async (req, res) => {
+router.get("/workers", requirePermission(PERMISSIONS.WORKERS_VIEW), asyncHandler(async (req, res) => {
   const { limit, offset } = parseListQuery(req, [], { defaultLimit: 50, maxLimit: 100 });
   res.json(await getAdministrationWorkers(req.auth!.clubId, limit, offset));
 }));
@@ -53,6 +53,31 @@ router.delete("/workers/:id/photo", requirePermission(PERMISSIONS.WORKERS_MANAGE
   const id=String(req.params.id);
   if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de trabajador inválido."});
   res.json(await deleteEmployeePhoto(req.auth!.clubId, id));
+}));
+
+router.get("/activity-workers", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (req, res) => {
+  const result = await tenantExecutor(req.auth!.clubId).query<{ id: string; personId: string; displayName: string; role: string | null }>(`
+    select e.id::text, e.person_id::text as "personId",
+      coalesce(nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), 'Sin nombre') as "displayName",
+      e.position::text as role
+    from miclub.employees e
+    join miclub.people p on p.id=e.person_id and p.club_id=e.club_id
+    where e.club_id=$1 and e.status='active' and e.archived_at is null
+    order by p.last_name,p.first_name,e.id
+  `, [req.auth!.clubId]);
+  res.json({ items: result.rows });
+}));
+
+router.get("/activity-sectors", requirePermission(PERMISSIONS.ACTIVITIES_VIEW), asyncHandler(async (req, res) => {
+  const visibleSectors = req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds;
+  const result = await tenantExecutor(req.auth!.clubId).query<{ id: string; name: string; status: string }>(`
+    select s.id::text,s.name,s.status::text
+    from miclub.sectors s
+    where s.club_id=$1 and s.archived_at is null and s.status='active'
+      and ($2::uuid[] is null or s.id=any($2))
+    order by s.name,s.id
+  `, [req.auth!.clubId, visibleSectors]);
+  res.json({ items: result.rows });
 }));
 router.get("/sector-manager-candidates", asyncHandler(async (req, res) => {
   res.json({ items: await listSectorManagerCandidates(req.auth!.clubId) });
@@ -125,7 +150,7 @@ router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_CREATE), asyncHand
   return res.status(201).json(result.sector);
 }));
 
-router.get("/", asyncHandler(async (req, res) => {
+router.get("/", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {
   res.json(await getAdministrationInitialReadModel(req.auth!.clubId));
 }));
 

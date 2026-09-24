@@ -1,5 +1,21 @@
 # Testing
 
+## Auditoría de Administración y área global — 2026-09-24
+
+- API: 468/468, web: 87/87 y shared: 9/9. Incluye regresiones de
+  autorización, ocultación de rentabilidad sin `finance:read`, estado vacío
+  genuino del resumen y paginación completa de sectores.
+- `npm run typecheck`, `npm run build` y `npm run docs:check`: PASS. El build
+  conserva el aviso de chunk principal grande (888,18 kB).
+- Lint focalizado de los archivos modificados: 0 errores. El lint web global
+  sigue fallando por deuda anterior (32 errores, 75 advertencias tras las
+  correcciones de esta tarea; línea inicial 41/77).
+- Geometría del shell validada en navegador con estilos reales: en 1707 px,
+  borde derecho 90,54 %; en 1024 y 390 px, margen de 12 px y sin overflow
+  horizontal. Se verificó contraste del título en tema claro. No hubo sesión
+  autenticada para recorridos visuales completos ni `AUDIT_DATABASE_URL` para
+  validar SQL y datos de dos clubes contra PostgreSQL real.
+
 ## Administración: sectores, trabajadores y actividades — 2026-09-23
 
 Las regresiones de saldo por trabajador cubren importes firmados y separados por moneda, revisión pendiente, remuneraciones vencidas, saldos iniciales aprobados y diagnósticos incompletos. Las pruebas de saldos sectoriales rechazan sumas nominales entre monedas. Las suites API/web, typecheck y build se ejecutan antes de entregar cambios; la verificación visual de las tres pantallas requiere un club de prueba accesible en navegador. La auditoría del esquema y de datos reales requiere `AUDIT_DATABASE_URL` de solo lectura y verificación previa de `current_user` y `transaction_read_only`.

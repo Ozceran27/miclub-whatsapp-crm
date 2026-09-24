@@ -1,5 +1,37 @@
 # Current State
 
+## Auditoría de Administración y espacio de trabajo — 2026-09-24
+
+El resumen administrativo distingue cero real de indicador no calculado: los
+campos financieros y los totales de tareas/solicitudes que este read model no
+provee devuelven `null`; un club sin operaciones muestra sus ceros reales. La
+serie mensual financiera también devuelve `null` hasta poder valorar monedas
+con una regla única; conserva los conteos reales. Las lecturas de Sectores y
+Actividades omiten rentabilidad sin `finance:read`, y las fichas sólo piden
+inscripciones, movimientos o actividades relacionadas cuando existe el permiso.
+La tabla de actividades principales conserva actividades con cero inscriptos y
+cuenta sólo inscripciones activas. La lectura laboral exige `workers.view`, la
+lectura financiera legacy exige `finance:read` y el editor de Actividades usa
+catálogos mínimos de empleados activos y sectores visibles tenant-scoped.
+
+Las listas de Sectores y Actividades, sus fichas relacionadas y los catálogos
+de inscripción recorren todas las páginas en vez de truncarse en 100/200
+registros. Crear un movimiento o una inscripción actualiza su lista visible y
+el resumen. Los modales de alta de ambos recursos ahora contienen/restauran el
+foco y no cierran durante el guardado. Tareas y Solicitudes distinguen fallo de
+carga de fallo de acción y no muestran una lista antigua tras una recarga
+fallida; el formulario de Tareas conserva el elemento antes de esperar la API.
+El circuito financiero informa fallos de su workbench y de saldos de apertura.
+
+El contenedor autenticado se amplió sólo hacia la derecha en escritorio ancho,
+con anchura máxima de 1314 px. El estándar de tablas futuras se
+documentó en `docs/operations/ui-regression-checklist.md` usando Sectores,
+Trabajadores y Actividades; no se aplicó a otras tablas. No hubo cambios de
+esquema ni SQL real. El entorno no ofrece `AUDIT_DATABASE_URL`,
+`MIGRATION_GATE_DATABASE_URL` ni `DATABASE_URL`: siguen pendientes la revisión
+visual autenticada y la integración PostgreSQL de dos clubes. Los tests
+unitarios y de contrato no sustituyen esa certificación.
+
 ## Administración: listas de Actividades y Sectores — 2026-09-24
 
 Actividades presenta filas independientes sin encabezado visible, conserva
