@@ -198,9 +198,8 @@ test("los cinco dashboards PostgreSQL aíslan dos clubes por club_id", async () 
     assert.equal((await getPostgresSummary(clubB)).totalDebtors, 0);
     await getPostgresClubFinanceSummary(clubA);
     await getPostgresClubFinanceSummary(clubB);
-    const settlementQuery = tenantQueries.find(({ text }) => text.includes("v_activity_settlement_sector_balances ssb"));
-    assert.match(settlementQuery?.text ?? "", /join miclub\.sectors s on s\.id = ssb\.sector_id and s\.club_id = ssb\.club_id/);
-    assert.match(settlementQuery?.text ?? "", /where ssb\.club_id = \$1/);
+    assert.ok(tenantQueries.some(({ text }) => text.includes('from miclub.activities where club_id=$1')));
+    assert.ok(!tenantQueries.some(({ text }) => text.includes('v_activity_settlement_sector_balances')));
     await getPostgresSectorOperationalSummary(clubA);
     await getPostgresSectorOperationalSummary(clubB);
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { setPostgresPoolForTests, type PgClient, type PgPool } from "../db/postgres.js";
-import { archiveSector, updateSector, type SectorActor } from "./sectorsRepository.js";
+import { archiveSector, createSector, listSectorManagerCandidates, setSectorStatus, updateSector, type SectorActor } from "./sectorsRepository.js";
 
 const actor: SectorActor = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -73,14 +73,87 @@ test("updateSector sincroniza icon e icon_key para que la identidad editada sea 
   assert.deepEqual(update?.params?.slice(3), ["tennis", "tennis"]);
 });
 
-test("updateSector protege el icono de un sector de sistema", async () => {
+test("updateSector rechaza toda edición de un sector de sistema y conserva el cambio de estado separado", async () => {
   const before = { id: "44444444-4444-4444-8444-444444444444", name: "TESORERÍA", icon_key: "treasury", is_system: true, updated_at: updatedAt };
   const queries = fakePool((sql) => {
     if (sql.includes("from miclub.sectors")) return { rows: [before] };
     throw new Error(`No debía ejecutar: ${sql}`);
   });
-  assert.deepEqual(await updateSector(actor, before.id, updatedAt, { iconKey: "fitness" }), { kind: "protected" });
+  assert.deepEqual(await updateSector(actor, before.id, updatedAt, { color: "#123456" }), { kind: "protected" });
   assert.equal(queries.some(({ sql }) => sql.includes("update miclub.sectors") || sql.includes("audit_log")), false);
+});
+
+test("setSectorStatus sigue disponible para un sector de sistema", async () => {
+  const before = { id: "44444444-4444-4444-8444-444444444444", club_id: actor.clubId, name: "TESORERÍA", is_system: true, updated_at: updatedAt };
+  const after = { ...before, status: "inactive", updated_at: "2026-08-05T12:01:00.000Z" };
+  fakePool((sql) => {
+    if (sql.includes("from miclub.sectors")) return { rows: [before] };
+    if (sql.includes("update miclub.sectors")) return { rows: [after] };
+    if (sql.includes("INSERT INTO miclub.audit_log")) return { rows: [{ id: "audit-1" }] };
+    throw new Error(`SQL inesperado: ${sql}`);
+  });
+  assert.equal((await setSectorStatus(actor, before.id, updatedAt, "inactive")).kind, "updated");
+});
+
+const createInput = (managerPersonId: string | null) => ({
+  name: "Aula", iconKey: "classroom", color: "#123456", status: "active" as const,
+  capacityMode: "INCOME" as const, configuredCapacity: null, managerPersonId,
+});
+
+test("createSector admite responsable válido del tenant y lo persiste", async () => {
+  const managerId = "55555555-5555-4555-8555-555555555555";
+  const created = { id: "44444444-4444-4444-8444-444444444444", updated_at: updatedAt, manager_person_id: managerId };
+  const queries = fakePool((sql) => {
+    if (sql.includes("from miclub.people p")) return { rows: [{ id: managerId }] };
+    if (sql.includes("pg_advisory_xact_lock") || sql.includes("select code from miclub.sectors")) return { rows: [] };
+    if (sql.includes("insert into miclub.sectors")) return { rows: [created] };
+    throw new Error(`SQL inesperado: ${sql}`);
+  });
+  assert.equal((await createSector(actor, createInput(managerId))).kind, "created");
+  const insert = queries.find(({ sql }) => sql.includes("insert into miclub.sectors"));
+  assert.match(insert?.sql ?? "", /manager_person_id/);
+  assert.equal(insert?.params?.[6], managerId);
+});
+
+test("createSector permite dejar responsable sin asignar", async () => {
+  const queries = fakePool((sql) => {
+    if (sql.includes("pg_advisory_xact_lock") || sql.includes("select code from miclub.sectors")) return { rows: [] };
+    if (sql.includes("insert into miclub.sectors")) return { rows: [{ id: "44444444-4444-4444-8444-444444444444", updated_at: updatedAt }] };
+    throw new Error(`SQL inesperado: ${sql}`);
+  });
+  assert.equal((await createSector(actor, createInput(null))).kind, "created");
+  assert.equal(queries.some(({ sql }) => sql.includes("from miclub.people p")), false);
+  assert.equal(queries.find(({ sql }) => sql.includes("insert into miclub.sectors"))?.params?.[6], null);
+});
+
+test("createSector rechaza responsables ajenos, inactivos o archivados antes del INSERT", async () => {
+  const managerId = "55555555-5555-4555-8555-555555555555";
+  const queries = fakePool((sql, params) => {
+    if (sql.includes("from miclub.people p")) {
+      assert.deepEqual(params, [actor.clubId, managerId]);
+      assert.match(sql, /e.status='active' and e.archived_at is null/);
+      assert.match(sql, /i.status='activa'/);
+      return { rows: [] };
+    }
+    throw new Error(`No debía ejecutar: ${sql}`);
+  });
+  assert.deepEqual(await createSector(actor, createInput(managerId)), { kind: "invalid_manager" });
+  assert.equal(queries.some(({ sql }) => sql.includes("insert into miclub.sectors")), false);
+});
+
+test("el catálogo de responsables consulta todos los elegibles del tenant sin paginación", async () => {
+  const candidates = [{ personId: "55555555-5555-4555-8555-555555555555", displayName: "Ana Pérez" }];
+  const queries = fakePool((sql, params) => {
+    if (sql.includes('select p.id::text "personId"')) {
+      assert.deepEqual(params, [actor.clubId]);
+      return { rows: candidates };
+    }
+    throw new Error(`SQL inesperado: ${sql}`);
+  });
+  assert.deepEqual(await listSectorManagerCandidates(actor.clubId), candidates);
+  const sql = queries.find(query => query.sql.includes('select p.id::text "personId"'))?.sql ?? "";
+  assert.match(sql, /p.club_id=\$1/);
+  assert.doesNotMatch(sql, /limit|offset/i);
 });
 
 test("updateSector sólo admite como responsable a personal operativo activo del tenant", async () => {

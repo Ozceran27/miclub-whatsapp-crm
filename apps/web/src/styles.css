@@ -3569,12 +3569,10 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 @media(max-width:680px){.activity-form__grid,.activity-terms__modes,.activity-terms__details{grid-template-columns:1fr}.activity-terms__percentage{max-width:none}.activity-list__header{align-items:flex-start}.activity-list__header-actions{justify-content:flex-start}}
 
 /* Polished activity catalog and detail */
-.activity-list__table-wrap{background:color-mix(in srgb,var(--color-card-muted) 34%,var(--color-card));border-radius:16px;overflow:auto}
-.activity-list__table{min-width:960px}
 .activity-list__table th{font-size:10px;letter-spacing:.065em;padding:13px 12px}
 .activity-list__table td{padding:14px 12px}
 .activity-list__row{transition:background 150ms ease}
-.activity-list__identity{align-items:center;display:flex;gap:11px;min-width:170px}
+.activity-list__identity{align-items:center;display:flex;gap:11px;min-width:0}
 .activity-list__identity>i,.activity-detail__icon{align-items:center;background:color-mix(in srgb,var(--activity-color) 18%,var(--color-card));border:1px solid color-mix(in srgb,var(--activity-color) 62%,var(--color-border));border-radius:12px;display:inline-flex;font-size:21px;font-style:normal;height:42px;justify-content:center;min-width:42px}
 .activity-list__identity>span,.activity-list__people,.activity-list__enrollments,.activity-list__terms{display:grid;gap:3px;min-width:0}
 .activity-list__identity small,.activity-list__people small,.activity-list__enrollments small,.activity-list__terms small{color:var(--color-text-muted);font-size:10px;line-height:1.3}
@@ -3602,7 +3600,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .activity-detail__related{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}.activity-detail__empty{color:var(--color-text-muted);font-size:12px;margin:0;padding:8px 0}.activity-detail__audit{align-items:center;color:var(--color-text-muted);display:flex;flex-wrap:wrap;font-size:10px;gap:10px;justify-content:space-between}.activity-detail__audit code{overflow-wrap:anywhere}.draft-modal__footer .activity-detail__archive{margin-right:auto}
 .activity-form>fieldset{background:color-mix(in srgb,var(--draft-modal-surface-muted) 72%,transparent);border:1px solid var(--color-border);border-radius:14px;display:grid;gap:14px;padding:15px}.activity-form>fieldset>legend{font-size:13px;font-weight:750;padding:0 6px}.activity-form__current-terms{align-items:center;background:color-mix(in srgb,var(--color-accent) 7%,var(--draft-modal-surface-muted));border:1px solid var(--color-border);border-radius:14px;display:flex;gap:16px;justify-content:space-between;padding:15px}.activity-form__current-terms>div{display:grid;gap:3px}.activity-form__current-terms small,.activity-form__current-terms span,.activity-form__history-note{color:var(--color-text-muted);font-size:11px}.activity-form__history-note{margin:0}
 @media(max-width:1050px){.activity-detail__summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:680px){.activity-list__table{min-width:0}.activity-list__table thead{display:none}.activity-list__table,.activity-list__table tbody,.activity-list__table tr,.activity-list__table td{display:block;width:100%}.activity-list__row{border-bottom:1px solid var(--color-border);display:grid!important;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));padding:14px}.activity-list__row td{border:0;padding:0}.activity-list__row td:first-child,.activity-list__row td:nth-last-child(2){grid-column:1/-1}.activity-list__row td:last-child{display:none}.activity-detail__summary,.activity-detail__related{grid-template-columns:1fr 1fr}.activity-detail__terms{align-items:start;grid-template-columns:1fr}.activity-detail__terms>div:last-child{text-align:left}.activity-form__current-terms{align-items:stretch;flex-direction:column}.draft-modal__footer .activity-detail__archive{margin-right:0}}
+@media(max-width:680px){.activity-detail__summary,.activity-detail__related{grid-template-columns:1fr 1fr}.activity-detail__terms{align-items:start;grid-template-columns:1fr}.activity-detail__terms>div:last-child{text-align:left}.activity-form__current-terms{align-items:stretch;flex-direction:column}.draft-modal__footer .activity-detail__archive{margin-right:0}}
 
 /* Member prices, weekly schedule and compact administration editors. */
 .sector-capacity-fields{display:grid;gap:12px}
@@ -3625,8 +3623,8 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .activity-schedule-editor__row{align-items:end;display:grid;gap:10px;grid-template-columns:minmax(160px,1.3fr) minmax(105px,1fr) minmax(105px,1fr) auto}
 .activity-schedule-editor__row label{display:grid;gap:6px}.activity-schedule-editor__row button{min-height:39px}.activity-schedule-editor__add{justify-self:start}
 .activity-list__status{font-weight:500;padding:5px 10px}.activity-list__status[data-active='false']{background:color-mix(in srgb,var(--color-warning) 10%,transparent);border-color:color-mix(in srgb,var(--color-warning) 32%,var(--color-border));color:var(--color-warning)}
-.activity-list__prices{display:grid;gap:3px;min-width:170px}.activity-list__prices strong{font-size:12px;font-weight:600}.activity-list__prices small{color:var(--color-text-muted);font-size:10px}
-.activity-list__color{align-items:center;display:flex;justify-content:center;min-width:35px}.activity-list__color i{display:block;height:20px;width:20px}
+.activity-list__prices{display:grid;gap:3px;min-width:0}.activity-list__prices strong{font-size:12px;font-weight:600}.activity-list__prices small{color:var(--color-text-muted);font-size:10px}
+.activity-list__color{align-items:center;display:flex;justify-content:center;min-width:0}.activity-list__color i{display:block;height:20px;width:20px}
 .activity-detail{display:grid;gap:16px}.activity-detail__price-grid{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.activity-detail__price-grid>div{background:var(--draft-modal-surface-muted);border:1px solid var(--color-border);border-radius:10px;display:grid;gap:4px;padding:12px}.activity-detail__price-grid small,.activity-detail__price-history{color:var(--color-text-muted);font-size:11px}.activity-detail__schedule{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}.activity-detail__schedule li{background:var(--draft-modal-surface-muted);border:1px solid var(--color-border);border-radius:999px;font-size:12px;padding:7px 11px}
 @media(max-width:780px){.activity-form__terms .activity-terms__details--fixed,.activity-prices__grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.sector-capacity-fields__choices,.activity-form__terms .activity-terms__details--variable,.activity-form__terms .activity-terms__details--fixed,.activity-prices__grid,.activity-form__advanced,.activity-schedule-editor__row{grid-template-columns:1fr}.sector-capacity-fields__limit{max-width:none}.activity-detail__price-grid{grid-template-columns:1fr}}
@@ -3634,8 +3632,6 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 /* Administration catalog spacing shared with the sector card language. */
 .sector-editor__body{align-content:start;display:grid;gap:18px}
 .sector-editor__body>.sector-editor__form{margin:0}
-.activity-list__table-wrap{background:transparent;border:0;border-radius:0;overflow-x:auto}
-.activity-list__table{border-collapse:separate;border-spacing:0 9px;min-width:1240px}
 .activity-list__table th{background:transparent;border:0;padding:6px 12px 8px;white-space:nowrap}
 .activity-list__table td{background:var(--color-card);border-bottom:1px solid var(--color-border);border-top:1px solid var(--color-border);padding:14px 12px;transition:background 160ms ease,border-color 160ms ease}
 .activity-list__table td:first-child{border-left:1px solid var(--color-border);border-radius:14px 0 0 14px}
@@ -3647,4 +3643,99 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .activity-list__enrollments{justify-items:end}
 .activity-list__financial{align-items:flex-end;text-align:right}
 .activity-list__status[data-active='false']{background:color-mix(in srgb,var(--color-text-muted) 10%,transparent);border-color:var(--color-border);color:var(--color-text-muted)}
-@media(max-width:680px){.activity-list__table{border-spacing:0}.activity-list__row{background:var(--color-card);border:1px solid var(--color-border);border-radius:14px;margin-bottom:10px}.activity-list__row td,.activity-list__row td:first-child,.activity-list__row td:last-child{background:transparent;border:0;border-radius:0;padding:0}.activity-list__table td:nth-child(4),.activity-list__table td:nth-child(8){text-align:left}.activity-list__enrollments{justify-items:start}.activity-list__financial{align-items:flex-start;text-align:left}}
+
+/* The modal body owns vertical scrolling; sector field groups may grow naturally. */
+.sector-editor__form,.sector-editor__form>fieldset,.sector-editor__form .draft-sector-icons,.sector-editor__form .draft-icon-grid--catalog{overflow:visible;max-height:none}
+.sector-editor__body--editing{display:block}
+
+.sector-list,.activity-list,.worker-list,.paginated-list{container-type:inline-size;min-width:0}
+.sector-list__row{box-sizing:border-box;grid-template-columns:minmax(0,2.4fr) minmax(0,.85fr) minmax(0,1.35fr) minmax(0,1.55fr) minmax(0,.65fr) minmax(0,.85fr) minmax(0,1.65fr) 30px 18px;gap:clamp(6px,.8cqi,12px);block-size:clamp(4rem,5cqi,4.5rem);padding:10px 12px}
+.sector-list__identity,.sector-list__datum,.sector-list__profitability{min-width:0;overflow:hidden}
+.sector-list__datum strong,.sector-list__datum small,.sector-list__profitability strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+.sector-list__identity strong{min-width:0}
+.worker-list__table-wrap,.activity-list__table-wrap{background:transparent;border:0;border-radius:0;box-sizing:border-box;min-width:0;max-width:100%;overflow:visible;padding:0;width:100%}
+.worker-list__table,.activity-list__table,.paginated-list__table{border-collapse:separate;border-spacing:0 9px;min-width:0;table-layout:fixed;width:100%}
+.worker-list__table{background:transparent;border:0;margin:0}
+.worker-list__table thead{position:absolute;block-size:1px;inline-size:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.worker-list__table th,.activity-list__table th,.paginated-list__table th{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.worker-list__table td,.activity-list__table td,.paginated-list__table td{box-sizing:border-box;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal;vertical-align:middle}
+.worker-list__table td{background:var(--color-card);border-block:1px solid var(--color-border);font-size:12px;padding:10px 8px}
+.worker-list__row,.activity-list__row,.paginated-list__row{block-size:clamp(4rem,5cqi,4.5rem)}
+.worker-list__table td:first-child{border-left:1px solid var(--color-border);border-radius:14px 0 0 14px}
+.worker-list__table td:last-child{border-right:1px solid var(--color-border);border-radius:0 14px 14px 0}
+.worker-list__row:hover td,.worker-list__row:focus-visible td{background:color-mix(in srgb,var(--color-accent) 7%,var(--color-card))}
+.worker-list__row:focus-visible{outline:3px solid color-mix(in srgb,var(--color-accent) 45%,transparent);outline-offset:-3px}
+.worker-list__table th:first-child,.worker-list__table td:first-child{width:22%}
+.worker-list__table th:nth-child(2),.worker-list__table td:nth-child(2){width:17%}
+.worker-list__table th:nth-child(3),.worker-list__table td:nth-child(3){width:17%}
+.worker-list__table[data-financial='true'] th:nth-child(4),.worker-list__table[data-financial='true'] td:nth-child(4){width:18%}
+.worker-list__table[data-financial='true'] th:nth-child(5),.worker-list__table[data-financial='true'] td:nth-child(5){width:8%}
+.worker-list__table[data-financial='true'] th:nth-child(6),.worker-list__table[data-financial='true'] td:nth-child(6){width:8%}
+.worker-list__table[data-financial='true'] th:nth-child(7),.worker-list__table[data-financial='true'] td:nth-child(7){width:10%}
+.worker-list__table[data-financial='false'] th:nth-child(4),.worker-list__table[data-financial='false'] td:nth-child(4){width:13%}
+.worker-list__table[data-financial='false'] th:nth-child(5),.worker-list__table[data-financial='false'] td:nth-child(5){width:13%}
+.worker-list__table[data-financial='false'] th:nth-child(6),.worker-list__table[data-financial='false'] td:nth-child(6){width:18%}
+.worker-list__identity{align-items:center;display:flex;gap:8px;min-width:0}
+.worker-list__identity i{align-items:center;background:color-mix(in srgb,var(--color-accent) 15%,var(--color-card));border:1px solid var(--color-border);border-radius:11px;color:var(--color-accent);display:flex;flex:0 0 32px;font-size:16px;font-style:normal;font-weight:700;height:32px;justify-content:center}
+.worker-list__identity strong,.worker-list__stack strong,.worker-list__stack small,.worker-list__balances strong,.worker-list__balances small{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.worker-list__stack,.worker-list__balances{display:grid;gap:3px;min-width:0}
+.worker-list__stack small,.worker-list__balances small,.worker-list__balance-note{color:var(--color-text-muted);font-size:11px}
+.worker-list__balances strong[data-negative='true']{color:var(--color-danger)}
+.worker-list__pagination{align-items:center;display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.worker-list__pagination span{color:var(--color-text-muted);font-size:12px}
+.activity-list__table th:first-child,.activity-list__table td:first-child{width:18%}
+.activity-list__table th:nth-child(2),.activity-list__table td:nth-child(2){width:8%}
+.activity-list__table th:nth-child(3),.activity-list__table td:nth-child(3){width:15%}
+.activity-list__table th:nth-child(4),.activity-list__table td:nth-child(4){width:7%}
+.activity-list__table th:nth-child(5),.activity-list__table td:nth-child(5){width:7%}
+.activity-list__table th:nth-child(6),.activity-list__table td:nth-child(6){width:12%}
+.activity-list__table th:nth-child(7),.activity-list__table td:nth-child(7){width:12%}
+.activity-list__table th:nth-child(8),.activity-list__table td:nth-child(8){width:3%;padding-inline:2px}
+.activity-list__table[data-financial='true'] th:nth-child(9),.activity-list__table[data-financial='true'] td:nth-child(9){width:16%}
+.activity-list__table th:last-child,.activity-list__table td:last-child{width:2%;padding-inline:2px}
+.activity-list__identity{min-width:0}
+.activity-list__identity>i{flex:0 0 32px;height:32px;min-width:32px;font-size:17px}
+.activity-list__identity>span,.activity-list__people,.activity-list__terms,.activity-list__prices,.activity-list__financial{min-width:0;overflow:hidden}
+.activity-list__identity strong,.activity-list__identity small,.activity-list__people strong,.activity-list__people small,.activity-list__terms strong,.activity-list__terms small,.activity-list__prices strong,.activity-list__prices small,.activity-list__financial strong,.activity-list__financial small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-list__prices,.activity-list__color{min-width:0}
+.paginated-list__table-wrap{max-width:100%;overflow:visible}
+.paginated-list__table th:first-child,.paginated-list__table td:first-child{width:8%}
+.paginated-list__table th:nth-child(2),.paginated-list__table td:nth-child(2){width:13%}
+.paginated-list__table th:nth-child(3),.paginated-list__table td:nth-child(3){width:29%}
+.paginated-list__table th:nth-child(4),.paginated-list__table td:nth-child(4){width:15%}
+.paginated-list__table th:nth-child(5),.paginated-list__table td:nth-child(5){width:13%}
+.paginated-list__table th:nth-child(6),.paginated-list__table td:nth-child(6){width:12%}
+.paginated-list__table th:nth-child(7),.paginated-list__table td:nth-child(7){width:10%}
+.paginated-list__table[data-kind='enrollment'] th:nth-child(2),.paginated-list__table[data-kind='enrollment'] td:nth-child(2){width:26%}
+.paginated-list__table[data-kind='enrollment'] th:nth-child(3),.paginated-list__table[data-kind='enrollment'] td:nth-child(3){width:18%}
+.paginated-list__table[data-kind='enrollment'] th:nth-child(5),.paginated-list__table[data-kind='enrollment'] td:nth-child(5){width:12%}
+.paginated-list__table[data-kind='enrollment'] th:nth-child(7),.paginated-list__table[data-kind='enrollment'] td:nth-child(7){width:9%}
+.paginated-list__table td strong,.paginated-list__table td small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@container (max-width:1100px){
+  .sector-list__row{grid-template-columns:repeat(4,minmax(0,1fr));block-size:clamp(6.5rem,11cqi,7.25rem);align-content:center;position:relative}
+  .sector-list__identity{grid-column:span 2}
+  .sector-list__system-badge{position:absolute;right:10px;bottom:8px}
+  .sector-list__arrow{display:none}
+  .activity-list__table,.activity-list__table tbody,.worker-list__table,.worker-list__table tbody,.paginated-list__table,.paginated-list__table tbody{display:block;width:100%}
+  .activity-list__table thead,.paginated-list__table thead{position:absolute;block-size:1px;inline-size:1px;overflow:hidden;clip-path:inset(50%)}
+  .activity-list__row,.worker-list__row,.paginated-list__row{background:var(--color-card);border:1px solid var(--color-border);border-radius:14px;display:grid;gap:8px 14px;grid-template-columns:repeat(2,minmax(0,1fr));block-size:clamp(16rem,28cqi,18rem);margin-bottom:10px;padding:13px}
+  .worker-list__row{block-size:clamp(11rem,20cqi,13rem)}
+  .paginated-list__row{block-size:clamp(12rem,22cqi,14rem)}
+  .activity-list__row td,.activity-list__row td:first-child,.activity-list__row td:last-child,.worker-list__row td,.worker-list__row td:first-child,.worker-list__row td:last-child,.paginated-list__row td{background:transparent!important;border:0;border-radius:0;display:block;min-width:0;max-width:100%;padding:0;text-align:left;width:100%!important}
+  .worker-list__row:hover,.worker-list__row:focus-visible,.activity-list__row:hover,.activity-list__row:focus-visible,.paginated-list__row:hover,.paginated-list__row:focus-visible{background:color-mix(in srgb,var(--color-accent) 7%,var(--color-card))}
+  .activity-list__row td::before,.worker-list__row td::before,.paginated-list__row td::before{color:var(--color-text-muted);content:attr(data-label);display:block;font-size:10px;font-weight:700;letter-spacing:.04em;margin-bottom:3px;text-transform:uppercase}
+  .activity-list__row td:first-child,.worker-list__row td:first-child,.paginated-list__row td:nth-child(3){grid-column:1/-1}
+  .activity-list__row td:last-child{display:none}
+  .activity-list__enrollments,.activity-list__financial{align-items:flex-start;justify-items:start;text-align:left}
+}
+@container (max-width:680px){
+  .sector-list__row{grid-template-columns:repeat(2,minmax(0,1fr));block-size:clamp(12rem,55cqi,14rem)}
+  .sector-list__identity,.sector-list__profitability{grid-column:1/-1}
+  .sector-list__system-badge{display:inline-flex}
+  .activity-list__row{block-size:clamp(16rem,52cqi,18rem)}
+}
+@container (max-width:440px){
+  .worker-list__row{block-size:clamp(16rem,70cqi,18rem)}
+  .activity-list__row{block-size:clamp(18rem,75cqi,20rem)}
+  .paginated-list__row{block-size:clamp(14rem,62cqi,16rem)}
+}

@@ -68,7 +68,8 @@ Todas requieren sesión, membresía activa, tenant derivado por el servidor y re
 
 | Método | Path | Permiso efectivo |
 | --- | --- | --- |
-| GET | `/api/administration`, `/api/administration/summary`, `/api/administration/workers` | `administration.view` |
+| GET | `/api/administration`, `/api/administration/summary`, `/api/administration/workers`, `/api/administration/sector-manager-candidates` | `administration.view` |
+| GET | `/api/administration/workers/balances` | `administration.view` + `workers.view` + `finance:read`; tenant y sectores visibles |
 | PATCH | `/api/sectors/:id`, `/api/sectors/:id/status` | `sectors.edit` + acceso al sector |
 | POST | `/api/sectors/:id/archive` | `sectors.archive` + acceso al sector |
 | POST | `/api/activities` | `activities.create` + acceso al sector |

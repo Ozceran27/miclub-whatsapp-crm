@@ -1,5 +1,9 @@
 # API Contracts
 
+## Saldos de trabajadores — 2026-09-23
+
+`GET /api/administration/workers/balances?page=N&limit=20` requiere sesión, membresía, `administration.view`, `workers.view` y `finance:read`. Devuelve `{asOf,scope,items}`; cada elemento incluye `workerId`, `personId`, `status` (`AVAILABLE` o `INCOMPLETE`) y `amounts` por moneda con importe firmado y `pendingReview`. `scope` es `ALL_SECTORS` o `VISIBLE_SECTORS`. No admite `clubId` del cliente y se entrega con `Cache-Control: private, no-store`. Un estado `INCOMPLETE` impide presentar un cero supuesto. El endpoint laboral general no incluye importes financieros.
+
 ## Actividades, precios e inscripciones — 2026-09-22
 
 `POST /api/activities` exige `pricing: {enrollmentPrice, feePrice, feeFrequency, effectiveFrom}` sólo cuando `generatesEnrollments` es `true`; `schedules: [{weekday,startTime,endTime}]` sigue siendo obligatorio (admite `[]`). En `PATCH /api/activities/:id`, omitir `pricing`, `schedules` o `status` conserva cada valor; `pricing` se rechaza cuando `generatesEnrollments` es `false`. Reactivar inscripciones requiere un precio vigente o uno nuevo con vigencia aplicable. `GET /api/actividades` expone estado `active`/`inactive`, precio vigente, `pricingConfigured`, fechas civiles `YYYY-MM-DD` y bloques semanales. `GET /api/administration/activities/:id/prices` devuelve historial tenant-scoped con `cancelledAt` para las vigencias futuras canceladas; éstas no se aplican a nuevas inscripciones. `GET /api/administration/club-currency` devuelve la moneda base. `POST /api/inscripciones` admite `enrollmentPrice` editable, usa `feeAmount` para la cuota y deriva el término por club/actividad/fecha en el servidor. No admite autoridad tenant ni término de precio desde el cliente.
@@ -112,10 +116,15 @@ disponible a la fecha de cada movimiento. Si falta una cotización requerida, el
 importe es `null` y el estado es `INCOMPLETE_EXCHANGE_RATE`; no se suman importes
 nominales de monedas distintas ni se presenta un cero inventado.
 
+`POST /api/administration/sectors` admite `managerPersonId` nulo u omitido; si
+se informa, debe identificar a una persona operativa activa del mismo club.
+`GET /api/administration/sector-manager-candidates` devuelve el catálogo completo
+de candidatos del tenant para el selector, sin paginarlo con la lista de trabajadores.
 `PATCH /api/sectors/:id` usa `iconKey` como entrada canónica y sincroniza la
-metadata visual persistida. Nombre e ícono permanecen protegidos para sectores
-de sistema. `POST /api/sectors/:id/archive` conserva historia y rechaza sectores
-de sistema o con trabajadores/actividades vigentes.
+metadata visual persistida. Rechaza toda edición cuando `is_system=true`.
+`PATCH /api/sectors/:id/status` permanece disponible para el estado operativo.
+`POST /api/sectors/:id/archive` conserva historia y rechaza sectores de sistema
+o con trabajadores/actividades vigentes.
 
 Además mutaciones de sectors, activities, tasks, requests, movements y enrollments.
 

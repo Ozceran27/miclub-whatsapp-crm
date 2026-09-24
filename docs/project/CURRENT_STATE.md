@@ -1,5 +1,30 @@
 # Current State
 
+## Administración: pulido de listas y alta de sectores — 2026-09-24
+
+La lista de Sectores muestra sólo capacidad utilizada y conserva los demás
+indicadores. Los tres sectores de sistema se identifican por `is_system`: su
+ficha es consultable, el editor general no aparece y la API rechaza su edición.
+El cambio independiente de estado operativo permanece disponible. El alta de
+un sector personalizado permite seleccionar un responsable opcional entre
+personas operativas activas del tenant; el selector usa un catálogo completo,
+independiente de la paginación de Trabajadores.
+
+Las listas de Sectores, Trabajadores, Actividades, Movimientos e Inscripciones
+usan anchos relativos, contenido acotado y alturas estables por ancho de
+contenedor. Trabajadores presenta filas independientes sin encabezado visible
+ni fondo común. Los valores extensos se consultan en sus fichas; la ficha de
+Trabajador muestra todos los saldos por moneda si la sesión tiene permiso
+financiero. No se agregó migración ni se ejecutó SQL real.
+
+## Administración: Sectores, Trabajadores y Actividades — 2026-09-23
+
+La ficha de Sector ahora ofrece «Editar sector» y abre el formulario de configuración precargado, compartiendo campos con el alta. El cuerpo del modal conserva el único desplazamiento vertical; los grupos de campos del sector se expanden sin barras internas. La tabla de Actividades adapta sus filas al ancho del contenedor y deja márgenes laterales. Trabajadores usa la misma presentación de tarjetas, pagina de a 20 y consulta un saldo financiero separado por moneda sólo cuando la sesión tiene `workers.view` y `finance:read`.
+
+El saldo por trabajador agrega el resultado del circuito de actividades por receptor histórico, remuneraciones fijas vencidas y saldos iniciales `EMPLOYEE` aprobados, restando las aplicaciones que ya contabiliza el circuito. Las líneas sin aprobar se muestran como pendientes de revisión. Los diagnósticos producen «No disponible». La lectura respeta tenant y sectores visibles. Los tableros ya no consumen la vista `v_activity_settlement_sector_balances` para sus saldos; esa vista permanece sólo para auditoría histórica. Cuando existen importes sectoriales en monedas distintas de la base, el total sectorial se considera incompleto en vez de sumar nominales.
+
+La base real no se auditó: `AUDIT_DATABASE_URL` sigue ausente. No se aplicó SQL ni se modificó el esquema. La lista de hallazgos históricos más abajo requiere reevaluación individual; B03 y C01 ya no describen el camino principal de los tableros, aunque la vista antigua aún exista.
+
 ## Correcciones de actividades y precios — 2026-09-22
 
 El código normaliza `activa`/`suspendida` al contrato público `active`/`inactive` y conserva el estado al editar sin modificarlo. Los precios sólo son obligatorios cuando la actividad admite inscripciones, tanto en Administración como en onboarding. Una nueva vigencia puede insertarse en una fecha pasada sin reescribir snapshots de inscripciones ni vigencias posteriores. Deshabilitar inscripciones cancela las vigencias futuras de forma auditable y mantiene la vigente. Las fechas civiles se envían a la web sin horario.
@@ -329,8 +354,8 @@ No son reglas aceptadas. A = documentación desactualizada; B = bug; C = ambiguo
 | --- | --- | --- |
 | B01 | B | Instalación vacía no autocontenida: objetos necesarios dependen de schema previo o DDL manual. Ver DATA_MODEL. |
 | B02 | B | Activities, movements, enrollments y CRM acceden a tablas protegidas sin contexto transaccional RLS. Ver TENANCY_AND_RBAC. |
-| B03 | B | Vista/lecturas FIXED usan monthly_fixed_fee; escrituras usan fixed_club_fee, frecuencia y moneda. |
-| C01 | B/C | No se encontró creación runtime de activity_settlements; calculador TS sólo consumido por tests; vistas requieren liquidaciones COMPLETADO existentes. |
+| B03 | Histórico, mitigado en runtime | La vista SQL antigua usa `monthly_fixed_fee`, pero los tableros y la tabla de trabajadores consultan el circuito moderno. La vista permanece para auditoría y requiere revisión antes de otros consumos. |
+| C01 | Histórico, resuelto en código | `financialCircuitService.loadCircuit` materializa `activity_settlements`; la base real sigue sin certificación por ausencia de acceso de auditoría. |
 | B04 | B | XLSX admite ANULADO pero workbook.ts lo transforma en COMPLETADO. |
 | B05 | B | readOnlyRepository.ts devuelve true as is_system para todos los sectores. |
 | B06 | B | Ruta worker invitations no revalida revocación de sesión como /auth/me. |

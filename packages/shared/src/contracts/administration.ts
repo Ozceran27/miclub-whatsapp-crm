@@ -9,6 +9,7 @@ export type AdministrationRecordStatus = "active" | "inactive" | "under_repair" 
 
 export type AdministrationSectorCreateDto = {
   name: string;
+  managerPersonId?: string | null;
   code?: string | null;
   description?: string | null;
   iconKey: string;
@@ -340,6 +341,19 @@ export type AdministrationWorkersDataSource = "employees" | "legacy";
 export interface AdministrationWorkersResponse extends AdministrationPaginatedResponse<AdministrationWorkerDto> {
   dataSource: AdministrationWorkersDataSource;
   limitations: string[];
+}
+
+export interface AdministrationWorkerBalance {
+  workerId: string;
+  personId: string;
+  status: "AVAILABLE" | "INCOMPLETE";
+  amounts: Array<{ currencyCode: string; amount: number; pendingReview: boolean }>;
+}
+
+export interface AdministrationWorkerBalancesResponse {
+  asOf: string;
+  scope: "ALL_SECTORS" | "VISIBLE_SECTORS";
+  items: AdministrationWorkerBalance[];
 }
 
 export interface AdministrationTaskDto {

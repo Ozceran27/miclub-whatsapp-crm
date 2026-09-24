@@ -1,5 +1,9 @@
 # Testing
 
+## Administración: sectores, trabajadores y actividades — 2026-09-23
+
+Las regresiones de saldo por trabajador cubren importes firmados y separados por moneda, revisión pendiente, remuneraciones vencidas, saldos iniciales aprobados y diagnósticos incompletos. Las pruebas de saldos sectoriales rechazan sumas nominales entre monedas. Las suites API/web, typecheck y build se ejecutan antes de entregar cambios; la verificación visual de las tres pantallas requiere un club de prueba accesible en navegador. La auditoría del esquema y de datos reales requiere `AUDIT_DATABASE_URL` de solo lectura y verificación previa de `current_user` y `transaction_read_only`.
+
 ## Regresión de precios de actividades — 2026-09-22
 
 `activitiesRepository.test.ts` cubre estado conservado en edición, alta sin precios cuando no hay inscripciones, fechas PostgreSQL `Date`, inserción histórica, fecha inicial duplicada, reactivación sin precio y cancelación auditable de vigencias futuras. `readOnlyRepository.test.ts` y `enrollmentsRepository.test.ts` comprueban que sólo los precios no cancelados se aplican; `activityPresentation.test.ts` comprueba fecha civil y frecuencia. La validación SQL real requiere las migraciones manuales y acceso de auditoría de sólo lectura.

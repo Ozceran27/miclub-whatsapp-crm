@@ -1,4 +1,4 @@
-import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorCreateDto, AdministrationSectorUpdateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
+import type { ActivityMutationContract, AdministrationActivitiesResponse, AdministrationEnrollmentsResponse, AdministrationMovementsResponse, AdministrationSectorCreateDto, AdministrationSectorUpdateDto, AdministrationSectorsResponse, AdministrationSummaryResponse, AdministrationWorkerBalancesResponse, AdministrationWorkerMutationDto, AdministrationWorkersResponse, EconomySectorRankings } from '@miclub/shared';
 import { apiJson } from '../../api';
 
 export const administrationEndpoints = {
@@ -13,6 +13,10 @@ export const getAdministrationSummary = (signal?: AbortSignal) =>
 
 export const getAdministrationSectors = (signal?: AbortSignal) =>
   apiJson<AdministrationSectorsResponse>('/api/sectores?page=1&limit=100', { cache: 'no-store', signal });
+
+export type SectorManagerCandidate = { personId: string; displayName: string };
+export const getSectorManagerCandidates = (signal?: AbortSignal) =>
+  apiJson<{ items: SectorManagerCandidate[] }>('/api/administration/sector-manager-candidates', { cache: 'no-store', signal });
 
 export const createAdministrationSector = (input: AdministrationSectorCreateDto) =>
   apiJson<Record<string,unknown>>('/api/administration/sectors', { method: 'POST', body: JSON.stringify(input) });
@@ -52,8 +56,10 @@ export const changeAdministrationActivityStatus = (id: string, updatedAt: string
 export const archiveAdministrationActivity = (id: string, updatedAt: string) =>
   apiJson<AdministrationActivityMutationResponse>(`/api/activities/${encodeURIComponent(id)}/archive` as `/${string}`, { method: 'POST', body: JSON.stringify({ updatedAt }) });
 
-export const getAdministrationWorkers = (signal?: AbortSignal) =>
-  apiJson<AdministrationWorkersResponse>('/api/administration/workers?page=1&limit=100', { cache: 'no-store', signal });
+export const getAdministrationWorkers = (signal?: AbortSignal, page = 1, limit = 100) =>
+  apiJson<AdministrationWorkersResponse>(`/api/administration/workers?page=${page}&limit=${limit}` as `/${string}`, { cache: 'no-store', signal });
+export const getAdministrationWorkerBalances = (page: number, signal?: AbortSignal) =>
+  apiJson<AdministrationWorkerBalancesResponse>(`/api/administration/workers/balances?page=${page}&limit=20` as `/${string}`, { cache: 'no-store', signal });
 export const createAdministrationWorker = (input: AdministrationWorkerMutationDto) => apiJson('/api/administration/workers', { method: 'POST', body: JSON.stringify(input) });
 export const updateAdministrationWorker = (id: string, input: AdministrationWorkerMutationDto) => apiJson(`/api/administration/workers/${encodeURIComponent(id)}` as `/${string}`, { method: 'PUT', body: JSON.stringify(input) });
 export const deleteAdministrationWorkerPhoto = (id: string) => apiJson<{deleted:boolean}>(`/api/administration/workers/${encodeURIComponent(id)}/photo` as `/${string}`, { method: 'DELETE' });

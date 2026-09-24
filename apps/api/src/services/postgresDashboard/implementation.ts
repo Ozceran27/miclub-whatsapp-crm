@@ -15,6 +15,7 @@ import { calculateDynamicSettlementBalance, calculateOperationalBalances } from 
 import { normalizeOperationalStatus } from "../../importers/normalizers.js";
 import { getClubFinanceSummary } from "../../repositories/economyRepository.js";
 import { readFinancialCircuit } from '../financialCircuitService.js';
+import { readCanonicalSectorBalances } from '../canonicalSectorBalances.js';
 
 const SHEETS: SourceSheet[] = [
   "FITNESS",
@@ -25,7 +26,6 @@ const SHEETS: SourceSheet[] = [
   "ADMINISTRACION",
 ];
 const toNumber = (value: unknown): number => normalizeMovementAmount(value);
-const money = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 const toStringValue = (value: unknown): string | undefined =>
   value == null ? undefined : String(value);
 const pick = (row: Record<string, unknown>, keys: string[]): unknown =>
@@ -475,14 +475,7 @@ export const getPostgresClubFinanceSummary =
         return { rows: [], rowCount: 0, command: "SELECT", oid: 0, fields: [] };
       }),
       Promise.resolve({ rows: [] as Record<string, unknown>[] }),
-      pool.query<Record<string, unknown>>(
-        `select ssb.*
-         from miclub.v_activity_settlement_sector_balances ssb
-         join miclub.sectors s on s.id = ssb.sector_id and s.club_id = ssb.club_id
-         where ssb.club_id = $1
-           and ssb.settlement_balance <> 0
-         order by ssb.sector_name asc nulls last, ssb.sector_id asc nulls last`, [clubId],
-      ),
+      pool.query<Record<string, unknown>>('select id::text sector_id,name sector_name from miclub.sectors where club_id=$1 order by name,id', [clubId]),
       pool.query<Record<string, unknown>>(getMovementBreakdown("sector_name"), [
         clubId, "INGRESOS",
       ]),
@@ -517,10 +510,14 @@ export const getPostgresClubFinanceSummary =
       ...(dashboard.rows[0] ?? {}),
       ...(latestOperationalBalances.rows[0] ?? {}),
     };
-    const dynamicSettlements = calculateDynamicSettlementBalance(sectors.rows.map((sector) => ({
+    const circuit = await readFinancialCircuit({ clubId, permissions: ['sectors:any'], sectorIds: [] });
+    const canonicalSectorBalances = await readCanonicalSectorBalances(clubId, circuit);
+    const incompleteSectorBalances = canonicalSectorBalances.some(balance => balance.amount === null);
+    const canonicalBySector = new Map(canonicalSectorBalances.map(balance => [balance.sectorId, balance.amount]));
+    const dynamicSettlements = calculateDynamicSettlementBalance(sectors.rows.filter(sector => canonicalBySector.get(pickString(sector, ['sector_id'])) != null).map((sector) => ({
       sectorId: pickString(sector, ["sector_id"]),
       sectorName: pickString(sector, ["sector_name", "sector"], "Sin sector"),
-      amount: pickNumber(sector, ["settlement_balance", "amount"]),
+      amount: canonicalBySector.get(pickString(sector, ["sector_id"])) ?? 0,
     })));
     const sectorBalances = dynamicSettlements.sectors.map(({ sectorName: sector, amount }) => ({ sector, amount }));
     const breakdown = (rows: Record<string, unknown>[]) =>
@@ -574,12 +571,11 @@ export const getPostgresClubFinanceSummary =
     const pendingIncome = pickNumber(pendingFallbackRow, ["pending_income"]) || pickNumber(row, ["pending_income"]);
     const pendingExpenses = pickNumber(pendingFallbackRow, ["pending_expenses"]) || pickNumber(row, ["pending_expenses"]);
     const pendingNetBalance = pickNumber(pendingFallbackRow, ["pending_net_balance"]) || pickNumber(row, ["pending_net_balance"]);
-    const circuit = await readFinancialCircuit({ clubId, permissions: ['sectors:any'], sectorIds: [] });
     const effectiveProjectedBalance = circuit.projection.projectedBalance;
     return {
       metadata: {
-        coverage: "complete",
-        warnings: [],
+        coverage: incompleteSectorBalances ? "partial" : "complete",
+        warnings: incompleteSectorBalances ? ['Hay saldos sectoriales sin valoración homogénea o con cálculos incompletos.'] : [],
         sourceCompleteness: {},
         cuotasACobrarSource: cuotasACobrarSelection.source,
         cuotasACobrarDebug: cuotasACobrarSelection,
@@ -656,11 +652,10 @@ export const getPostgresSectorOperationalSummary =
            coalesce(et.total_debt_amount, 0) as total_debt_amount,
            coalesce(mt.total_profitability, 0) as total_profitability,
            coalesce(mt.current_month_profitability, 0) as current_month_profitability,
-           ssb.settlement_balance
+           null::numeric as settlement_balance
          from miclub.sectors s
          left join enrollment_totals et on et.sector_id = s.id
          left join movement_totals mt on mt.sector_id = s.id
-         left join miclub.v_activity_settlement_sector_balances ssb on ssb.sector_id = s.id and ssb.club_id = s.club_id
          where s.club_id = $1
          order by s.name asc, s.id asc`,
         [clubId, monthWindow.from, monthWindow.to],
@@ -813,17 +808,13 @@ export const getPostgresSectorOperationalSummary =
         [clubId, [
           "fitness.total_profitability",
           "fitness.current_month_profitability",
-          "fitness.settlement_balance",
           "salon.total_profitability",
           "salon.current_month_profitability",
           "aula.total_profitability",
           "aula.current_month_profitability",
           "aula.average_commission",
-          "salon.settlement_balance",
-          "aula.settlement_balance",
           "local1.total_profitability",
           "local1.current_month_profitability",
-          "local1.settlement_balance",
           "cantina.kiosk_income",
           "cantina.drinks_income",
           "cantina.cmv",
@@ -874,8 +865,10 @@ export const getPostgresSectorOperationalSummary =
         [clubId],
       ),
     ]);
-    const sectors = sectorResult.rows;
-    const catalogSectors = mapSectorCatalogRows(catalogResult.rows);
+    const canonicalSectorBalances = await readCanonicalSectorBalances(clubId);
+    const canonicalBySector = new Map(canonicalSectorBalances.map(balance => [balance.sectorId, balance.amount]));
+    const sectors = sectorResult.rows.map(row => ({ ...row, settlement_balance: canonicalBySector.get(pickString(row, ['id'])) ?? (canonicalBySector.has(pickString(row, ['id'])) ? null : 0) }));
+    const catalogSectors = mapSectorCatalogRows(catalogResult.rows.map(row => ({ ...row, settlement_balance: canonicalBySector.get(pickString(row, ['id'])) ?? (canonicalBySector.has(pickString(row, ['id'])) ? null : 0) })));
     const snapshots = Object.fromEntries(
       snapshotResult.rows.map((row) => [
         pickString(row, ["metric_key"], ""),
@@ -924,10 +917,7 @@ export const getPostgresSectorOperationalSummary =
     };
     const sectorRow = (name: string) =>
       sectors.find(
-        (row) =>
-          String(pick(row, ["sector_name", "sector"]) ?? "")
-            .toUpperCase()
-            .replace(/\s+/g, "_") === name,
+        (row) => pickString(row, ["code"]).toUpperCase() === name,
       ) ?? {};
     const membersBySector = (name: SourceSheet) =>
       members.filter((member) => member.sourceSheet === name);
@@ -960,18 +950,18 @@ export const getPostgresSectorOperationalSummary =
           };
     const fitnessTotalProfitability = sectorProfitability("FITNESS").total;
     const fitnessCurrentMonthProfitability = sectorProfitability("FITNESS").currentMonth;
-    const fitnessSettlementBalance = snapshotMetric("fitness.settlementBalance", "fitness.settlement_balance");
+    const fitnessSettlementBalance = queriedMetric("fitness.settlementBalance", finance("FITNESS"), ["settlement_balance"]);
     const fitnessDebt = debtMetric("FITNESS");
     const salonTotalProfitability = sectorProfitability("SALON").total;
     const salonCurrentMonthProfitability = sectorProfitability("SALON").currentMonth;
     const aulaTotalProfitability = sectorProfitability("AULA").total;
     const aulaCurrentMonthProfitability = sectorProfitability("AULA").currentMonth;
     const aulaAverageCommission = snapshotMetric("aula.averageCommission", "aula.average_commission");
-    const salonSettlementBalance = snapshotMetric("salon.settlementBalance", "salon.settlement_balance");
-    const aulaSettlementBalance = snapshotMetric("aula.settlementBalance", "aula.settlement_balance");
+    const salonSettlementBalance = queriedMetric("salon.settlementBalance", finance("SALON"), ["settlement_balance"]);
+    const aulaSettlementBalance = queriedMetric("aula.settlementBalance", finance("AULA"), ["settlement_balance"]);
     const local1TotalProfitability = sectorProfitability("LOCAL_1").total;
     const local1CurrentMonthProfitability = sectorProfitability("LOCAL_1").currentMonth;
-    const local1SettlementBalance = snapshotMetric("local1.settlementBalance", "local1.settlement_balance") ?? queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
+    const local1SettlementBalance = queriedMetric("local1.settlementBalance", finance("LOCAL_1"), ["settlement_balance"]);
     const preferSnapshotUnlessZero = (snapshot: number | null, fallback: number): number =>
       snapshot == null || (snapshot === 0 && fallback > 0) ? fallback : snapshot;
     const cantinaKioskIncome = preferSnapshotUnlessZero(snapshotMetric("cantina.kioskIncome", "cantina.kiosk_income"), pickNumber(cantinaSpecial, ["kiosk_income"]));

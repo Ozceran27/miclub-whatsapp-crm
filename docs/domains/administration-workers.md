@@ -1,5 +1,7 @@
 # Fuente de datos de trabajadores
 
+La tabla administrativa muestra páginas de 20 trabajadores. Si la membresía posee `workers.view` y `finance:read`, consulta por separado los saldos devengados por persona y moneda. La lectura financiera sólo incluye sectores visibles para la membresía; un saldo incompleto o una falla de cálculo aparece como «No disponible». El permiso laboral por sí solo no expone importes.
+
 `GET /api/administration/workers` usa `miclub.employees` cuando la tabla existe. La respuesta indica `dataSource: "employees"` y no incluye campos de autenticación ni consulta `password_hash`.
 
 En instalaciones anteriores sin esa tabla, el endpoint se degrada a `miclub.people`, `miclub.instructors` y `miclub.user_club_memberships` (`dataSource: "legacy"`). En este modo:

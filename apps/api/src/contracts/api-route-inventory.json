@@ -106,6 +106,26 @@
       ]
     },
     {
+      "id": "GET /api/administration/sector-manager-candidates",
+      "method": "GET",
+      "path": "/api/administration/sector-manager-candidates",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "administration.view",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
       "id": "GET /api/administration/workers",
       "method": "GET",
       "path": "/api/administration/workers",
@@ -1694,6 +1714,26 @@
       "sectorScope": "tenant-invitation",
       "mutability": "write",
       "idempotency": "single-use",
+      "testCategories": [
+        "authentication",
+        "authorization",
+        "tenant-isolation",
+        "validation",
+        "success"
+      ]
+    },
+    {
+      "id": "GET /api/administration/workers/balances",
+      "method": "GET",
+      "path": "/api/administration/workers/balances",
+      "source": "apps/api/src/routes/administrationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "workers.view + finance:read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant-and-visible-sectors",
+      "mutability": "read",
+      "idempotency": "safe",
       "testCategories": [
         "authentication",
         "authorization",

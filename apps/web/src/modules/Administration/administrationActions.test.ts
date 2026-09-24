@@ -37,17 +37,23 @@ void test('los accesos rápidos respetan orden, estado, accesibilidad y modales 
 void test('la administración de sectores presenta el nuevo resumen y editor visual', () => {
   const list = read('./SectorList.tsx');
   const modal = read('./SectorDetailModal.tsx');
-  assert.match(list, /Capacidad ociosa/);
+  const fields = read('./SectorConfigurationFields.tsx');
+  assert.doesNotMatch(list, /Capacidad ociosa/);
+  assert.match(list, /Capacidad utilizada/);
   assert.match(list, /Rentabilidad operativa anual/);
   assert.match(list, /Sector del sistema/);
   assert.doesNotMatch(list, /<small>\{sector\.code\}<\/small>/);
   assert.doesNotMatch(list, /Tipo de capacidad/);
   assert.doesNotMatch(list, /<small>Horario<\/small>/);
-  assert.match(modal, /<SectorIconPicker value=\{iconKey\}/);
-  assert.match(modal, /<ConfigurationColorPicker value=\{color\}/);
+  assert.match(fields, /<SectorIconPicker value=\{iconKey\}/);
+  assert.match(fields, /<ConfigurationColorPicker value=\{color\}/);
+  assert.match(modal, /Editar sector/);
+  assert.match(list, /<SectorConfigurationFields/);
+  assert.match(modal, /<SectorConfigurationFields/);
   assert.match(modal, /Eliminar sector/);
-  assert.match(modal, /sector\.isSystem \? \{\} : \{ iconKey \}/);
-  assert.match(modal, /currentManagerMissing/);
+  assert.match(modal, /canEdit && !sector\.isSystem/);
+  assert.match(fields, /name="managerPersonId"/);
+  assert.match(fields, /currentManagerMissing/);
   assert.match(list, /creationError && <p className="activity-form__error" role="alert">/);
   assert.match(list, /annualOperatingProfitability == null/);
 });

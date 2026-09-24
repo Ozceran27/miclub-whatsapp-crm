@@ -28,7 +28,7 @@ const respond = (res: Response, result: SectorMutationResult) => {
   if (result.kind === "updated") return res.json(result.sector);
   if (result.kind === "missing") return fail(res, 404, "SECTOR_NOT_FOUND", "Sector no encontrado.");
   if (result.kind === "conflict") return fail(res, 409, "OPTIMISTIC_CONCURRENCY_CONFLICT", "El sector fue modificado por otra operación; recargue los datos.");
-  if (result.kind === "protected") return fail(res, 409, "SYSTEM_SECTOR_PROTECTED", "El nombre, el icono y el archivado de un sector de sistema están protegidos.");
+  if (result.kind === "protected") return fail(res, 409, "SYSTEM_SECTOR_PROTECTED", "Los sectores de sistema no admiten edición ni archivado.");
   if (result.kind === "invalid_manager") return fail(res, 400, "INVALID_MANAGER", "El responsable no pertenece al club.");
   return fail(res, 409, "SECTOR_HAS_DEPENDENCIES", "El sector tiene dependencias y no puede archivarse.", result.dependencies);
 };

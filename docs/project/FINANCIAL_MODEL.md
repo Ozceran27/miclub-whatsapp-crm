@@ -1,5 +1,11 @@
 # Financial Model
 
+## Lectura de saldos en Trabajadores — 2026-09-23
+
+La columna «Saldo a Liquidar» agrega por `person_id` y moneda los saldos firmados que devuelve el circuito financiero vigente. Incluye liquidaciones de actividades de todas las vigencias, obligaciones de remuneración fija con vencimiento hasta hoy y obligaciones iniciales `EMPLOYEE` aprobadas. Si una remuneración vencida todavía no tiene obligación materializada, la lectura usa `compensationDueDates` y la muestra como devengado pendiente de revisión, sin persistir ni habilitar pagos. Tras un arranque aprobado, excluye remuneraciones anteriores o iguales al corte para evitar duplicarlas con la obligación inicial. El propio circuito aplica pagos, ajustes y compensaciones explícitos; la tabla no recalcula esas reglas. Una línea `DRAFT` o `REQUIRES_REVIEW` contribuye al devengado visible con aviso de revisión, pero sólo los importes aprobados pueden procesarse para pago. Un diagnóstico del circuito vuelve incompleto el saldo de los receptores afectados. No se convierten monedas en esta columna.
+
+Los tableros usan el circuito para los saldos sectoriales de actividades. La vista `v_activity_settlement_sector_balances`, que usa el campo histórico `monthly_fixed_fee`, queda fuera del runtime de tableros y sólo se conserva para auditoría de divergencias. Los totales sectoriales con varias monedas se marcan incompletos hasta que exista una valoración homogénea; no se suman importes nominales heterogéneos.
+
 ## Presentación de saldos operativos (2026-09-21)
 
 El circuito devuelve totales separados por moneda: `activityToPay` (saldo positivo
@@ -132,8 +138,8 @@ Los términos históricos respetan effective_from/effective_to; no sustituirlos 
 - postgresDashboard/implementation.ts consume v_activity_settlement_sector_balances.
 - v_activity_settlement_balances parte de activity_settlements COMPLETADO no anulados, relacionados con término/período y allocations.
 - La vista suma ingresos completados de la actividad por fecha; no agrega un filtro de clasificación de categoría.
-- **B03:** vista y readOnlyRepository aún leen monthly_fixed_fee; altas modernas escriben fixed_club_fee/frecuencia/moneda. FIXED nuevo puede devolver NULL y desaparecer del agregado; frecuencias y monedas no están conciliadas en esa vista.
-- **C01:** no se encontró creación runtime de activity_settlements. activitySettlementService.ts calcula en TypeScript, pero sólo se encontró consumo en tests; no certifica la vista.
+- **B03 histórico:** la vista conserva `monthly_fixed_fee` y no es fuente de saldos en los tableros actuales. `readOnlyRepository` ya lee `fixed_club_fee`, frecuencia y moneda. Un consumidor externo de la vista debe tratarla como legacy.
+- **C01 histórico:** `financialCircuitService.loadCircuit` materializa `activity_settlements` desde movimientos y términos. La paridad con datos de la base real queda pendiente de auditoría de solo lectura.
 - El cálculo TS usa calendario Buenos Aires; FIXED mensual exige meses completos. No extender implícitamente esta política a reglas no resueltas.
 
 Estos son bugs/brechas, no modificaciones de las fórmulas anteriores. Falta definir/materializar el ciclo de liquidación y comprobar paridad SQL con los ejemplos.

@@ -5,8 +5,9 @@ import { getAdministrationInitialReadModel } from "../services/administration/ad
 import { getAdministrationSummary } from "../services/administration/administrationSummaryService.js";
 import asyncHandler from "./asyncHandler.js";
 import { getAdministrationWorkers } from "../services/administration/workersService.js";
+import { getAdministrationWorkerBalances } from "../services/administration/workerBalancesService.js";
 import { parseListQuery } from "./listQuery.js";
-import { createSector, type SectorActor } from "../repositories/sectorsRepository.js";
+import { createSector, listSectorManagerCandidates, type SectorActor } from "../repositories/sectorsRepository.js";
 import { archiveWorker, createWorker, updateWorker, WorkerMutationError, type WorkerActor } from "../services/administration/workerMutationService.js";
 import { getPostgresPool } from "../db/postgres.js";
 import { tenantExecutor } from "../db/transaction.js";
@@ -52,6 +53,15 @@ router.delete("/workers/:id/photo", requirePermission(PERMISSIONS.WORKERS_MANAGE
   const id=String(req.params.id);
   if(!UUID.test(id)) return res.status(400).json({error:true,code:"VALIDATION_ERROR",message:"id de trabajador inválido."});
   res.json(await deleteEmployeePhoto(req.auth!.clubId, id));
+}));
+router.get("/sector-manager-candidates", asyncHandler(async (req, res) => {
+  res.json({ items: await listSectorManagerCandidates(req.auth!.clubId) });
+}));
+
+router.get("/workers/balances", requirePermission(PERMISSIONS.WORKERS_VIEW), requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {
+  const { limit, offset } = parseListQuery(req, [], { defaultLimit: 50, maxLimit: 100 });
+  res.set('Cache-Control', 'private, no-store');
+  res.json(await getAdministrationWorkerBalances(req.auth!, limit, offset));
 }));
 router.delete("/workers/:id", requirePermission(PERMISSIONS.WORKERS_MANAGE), workerMutation((actor, id, body) => archiveWorker(actor, id, body)));
 
@@ -105,9 +115,13 @@ router.post("/sectors", requirePermission(PERMISSIONS.SECTORS_CREATE), asyncHand
   const iconKey = typeof body.iconKey === "string" ? body.iconKey.trim() : "";
   const capacityMode = body.capacityMode === "ENROLLMENTS" ? "ENROLLMENTS" : "INCOME";
   const configuredCapacity = capacityMode === "ENROLLMENTS" ? Number(body.configuredCapacity) : null;
+  const managerPersonId = body.managerPersonId === undefined || body.managerPersonId === null || body.managerPersonId === "" ? null : body.managerPersonId;
+  if (managerPersonId !== null && (typeof managerPersonId !== "string" || !UUID.test(managerPersonId)))
+    return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "managerPersonId inválido." });
   if (!name || !iconKey || (capacityMode === "ENROLLMENTS" && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) return res.status(400).json({ error: true, code: "VALIDATION_ERROR", message: "Nombre, icono y capacidad válidos son obligatorios para un sector personalizado." });
-  const input: Parameters<typeof createSector>[1] = { name, code: typeof body.code === "string" ? body.code : null, description: typeof body.description === "string" ? body.description.trim() || null : null, iconKey, color, status: status as "active" | "inactive" | "under_repair", capacityMode, configuredCapacity };
+  const input: Parameters<typeof createSector>[1] = { name, code: typeof body.code === "string" ? body.code : null, description: typeof body.description === "string" ? body.description.trim() || null : null, iconKey, color, managerPersonId, status: status as "active" | "inactive" | "under_repair", capacityMode, configuredCapacity };
   const result = await createSector(actor, input);
+  if (result.kind === "invalid_manager") return res.status(400).json({ error: true, code: "INVALID_MANAGER", message: "El responsable no pertenece al club o no está activo." });
   return res.status(201).json(result.sector);
 }));
 

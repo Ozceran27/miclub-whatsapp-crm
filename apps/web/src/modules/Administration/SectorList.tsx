@@ -1,12 +1,11 @@
 import { DEFAULT_SECTOR_ICON_KEY, PERMISSIONS, type AdministrationSectorDto, type AdministrationSectorsResponse } from '@miclub/shared';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { createAdministrationSector, getAdministrationSectors } from '../../services/api/administrationApi';
+import { createAdministrationSector, getAdministrationSectors, getSectorManagerCandidates, type SectorManagerCandidate } from '../../services/api/administrationApi';
 import { SectorDetailModal } from './SectorDetailModal';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
 import { useSession } from '../../session';
 import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
-import { ConfigurationColorPicker, SectorIconPicker } from '../shared/ConfigurationVisualFields';
-import { SectorCapacityFields } from '../shared/SectorCapacityFields';
+import { SectorConfigurationFields } from './SectorConfigurationFields';
 
 const integer = new Intl.NumberFormat('es-AR');
 const formText = (form: FormData, name: string) => { const value=form.get(name); return typeof value==='string' ? value.trim() : ''; };
@@ -18,9 +17,6 @@ const usedCapacity = ({ capacityDataStatus, currentUsage, maximumCapacity, utili
   capacityDataStatus !== 'AVAILABLE' || maximumCapacity == null || utilizationPercentage == null
     ? 'Sin datos'
     : `${integer.format(currentUsage ?? 0)} / ${integer.format(maximumCapacity)} · ${integer.format(utilizationPercentage)}%`;
-
-const idleCapacity = ({ capacityDataStatus, idlePercentage }: AdministrationSectorDto) =>
-  capacityDataStatus === 'AVAILABLE' && idlePercentage != null ? `${integer.format(idlePercentage)}%` : 'Sin datos';
 
 const annualProfitability = ({ annualOperatingProfitability, operatingCurrencyCode }: AdministrationSectorDto) => {
   if (annualOperatingProfitability == null) return 'Sin cotización';
@@ -47,7 +43,24 @@ export function SectorList() {
   const [newIconKey, setNewIconKey] = useState(DEFAULT_SECTOR_ICON_KEY);
   const [capacityMode, setCapacityMode] = useState<'ENROLLMENTS'|'INCOME'>('INCOME');
   const [configuredCapacity, setConfiguredCapacity] = useState<number | null>(null);
-  const openCreation = useCallback(() => { setNewColor('#2563EB'); setNewIconKey(DEFAULT_SECTOR_ICON_KEY); setCapacityMode('INCOME'); setConfiguredCapacity(null); setCreationError(null); setCreating(true); }, []);
+  const [managers, setManagers] = useState<SectorManagerCandidate[]>([]);
+  const [managersLoading, setManagersLoading] = useState(false);
+  const [managersError, setManagersError] = useState<string | null>(null);
+  const openCreation = useCallback(() => { setNewColor('#2563EB'); setNewIconKey(DEFAULT_SECTOR_ICON_KEY); setCapacityMode('INCOME'); setConfiguredCapacity(null); setManagers([]); setManagersLoading(true); setManagersError(null); setCreationError(null); setCreating(true); }, []);
+
+  useEffect(() => {
+    if (!creating) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setManagersLoading(true); setManagersError(null);
+      void getSectorManagerCandidates(controller.signal).then(result => {
+        if (!controller.signal.aborted) setManagers(result.items);
+      }).catch(() => {
+        if (!controller.signal.aborted) setManagersError('No se pudieron cargar los responsables. Podés crear el sector sin asignarlo.');
+      }).finally(() => { if (!controller.signal.aborted) setManagersLoading(false); });
+    }, 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [creating]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -79,7 +92,7 @@ export function SectorList() {
     const status = formText(data,'status');
     if (!newColor || !status || !newIconKey || (capacityMode === 'ENROLLMENTS' && (!Number.isSafeInteger(configuredCapacity) || Number(configuredCapacity) < 1))) { setCreationError('Revisá los datos del sector antes de continuar.'); setLoading(false); return; }
     try {
-      await createAdministrationSector({name:formText(data,'name'),description:formText(data,'description')||null,iconKey:newIconKey,color:newColor,status:status as 'active'|'inactive'|'under_repair',capacityMode,configuredCapacity:capacityMode==='ENROLLMENTS'?configuredCapacity:null});
+      await createAdministrationSector({name:formText(data,'name'),managerPersonId:formText(data,'managerPersonId')||null,description:formText(data,'description')||null,iconKey:newIconKey,color:newColor,status:status as 'active'|'inactive'|'under_repair',capacityMode,configuredCapacity:capacityMode==='ENROLLMENTS'?configuredCapacity:null});
       setCreating(false); await load(); window.dispatchEvent(new Event('miclub:navigation-changed'));
     }
     catch (e) { setCreationError(e instanceof Error ? e.message : 'No se pudo crear el sector.'); setLoading(false); }
@@ -114,15 +127,14 @@ export function SectorList() {
               aria-pressed={selectedSectorId === sector.id}
               onClick={() => setSelectedSectorId(sector.id)}
             >
-              <span className="sector-list__identity">
+               <span className="sector-list__identity" title={sector.name}>
                 <span role="img" aria-label={`Icono de ${sector.name}`}>{getSectorVisualMeta(sector).icon}</span>
                 <span className="sector-list__color" style={{ backgroundColor: sector.color || '#91a4c8' }} aria-label={`Color ${sector.color || 'no configurado'}`} />
                 <strong>{sector.name}</strong>
               </span>
               <span className="sector-list__status" data-status={sector.status}>{statusLabel(sector)}</span>
-              <span className="sector-list__datum"><small>Responsable</small><strong>{sector.managerName || 'Sin asignar'}</strong></span>
+               <span className="sector-list__datum" title={sector.managerName || 'Sin asignar'}><small>Responsable</small><strong>{sector.managerName || 'Sin asignar'}</strong></span>
               <span className="sector-list__datum"><small>Capacidad utilizada</small><strong>{usedCapacity(sector)}</strong></span>
-              <span className="sector-list__datum"><small>Capacidad ociosa</small><strong>{idleCapacity(sector)}</strong></span>
               <span className="sector-list__datum"><small>Actividades</small><strong>{integer.format(sector.activitiesCount ?? 0)}</strong></span>
               <span className="sector-list__datum"><small>Inscriptos activos</small><strong>{integer.format(sector.activeEnrollmentsCount ?? 0)}</strong></span>
               <span className="sector-list__datum sector-list__profitability"><small>Rentabilidad operativa anual</small><strong data-negative={(sector.annualOperatingProfitability ?? 0) < 0} title={`Acumulado ${sector.annualOperatingProfitabilityYear ?? new Date().getFullYear()} hasta hoy`}>{annualProfitability(sector)}</strong></span>
@@ -141,14 +153,9 @@ export function SectorList() {
         onClose={() => setCreating(false)}
         footer={<><button type="button" className="ghost-btn" onClick={() => setCreating(false)} disabled={loading}>Cancelar</button><button type="submit" className="primary-btn" form="administration-sector-create" disabled={loading}>{loading ? 'Creando…' : 'Crear sector'}</button></>}
       >
-        <form id="administration-sector-create" className="draft-form" onSubmit={(event) => void create(event)}>
+        <form id="administration-sector-create" className="draft-form sector-editor__form" onSubmit={(event) => void create(event)}>
           {creationError && <p className="activity-form__error" role="alert">{creationError}</p>}
-          <label>Nombre<input name="name" required /></label>
-          <SectorIconPicker value={newIconKey} onChange={setNewIconKey} />
-          <ConfigurationColorPicker value={newColor} onChange={setNewColor} label="Color del sector" />
-          <SectorCapacityFields mode={capacityMode} capacity={configuredCapacity} onModeChange={mode=>{setCapacityMode(mode);setConfiguredCapacity(mode==='INCOME'?null:value=>value??1);}} onCapacityChange={setConfiguredCapacity}/>
-          <label>Estado<select name="status" defaultValue="active"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="under_repair">En reparación</option></select></label>
-          <fieldset><legend>Configuración avanzada</legend><label>Descripción<textarea name="description" rows={3}/></label></fieldset>
+          <SectorConfigurationFields managers={managers} managersLoading={managersLoading} managersError={managersError} iconKey={newIconKey} color={newColor} capacityMode={capacityMode} configuredCapacity={configuredCapacity} onIconChange={setNewIconKey} onColorChange={setNewColor} onCapacityModeChange={mode=>{setCapacityMode(mode);setConfiguredCapacity(mode==='INCOME'?null:value=>value??1);}} onCapacityChange={setConfiguredCapacity}/>
         </form>
       </ConfigurationEditorModal>}
     </section>
