@@ -135,8 +135,8 @@ test('regresión responsive: escritorio, móvil, tema oscuro y movimiento reduci
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/);
   assert.match(styles, /var\(--color-card\)/);
   assert.match(styles, /backdrop-filter: blur/);
-  assert.match(styles, /\(max-width: 1304px\) and \(max-height: 800px\), \(min-width: 1305px\) and \(max-height: 720px\)/);
-  assert.match(styles, /\(max-width: 1304px\) and \(max-height: 700px\), \(min-width: 1305px\) and \(max-height: 630px\)/);
+  assert.match(styles, /\(max-width: 1231px\) and \(max-height: 800px\), \(min-width: 1232px\) and \(max-height: 680px\)/);
+  assert.match(styles, /\(max-width: 1231px\) and \(max-height: 700px\), \(min-width: 1232px\) and \(max-height: 595px\)/);
   assert.match(styles, /grid-template-rows: auto minmax\(0,1fr\) auto/);
   assert.match(styles, /\.onboarding-viewport \{[^}]*overflow-y: auto/);
   assert.match(styles, /\.onboarding-actions button,[^}]*min-height: 44px/);

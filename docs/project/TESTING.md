@@ -1,5 +1,17 @@
 # Testing
 
+## Escala de escritorio al 85 % — 2026-09-25
+
+`npm run test -w @miclub/web` pasó (88/88), junto con `typecheck` y `build`.
+Chrome headless confirmó escala 1 hasta 1231 px y escala 0,85 desde 1232 px.
+A 1366 × 608 px, el panel ocupó x=164…1293, el onboarding y=15…593 y no hubo
+overflow horizontal. Un menú fijo conservó su alineación horizontal con el
+disparador al convertir coordenadas bajo `zoom: 0.85`. El lint web mantiene
+30 errores y 75 advertencias preexistentes. No hubo cambios de DB ni SQL.
+
+La comparación visual autenticada en Chrome con zoom real 85 % y 100 % sigue
+pendiente; la medición headless verifica geometría y puntos de ruptura.
+
 ## Escala de escritorio al 90 % — 2026-09-25
 
 `npm run test -w @miclub/web` pasó (88/88), junto con `typecheck`, `build`,

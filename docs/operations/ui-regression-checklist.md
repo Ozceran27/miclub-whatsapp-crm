@@ -46,12 +46,12 @@ sin copiar tamaños de columnas que sólo tienen sentido para otro dominio.
 
 ## Área de trabajo global
 
-Desde 1305 px CSS de viewport, la raíz usa `zoom: 0.9` y el shell compensa
+Desde 1232 px CSS de viewport, la raíz usa `zoom: 0.85` y el shell compensa
 el ancho del viewport para reproducir a zoom 100 % la composición anterior
-de Chrome al 90 %. Por debajo de 1305 px no hay escala CSS. Comprobar en
+de Chrome al 85 %. Por debajo de 1232 px no hay escala CSS. Comprobar en
 Inicio, Administración, Tesorería, CRM, Migración, login y registro el zoom
-100 % a 1305, 1366, 1440 y 1920 px; a 1366 px el panel comienza cerca de
-x=134 y termina cerca de x=1293 cuando hay scrollbar vertical. Revisar
+100 % a 1232, 1366, 1440 y 1920 px; a 1366 px el panel comienza cerca de
+x=164 y termina cerca de x=1293 cuando hay scrollbar vertical. Revisar
 scroll horizontal, badges, menús, tooltips, modales y tablas. El zoom 125 %
 y 200 % elegido por el usuario debe seguir ampliando la interfaz.
 

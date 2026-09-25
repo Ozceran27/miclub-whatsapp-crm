@@ -1,5 +1,13 @@
 # Current State
 
+## Escala visual de escritorio al 85 % — 2026-09-25
+
+La escala general de la raíz pasó de `zoom: 0.9` a `zoom: 0.85` y se activa
+desde 1232 px CSS de viewport. El shell, el alto efectivo del viewport y los
+umbrales de altura del onboarding se recalcularon para 85 %. La utilidad de
+coordenadas de menús y tooltips continúa leyendo el zoom CSS aplicado. Tablet
+y móvil conservan escala 1.
+
 ## Escala visual de escritorio al 90 % — 2026-09-25
 
 La escala general de la raíz pasó de `zoom: 0.8` a `zoom: 0.9`. Se activa
