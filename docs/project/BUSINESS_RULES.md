@@ -89,7 +89,9 @@ La lista anterior no coincidía con el catálogo activo. La fuente enumerada es 
 
 Valores técnicos: `OPERATIONAL`, `NON_OPERATIONAL`, `TAX`, `SERVICE`, `LIABILITY` (no `OPERATIVE`/`NON_OPERATIVE`).
 
-**Corrección probada:** CMV es `NON_OPERATIONAL`, dirección `EGRESOS`, desde `202609050003_classify_cmv_as_non_operational.sql` y el commit `ff0a88b`. Este documento decía operativo erróneamente. SALARIOS sigue `OPERATIONAL` en el catálogo shared; su clasificación fallback distinta en economyDomain es conflicto abierto C05, no cambio de regla.
+**Regla vigente:** toda categoría activa admite movimientos `INGRESOS` y `EGRESOS`. La dirección es atributo del movimiento; `movement_categories.direction` queda nulo como dato legado tras `202609250001_bidirectional_movement_categories.sql`. Los IDs y la clasificación histórica se conservan. CMV es `NON_OPERATIONAL` desde `202609050003_classify_cmv_as_non_operational.sql`. SALARIOS conserva la clasificación `OPERATIONAL` del catálogo canónico.
+
+En pagos de liquidaciones, remuneraciones y cobros de deuda sólo se aceptan categorías canónicas `OPERATIONAL` o código `DEUDAS`. El cobro de deuda de un responsable, aun clasificado como operativo, no constituye una nueva recaudación de actividad ni se suma a su rentabilidad operativa.
 
 ## 7. Actividades
 

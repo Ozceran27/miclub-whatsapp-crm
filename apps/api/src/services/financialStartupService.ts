@@ -78,21 +78,24 @@ export async function approveStartup(db: QueryExecutor, auth: RequestAuthContext
 }
 
 export async function reconcileMovement(db: QueryExecutor, auth: RequestAuthContext, id: string, revision: number) {
-  const row = (await db.query(`update miclub.movements set reconciled_at=now() where club_id=$1 and id=$2 and revision=$3 and account_id is not null and operational_status='COMPLETADO'
+  const row = (await db.query(`update miclub.movements set reconciled_at=now() where club_id=$1 and id=$2 and revision=$3 and reconciled_at is null and account_id is not null and operational_status='COMPLETADO'
     and ($4::uuid[] is null or sector_id=any($4)) returning id,revision,reconciled_at`, [auth.clubId, id, revision, auth.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : auth.sectorIds])).rows[0];
   if (!row) throw financialError('Movimiento cambiado, sin cuenta o no completado.');
   return row;
 }
 
-export async function payInitialObligation(db: QueryExecutor, auth: RequestAuthContext, id: string, accountId: string, amount: number, date: string) {
+export async function payInitialObligation(db: QueryExecutor, auth: RequestAuthContext, id: string, accountId: string, categoryId: string, amount: number, date: string) {
   financialMoney(amount); financialDate(date);
+  const category=(await db.query(`select 1 from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id and cc.is_active
+    where mc.club_id=$1 and mc.id=$2 and mc.is_active and (cc.classification='OPERATIONAL' or cc.code='DEUDAS')`,[auth.clubId,categoryId])).rows[0];
+  if(!category) throw financialError('Seleccione una categoría operativa o Deudas.',400);
   const row = (await db.query<{ balance: number; person_id: string; activity_id: string | null; currency_code: string; timezone: string; today: string }>(`select (o.amount-o.settled_amount)::float8 balance,o.person_id,o.activity_id,o.currency_code,coalesce(c.timezone,'America/Argentina/Buenos_Aires') timezone,(now() at time zone coalesce(c.timezone,'America/Argentina/Buenos_Aires'))::date::text today
     from miclub.initial_obligations o join miclub.clubs c on c.id=o.club_id join miclub.financial_accounts a on a.club_id=o.club_id and a.id=$3 and a.currency_code=o.currency_code and a.status='ACTIVE'
     where o.club_id=$1 and o.id=$2 and o.kind in ('EMPLOYEE','SUPPLIER') and o.review_state='APPROVED' and exists(select 1 from miclub.finance_startups s where s.club_id=o.club_id and s.approved_snapshot is not null) for update of o`, [auth.clubId, id, accountId])).rows[0];
   if (!row) throw financialError('Obligación inicial aprobada o cuenta compatible no disponible.', 404);
   if (amount <= 0 || amount > row.balance || date > row.today) throw financialError('Importe superior al saldo, no positivo o fecha futura.');
-  const created = (await db.query<{id:string}>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,sector_id,activity_id,person_id,concept,counterparty_text,amount,currency_code,account_id,operational_status,financial_status,source,initial_obligation_id)
-    values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,'EGRESOS',(select sector_id from miclub.activities where club_id=$1 and id=$4),$4,$5,'Pago de obligación inicial','Empleado / proveedor',$6,$7,$8,'COMPLETADO','pagado','finance_circuit',$9) returning id`, [auth.clubId,date,row.timezone,row.activity_id,row.person_id,amount,row.currency_code,accountId,id])).rows[0];
+  const created = (await db.query<{id:string}>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,category_id,sector_id,activity_id,person_id,concept,counterparty_text,amount,currency_code,account_id,operational_status,financial_status,source,initial_obligation_id)
+    values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,'EGRESOS',$10,(select sector_id from miclub.activities where club_id=$1 and id=$4),$4,$5,'Pago de obligación inicial','Empleado / proveedor',$6,$7,$8,'COMPLETADO','pagado','finance_circuit',$9) returning id`, [auth.clubId,date,row.timezone,row.activity_id,row.person_id,amount,row.currency_code,accountId,id,categoryId])).rows[0];
   await db.query('update miclub.initial_obligations set settled_amount=settled_amount+$3 where club_id=$1 and id=$2', [auth.clubId,id,amount]);
   return { id: created.id, amount, remaining: Math.round((row.balance-amount)*100)/100 };
 }

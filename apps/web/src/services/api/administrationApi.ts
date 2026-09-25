@@ -113,7 +113,7 @@ export const getAdministrationMovements = (page: number, filters: Administration
 export const getAdministrationEnrollments = (page: number, filters: AdministrationListFilters, signal?: AbortSignal) =>
   apiJson<AdministrationEnrollmentsResponse>(paginatedUrl('/api/inscripciones', page, filters), { cache: 'no-store', signal });
 
-export type MovementCatalogItem = { id: string; code?: string; name: string; displayName?: string; classification?: 'OPERATIONAL'|'NON_OPERATIONAL'|'TAX'|'SERVICE'|'LIABILITY'; displayOrder?: number; sectorId?: string; direction?: 'INGRESOS'|'EGRESOS'; isActive?: boolean };
+export type MovementCatalogItem = { id: string; code?: string; name: string; displayName?: string; classification?: 'OPERATIONAL'|'NON_OPERATIONAL'|'TAX'|'SERVICE'|'LIABILITY'; displayOrder?: number; sectorId?: string; /** Legacy preferred direction; every active category accepts both types. */ direction?: 'INGRESOS'|'EGRESOS'|null; isActive?: boolean };
 export const getMovementFormCatalogs = async (signal?: AbortSignal) => {
   const [categories,sectors,activities,paymentMethods,accounts]=await Promise.all([
     apiJson<MovementCatalogItem[]>('/api/movement-categories',{signal}), apiJson<MovementCatalogItem[]>('/api/sectors',{signal}),

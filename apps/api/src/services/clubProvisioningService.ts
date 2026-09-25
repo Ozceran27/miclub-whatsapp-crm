@@ -82,12 +82,12 @@ export async function provisionClub(
   await client.query(`insert into miclub.payment_methods (club_id, name) values ($1, 'Efectivo'), ($1, 'Transferencia') on conflict do nothing`, [clubId]);
   await client.query(`
     insert into miclub.movement_categories (club_id, name, direction, is_active, catalog_id)
-    select $1, item.display_name, item.direction::miclub.movement_type, true, cc.id
-    from jsonb_to_recordset($2::jsonb) as item(code text, display_name text, direction text)
+    select $1, item.display_name, null, true, cc.id
+    from jsonb_to_recordset($2::jsonb) as item(code text, display_name text)
     join miclub.category_catalog cc on cc.code = item.code and cc.is_active
     on conflict (club_id, upper(trim(name))) do update
-      set catalog_id = excluded.catalog_id, direction = excluded.direction, is_active = true`,
-  [clubId, JSON.stringify(MOVEMENT_CATEGORY_CATALOG.map(([code, displayName, , direction]) => ({ code, display_name: displayName, direction })))]);
+      set catalog_id = excluded.catalog_id, direction = null, is_active = true`,
+  [clubId, JSON.stringify(MOVEMENT_CATEGORY_CATALOG.map(([code, displayName]) => ({ code, display_name: displayName })))]);
 
   return { clubId, userId: user.rows[0].id, personId: person.rows[0].id, membershipId: membership.rows[0].id };
 }

@@ -56,7 +56,12 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
     const activity = (await db.query<{ id: string }>("insert into miclub.activities(club_id,sector_id,instructor_id,name) values($1,$2,$3,'Arte') returning id", [club, sector, instructor])).rows[0].id;
     const term = (await db.query<{ id: string }>("insert into miclub.activity_terms(club_id,activity_id,mode,club_share_percentage,effective_from) values($1,$2,'VARIABLE',40,'2026-09-01') returning id", [club, activity])).rows[0].id;
     const account = (await db.query<{ id: string }>("insert into miclub.financial_accounts(club_id,code,name,currency_code) values($1,'TEST','Caja prueba','ARS') returning id", [club])).rows[0].id;
-    const category = (await db.query<{ id: string }>("select id from miclub.movement_categories where club_id=$1 and name='Cuotas' limit 1", [club])).rows[0]?.id ?? (await db.query<{ id: string }>("select mc.id from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id where mc.club_id=$1 and mc.direction='INGRESOS' and cc.classification='OPERATIONAL' limit 1", [club])).rows[0].id;
+    const category = (await db.query<{ id: string }>("select mc.id from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id where mc.club_id=$1 and cc.classification='OPERATIONAL' and mc.is_active limit 1", [club])).rows[0].id;
+    const paymentMethodId = (await db.query<{id:string}>("select id from miclub.payment_methods where club_id=$1 and is_active limit 1",[club])).rows[0].id;
+    const paymentPreview = async (amount:number,debtCollection=false) => {
+      const result=await request(`/api/finance/responsibles/${person}/preview`,{accountId:account,amount,debtCollection},cookie);
+      assert.equal(result.status,200,JSON.stringify(result.body));return String(result.body.previewHash);
+    };
     const receipt = { movementDate: '2026-09-03', movementType: 'INGRESOS', accountId: account, categoryId: category, sectorId: sector, activityId: activity, personId: person, concept: 'Cuota de Arte', counterpartyText: 'Alumno', amount: 100000, operationalStatus: 'COMPLETADO' };
     const read = async () => {
       const result = await request('/api/finance/circuit', undefined, cookie);
@@ -79,7 +84,7 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
       assert.equal(line.balance, 60000);
       const approved = await request(`/api/finance/settlements/${line.id}/approve`, { revision: line.revision, reason: 'Revisado' }, cookie);
       assert.equal(approved.status, 200, JSON.stringify(approved.body));
-      const key = randomUUID(); const payment = { accountId: account, amount: 60000, date: '2026-09-04', debtCollection: false, reason: 'Pago revisado' };
+      const key = randomUUID(); const payment = { accountId: account, categoryId: category, paymentMethodId, amount: 60000, date: '2026-09-04', debtCollection: false, reason: 'Pago revisado', previewHash:await paymentPreview(60000) };
       const paid = await request(`/api/finance/responsibles/${person}/pay`, payment, cookie, key);
       assert.equal(paid.status, 200, JSON.stringify(paid.body));
       assert.deepEqual((await request(`/api/finance/responsibles/${person}/pay`, payment, cookie, key)).body, paid.body);
@@ -115,7 +120,7 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
       const line = (await read()).settlements.find(s => s.termId === term)!;
       assert.equal(line.balance, 42000);
       assert.equal((await request(`/api/finance/settlements/${line.id}/approve`, { revision: line.revision, reason: 'Revisión de saldo neto' }, cookie)).status, 200);
-      const payment = { accountId: account, amount: 30000, date: '2026-09-06', reason: 'Pago concurrente' };
+      const payment = { accountId: account, categoryId: category, paymentMethodId, amount: 30000, date: '2026-09-06', reason: 'Pago concurrente', previewHash:await paymentPreview(30000) };
       const results = await Promise.all([request(`/api/finance/responsibles/${person}/pay`, payment, cookie), request(`/api/finance/responsibles/${person}/pay`, payment, cookie)]);
       assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
       assert.equal((await read()).settlements.find(s => s.termId === term)?.balance, 12000);
@@ -142,7 +147,7 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
       assert.equal(line.balance, 30000);
       assert.equal((await request(`/api/finance/settlements/${line.id}/approve`, { revision: line.revision, reason: 'Saldo revisado' }, cookie)).status, 200);
       const cashBefore = (await read()).projection.liquidity!;
-      const paid = await request(`/api/finance/responsibles/${person}/pay`, { accountId: account, amount: 18000, date: '2026-09-08', reason: 'Compensar deuda de arranque' }, cookie);
+      const paid = await request(`/api/finance/responsibles/${person}/pay`, { accountId: account, categoryId: category, paymentMethodId, amount: 18000, date: '2026-09-08', reason: 'Compensar deuda de arranque', previewHash:await paymentPreview(18000) }, cookie);
       assert.equal(paid.status, 200, JSON.stringify(paid.body));
       const after = await read();
       assert.equal(after.settlements.filter(s => s.personId === person).reduce((sum, s) => sum + s.balance, 0), 0);
@@ -155,7 +160,7 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
       assert.equal(created.status, 201, JSON.stringify(created.body));
       const refunded = await request(`/api/finance/movements/${String(created.body.id)}/refund`, { revision: 1, amount: 40000, accountId: account, date: '2026-09-07', reason: 'Devolución parcial' }, cookie);
       assert.equal(refunded.status, 200, JSON.stringify(refunded.body));
-      const expenseCategory = (await db.query<{id: string}>("select id from miclub.movement_categories where club_id=$1 and direction='EGRESOS' and is_active limit 1", [club])).rows[0].id;
+      const expenseCategory = (await db.query<{id: string}>("select id from miclub.movement_categories where club_id=$1 and is_active limit 1", [club])).rows[0].id;
       const refundInput = { ...receipt, movementType: 'EGRESOS', categoryId: expenseCategory, movementDate: '2026-09-07', amount: 20000 };
       for (const [revision, status, cancelled, paid] of [[1, 'COMPLETADO', 20000, 80000], [2, 'ANULADO', 0, 100000]] as const) {
         const corrected = await request(`/api/finance/movements/${String(refunded.body.id)}/correct`, { revision, movement: { ...refundInput, operationalStatus: status }, reason: 'Corregir devolución registrada' }, cookie);
@@ -166,7 +171,7 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
     });
     await t.test('pago parcial e idempotente de obligación inicial de proveedor', async () => {
       const obligation = (await db.query<{id:string}>("insert into miclub.initial_obligations(club_id,person_id,kind,currency_code,amount,source_key,due_date) values($1,$2,'SUPPLIER','ARS',100,'supplier-test','2026-08-31') returning id", [club,person])).rows[0].id;
-      const key = randomUUID(); const input = { accountId: account, amount: 40, date: '2026-09-09', reason: 'Pago parcial proveedor' };
+      const key = randomUUID(); const input = { accountId: account, categoryId:category, amount: 40, date: '2026-09-09', reason: 'Pago parcial proveedor' };
       const paid = await request(`/api/finance/initial-obligations/${obligation}/pay`, input, cookie, key);
       assert.equal(paid.status, 200, JSON.stringify(paid.body)); assert.equal(paid.body.remaining, 60);
       assert.deepEqual((await request(`/api/finance/initial-obligations/${obligation}/pay`, input, cookie, key)).body, paid.body);
@@ -201,6 +206,45 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
         assert.equal(response.status, 200, `${endpoint}: ${JSON.stringify(response.body)}`);
       }
       assert.equal((await request('/api/finance/workbench', undefined, cookie)).status, 200);
+    });
+    await t.test('categoría activa sirve para ambos tipos y doble conciliación conserva la marca',async()=>{
+      const directions=(await db.query<{direction:string|null}>("select direction::text from miclub.movement_categories where club_id=$1 and is_active",[club])).rows;
+      assert.ok(directions.length>0);assert.ok(directions.every(row=>row.direction===null));
+      const created=await request('/api/finance/movements',{reason:'Gasto de prueba',movement:{...receipt,movementType:'EGRESOS',activityId:null,personId:null,amount:10}},cookie);
+      assert.equal(created.status,201,JSON.stringify(created.body));
+      const id=String(created.body.id);
+      const first=await request(`/api/finance/movements/${id}/reconcile`,{revision:1,reason:'Control de caja'},cookie);
+      assert.equal(first.status,200,JSON.stringify(first.body));
+      const reconciled=(await db.query<{reconciled_at:Date|null}>('select reconciled_at from miclub.movements where club_id=$1 and id=$2',[club,id])).rows[0].reconciled_at;
+      assert.ok(reconciled);
+      assert.equal((await request(`/api/finance/movements/${id}/reconcile`,{revision:1,reason:'Segundo intento'},cookie)).status,409);
+      assert.equal((await db.query<{reconciled_at:Date|null}>('select reconciled_at from miclub.movements where club_id=$1 and id=$2',[club,id])).rows[0].reconciled_at?.getTime(),reconciled.getTime());
+      const other=await request('/auth/login',{username:'financeB@test.invalid',password:'FinancialTest123!'});
+      assert.equal(other.status,200);assert.ok(other.cookie);
+      assert.equal((await request(`/api/finance/movements/${id}`,undefined,other.cookie)).status,404);
+    });
+    await t.test('corrección de cierre y anulación de grupo revierten estado y saldo inicial',async()=>{
+      const person2=(await db.query<{id:string}>("insert into miclub.people(club_id,first_name,last_name) values($1,'Historial','Prueba') returning id",[club])).rows[0].id;
+      const activity2=(await db.query<{id:string}>("insert into miclub.activities(club_id,sector_id,instructor_id,name) values($1,$2,$3,'Actividad cierre') returning id",[club,sector,instructor])).rows[0].id;
+      const term2=(await db.query<{id:string}>("insert into miclub.activity_terms(club_id,activity_id,mode,club_share_percentage,responsible_person_id,effective_from) values($1,$2,'VARIABLE',40,$3,'2026-08-01') returning id",[club,activity2,person2])).rows[0].id;
+      const created=await request('/api/finance/movements',{reason:'Cobro agosto',movement:{...receipt,movementDate:'2026-08-05',activityId:activity2,personId:person2,amount:100}},cookie);
+      assert.equal(created.status,201,JSON.stringify(created.body));
+      let row=(await read()).settlements.find(s=>s.termId===term2&&s.month==='2026-08')!;
+      assert.equal((await request(`/api/finance/settlements/${row.id}/approve`,{revision:row.revision,reason:'Revisión agosto'},cookie)).status,200);
+      assert.equal((await request(`/api/finance/settlements/${row.id}/close`,{revision:row.revision,reason:'Cierre agosto'},cookie)).status,200);
+      row=(await read()).settlements.find(s=>s.id===row.id)!;assert.ok(row.closedAt);
+      assert.equal((await request(`/api/finance/settlements/${row.id}/adjustments`,{revision:row.revision,amount:1,reason:'Ajuste posterior'},cookie)).status,201);
+      row=(await read()).settlements.find(s=>s.id===row.id)!;
+      assert.equal(row.reviewState,'REQUIRES_REVIEW');assert.equal(row.closedAt,null);
+      const person3=(await db.query<{id:string}>("insert into miclub.people(club_id,first_name,last_name) values($1,'Inicial','Prueba') returning id",[club])).rows[0].id;
+      const initial=(await db.query<{id:string}>("insert into miclub.initial_obligations(club_id,person_id,kind,currency_code,amount,source_key,due_date,review_state) values($1,$2,'RESPONSIBLE','ARS',100,'initial-void-test','2026-08-31','APPROVED') returning id",[club,person3])).rows[0].id;
+      const preview=await request(`/api/finance/responsibles/${person3}/preview`,{accountId:account,amount:40,debtCollection:false},cookie);
+      assert.equal(preview.status,200,JSON.stringify(preview.body));
+      const paid=await request(`/api/finance/responsibles/${person3}/pay`,{accountId:account,categoryId:category,paymentMethodId,amount:40,date:'2026-09-09',debtCollection:false,previewHash:preview.body.previewHash,reason:'Aplicación inicial'},cookie);
+      assert.equal(paid.status,200,JSON.stringify(paid.body));
+      assert.equal((await db.query<{settled:number}>('select settled_amount::float8 settled from miclub.initial_obligations where club_id=$1 and id=$2',[club,initial])).rows[0].settled,40);
+      assert.equal((await request(`/api/finance/payout-groups/${String(paid.body.groupId)}/void`,{reason:'Reversión de prueba'},cookie)).status,200);
+      assert.equal((await db.query<{settled:number}>('select settled_amount::float8 settled from miclub.initial_obligations where club_id=$1 and id=$2',[club,initial])).rows[0].settled,0);
     });
     if (visual) {
       await db.query("update miclub.club_onboarding set status='COMPLETED',completed_at=now() where club_id=$1", [club]);

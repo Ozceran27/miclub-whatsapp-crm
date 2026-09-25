@@ -1,7 +1,8 @@
 import type { AdministrationMovementDto } from '@miclub/shared';
 import { useEffect, useId, useRef } from 'react';
+import { MovementFinanceActions } from './MovementFinanceActions';
 
-type Props = { movement: AdministrationMovementDto; onClose: () => void };
+type Props = { movement: AdministrationMovementDto; onClose: () => void; onChanged: () => void };
 const focusable = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
@@ -13,7 +14,7 @@ const showDate = (value?: string | null) => {
 const showText = (value?: string | null) => value || 'No informado';
 const showStatus = (value?: string | null) => value?.replaceAll('_', ' ').toLocaleLowerCase('es-AR') || 'Sin estado';
 
-export function MovementDetailModal({ movement, onClose }: Props) {
+export function MovementDetailModal({ movement, onClose, onChanged }: Props) {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -53,7 +54,7 @@ export function MovementDetailModal({ movement, onClose }: Props) {
         <div><dt>ID de medio de pago</dt><dd><code>{showText(movement.paymentMethodId)}</code></dd></div>
       </dl></section>
       <section><h3>Origen y auditoría</h3><dl className="sector-modal__facts activity-modal__audit"><div><dt>Fuente</dt><dd>{showText(movement.source)}</dd></div><div><dt>ID externo</dt><dd><code>{showText(movement.externalId)}</code></dd></div><div><dt>Identificador</dt><dd><code>{movement.id}</code></dd></div><div><dt>Creado</dt><dd>{showDate(movement.createdAt)}</dd></div><div><dt>Última actualización</dt><dd>{showDate(movement.updatedAt)}</dd></div></dl></section>
-      <div className="detail-modal__actions"><button className="ghost-btn" type="button" disabled title="Se habilitará en una próxima versión">Editar datos financieros</button><p className="activity-modal__notice" role="note">Las mutaciones financieras están preparadas, pero permanecerán deshabilitadas hasta un próximo PR. El identificador y la auditoría nunca serán editables.</p></div>
+      <MovementFinanceActions movement={movement} onChanged={onChanged}/>
     </div>
   </div>;
 }

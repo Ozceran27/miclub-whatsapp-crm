@@ -1,6 +1,7 @@
 import { getPostgresPool } from "../db/postgres.js";
 import { withTenantTransaction } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
+import type { QueryExecutor } from "../db/postgres.js";
 
 export type MovementRow = Record<string, unknown>;
 export type MovementFilters = { from?: string; to?: string; type?: string; status?: string; sectorId?: string; personId?: string };
@@ -54,7 +55,7 @@ export const createMovement = async (actor: MovementActor, input: MovementInput,
       select $1,miclub.next_tenant_sequence($1,'movement'),'manual:'||gen_random_uuid(),$2,$3,$4,c.id,s.id,a.id,$8,$9,$10,$11,$12,p.id,coalesce($14,'otro'),coalesce($15,'COMPLETADO'),'manual'
       from miclub.movement_categories c join miclub.sectors s on s.club_id=$1 join miclub.payment_methods p on p.club_id=$1
       left join miclub.activities a on a.club_id=$1 and a.id=$7 and a.sector_id=s.id
-      where c.club_id=$1 and c.id=$5 and c.is_active and c.direction::text=$4 and s.id=$6 and p.id=$13 and p.is_active and ($7::uuid is null or a.id is not null)
+      where c.club_id=$1 and c.id=$5 and c.is_active and s.id=$6 and p.id=$13 and p.is_active and ($7::uuid is null or a.id is not null)
       on conflict (club_id,idempotency_key) where idempotency_key is not null do nothing returning ${movementColumns}`,
       [actor.clubId,idempotencyKey,input.movementDate,input.movementType,input.categoryId,input.sectorId,input.activityId??null,input.concept,input.personId??null,input.counterpartyText,input.amount,input.taxes??0,input.paymentMethodId,input.financialStatus??null,input.operationalStatus??null]);
     if(!result.rows[0]) { const concurrent=await db.query<MovementRow>(`select ${movementColumns} from miclub.movements where club_id=$1 and idempotency_key=$2`,[actor.clubId,idempotencyKey]); return concurrent.rows[0]?{kind:"replayed",movement:concurrent.rows[0]}:{kind:"invalid_reference"}; }
@@ -62,7 +63,7 @@ export const createMovement = async (actor: MovementActor, input: MovementInput,
   },pool);
 };
 
-const lockMovement = async (db: Parameters<typeof auditService.movement>[1] & { query: Function }, actor: MovementActor, id: string, expected: string) => {
+const lockMovement = async (db: Parameters<typeof auditService.movement>[1] & QueryExecutor, actor: MovementActor, id: string, expected: string) => {
   const result = await db.query(`select ${movementColumns}, miclub.movement_has_payment_allocation(m.id) as linked_payment from miclub.movements m where m.club_id=$1 and m.id=$2 for update`,[actor.clubId,id]);
   const row=result.rows[0] as MovementRow|undefined; if(!row)return {kind:"missing" as const};
   if(new Date(String(row.updated_at)).toISOString()!==new Date(expected).toISOString())return {kind:"conflict" as const};

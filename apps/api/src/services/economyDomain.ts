@@ -1,4 +1,4 @@
-import { MOVEMENT_CATEGORY_CATALOG } from '@miclub/shared';
+import { MOVEMENT_CATEGORY_CATALOG, MOVEMENT_CATEGORY_CLASSIFICATIONS } from '@miclub/shared';
 import {
   ARGENTINA_TIME_ZONE,
   argentinaDayStart,
@@ -16,41 +16,23 @@ export {
   getArgentinaYearWindow,
 };
 
-export const CATEGORY_CLASSIFICATIONS = [
-  "OPERATIONAL",
-  "NON_OPERATIONAL",
-  "TAX",
-  "SERVICE",
-  "LIABILITY",
-] as const;
+export const CATEGORY_CLASSIFICATIONS = MOVEMENT_CATEGORY_CLASSIFICATIONS;
 export type CategoryClassification = (typeof CATEGORY_CLASSIFICATIONS)[number];
 
 // Stable codes are compatibility identifiers, never presentation labels. Runtime
 // queries receive classification from miclub.category_catalog.
 export const OPERATING_CATEGORIES = MOVEMENT_CATEGORY_CATALOG
-  .filter(([, , classification, direction]) => classification === 'OPERATIONAL' && direction === 'INGRESOS')
+  .filter(([, , classification]) => classification === 'OPERATIONAL')
   .map(([code]) => code);
 export const OPERATING_PROFIT_CATEGORIES = OPERATING_CATEGORIES;
+const codesOf = (classification: CategoryClassification) => MOVEMENT_CATEGORY_CATALOG
+  .filter(([, , current]) => current === classification).map(([code]) => code);
 export const NON_OPERATING_EXPENSE_CATEGORIES = [
-  "PUBLICIDAD",
-  "SALARIOS",
-  "MANTENIMIENTO", "MANTENIM",
-  "DEPOSITOS",
-  "EXTRACCIONES",
-  "DOLARES",
-  "REPARACIONES",
-  "VIATICOS",
-  "GANANCIA",
-  "PERDIDA",
-  "CMV",
-  "SEGUROS",
-  "LIMPIEZA",
-  "LIBRERIA",
-  "OTROS",
+  ...codesOf('NON_OPERATIONAL').filter(code => code !== 'CAPITAL_INICIAL'), 'MANTENIM',
 ] as const;
-export const DEBT_LIABILITY_CATEGORIES = ["DEUDAS", "DEUDA"] as const;
-export const SERVICE_CATEGORIES = ["LUZ", "AGUA", "INTERNET"] as const;
-export const TAX_CATEGORIES = ["IMPUESTOS", "IMPUESTO"] as const;
+export const DEBT_LIABILITY_CATEGORIES = [...codesOf('LIABILITY'), 'DEUDA'] as const;
+export const SERVICE_CATEGORIES = codesOf('SERVICE');
+export const TAX_CATEGORIES = [...codesOf('TAX'), 'IMPUESTO'] as const;
 export const TAX_CATEGORY_KEYS = [...TAX_CATEGORIES];
 export const NON_OPERATING_EXPENSE_CATEGORY_KEYS = [
   ...NON_OPERATING_EXPENSE_CATEGORIES,
@@ -73,8 +55,10 @@ export type VariationResult = {
 };
 const roundMoney = (value: number) =>
   Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
+const scalarText = (value: unknown): string =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint' ? String(value) : '';
 export const normalizeCategoryName = (value: unknown): string =>
-  String(value ?? "")
+  scalarText(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
@@ -380,7 +364,7 @@ export const calculateOperatingProfitabilityBySector = (
   options: { sector?: unknown } = {},
 ) => {
   const result = calculateOperatingProfitability(movements, options);
-  return { sector: String(options.sector ?? "Sin sector"), ...result };
+  return { sector: scalarText(options.sector) || "Sin sector", ...result };
 };
 
 export const calculateSectorProfitability = (
@@ -416,14 +400,9 @@ export const calculateSectorProfitability = (
         : !isOperatingCategory(categoryCode))
     )
       continue;
-    const type = normalizeCategoryName(
-      movement.movement_type ?? movement.movementType ?? movement.tipo,
-    );
     if (!isIncomeMovement(movement) && !isExpenseMovement(movement)) continue;
     const name =
-      String(
-        movement.sectorName ?? movement.sector_name ?? movement.sector ?? "",
-      ).trim() || "Sin sector";
+      scalarText(movement.sectorName ?? movement.sector_name ?? movement.sector).trim() || "Sin sector";
     const current = sectors.get(name) ?? {
       name,
       income: 0,

@@ -5,7 +5,7 @@ export const MOVEMENT_CATEGORY_CLASSIFICATIONS = [
 export type MovementCategoryClassification = typeof MOVEMENT_CATEGORY_CLASSIFICATIONS[number];
 export type MovementCategoryDirection = "INGRESOS" | "EGRESOS";
 
-/** Product catalog used by tenant provisioning and movement creation. */
+/** Product catalog. The fourth value is a historical default, not an allowed movement type. */
 export const MOVEMENT_CATEGORY_CATALOG = [
   ["INSCRIPCION", "Inscripción", "OPERATIONAL", "INGRESOS"], ["CUOTA", "Cuota", "OPERATIONAL", "INGRESOS"],
   ["TURNOS", "Turnos", "OPERATIONAL", "INGRESOS"], ["COMISION", "Comisión", "OPERATIONAL", "INGRESOS"],

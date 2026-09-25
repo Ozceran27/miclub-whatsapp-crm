@@ -5,6 +5,17 @@ import test from "node:test";
 const sql = (name: string) => readFileSync(new URL(`../../../../docs/dbeaver/${name}`, import.meta.url), "utf8");
 const stabilizationSql = (name: string) => sql(`stabilization-2026-08/${name}`);
 
+test("categorías bidireccionales no dependen del ledger de precios y validan antes del commit", () => {
+  const script = sql("2026-09-25-categorias-bidireccionales.sql");
+  const executable = script.replace(/^--.*$/gm, "");
+  assert.doesNotMatch(executable, /IF NOT EXISTS[\s\S]{0,150}202609220002_cancel_future_activity_prices/);
+  assert.match(executable, /CREATE TEMP TABLE category_direction_before_20260925/);
+  assert.match(executable, /rolsuper OR rolbypassrls/);
+  assert.match(executable, /UPDATE miclub\.movement_categories SET direction=NULL/);
+  assert.match(executable, /RAISE EXCEPTION 'Persisten categorías activas con dirección fija'/);
+  assert.match(executable, /END \$\$;\s*COMMIT;/);
+});
+
 test("SQL DBeaver usa las columnas reales y recupera transacciones abortadas", () => {
   const diagnostic = sql("01_auth_tenant_diagnostic_readonly.sql");
   const backfill = sql("02_miclub_backfill_manual.sql");

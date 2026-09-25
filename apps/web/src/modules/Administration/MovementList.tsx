@@ -3,13 +3,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { getAdministrationMovements } from '../../services/api/administrationApi';
 import { PaginatedList } from './PaginatedList';
 import { MovementDetailModal } from './MovementDetailModal';
+import { MovementCreateModal } from './MovementCreateModal';
 
 const PAGE_SIZE = 20;
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short' });
 const statusOptions = [{ value: 'INGRESOS', label: 'Ingresos' }, { value: 'EGRESOS', label: 'Egresos' }];
 
-export function MovementList() {
+export function MovementList({canCreate=false}:{canCreate?:boolean}) {
+  const [createOpen,setCreateOpen]=useState(false);
   const [items, setItems] = useState<AdministrationMovementDto[]>([]);
   const [page, setPage] = useState(1); const [total, setTotal] = useState(0);
   const [search, setSearch] = useState(''); const [type, setType] = useState('');
@@ -20,7 +22,9 @@ export function MovementList() {
   useEffect(() => { const controller = new AbortController(); const timer = window.setTimeout(() => void load(controller.signal), 0); return () => { window.clearTimeout(timer); controller.abort(); }; }, [load]);
   useEffect(() => { const refresh = () => { void load(); }; window.addEventListener('miclub:movement-created', refresh); return () => window.removeEventListener('miclub:movement-created', refresh); }, [load]);
   return <PaginatedList id="movement-list" eyebrow="Movimientos" title="Movimientos del club" description="Consulta paginada; sólo se descargan 20 registros por vez." searchLabel="Concepto, persona o categoría" search={search} status={type} statusLabel="Tipo" statusOptions={statusOptions} loading={loading} error={error} total={total} page={page} pageSize={PAGE_SIZE} emptyMessage="No hay movimientos para estos filtros." onSearchChange={setSearch} onStatusChange={setType} onFilter={(event) => { event.preventDefault(); setPage(1); setFilters({ search, type }); }} onPageChange={setPage} onRetry={() => void load()}>
+    {canCreate&&<div className="paginated-list__actions"><button className="primary-btn" type="button" onClick={()=>setCreateOpen(true)}>Registrar movimiento</button></div>}
     <div className="paginated-list__table-wrap"><table className="paginated-list__table"><thead><tr><th>N.º</th><th>Fecha</th><th>Concepto</th><th>Sector</th><th>Tipo</th><th>Estado</th><th>Monto</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="paginated-list__row" tabIndex={0} role="button" aria-label={`Ver detalle de ${item.concept || item.category || 'movimiento'}`} onClick={() => setSelectedMovement(item)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedMovement(item); } }}><td data-label="N.º">#{item.sequenceNumber}</td><td data-label="Fecha">{item.date ? date.format(new Date(item.date)) : 'Sin fecha'}</td><td data-label="Concepto" title={item.concept || item.category || 'Sin concepto'}><strong>{item.concept || item.category || 'Sin concepto'}</strong><small>{item.counterpartyText || item.paymentMethod || ''}</small></td><td data-label="Sector" title={item.sector || 'Sin sector'}>{item.sector || 'Sin sector'}</td><td data-label="Tipo">{item.type?.toLocaleLowerCase('es-AR') || 'Sin tipo'}</td><td data-label="Estado">{item.status?.replaceAll('_', ' ').toLocaleLowerCase('es-AR') || 'Sin estado'}</td><td data-label="Monto" className={item.type === 'EGRESOS' ? 'paginated-list__expense' : ''}>{money.format(item.amount)}</td></tr>)}</tbody></table></div>
-    {selectedMovement && <MovementDetailModal movement={selectedMovement} onClose={() => setSelectedMovement(null)} />}
+    {selectedMovement && <MovementDetailModal movement={selectedMovement} onClose={() => setSelectedMovement(null)} onChanged={() => {setSelectedMovement(null);void load();}} />}
+    {canCreate&&<MovementCreateModal open={createOpen} onClose={()=>setCreateOpen(false)} onCreated={()=>void load()}/>}
   </PaginatedList>;
 }

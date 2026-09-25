@@ -103,7 +103,9 @@ idempotencia, transacción y comprobación de referencias dentro del tenant.
 
 PostgreSQL es autoridad. Tipos técnicos INGRESOS/EGRESOS/CAPITAL; operational_status gobierna agregados ordinarios con COMPLETADO, no financial_status (pagado, pendiente, etc.). PENDIENTE tiene agregados específicos. Anulados no deben volver a participar.
 
-Categorías: shared movementCategoryCatalog y DB category_catalog/aliases con asociaciones movement_categories. CMV es NON_OPERATIONAL desde 202609050003. C05: economyDomain conserva listas fallback divergentes; no constituyen otra regla aceptada.
+Categorías: shared movementCategoryCatalog y DB category_catalog/aliases con asociaciones movement_categories. Toda categoría activa se puede usar en INGRESOS y EGRESOS; el tipo pertenece al movimiento. La dirección almacenada en categorías queda nula mediante 202609250001 sin modificar IDs, clasificación ni movimientos históricos. CMV es NON_OPERATIONAL desde 202609050003. El procesamiento de liquidaciones, remuneraciones y cobros de deuda restringe la elección a OPERATIONAL o DEUDAS; los cobros de deuda se excluyen de la recaudación y rentabilidad de actividad.
+
+El pago requiere una vista previa backend del saldo neto por persona y moneda, compensaciones y aplicaciones FIFO. La confirmación valida un hash de la versión y rechaza saldos cambiados; la operación permanece idempotente bajo el lock financiero del tenant. Una versión recalculada o ajustada invalida aprobación/cierre vigente y conserva la historia de revisión anterior. Anular un grupo revierte sus aplicaciones a obligaciones iniciales. Conciliar dos veces el mismo movimiento se rechaza.
 
 ## Liquidez y saldos iniciales
 

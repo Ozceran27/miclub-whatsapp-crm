@@ -81,6 +81,7 @@ export async function loadCircuit(db: QueryExecutor, auth: FinanceScope, selecte
     join miclub.category_catalog cc on cc.id=c.catalog_id
     where m.club_id=$1 and m.movement_type='INGRESOS' and cc.classification='OPERATIONAL' and m.activity_id is not null
     and not exists(select 1 from miclub.activity_settlement_allocations x where x.club_id=m.club_id and x.movement_id=m.id)
+    and not exists(select 1 from miclub.payout_groups g where g.club_id=m.club_id and g.id=m.payout_group_id and g.direction='COLLECT')
     and ($2::uuid[] is null or m.sector_id=any($2)) order by m.id`, [auth.clubId, sectors])).rows;
   const refunds = (await db.query<MonthlyRefund & { activityId: string }>(`select r.id,r.original_movement_id "collectionId",r.original_term_id "originalTermId",r.responsible_amount::float8 "originalResponsibleAmount",
     m.amount::float8 amount,m.movement_date "occurredAt",m.operational_status status,m.voided_at "voidedAt",o.activity_id "activityId"
@@ -122,13 +123,18 @@ export async function loadCircuit(db: QueryExecutor, auth: FinanceScope, selecte
             // sólo excluye cobranzas anteriores al corte; nunca prorratea el fijo.
           }
           const fingerprint = hash({ income: line.income, responsibleIncome: line.responsibleIncome, refunds: line.refunds, responsibleRefunds: line.responsibleRefunds, fixedClubFee: line.fixedClubFee, personId: line.personId });
-          const stored = (await db.query<RawSettlement>(`insert into miclub.activity_settlements(club_id,activity_id,activity_term_id,period_from,period_to,circuit_version,calculation,calculation_hash)
+          const changed = (await db.query<RawSettlement>(`insert into miclub.activity_settlements(club_id,activity_id,activity_term_id,period_from,period_to,circuit_version,calculation,calculation_hash)
             values($1,$2,$3,$4,$5,1,$6,$7) on conflict(activity_term_id,period_from,period_to) do update
             set calculation=excluded.calculation,calculated_at=now(),circuit_version=1,
-            review_state=case when miclub.activity_settlements.calculation_hash is distinct from excluded.calculation_hash and miclub.activity_settlements.review_state<>'DRAFT' then 'REQUIRES_REVIEW' else miclub.activity_settlements.review_state end,
-            revision=miclub.activity_settlements.revision+case when miclub.activity_settlements.calculation_hash is distinct from excluded.calculation_hash then 1 else 0 end,
-            calculation_hash=excluded.calculation_hash returning id,revision,review_state,closed_at,calculation_hash`,
+            review_state=case when miclub.activity_settlements.review_state='DRAFT' then 'DRAFT' else 'REQUIRES_REVIEW' end,
+            revision=miclub.activity_settlements.revision+1,closed_at=null,
+            calculation_hash=excluded.calculation_hash
+            where miclub.activity_settlements.calculation_hash is distinct from excluded.calculation_hash
+            returning id,revision,review_state,closed_at,calculation_hash`,
           [auth.clubId, activityId, line.termId, `${current}-01`, end, JSON.stringify(line), fingerprint])).rows[0];
+          const stored = changed ?? (await db.query<RawSettlement>(`select id,revision,review_state,closed_at,calculation_hash from miclub.activity_settlements
+            where club_id=$1 and activity_term_id=$2 and period_from=$3 and period_to=$4`,
+          [auth.clubId, line.termId, `${current}-01`, end])).rows[0];
           settlements.push({ ...line, id: stored.id, revision: stored.revision, reviewState: stored.review_state, closedAt: stored.closed_at?.toISOString() ?? null, activityName: term.activityName, personName: term.personName });
         }
       } catch (error) {
@@ -241,7 +247,9 @@ export async function reviewSettlement(db: QueryExecutor, auth: RequestAuthConte
   if (!row) throw financialError('Liquidación no encontrada.', 404);
   if (row.initialObligationId) throw financialError('El saldo inicial se aprueba mediante la conciliación del arranque.');
   if (row.revision !== revision) throw financialError('El cálculo cambió. Revise la versión vigente.');
+  if (!close && row.reviewState === 'APPROVED') throw financialError('La versión ya está aprobada.');
   if (close && (row.reviewState !== 'APPROVED' || row.month >= circuit.today.slice(0, 7))) throw financialError('El cierre requiere aprobación y un mes ya terminado.');
+  if (close && row.closedAt) throw financialError('La liquidación ya está cerrada.');
   await db.query(`insert into miclub.settlement_reviews(club_id,settlement_id,revision,snapshot,actor_id,reason) values($1,$2,$3,$4,$5,$6)
     on conflict(settlement_id,revision) do nothing`, [auth.clubId, id, revision, JSON.stringify(row), auth.userId, reason]);
   await db.query("update miclub.activity_settlements set review_state='APPROVED',reviewed_by=$3,closed_at=case when $4 then now() else closed_at end where club_id=$1 and id=$2", [auth.clubId, id, auth.userId, close]);
@@ -261,83 +269,121 @@ export async function resolveTerm(db: QueryExecutor, auth: RequestAuthContext, i
   return { id };
 }
 
-export async function recordResponsiblePayment(db: QueryExecutor, auth: RequestAuthContext, personId: string, accountId: string, categoryId: string, paymentMethodId: string, amount: number, date: string, debtCollection: boolean, reason: string) {
+type PayableLine = { kind: 'settlement' | 'compensation'; id: string; initialId?: string; balance: number; order: string; activityId?: string; personName: string; label: string; sectorId?: string | null };
+
+export function planResponsiblePayment(circuit: FinancialCircuit, personId: string, currencyCode: string, amount: number, debtCollection: boolean, accountId: string) {
+  financialMoney(amount);
+  if (amount <= 0) throw financialError('El importe debe ser mayor a cero.', 400);
+  const rows = circuit.settlements.filter(s => s.personId === personId && s.currencyCode === currencyCode && s.balance !== 0);
+  const compensationRows = (circuit.compensationObligations ?? []).filter(o => o.personId === personId && o.currencyCode === currencyCode && o.reviewState !== 'CANCELLED' && o.balance > 0);
+  if ((!rows.length && !compensationRows.length) || rows.some(r => r.reviewState !== 'APPROVED') || compensationRows.some(o => o.reviewState !== 'APPROVED')) throw financialError('Revise todas las liquidaciones y remuneraciones del responsable antes de operar.');
+  const net = Math.round((rows.reduce((sum, row) => sum + row.balance, 0) + compensationRows.reduce((sum, row) => sum + row.balance, 0)) * 100) / 100;
+  const available = debtCollection ? -net : net;
+  if (amount > available) throw financialError('El importe supera el saldo neto disponible.');
+  const settlementLines: PayableLine[] = rows.map(row => ({ kind: 'settlement', id: row.id, initialId: row.initialObligationId, balance: row.balance, order: row.month, activityId: row.activityId, personName: row.personName, label: `${row.activityName} · ${row.month}` }));
+  const compensationLines: PayableLine[] = compensationRows.map(row => ({ kind: 'compensation', id: row.id, balance: row.balance, order: row.dueDate, personName: row.personName, label: `Remuneración · ${row.dueDate}`, sectorId: row.sectorId }));
+  const debts = settlementLines.filter(row => row.balance < 0).sort((a,b) => a.order.localeCompare(b.order) || a.id.localeCompare(b.id));
+  const credits = [...settlementLines.filter(row => row.balance > 0), ...compensationLines].sort((a,b) => a.order.localeCompare(b.order) || a.id.localeCompare(b.id));
+  const compensations: { debt: PayableLine; credit: PayableLine; amount: number }[] = [];
+  for (const debt of debts) for (const credit of credits) {
+    if (debt.balance >= 0) break;
+    if (credit.balance <= 0) continue;
+    const applied = Math.min(-debt.balance, credit.balance);
+    if (applied <= 0) continue;
+    compensations.push({ debt: { ...debt }, credit: { ...credit }, amount: applied });
+    debt.balance = Math.round((debt.balance + applied) * 100) / 100;
+    credit.balance = Math.round((credit.balance - applied) * 100) / 100;
+  }
+  let remaining = amount;
+  const portions: { line: PayableLine; amount: number }[] = [];
+  for (const line of (debtCollection ? debts : credits)) {
+    if (remaining <= 0) break;
+    const portion = Math.min(remaining, debtCollection ? -line.balance : line.balance);
+    if (portion <= 0) continue;
+    if (line.kind === 'compensation' && !line.sectorId) throw financialError('Asigne un sector a la remuneración antes de procesarla.');
+    portions.push({ line, amount: portion });
+    remaining = Math.round((remaining - portion) * 100) / 100;
+  }
+  if (remaining !== 0) throw financialError('No se pudo distribuir el pago completo.');
+  const previewHash = hash({ personId, accountId, currencyCode, amount, debtCollection,
+    settlements: rows.map(row => [row.id, row.revision, row.balance, row.reviewState, row.activityName, row.month]),
+    compensations: compensationRows.map(row => [row.id, row.revision, row.balance, row.reviewState, row.dueDate]) });
+  return { net, available, currencyCode, previewHash, compensations, portions };
+}
+
+export async function previewResponsiblePayment(db: QueryExecutor, auth: FinanceScope, personId: string, accountId: string, amount: number, debtCollection: boolean) {
+  const circuit = await loadCircuit(db, auth);
+  const account = circuit.accounts.find(row => row.id === accountId);
+  if (!account) throw financialError('Cuenta no disponible.', 404);
+  const plan = planResponsiblePayment(circuit, personId, account.currencyCode, amount, debtCollection, accountId);
+  return { net: plan.net, available: plan.available, currencyCode: plan.currencyCode, previewHash: plan.previewHash,
+    compensations: plan.compensations.map(row => ({ debtId: row.debt.id, debtLabel: row.debt.label, creditId: row.credit.id, creditLabel: row.credit.label, amount: row.amount })),
+    portions: plan.portions.map(row => ({ kind: row.line.kind, id: row.line.id, label: row.line.label, amount: row.amount })) };
+}
+
+export async function recordResponsiblePayment(db: QueryExecutor, auth: RequestAuthContext, personId: string, accountId: string, categoryId: string, paymentMethodId: string, amount: number, date: string, debtCollection: boolean, reason: string, expectedPreviewHash: string) {
   financialMoney(amount); financialDate(date);
   if (amount <= 0) throw financialError('El importe debe ser mayor a cero.', 400);
   const circuit = await loadCircuit(db, auth);
   const account = circuit.accounts.find(a => a.id === accountId);
   if (!account) throw financialError('Cuenta no disponible.', 404);
-  const catalog = (await db.query(`select 1 from miclub.movement_categories c join miclub.payment_methods pm on pm.club_id=c.club_id and pm.id=$4 and pm.is_active where c.club_id=$1 and c.id=$2 and c.is_active and c.direction=$3`, [auth.clubId, categoryId, debtCollection ? 'INGRESOS' : 'EGRESOS', paymentMethodId])).rows[0];
-  if (!catalog) throw financialError('La categoría o el medio de pago no corresponde a la dirección de la operación.', 400);
-  const rows = circuit.settlements.filter(s => s.personId === personId && s.currencyCode === account.currencyCode);
-  const compensationRows = (circuit.compensationObligations ?? []).filter(o => o.personId === personId && o.currencyCode === account.currencyCode && o.reviewState !== 'CANCELLED' && o.balance > 0);
-  if ((!rows.length && !compensationRows.length) || rows.some(r => r.reviewState !== 'APPROVED') || compensationRows.some(o => o.reviewState !== 'APPROVED')) throw financialError('Revise todas las liquidaciones y remuneraciones del responsable antes de operar.');
-  const net = Math.round((rows.reduce((sum, r) => sum + r.balance, 0) + compensationRows.reduce((sum,o)=>sum+o.balance,0)) * 100) / 100;
-  if (amount > (debtCollection ? -net : net)) throw financialError('El importe supera el saldo neto disponible.');
+  const catalog = (await db.query(`select 1 from miclub.movement_categories c join miclub.category_catalog cc on cc.id=c.catalog_id and cc.is_active
+    join miclub.payment_methods pm on pm.club_id=c.club_id and pm.id=$3 and pm.is_active
+    where c.club_id=$1 and c.id=$2 and c.is_active and (cc.classification='OPERATIONAL' or cc.code='DEUDAS')`, [auth.clubId, categoryId, paymentMethodId])).rows[0];
+  if (!catalog) throw financialError('Seleccione una categoría operativa o Deudas y un medio de pago activo.', 400);
+  const plan = planResponsiblePayment(circuit, personId, account.currencyCode, amount, debtCollection, accountId);
+  if (expectedPreviewHash !== plan.previewHash) throw financialError('El saldo cambió; revise una nueva vista previa antes de confirmar.');
   const group = randomUUID();
   await db.query(`insert into miclub.payout_groups(id,club_id,person_id,currency_code,direction,amount,reason,created_by) values($1,$2,$3,$4,$5,$6,$7,$8)`, [group, auth.clubId, personId, account.currencyCode, debtCollection ? 'COLLECT' : 'PAY', amount, reason, auth.userId]);
-  type PayableLine = { kind: 'settlement' | 'compensation'; id: string; initialId?: string; balance: number; order: string; activityId?: string; personName: string; sectorId?: string | null };
-  const settlementLines: PayableLine[] = rows.map(row=>({kind:'settlement',id:row.id,initialId:row.initialObligationId,balance:row.balance,order:row.month,activityId:row.activityId,personName:row.personName}));
-  const compensationLines: PayableLine[] = compensationRows.map(row=>({kind:'compensation',id:row.id,balance:row.balance,order:row.dueDate,personName:row.personName,sectorId:row.sectorId}));
-  const debts=settlementLines.filter(row=>row.balance<0).sort((a,b)=>a.order.localeCompare(b.order)||a.id.localeCompare(b.id));
-  const credits=[...settlementLines.filter(row=>row.balance>0),...compensationLines].sort((a,b)=>a.order.localeCompare(b.order)||a.id.localeCompare(b.id));
   const compensations: { debtId:string; creditId:string; amount:number }[]=[];
-  for(const debt of debts) for(const credit of credits){
-    if(debt.balance>=0) break;if(credit.balance<=0) continue;
-    const applied=Math.min(-debt.balance,credit.balance);if(applied<=0)continue;
+  for(const { debt, credit, amount: applied } of plan.compensations){
     await db.query(`insert into miclub.settlement_compensations(club_id,person_id,currency_code,debt_settlement_id,credit_settlement_id,amount,debt_initial_obligation_id,credit_initial_obligation_id,credit_employee_compensation_obligation_id,payout_group_id)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[auth.clubId,personId,account.currencyCode,debt.initialId?null:debt.id,credit.kind==='settlement'&&!credit.initialId?credit.id:null,applied,debt.initialId??null,credit.kind==='settlement'?credit.initialId??null:null,credit.kind==='compensation'?credit.id:null,group]);
-    debt.balance=Math.round((debt.balance+applied)*100)/100;credit.balance=Math.round((credit.balance-applied)*100)/100;compensations.push({debtId:debt.id,creditId:credit.id,amount:applied});
+    compensations.push({debtId:debt.id,creditId:credit.id,amount:applied});
   }
   const timezone = (await db.query<{ timezone: string }>("select coalesce(timezone,'America/Argentina/Buenos_Aires') timezone from miclub.clubs where id=$1", [auth.clubId])).rows[0].timezone;
   if (date > circuit.today) throw financialError('Un pago realizado no puede tener fecha futura.', 400);
-  let remaining = amount;
-  const remainingLines=(debtCollection?debts:credits).sort((a,b)=>a.order.localeCompare(b.order)||a.id.localeCompare(b.id));
-  for (const entry of remainingLines) {
-    if (remaining <= 0) break;
-    const available = debtCollection ? -entry.balance : entry.balance;
-    if (available <= 0) continue;
-    const row = entry;
-    const portion = Math.min(remaining, available);
+  for (const { line: row, amount: portion } of plan.portions) {
     if (row.kind==='compensation') {
       if (!row.sectorId) throw financialError('Asigne un sector a la remuneración antes de procesarla.');
       const movement=(await db.query<{id:string}>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,category_id,sector_id,concept,person_id,counterparty_text,amount,currency_code,account_id,payment_method_id,financial_status,operational_status,source,payout_group_id)
         values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,'EGRESOS',$4,$5,'Remuneración fija',$6,$7,$8,$9,$10,$11,'pagado','COMPLETADO','employee_compensation',$12) returning id`,[auth.clubId,date,timezone,categoryId,row.sectorId,personId,row.personName,portion,account.currencyCode,accountId,paymentMethodId,group])).rows[0];
       await db.query(`insert into miclub.employee_compensation_allocations(club_id,obligation_id,movement_id,amount) values($1,$2,$3,$4)`,[auth.clubId,row.id,movement.id,portion]);
-      remaining=Math.round((remaining-portion)*100)/100;continue;
+      continue;
     }
     if (row.initialId) {
       await db.query(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,category_id,sector_id,activity_id,concept,person_id,counterparty_text,amount,currency_code,account_id,payment_method_id,financial_status,operational_status,source,payout_group_id,initial_obligation_id)
         values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,$4::miclub.movement_type,$13,(select sector_id from miclub.activities where club_id=$1 and id=$12),$12,'Aplicación de saldo inicial',$6,$7,$8,$9,$10,$14,'pagado','COMPLETADO','finance_circuit',$11,$5)`, [auth.clubId, date, timezone, debtCollection ? 'INGRESOS' : 'EGRESOS', row.initialId, personId, row.personName, portion, account.currencyCode, accountId, group, row.activityId || null, categoryId, paymentMethodId]);
       await db.query('update miclub.initial_obligations set settled_amount=settled_amount+$3 where club_id=$1 and id=$2', [auth.clubId, row.initialId, debtCollection ? -portion : portion]);
-      remaining = Math.round((remaining - portion) * 100) / 100;
       continue;
     }
     const movement = (await db.query<{ id: string }>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,category_id,sector_id,activity_id,concept,person_id,counterparty_text,amount,currency_code,account_id,payment_method_id,financial_status,operational_status,source,payout_group_id)
       select $1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,$4::miclub.movement_type,$13,a.sector_id,a.id,$5,$6,$7,$8,$9,$10,$14,'pagado','COMPLETADO','finance_circuit',$11
       from miclub.activities a where a.club_id=$1 and a.id=$12 returning id`, [auth.clubId, date, timezone, debtCollection ? 'INGRESOS' : 'EGRESOS', debtCollection ? 'Cobro de deuda del responsable' : 'Liquidación de actividad', personId, row.personName, portion, account.currencyCode, accountId, group, row.activityId, categoryId, paymentMethodId])).rows[0];
     await db.query("insert into miclub.activity_settlement_allocations(club_id,settlement_id,movement_id,allocation_type,amount,status,occurred_at,completed_at) values($1,$2,$3,'PAYMENT',$4,'COMPLETADO',$5,now())", [auth.clubId, row.id, movement.id, portion, date]);
-    remaining = Math.round((remaining - portion) * 100) / 100;
   }
-  if (remaining !== 0) throw financialError('No se pudo distribuir el pago completo.');
   return { groupId: group, amount, compensations };
 }
 
 export async function adjustSettlement(db: QueryExecutor, auth: RequestAuthContext, settlementId: string, expectedRevision: number, amount: number, reason: string) {
   if (!Number.isFinite(amount) || amount === 0 || Math.abs(Math.round(amount * 100) - amount * 100) > .0001) throw financialError('El ajuste debe ser un importe firmado distinto de cero.', 400);
-  const settlement = (await db.query<{ revision: number; review_state: string }>(`select revision,review_state from miclub.activity_settlements where club_id=$1 and id=$2 for update`, [auth.clubId, settlementId])).rows[0];
+  const settlement = (await db.query<{ revision: number; review_state: string }>(`select s.revision,s.review_state from miclub.activity_settlements s join miclub.activities a on a.id=s.activity_id and a.club_id=s.club_id
+    where s.club_id=$1 and s.id=$2 and ($3::uuid[] is null or a.sector_id=any($3)) for update of s`, [auth.clubId, settlementId, auth.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:auth.sectorIds])).rows[0];
   if (!settlement) throw financialError('Liquidación no encontrada.', 404);
   if (settlement.revision !== expectedRevision) throw financialError('La liquidación cambió; recargue los datos.');
   const adjustment = (await db.query<{ id: string }>(`insert into miclub.activity_settlement_adjustments(club_id,settlement_id,amount,reason,created_by) values($1,$2,$3,$4,$5) returning id`, [auth.clubId, settlementId, amount, reason, auth.userId])).rows[0];
-  await db.query(`update miclub.activity_settlements set review_state='REQUIRES_REVIEW',revision=revision+1 where club_id=$1 and id=$2`, [auth.clubId, settlementId]);
+  await db.query(`update miclub.activity_settlements set review_state='REQUIRES_REVIEW',closed_at=null,revision=revision+1 where club_id=$1 and id=$2`, [auth.clubId, settlementId]);
   await db.query(`insert into miclub.finance_history(club_id,entity_type,entity_id,after_data,actor_id,reason) values($1,'activity_settlement_adjustments',$2,$3,$4,$5)`, [auth.clubId, adjustment.id, JSON.stringify({ settlementId, amount }), auth.userId, reason]);
   return { id: adjustment.id, settlementId, amount, reviewState: 'REQUIRES_REVIEW' };
 }
 
 export async function voidSettlementAdjustment(db: QueryExecutor, auth: RequestAuthContext, id: string, revision: number, reason: string) {
-  const result = await db.query<{ settlement_id: string }>(`update miclub.activity_settlement_adjustments set status='VOIDED',voided_at=now(),voided_by=$4,void_reason=$5,revision=revision+1 where club_id=$1 and id=$2 and revision=$3 and status='ACTIVE' returning settlement_id`, [auth.clubId, id, revision, auth.userId, reason]);
+  const result = await db.query<{ settlement_id: string }>(`update miclub.activity_settlement_adjustments x set status='VOIDED',voided_at=now(),voided_by=$4,void_reason=$5,revision=x.revision+1
+    where x.club_id=$1 and x.id=$2 and x.revision=$3 and x.status='ACTIVE' and exists(
+      select 1 from miclub.activity_settlements s join miclub.activities a on a.id=s.activity_id and a.club_id=s.club_id
+      where s.club_id=x.club_id and s.id=x.settlement_id and ($6::uuid[] is null or a.sector_id=any($6))) returning x.settlement_id`, [auth.clubId, id, revision, auth.userId, reason, auth.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:auth.sectorIds]);
   const row = result.rows[0]; if (!row) throw financialError('El ajuste cambió o ya fue anulado.');
-  await db.query(`update miclub.activity_settlements set review_state='REQUIRES_REVIEW',revision=revision+1 where club_id=$1 and id=$2`, [auth.clubId, row.settlement_id]);
+  await db.query(`update miclub.activity_settlements set review_state='REQUIRES_REVIEW',closed_at=null,revision=revision+1 where club_id=$1 and id=$2`, [auth.clubId, row.settlement_id]);
   return { id, voided: true };
 }
 
@@ -346,8 +392,17 @@ export async function voidPayoutGroup(db: QueryExecutor, auth: RequestAuthContex
   if (!group) throw financialError('Grupo de pago inexistente.', 404); if (group.status === 'VOIDED') return { id, voided: true };
   const reconciled = (await db.query(`select 1 from miclub.movements where club_id=$1 and payout_group_id=$2 and reconciled_at is not null limit 1`, [auth.clubId, id])).rows[0];
   if (reconciled && !auth.permissions.includes(PERMISSIONS.FINANCE_RECONCILE)) throw financialError('La operación conciliada requiere permiso de conciliación.', 403);
+  await db.query(`with applied as (
+    select initial_obligation_id, sum(case when movement_type='EGRESOS' then amount else -amount end) amount
+    from miclub.movements where club_id=$1 and payout_group_id=$2 and initial_obligation_id is not null
+      and operational_status='COMPLETADO' and voided_at is null group by initial_obligation_id
+  ) update miclub.initial_obligations o set settled_amount=o.settled_amount-applied.amount
+    from applied where o.club_id=$1 and o.id=applied.initial_obligation_id`, [auth.clubId, id]);
   await db.query(`update miclub.movements set operational_status='ANULADO',voided_at=now(),revision=revision+1 where club_id=$1 and payout_group_id=$2 and operational_status<>'ANULADO'`, [auth.clubId, id]);
   await db.query(`update miclub.activity_settlement_allocations set status='CANCELADO',voided_at=now() where club_id=$1 and movement_id in(select id from miclub.movements where club_id=$1 and payout_group_id=$2)`, [auth.clubId, id]);
+  await db.query(`update miclub.activity_settlements s set review_state='REQUIRES_REVIEW',closed_at=null,revision=revision+1
+    where s.club_id=$1 and exists(select 1 from miclub.activity_settlement_allocations a join miclub.movements m on m.club_id=a.club_id and m.id=a.movement_id
+      where a.club_id=s.club_id and a.settlement_id=s.id and m.payout_group_id=$2)`, [auth.clubId, id]);
   await db.query(`update miclub.employee_compensation_allocations set status='CANCELADO',voided_at=now(),voided_by=$3,void_reason=$4 where club_id=$1 and movement_id in(select id from miclub.movements where club_id=$1 and payout_group_id=$2)`, [auth.clubId, id, auth.userId, reason]);
   await db.query(`update miclub.settlement_compensations set status='VOIDED',voided_at=now(),voided_by=$3,void_reason=$4 where club_id=$1 and payout_group_id=$2 and status='ACTIVE'`, [auth.clubId, id, auth.userId, reason]);
   await db.query(`update miclub.payout_groups set status='VOIDED',voided_at=now(),voided_by=$3,void_reason=$4 where club_id=$1 and id=$2`, [auth.clubId, id, auth.userId, reason]);

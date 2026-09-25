@@ -1,7 +1,10 @@
 import type { AdministrationEnrollmentDto } from '@miclub/shared';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { PERMISSIONS } from '@miclub/shared';
+import { apiJson } from '../../api';
+import { useSession } from '../../session';
 
-type Props = { enrollment: AdministrationEnrollmentDto; onClose: () => void };
+type Props = { enrollment: AdministrationEnrollmentDto; onClose: () => void; onChanged: () => void };
 const focusable = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 });
 const date = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeZone: 'UTC' });
@@ -16,10 +19,13 @@ const showStatus = (value: string) => value.replaceAll('_', ' ').replace(/^./, (
 const showNotes = (notes: unknown) => {
   if (notes == null || notes === '') return 'Sin notas';
   if (typeof notes === 'string') return notes;
-  try { return JSON.stringify(notes, null, 2); } catch { return String(notes); }
+  try { return JSON.stringify(notes, null, 2); } catch { return 'Notas no disponibles'; }
 };
 
-export function EnrollmentDetailModal({ enrollment, onClose }: Props) {
+export function EnrollmentDetailModal({ enrollment, onClose, onChanged }: Props) {
+  const {permissions}=useSession();
+  const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+  const abandon=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const f=new FormData(event.currentTarget);setBusy(true);setError('');void apiJson(`/api/finance/enrollments/${enrollment.id}/abandon`,{method:'POST',headers:{'idempotency-key':crypto.randomUUID()},body:JSON.stringify({decision:f.get('decision'),reason:f.get('reason')})}).then(onChanged).catch(cause=>setError(cause instanceof Error?cause.message:'No se pudo registrar la baja.')).finally(()=>setBusy(false));};
   const titleId = useId(); const descriptionId = useId(); const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -43,6 +49,6 @@ export function EnrollmentDetailModal({ enrollment, onClose }: Props) {
     <section><h3>Persona</h3><dl className="sector-modal__facts"><div><dt>Nombre completo</dt><dd>{name}</dd></div><div><dt>Nombre</dt><dd>{showText(enrollment.firstName)}</dd></div><div><dt>Apellido</dt><dd>{showText(enrollment.lastName)}</dd></div><div><dt>DNI</dt><dd>{showText(enrollment.dni)}</dd></div><div><dt>ID de persona</dt><dd><code>{enrollment.personId}</code></dd></div></dl></section>
     <section><h3>Inscripción</h3><dl className="sector-modal__facts"><div><dt>Número</dt><dd>#{enrollment.sequenceNumber}</dd></div><div><dt>Actividad</dt><dd>{showText(enrollment.activityName)}</dd></div><div><dt>Sector</dt><dd>{showText(enrollment.sectorName)}</dd></div><div><dt>Estado</dt><dd>{showStatus(enrollment.status)}</dd></div><div><dt>Vencimiento</dt><dd>{showDate(enrollment.dueDate)}</dd></div><div><dt>Cuota</dt><dd>{money.format(enrollment.feeAmount)}</dd></div><div><dt>ID de actividad</dt><dd><code>{enrollment.activityId}</code></dd></div><div><dt>ID de sector</dt><dd><code>{showText(enrollment.sectorId)}</code></dd></div><div className="sector-modal__fact--wide"><dt>Notas</dt><dd><pre className="detail-modal__notes">{showNotes(enrollment.notes)}</pre></dd></div></dl></section>
     <section><h3>Origen y auditoría</h3><dl className="sector-modal__facts activity-modal__audit"><div><dt>Fuente</dt><dd>{showText(enrollment.source)}</dd></div><div><dt>ID externo</dt><dd><code>{showText(enrollment.externalId)}</code></dd></div><div><dt>Identificador</dt><dd><code>{enrollment.id}</code></dd></div><div><dt>ID del club</dt><dd><code>{showText(enrollment.clubId)}</code></dd></div><div><dt>Creada</dt><dd>{showDate(enrollment.createdAt, true)}</dd></div><div><dt>Última actualización</dt><dd>{showDate(enrollment.updatedAt, true)}</dd></div></dl></section>
-    <div className="detail-modal__actions"><button className="ghost-btn" type="button" disabled title="Se habilitará en una próxima versión">Editar cuota</button><p className="activity-modal__notice" role="note">Las mutaciones financieras están preparadas, pero permanecerán deshabilitadas hasta un próximo PR. El identificador, el club y la auditoría nunca serán editables.</p></div>
+    {permissions.includes(PERMISSIONS.ENROLLMENTS_CANCEL)&&!['abandonado','cancelado'].includes(enrollment.status)&&<section><h3>Registrar abandono</h3><p>Elija cómo tratar la deuda existente y deje un motivo auditable.</p><form className="finance-form" onSubmit={abandon}><label>Deuda existente<select name="decision" required defaultValue=""><option value="">Elegir…</option><option value="KEEP">Conservar deuda</option><option value="FORGIVE">Perdonar deuda</option></select></label><label>Motivo<input name="reason" required/></label><button disabled={busy}>{busy?'Registrando…':'Registrar abandono'}</button></form>{error&&<p role="alert">{error}</p>}</section>}
   </div></div>;
 }

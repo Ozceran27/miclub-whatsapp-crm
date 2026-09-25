@@ -95,6 +95,7 @@ const listDefinitions = {
           and movement.operational_status = 'COMPLETADO'
           and movement.movement_type in ('INGRESOS', 'EGRESOS')
           and catalog.classification = 'OPERATIONAL'
+          and not exists(select 1 from miclub.payout_groups payout where payout.club_id=movement.club_id and payout.id=movement.payout_group_id and payout.direction='COLLECT')
           and movement.movement_date >= make_timestamptz(
             extract(year from (now() at time zone coalesce(nullif(trim(club.timezone), ''), 'America/Argentina/Buenos_Aires')))::integer,
             1, 1, 0, 0, 0,
@@ -147,6 +148,7 @@ const listDefinitions = {
           order by exchange_rate.rate_date desc,exchange_rate.created_at desc limit 1) rate on movement.currency_code is distinct from activity_club.base_currency_code
         where movement.club_id=a.club_id and movement.activity_id=a.id and movement.operational_status='COMPLETADO'
           and movement.movement_type in ('INGRESOS','EGRESOS') and catalog.classification='OPERATIONAL'
+          and not exists(select 1 from miclub.payout_groups payout where payout.club_id=movement.club_id and payout.id=movement.payout_group_id and payout.direction='COLLECT')
           and movement.movement_date>=make_timestamptz(extract(year from (now() at time zone coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires')))::integer,1,1,0,0,0,coalesce(nullif(trim(activity_club.timezone),''),'America/Argentina/Buenos_Aires'))
           and movement.movement_date<now()
       ) activity_profitability on true`,

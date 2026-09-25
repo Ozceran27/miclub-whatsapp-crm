@@ -20,13 +20,13 @@ async function validateCash(db: QueryExecutor, auth: RequestAuthContext, input: 
   const reference = (await db.query<{ currency: string; timezone: string }>(`select f.currency_code currency,coalesce(c.timezone,'America/Argentina/Buenos_Aires') timezone
     from miclub.financial_accounts f join miclub.clubs c on c.id=f.club_id
     join miclub.sectors s on s.id=$3 and s.club_id=f.club_id
-    join miclub.movement_categories cat on cat.id=$4 and cat.club_id=f.club_id and cat.direction::text=$5 and cat.is_active
+    join miclub.movement_categories cat on cat.id=$4 and cat.club_id=f.club_id and cat.is_active
     where f.club_id=$1 and f.id=$2 and f.status='ACTIVE'
-    and ($6::uuid is null or exists(select 1 from miclub.activities a where a.club_id=$1 and a.id=$6 and a.sector_id=$3))
-    and ($7::uuid is null or exists(select 1 from miclub.people p where p.club_id=$1 and p.id=$7))
-    and ($8::uuid is null or exists(select 1 from miclub.payment_methods p where p.club_id=$1 and p.id=$8 and p.is_active))
-    and ($9::uuid is null or exists(select 1 from miclub.receivables r where r.club_id=$1 and r.id=$9 and r.person_id=$7 and r.activity_id is not distinct from $6::uuid and r.currency_code=f.currency_code))`,
-  [auth.clubId, input.accountId, input.sectorId, input.categoryId, input.movementType, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.receivableId ?? null])).rows[0];
+    and ($5::uuid is null or exists(select 1 from miclub.activities a where a.club_id=$1 and a.id=$5 and a.sector_id=$3))
+    and ($6::uuid is null or exists(select 1 from miclub.people p where p.club_id=$1 and p.id=$6))
+    and ($7::uuid is null or exists(select 1 from miclub.payment_methods p where p.club_id=$1 and p.id=$7 and p.is_active))
+    and ($8::uuid is null or exists(select 1 from miclub.receivables r where r.club_id=$1 and r.id=$8 and r.person_id=$6 and r.activity_id is not distinct from $5::uuid and r.currency_code=f.currency_code))`,
+  [auth.clubId, input.accountId, input.sectorId, input.categoryId, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.receivableId ?? null])).rows[0];
   if (!reference) throw financialError('Cuenta, categoría, sector o referencias no compatibles dentro del club.', 404);
   return reference;
 }
@@ -55,7 +55,7 @@ export async function correctFinancialMovement(db: QueryExecutor, auth: RequestA
   if (allocations.length) {
     if (input.activityId !== before.activity_id || input.personId !== before.person_id || input.movementType !== before.movement_type || reference.currency !== before.currency_code) throw financialError('Un pago de liquidación conserva receptor, actividad y moneda; corrija importe, fecha o estado.');
     await db.query("update miclub.activity_settlement_allocations set amount=$3,status=case when $4='COMPLETADO' then 'COMPLETADO' when $4='ANULADO' then 'CANCELADO' else 'PENDIENTE' end where club_id=$1 and movement_id=$2", [auth.clubId, id, input.amount, input.operationalStatus ?? 'COMPLETADO']);
-    await db.query("update miclub.activity_settlements set review_state='REQUIRES_REVIEW',revision=revision+1 where club_id=$1 and id=any($2::uuid[])", [auth.clubId, allocations.map(a => a.settlement_id)]);
+    await db.query("update miclub.activity_settlements set review_state='REQUIRES_REVIEW',revision=revision+1,closed_at=null where club_id=$1 and id=any($2::uuid[])", [auth.clubId, allocations.map(a => a.settlement_id)]);
   } else if (before.initial_obligation_id) {
     if ((input.activityId ?? null) !== before.activity_id || (input.personId ?? null) !== before.person_id || input.movementType !== before.movement_type || reference.currency !== before.currency_code || input.receivableId || applications?.length) throw financialError('La aplicación inicial conserva persona, actividad, tipo y moneda.');
     const oldApplied = before.operational_status === 'COMPLETADO' ? before.amount : 0;

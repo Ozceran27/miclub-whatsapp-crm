@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { PERMISSIONS } from '@miclub/shared';
 import { requirePermission } from '../middleware/authorization.js';
 import asyncHandler from './asyncHandler.js';
-import { adjustSettlement, assertFinancialSchema, financeTransaction, financialError, financialMoney, readFinancialCircuit, recordResponsiblePayment, resolveTerm, reviewSettlement, voidPayoutGroup, voidSettlementAdjustment } from '../services/financialCircuitService.js';
+import { adjustSettlement, assertFinancialSchema, financeTransaction, financialError, financialMoney, previewResponsiblePayment, readFinancialCircuit, recordResponsiblePayment, resolveTerm, reviewSettlement, voidPayoutGroup, voidSettlementAdjustment } from '../services/financialCircuitService.js';
 import { editEmployeeCompensationObligation, listEmployeeCompensationObligations, refreshEmployeeCompensationObligations, reviewEmployeeCompensationObligation } from '../services/employeeCompensationService.js';
 import { abandonEnrollment, correctFinancialMovement, createFinancialMovement, refundCollection } from '../services/financialMovementService.js';
 import { withTenantTransaction } from '../db/transaction.js';
@@ -32,7 +32,7 @@ const body = (req: Request, allowed: string[]) => {
   if (!req.body || Array.isArray(req.body) || typeof req.body !== 'object' || Object.keys(req.body as object).some(k => ![...allowed, 'reason'].includes(k))) throw financialError('La solicitud contiene campos no editables.', 400);
   return req.body as Record<string, unknown>;
 };
-const run = <T>(req: Request, action: Parameters<typeof financeTransaction<T>>[4]) => financeTransaction(req.auth!, text(req.get('idempotency-key')), { route: req.originalUrl, body: req.body }, text(req.body.reason), action);
+const run = <T>(req: Request, action: Parameters<typeof financeTransaction<T>>[4]) => financeTransaction(req.auth!, text(req.get('idempotency-key')), { route: req.originalUrl, body: req.body as unknown }, text((req.body as Record<string,unknown>).reason), action);
 
 router.get('/finance/workbench', requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
@@ -40,21 +40,15 @@ router.get('/finance/workbench', requirePermission(PERMISSIONS.FINANCE_READ), as
     await assertFinancialSchema(db);
     const club = req.auth!.clubId;
     const sectors = req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds;
-    const movements = (await db.query(`select m.id,m.revision,m.amount::float8 amount,m.taxes::float8 taxes,
-      (m.movement_date at time zone coalesce(c.timezone,'America/Argentina/Buenos_Aires'))::date::text "movementDate",
-      m.movement_type "movementType",m.account_id "accountId",m.category_id "categoryId",m.sector_id "sectorId",m.activity_id "activityId",m.person_id "personId",m.payment_method_id "paymentMethodId",m.concept,m.counterparty_text "counterpartyText",m.operational_status "operationalStatus",m.receivable_id "receivableId",m.reconciled_at "reconciledAt"
-      from miclub.movements m join miclub.clubs c on c.id=m.club_id where m.club_id=$1 and ($2::uuid[] is null or m.sector_id=any($2)) order by m.movement_date desc,m.id limit 100`, [club, sectors])).rows;
-    const categories = (await db.query('select id,name,direction from miclub.movement_categories where club_id=$1 and is_active order by name', [club])).rows;
+    const categories = (await db.query(`select mc.id,mc.name,cc.code,cc.classification
+      from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id and cc.is_active
+      where mc.club_id=$1 and mc.is_active order by cc.display_order,mc.name`, [club])).rows;
     const activities = (await db.query('select id,name,sector_id "sectorId" from miclub.activities where club_id=$1 and ($2::uuid[] is null or sector_id=any($2)) order by name', [club, sectors])).rows;
     const sectorRows = (await db.query('select id,name from miclub.sectors where club_id=$1 and ($2::uuid[] is null or id=any($2)) order by name', [club, sectors])).rows;
     const methods = (await db.query('select id,name from miclub.payment_methods where club_id=$1 and is_active order by name', [club])).rows;
-    const receivables = (await db.query(`select r.id,r.person_id "personId",r.activity_id "activityId",r.concept,r.currency_code "currencyCode",
-      greatest(0,r.amount-r.cancelled_amount-coalesce((select sum(a.amount) from miclub.payment_allocations a where a.club_id=r.club_id and a.receivable_id=r.id),0))::float8 balance
-      from miclub.receivables r where r.club_id=$1 and ($2::uuid[] is null or r.sector_id=any($2)) order by r.due_date,r.id`, [club, sectors])).rows;
-    const enrollments = (await db.query(`select e.id,concat_ws(' ',p.first_name,p.last_name)||' — '||a.name name from miclub.enrollments e join miclub.people p on p.id=e.person_id and p.club_id=e.club_id join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id where e.club_id=$1 and not e.inactive and ($2::uuid[] is null or a.sector_id=any($2))`, [club, sectors])).rows;
     const startup = sectors === null && req.auth!.permissions.includes(PERMISSIONS.FINANCE_RECONCILE) ? (await db.query('select mode,cutoff_date::text "cutoffDate",revision,status,expected_balances preview,approved_snapshot from miclub.finance_startups where club_id=$1', [club])).rows[0] ?? null : null;
     const initialObligations = req.auth!.permissions.some(p => p === PERMISSIONS.FINANCE_RECONCILE || p === PERMISSIONS.FINANCE_PAY) && sectors === null ? (await db.query(`select id,review_state "reviewState",(amount-settled_amount)::float8 balance,source_key "sourceKey",person_id "personId",coalesce(activity_id::text,'') "activityId",kind,currency_code "currencyCode",amount::float8 amount,due_date::text "dueDate" from miclub.initial_obligations where club_id=$1 order by due_date,id`, [club])).rows : [];
-    return { movements, categories, activities, sectors: sectorRows, methods, receivables, enrollments, startup, initialObligations };
+    return { categories, activities, sectors: sectorRows, methods, startup, initialObligations };
   }));
 }));
 
@@ -80,9 +74,55 @@ router.get('/finance/circuit', requirePermission(PERMISSIONS.FINANCE_READ), asyn
   res.set('Cache-Control', 'private, no-store');
   res.json(await readFinancialCircuit(req.auth!, req.query.month ? text(req.query.month) : undefined));
 }));
+router.get('/finance/movements/:id', requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json(await withTenantTransaction(req.auth!.clubId, async db => {
+    const row = (await db.query(`select m.id,m.revision,m.amount::float8 amount,m.taxes::float8 taxes,
+      (m.movement_date at time zone coalesce(c.timezone,'America/Argentina/Buenos_Aires'))::date::text "movementDate",
+      m.movement_type "movementType",m.account_id "accountId",m.category_id "categoryId",m.sector_id "sectorId",
+      m.activity_id "activityId",m.person_id "personId",m.payment_method_id "paymentMethodId",m.concept,
+      m.counterparty_text "counterpartyText",m.operational_status "operationalStatus",m.receivable_id "receivableId",
+      m.reconciled_at "reconciledAt",m.currency_code "currencyCode",m.voided_at "voidedAt"
+      from miclub.movements m join miclub.clubs c on c.id=m.club_id
+      where m.club_id=$1 and m.id=$2 and ($3::uuid[] is null or m.sector_id=any($3))`,
+      [req.auth!.clubId, uuid(req.params.id), req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds])).rows[0];
+    if (!row) throw financialError('Movimiento no disponible.', 404);
+    return row;
+  }));
+}));
+router.get('/finance/reconciliation/movements', requirePermission(PERMISSIONS.FINANCE_READ), requirePermission(PERMISSIONS.FINANCE_RECONCILE), asyncHandler(async (req, res) => {
+  const page = Number(req.query.page ?? 1);
+  if (!Number.isSafeInteger(page) || page < 1 || page > 100000) throw financialError('Página inválida.', 400);
+  const status = req.query.status === 'all' ? 'all' : req.query.status === undefined || req.query.status === 'pending' ? 'pending' : null;
+  if (!status) throw financialError('Estado de conciliación inválido.', 400);
+  res.set('Cache-Control', 'private, no-store');
+  res.json(await withTenantTransaction(req.auth!.clubId, async db => {
+    const sectors = req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds;
+    const where = `m.club_id=$1 and m.account_id is not null and m.operational_status='COMPLETADO' and m.voided_at is null
+      and ($2::uuid[] is null or m.sector_id=any($2)) and ($3::text='all' or m.reconciled_at is null)`;
+    const total = (await db.query<{ count: number }>(`select count(*)::int count from miclub.movements m where ${where}`, [req.auth!.clubId, sectors, status])).rows[0].count;
+    const items = (await db.query(`select m.id,m.revision,m.movement_date "movementDate",m.movement_type "movementType",
+      m.concept,m.amount::float8 amount,m.currency_code "currencyCode",a.name "accountName",m.reconciled_at "reconciledAt"
+      from miclub.movements m join miclub.financial_accounts a on a.id=m.account_id and a.club_id=m.club_id
+      where ${where} order by m.movement_date desc,m.id desc limit 20 offset $4`,
+      [req.auth!.clubId, sectors, status, (page - 1) * 20])).rows;
+    return { items, total, page, pageSize: 20 };
+  }));
+}));
 router.get('/finance/history/:entity/:id', requirePermission(PERMISSIONS.FINANCE_READ), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req, res) => {
   const id = uuid(req.params.id);
   res.json(await withTenantTransaction(req.auth!.clubId, async db => (await db.query('select entity_type,entity_id,before_data,after_data,actor_id,reason,created_at from miclub.finance_history where club_id=$1 and entity_type=$2 and entity_id=$3 order by created_at desc', [req.auth!.clubId, String(req.params.entity), id])).rows));
+}));
+router.get('/finance/settlements/:id/adjustments', requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req,res)=>{
+  res.set('Cache-Control','private, no-store');
+  res.json(await withTenantTransaction(req.auth!.clubId, async db => {
+    const sectors=req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:req.auth!.sectorIds;
+    return (await db.query(`select x.id,x.amount::float8 amount,x.reason,x.status,x.revision,x.created_at "createdAt"
+      from miclub.activity_settlement_adjustments x join miclub.activity_settlements s on s.id=x.settlement_id and s.club_id=x.club_id
+      join miclub.activities a on a.id=s.activity_id and a.club_id=s.club_id
+      where x.club_id=$1 and x.settlement_id=$2 and ($3::uuid[] is null or a.sector_id=any($3))
+      order by x.created_at desc,x.id desc`,[req.auth!.clubId,uuid(req.params.id),sectors])).rows;
+  }));
 }));
 router.post('/finance/terms/:id/resolve', requirePermission(PERMISSIONS.FINANCE_CORRECT), asyncHandler(async (req, res) => {
   const b = body(req, ['revision', 'personId']);
@@ -92,10 +132,18 @@ for (const operation of ['approve', 'close'] as const) router.post(`/finance/set
   const b = body(req, ['revision']);
   res.json(await run(req, db => reviewSettlement(db, req.auth!, uuid(req.params.id), revision(b.revision), text(b.reason), operation === 'close')));
 }));
+router.post('/finance/responsibles/:id/preview', requirePermission(PERMISSIONS.FINANCE_PAY), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req, res) => {
+  const b = body(req, ['accountId', 'amount', 'debtCollection']);
+  if (typeof b.debtCollection !== 'boolean') throw financialError('Tipo de operación inválido.', 400);
+  res.set('Cache-Control', 'private, no-store');
+  res.json(await withTenantTransaction(req.auth!.clubId, db => previewResponsiblePayment(db, req.auth!, uuid(req.params.id), uuid(b.accountId), b.amount as number, b.debtCollection === true)));
+}));
 router.post('/finance/responsibles/:id/pay', requirePermission(PERMISSIONS.FINANCE_PAY), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req, res) => {
-  const b = body(req, ['accountId', 'categoryId', 'paymentMethodId', 'amount', 'date', 'debtCollection']);
+  const b = body(req, ['accountId', 'categoryId', 'paymentMethodId', 'amount', 'date', 'debtCollection', 'previewHash']);
   if (b.debtCollection !== undefined && typeof b.debtCollection !== 'boolean') throw financialError('Tipo de operación inválido.', 400);
-  res.json(await run(req, db => recordResponsiblePayment(db, req.auth!, uuid(req.params.id), uuid(b.accountId), uuid(b.categoryId), uuid(b.paymentMethodId), b.amount as number, text(b.date), b.debtCollection === true, text(b.reason))));
+  if (typeof b.previewHash !== 'string' || !/^[0-9a-f]{64}$/.test(b.previewHash)) throw financialError('Revise la vista previa antes de confirmar.', 400);
+  const previewHash = b.previewHash;
+  res.json(await run(req, db => recordResponsiblePayment(db, req.auth!, uuid(req.params.id), uuid(b.accountId), uuid(b.categoryId), uuid(b.paymentMethodId), b.amount as number, text(b.date), b.debtCollection === true, text(b.reason), previewHash)));
 }));
 router.post('/finance/settlements/:id/adjustments', requirePermission(PERMISSIONS.FINANCE_CORRECT), asyncHandler(async (req,res) => {
   const b=body(req,['revision','amount']); res.status(201).json(await run(req,db=>adjustSettlement(db,req.auth!,uuid(req.params.id),revision(b.revision),Number(b.amount),text(b.reason))));
@@ -104,7 +152,7 @@ router.post('/finance/settlement-adjustments/:id/void', requirePermission(PERMIS
   const b=body(req,['revision']); res.json(await run(req,db=>voidSettlementAdjustment(db,req.auth!,uuid(req.params.id),revision(b.revision),text(b.reason))));
 }));
 router.post('/finance/payout-groups/:id/void', requirePermission(PERMISSIONS.FINANCE_CORRECT), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req,res) => {
-  body(req,[]); res.json(await run(req,db=>voidPayoutGroup(db,req.auth!,uuid(req.params.id),text(req.body.reason))));
+  const b=body(req,[]); res.json(await run(req,db=>voidPayoutGroup(db,req.auth!,uuid(req.params.id),text(b.reason))));
 }));
 
 router.get('/finance/compensation-obligations', requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req,res) => {
@@ -168,8 +216,8 @@ router.post('/finance/opening-balances/replace',requirePermission(PERMISSIONS.FI
   res.json(await run(req,async db=>{const previous=(await db.query(`select to_jsonb(x) snapshot from (select * from miclub.opening_balance_batches where club_id=$1 and status='APPLIED' order by revision desc limit 1)x`,[req.auth!.clubId])).rows[0]?.snapshot??null;const batch=(await db.query<{id:string}>(`select miclub.replace_opening_balances($1,$2,$3,$4,$5,$6) id`,[req.auth!.clubId,values[0],values[1],values[2],`${key}:opening`,req.auth!.userId])).rows[0];const replacement={batchId:batch.id,cash:values[0],bank:values[1],usdCash:values[2]};await db.query(`insert into miclub.opening_balance_revisions(club_id,operation_key,previous_snapshot,replacement_snapshot,reason,actor_id) values($1,$2,$3,$4,$5,$6) on conflict(club_id,operation_key) do nothing`,[req.auth!.clubId,key,previous,JSON.stringify(replacement),text(b.reason),req.auth!.userId]);return replacement;}));
 }));
 router.post('/finance/initial-obligations/:id/pay', requirePermission(PERMISSIONS.FINANCE_PAY), requirePermission(PERMISSIONS.SECTORS_ANY), asyncHandler(async (req,res) => {
-  const b = body(req,['accountId','amount','date']);
-  res.json(await run(req,db => payInitialObligation(db,req.auth!,uuid(req.params.id),uuid(b.accountId),b.amount as number,text(b.date))));
+  const b = body(req,['accountId','categoryId','amount','date']);
+  res.json(await run(req,db => payInitialObligation(db,req.auth!,uuid(req.params.id),uuid(b.accountId),uuid(b.categoryId),b.amount as number,text(b.date))));
 }));
 router.post('/finance/movements/:id/reconcile', requirePermission(PERMISSIONS.FINANCE_RECONCILE), asyncHandler(async (req, res) => {
   const b = body(req, ['revision']);

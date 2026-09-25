@@ -26,8 +26,10 @@ const SHEETS: SourceSheet[] = [
   "ADMINISTRACION",
 ];
 const toNumber = (value: unknown): number => normalizeMovementAmount(value);
+const scalarText = (value: unknown): string =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint' ? String(value) : '';
 const toStringValue = (value: unknown): string | undefined =>
-  value == null ? undefined : String(value);
+  value == null ? undefined : scalarText(value);
 const pick = (row: Record<string, unknown>, keys: string[]): unknown =>
   keys.find((key) => row[key] !== undefined)
     ? row[keys.find((key) => row[key] !== undefined)!]
@@ -239,7 +241,7 @@ export const selectCuotasACobrar = ({
   };
 };
 export const normalizePostgresSourceSheet = (value: unknown): SourceSheet => {
-  const normalized = String(value ?? "")
+  const normalized = scalarText(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
@@ -283,7 +285,7 @@ const getMovementBreakdown = (groupColumn: "sector_name" | "category") => `
 `;
 
 export const normalizeStatusLabel = (value: unknown, _dueDate?: unknown): DebtorStatus => {
-  const status = normalizeOperationalStatus(String(value ?? ""));
+  const status = normalizeOperationalStatus(scalarText(value));
   if (status === "al_dia") return "Al día";
   if (status === "adeudando") return "Adeudando";
   if (status === "abandonado") return "Abandonado";
@@ -446,7 +448,7 @@ export const getPostgresReceivableEffectiveStatusDebug = async (clubId: string):
   return {
     businessRule: "cuotas_a_cobrar incluye solo effective_status=adeudando; nuevo_inscripto queda excluido",
     rows: result.rows.map((row) => ({
-      effectiveStatus: String(row.effective_status ?? ""),
+      effectiveStatus: scalarText(row.effective_status),
       enrollmentsCount: toNumber(row.enrollments_count),
       totalReceivableFee: toNumber(row.total_receivable_fee),
       totalNormalizedFee: toNumber(row.total_normalized_fee),
@@ -564,7 +566,7 @@ export const getPostgresClubFinanceSummary =
     // retained only as reconciliation input and may legitimately lag behind an
     // import; avoid emitting the same warning on every dashboard request.
     if (cuotasACobrarSelection.differsBeyondThreshold && process.env.DEBUG_DASHBOARD_RECONCILIATION === "true") {
-      console.info("[postgres-dashboard] vista legacy difiere del agregado autoritativo", cuotasACobrarSelection);
+      console.warn("[postgres-dashboard] vista legacy difiere del agregado autoritativo", cuotasACobrarSelection);
     }
     const cuotasACobrar = cuotasACobrarSelection.cuotasACobrar;
     const pendingFallbackRow = pendingFallback.rows[0] ?? {};
@@ -679,6 +681,7 @@ export const getPostgresSectorOperationalSummary =
             and upper(regexp_replace(regexp_replace(translate(trim(coalesce(m.operational_status::text, '')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN'), '\\s+', ' ', 'g'), '\\.+$', '', 'g')) in ('COMPLETADO', 'COMPLETED')
             and m.movement_type in ('INGRESOS', 'EGRESOS')
             and cc.classification = 'OPERATIONAL'
+            and not exists(select 1 from miclub.payout_groups payout where payout.club_id=m.club_id and payout.id=m.payout_group_id and payout.direction='COLLECT')
         ), current_month as (
           select $2::timestamptz as start_at, $3::timestamptz as end_at
         )

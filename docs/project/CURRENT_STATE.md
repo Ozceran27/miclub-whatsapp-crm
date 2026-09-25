@@ -1,5 +1,11 @@
 # Current State
 
+## Liquidaciones y conciliación — 2026-09-25
+
+Administración presenta Resumen, Liquidaciones, Remuneraciones y Conciliación con detalles y acciones revisables. Movimientos reúne altas, correcciones y devoluciones; Inscripciones reúne generación de cuotas y abandono. La conciliación actual comprende movimientos, apertura y arranque/importación, sin cotejo bancario externo. La bandeja de pendientes usa paginación tenant-scoped; el procesamiento muestra una vista previa backend y exige su hash vigente. Las categorías activas admiten ambas direcciones mediante la migración versionada `202609250001_bidirectional_movement_categories.sql`; su aplicación a la base real requiere ejecución manual.
+
+La auditoría de solo lectura del 25/09/2026 con `AUDIT_DATABASE_URL` confirmó una base local con una organización, 35 categorías activas con `direction` fijo y referencias canónicas válidas; la columna admite NULL. El rol `miclub_audit` no puede leer `public.miclub_schema_migrations`. El script manual de categorías ya no exige la entrada de ledger `202609220002`, ajena a ese cambio. La tabla y el constraint de precios observados coinciden estructuralmente con esa migración, pero ello **no certifica** su registro en el ledger. La ejecución manual, la conciliación del ledger y las pruebas de integración PostgreSQL siguen pendientes.
+
 ## Escala visual de escritorio al 85 % — 2026-09-25
 
 La escala general de la raíz pasó de `zoom: 0.9` a `zoom: 0.85` y se activa

@@ -98,7 +98,7 @@ export default function AdministrationModule() {
       <div id="admin-finance"><FinancialCircuitPanel /></div>
       <div id="admin-operations">
         {capabilities.enrollments ? <EnrollmentList /> : <UnavailableSurface capability="enrollments" title="Inscripciones" />}
-        {capabilities.movements ? <MovementList /> : <UnavailableSurface capability="movements" title="Movimientos" />}
+        {capabilities.movements ? <MovementList canCreate={capabilities.createMovement} /> : <UnavailableSurface capability="movements" title="Movimientos" />}
         {capabilities.tasks ? <TaskPanel canCreate={capabilities.createTask} canEdit={capabilities.editTask} /> : <UnavailableSurface capability="tasks" title="Tareas" />}
         {capabilities.requests ? <RequestPanel canApprove={capabilities.approveRequest} canReject={capabilities.rejectRequest} /> : <UnavailableSurface capability="requests" title="Solicitudes" />}
       </div>
