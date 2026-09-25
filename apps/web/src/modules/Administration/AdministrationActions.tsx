@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getLayoutViewport, toLayoutRect } from '../../layoutViewport';
 
 type Operation = 'movement' | 'enrollment' | 'sector' | 'worker' | 'activity';
 type AdministrationAction = {
@@ -52,11 +53,13 @@ function ActionCard({ action, run, permitted }: { action: AdministrationAction; 
   useLayoutEffect(() => {
     if (!open) return;
     const update = () => {
-      const anchor = iconRef.current?.getBoundingClientRect() ?? buttonRef.current?.getBoundingClientRect();
+      const anchorRect = iconRef.current?.getBoundingClientRect() ?? buttonRef.current?.getBoundingClientRect();
       const popup = tooltipRef.current;
-      if (!anchor || !popup) return;
+      if (!anchorRect || !popup) return;
+      const viewport = getLayoutViewport();
+      const anchor = toLayoutRect(anchorRect, viewport.zoom);
       const margin = 12;
-      const left = Math.min(Math.max(anchor.left + anchor.width / 2 - popup.offsetWidth / 2, margin), window.innerWidth - popup.offsetWidth - margin);
+      const left = Math.min(Math.max(anchor.left + anchor.width / 2 - popup.offsetWidth / 2, margin), viewport.width - popup.offsetWidth - margin);
       const top = anchor.top > popup.offsetHeight + TOOLTIP_GAP + margin ? anchor.top - popup.offsetHeight - TOOLTIP_GAP : anchor.bottom + TOOLTIP_GAP;
       setPosition({ top, left });
     };

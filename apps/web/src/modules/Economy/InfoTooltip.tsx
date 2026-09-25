@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getLayoutViewport, toLayoutRect } from '../../layoutViewport';
 
 type InfoTooltipProps = {
   content: string;
@@ -33,12 +34,13 @@ export function InfoTooltip({ content, label = 'Ver ayuda', className = '' }: In
       const trigger = triggerRef.current;
       if (!trigger) return;
 
-      const triggerRect = trigger.getBoundingClientRect();
+      const viewport = getLayoutViewport();
+      const triggerRect = toLayoutRect(trigger.getBoundingClientRect(), viewport.zoom);
       const tooltip = tooltipRef.current;
-      const tooltipWidth = Math.min(tooltip?.offsetWidth ?? MAX_TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
+      const tooltipWidth = Math.min(tooltip?.offsetWidth ?? MAX_TOOLTIP_WIDTH, viewport.width - VIEWPORT_MARGIN * 2);
       const tooltipHeight = tooltip?.offsetHeight ?? 0;
       const spaceAbove = triggerRect.top - VIEWPORT_MARGIN;
-      const spaceBelow = window.innerHeight - triggerRect.bottom - VIEWPORT_MARGIN;
+      const spaceBelow = viewport.height - triggerRect.bottom - VIEWPORT_MARGIN;
       const placement: TooltipPosition['placement'] = spaceAbove >= tooltipHeight + TOOLTIP_GAP || spaceAbove > spaceBelow ? 'top' : 'bottom';
       const desiredTop = placement === 'top'
         ? triggerRect.top - tooltipHeight - TOOLTIP_GAP
@@ -46,8 +48,8 @@ export function InfoTooltip({ content, label = 'Ver ayuda', className = '' }: In
       const centeredLeft = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
 
       setPosition({
-        top: clamp(desiredTop, VIEWPORT_MARGIN, window.innerHeight - tooltipHeight - VIEWPORT_MARGIN),
-        left: clamp(centeredLeft, VIEWPORT_MARGIN, window.innerWidth - tooltipWidth - VIEWPORT_MARGIN),
+        top: clamp(desiredTop, VIEWPORT_MARGIN, viewport.height - tooltipHeight - VIEWPORT_MARGIN),
+        left: clamp(centeredLeft, VIEWPORT_MARGIN, viewport.width - tooltipWidth - VIEWPORT_MARGIN),
         placement
       });
     };

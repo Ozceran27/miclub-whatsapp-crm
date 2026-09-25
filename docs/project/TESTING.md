@@ -1,5 +1,35 @@
 # Testing
 
+## Escala de escritorio al 90 % — 2026-09-25
+
+`npm run test -w @miclub/web` pasó (88/88), junto con `typecheck`, `build`,
+`docs:check` y `git diff --check`. En Chrome headless con viewport de alto
+608 px, la raíz conservó escala 1 hasta 1304 px de ancho y aplicó 0,9 desde
+1305 px. A 1366 px el panel ocupó x=134…1292, el onboarding y=11…597 y no
+hubo overflow horizontal. La conversión de coordenadas mantuvo alineado un
+menú fijo con su disparador bajo `zoom: 0.9`.
+
+Sigue pendiente la comparación autenticada en el Chrome del usuario con zoom
+real 90 % y 100 % y el recorrido con zoom real 125 % y 200 %. No hubo cambios
+de DB ni SQL.
+
+## Escala general de escritorio — 2026-09-24
+
+El frontend pasó 88/88 tests web, `typecheck` y `build`. `docs:check` pasó.
+La auditoría dirigida con Chrome headless verificó la raíz a escala 1 en
+390, 683, 1093 y 1159 px, y a escala 0,8 desde 1160 px. Con viewport
+1366 × 608 px y scrollbar vertical, el panel ocupó x=195…1294 sin overflow
+horizontal y el onboarding quedó dentro del viewport;
+el diálogo alcanzó 579 px de alto frente a 608 px disponibles. Una prueba de
+geometría comprobó que el menú posicionado desde `getBoundingClientRect()`
+conserva la alineación tras convertir coordenadas con el factor 0,8.
+
+La comparación autenticada de todas las rutas con el Chrome del usuario al
+80 % y 100 %, y la comprobación con zoom real 125 % y 200 %, requieren una
+sesión navegable; la auditoría headless verificó sus anchos CSS equivalentes,
+pero no sustituye esos recorridos. El lint global mantiene errores previos.
+No hubo cambios de DB ni SQL.
+
 ## Reversión de densidad visual — 2026-09-24
 
 La capa `density.css`, su importación y los breakpoints experimentales de las

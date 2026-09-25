@@ -1,13 +1,32 @@
 # Current State
 
+## Escala visual de escritorio al 90 % — 2026-09-25
+
+La escala general de la raíz pasó de `zoom: 0.8` a `zoom: 0.9`. Se activa
+desde 1305 px CSS de viewport, equivalente al breakpoint histórico de
+1450 px con Chrome al 90 %. Se recalcularon la compensación horizontal del
+shell, el alto efectivo del viewport y los umbrales de altura del onboarding.
+La conversión compartida de coordenadas para menús y tooltips sigue leyendo
+el zoom CSS aplicado, por lo que no tiene un factor fijo de 80 %.
+
+## Escala visual general de escritorio — 2026-09-24
+
+El frontend aplica `zoom: 0.8` en la raíz desde 1160 px CSS de viewport.
+Chrome permanece al zoom elegido por cada usuario; tablet y móvil conservan
+escala CSS 1. El shell compensa el viewport que CSS `zoom` no amplía para las
+media queries y unidades `vw`; las superficies que dependen de `dvh` usan una
+variable de alto efectivo. Los menús y tooltips montados en `document.body`
+convierten sus coordenadas físicas a píxeles de layout mediante una utilidad
+compartida. No se restauró la antigua capa `density.css`.
+
 ## Reversión de densidad visual — 2026-09-24
 
 Se retiró la capa experimental `density.css` por inconsistencias entre
 componentes y un badge «PRÓXIMAMENTE» demasiado grande. La tipografía,
 espaciado y componentes vuelven a la hoja previa. Se conserva el ajuste global
 de márgenes: a 1707 px CSS, aproximadamente 232 px a la izquierda y 60 px a la
-derecha; a 1366 px, 12 y 48 px. La reducción visual equivalente al zoom del
-navegador al 80 % sigue pendiente de un nuevo diseño y comparación real.
+derecha; a 1366 px, 12 y 48 px. En ese momento seguía pendiente una nueva
+solución para la reducción visual equivalente al zoom del navegador al 80 %.
 
 ## Auditoría de Administración y espacio de trabajo — 2026-09-24
 

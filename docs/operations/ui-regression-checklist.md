@@ -46,20 +46,22 @@ sin copiar tamaños de columnas que sólo tienen sentido para otro dominio.
 
 ## Área de trabajo global
 
-En escritorio ancho, el contenedor autenticado conserva el origen horizontal
-previo y deja un margen derecho de 3,5 vw, limitado a 24–64 px. A 1366 px CSS
-el margen izquierdo es de 12 px y el derecho de unos 48 px; a 1707 px son
-aproximadamente 232 y 60 px. Desde 1100 px el contenedor usa 12 px a ambos
-lados. El ajuste pertenece a la estructura global: revisar Inicio,
-Administración, Tesorería, CRM, Migración y navegación sin scroll horizontal.
-
-La capa experimental de densidad se retiró. Antes de intentar otra reducción
-de escala, comparar los mismos recorridos con el zoom real del navegador al
-80 % y al 100 %, incluidos badges, menús, modales y tablas.
+Desde 1305 px CSS de viewport, la raíz usa `zoom: 0.9` y el shell compensa
+el ancho del viewport para reproducir a zoom 100 % la composición anterior
+de Chrome al 90 %. Por debajo de 1305 px no hay escala CSS. Comprobar en
+Inicio, Administración, Tesorería, CRM, Migración, login y registro el zoom
+100 % a 1305, 1366, 1440 y 1920 px; a 1366 px el panel comienza cerca de
+x=134 y termina cerca de x=1293 cuando hay scrollbar vertical. Revisar
+scroll horizontal, badges, menús, tooltips, modales y tablas. El zoom 125 %
+y 200 % elegido por el usuario debe seguir ampliando la interfaz.
 
 ## Onboarding: matriz de viewports
 
-Validar siempre con el **zoom del navegador al 100%**, sin escalado CSS. En cada escenario, el encabezado de progreso y la barra de acciones deben permanecer visibles; cuando el paso exceda el espacio disponible, únicamente `.onboarding-viewport` debe desplazarse.
+Validar siempre con el **zoom del navegador al 100%**. En escritorio se aplica
+la escala general de la raíz; en tablet y móvil no se escala. En cada escenario,
+el encabezado de progreso y la barra de acciones deben permanecer visibles;
+cuando el paso exceda el espacio disponible, únicamente `.onboarding-viewport`
+debe desplazarse.
 
 | Escenario | Viewport CSS | Zoom | Verificación esperada |
 | --- | ---: | ---: | --- |
@@ -71,7 +73,9 @@ Validar siempre con el **zoom del navegador al 100%**, sin escalado CSS. En cada
 | Móvil | 390 × 844 | 100% | Hoja inferior a ancho completo; acciones visibles y controles de al menos 44 px. |
 | Móvil compacto | 360 × 640 | 100% | Etiquetas de progreso ocultas; cabecera y acciones visibles; scroll central. |
 
-Comprobar además la apertura de los modales de edición dentro del onboarding: deben usar el mismo margen y densidad, conservar el foco en coordenadas reales y permitir su propio scroll sin `zoom` ni `transform: scale()`.
+Comprobar además la apertura de los modales de edición dentro del onboarding:
+deben usar el mismo margen y densidad, conservar el foco en coordenadas reales
+y permitir su propio scroll sin aplicar otra escala al diálogo.
 
 ## Recorrido integral de onboarding
 

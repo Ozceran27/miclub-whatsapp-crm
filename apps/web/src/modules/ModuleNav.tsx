@@ -3,6 +3,7 @@ export type ModuleId = CoreModuleId | `sector:${string}`;
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getLayoutViewport, toLayoutRect } from '../layoutViewport';
 
 export type ModuleDefinition = {
   id: ModuleId;
@@ -39,8 +40,9 @@ export default function ModuleNav({ modules, sectors, currentModule, onSelect }:
   const positionMenu = () => {
     const trigger = sectorsTriggerRef.current;
     if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setMenuPosition(calculateSectorMenuPosition(rect, { width: window.innerWidth, height: window.innerHeight }));
+    const viewport = getLayoutViewport();
+    const rect = toLayoutRect(trigger.getBoundingClientRect(), viewport.zoom);
+    setMenuPosition(calculateSectorMenuPosition(rect, viewport));
   };
 
   useLayoutEffect(() => { if (sectorsOpen) positionMenu(); }, [sectorsOpen, sectors.length]);
