@@ -81,11 +81,13 @@ export default function AdministrationModule() {
           <AdministrationActions
             onCreateMovement={()=>setMovementOpen(true)}
             onCreateEnrollment={()=>setEnrollmentOpen(true)}
+            onLoadQuota={()=>{document.getElementById('enrollment-list')?.scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('enrollment-list-title')?.focus({preventScroll:true});window.dispatchEvent(new Event('miclub:open-quotas'));}}
             onCreateSector={()=>window.dispatchEvent(new Event('miclub:create-sector'))}
             onCreateWorker={()=>window.dispatchEvent(new Event('miclub:create-worker'))}
             onCreateActivity={()=>window.dispatchEvent(new Event('miclub:create-activity'))}
             canCreateMovement={capabilities.createMovement}
             canCreateEnrollment={capabilities.createEnrollment}
+            canLoadQuota={capabilities.enrollments&&session.permissions.includes(PERMISSIONS.ENROLLMENTS_CREATE)}
             canCreateSector={canCreateSector}
             canCreateWorker={canCreateWorker}
             canCreateActivity={canCreateActivity}

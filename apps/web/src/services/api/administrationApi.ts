@@ -113,15 +113,11 @@ export const getAdministrationMovements = (page: number, filters: Administration
 export const getAdministrationEnrollments = (page: number, filters: AdministrationListFilters, signal?: AbortSignal) =>
   apiJson<AdministrationEnrollmentsResponse>(paginatedUrl('/api/inscripciones', page, filters), { cache: 'no-store', signal });
 
-export type MovementCatalogItem = { id: string; code?: string; name: string; displayName?: string; classification?: 'OPERATIONAL'|'NON_OPERATIONAL'|'TAX'|'SERVICE'|'LIABILITY'; displayOrder?: number; sectorId?: string; /** Legacy preferred direction; every active category accepts both types. */ direction?: 'INGRESOS'|'EGRESOS'|null; isActive?: boolean };
-export const getMovementFormCatalogs = async (signal?: AbortSignal) => {
-  const [categories,sectors,activities,paymentMethods,accounts]=await Promise.all([
-    apiJson<MovementCatalogItem[]>('/api/movement-categories',{signal}), apiJson<MovementCatalogItem[]>('/api/sectors',{signal}),
-    apiJson<MovementCatalogItem[]>('/api/activities',{signal}), apiJson<MovementCatalogItem[]>('/api/payment-methods',{signal}), apiJson<MovementCatalogItem[]>('/api/finance/accounts',{signal})
-  ]); return {categories,sectors,activities,paymentMethods,accounts};
-};
-export const createAdministrationMovement = (input: Record<string,unknown>, idempotencyKey: string) =>
-  apiJson<Record<string,unknown>>('/api/finance/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify({ movement: input, reason: 'Registro de movimiento desde Administración' })});
+export type MovementCatalogItem = { id: string; code?: string; name: string; displayName?: string; classification?: 'OPERATIONAL'|'NON_OPERATIONAL'|'TAX'|'SERVICE'|'LIABILITY'; displayOrder?: number; sectorId?: string; currencyCode?: string; direction?: 'INGRESOS'|'EGRESOS'|null; isActive?: boolean };
+export type MovementFormCatalogs = {categories:MovementCatalogItem[];sectors:MovementCatalogItem[];activities:MovementCatalogItem[];paymentMethods:MovementCatalogItem[];accounts:MovementCatalogItem[]};
+export const getMovementFormCatalogs = (signal?: AbortSignal) => apiJson<MovementFormCatalogs>('/api/finance/movement-catalogs',{signal,cache:'no-store'});
+export const createAdministrationMovement = (input: Record<string,unknown>, idempotencyKey: string, applications?:{receivableId:string;amount:number}[]) =>
+  apiJson<Record<string,unknown>>('/api/finance/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify({ movement: input, applications, reason: 'Registro de movimiento desde Administración' })});
 
 export type EnrollmentCatalogItem={id:string;name:string;status?:string;generatesEnrollments?:boolean;pricingConfigured?:boolean;enrollmentPrice?:number|null;feePrice?:number|null;feeFrequency?:string|null;currencyCode?:string|null};
 type EnrollmentPerson = { id:string; firstName?:string; lastName?:string; dni?:string };

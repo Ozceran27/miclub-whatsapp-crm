@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getLayoutViewport, toLayoutRect } from '../../layoutViewport';
 
-type Operation = 'movement' | 'enrollment' | 'sector' | 'worker' | 'activity';
+type Operation = 'movement' | 'enrollment' | 'quota' | 'sector' | 'worker' | 'activity';
 type AdministrationAction = {
   operation?: Operation;
   label: string;
@@ -14,7 +14,7 @@ type AdministrationAction = {
 export const administrationActions: readonly AdministrationAction[] = [
   { operation: 'movement', label: 'Cargar Movimiento', description: 'Registrá ingresos, egresos o ajustes administrativos del club.', icon: '↕', availability: 'enabled' },
   { operation: 'enrollment', label: 'Cargar Inscripción', description: 'Iniciá el alta de una persona en una actividad o plan.', icon: '📝', availability: 'enabled' },
-  { label: 'Cargar Cuota', description: 'Permitirá gestionar cuotas, vencimientos y su seguimiento.', icon: '💳', availability: 'coming-soon' },
+  { operation: 'quota', label: 'Cargar Cuota', description: 'Generá cuotas mensuales y consultá sus saldos en Inscripciones.', icon: '💳', availability: 'enabled' },
   { label: 'Crear Reserva', description: 'Permitirá reservar espacios y recursos con disponibilidad, pagos y reglas de cancelación.', icon: '📅', availability: 'coming-soon' },
   { label: 'Cargar Socio', description: 'Permitirá dar de alta o actualizar los datos principales de un socio.', icon: '👤', availability: 'coming-soon' },
   { operation: 'sector', label: 'Gestionar Sectores', description: 'Creá sectores y administrá su identidad visual, capacidad y estado.', icon: '🏟️', availability: 'enabled' },
@@ -27,11 +27,13 @@ export const administrationActions: readonly AdministrationAction[] = [
 type AdministrationActionsProps = {
   onCreateMovement: () => void;
   onCreateEnrollment: () => void;
+  onLoadQuota: () => void;
   onCreateSector: () => void;
   onCreateWorker: () => void;
   onCreateActivity: () => void;
   canCreateMovement: boolean;
   canCreateEnrollment: boolean;
+  canLoadQuota: boolean;
   canCreateSector: boolean;
   canCreateWorker: boolean;
   canCreateActivity: boolean;
@@ -82,6 +84,7 @@ export function AdministrationActions(props: AdministrationActionsProps) {
   const operation: Record<Operation, { run: () => void; permitted: boolean }> = {
     movement: { run: props.onCreateMovement, permitted: props.canCreateMovement },
     enrollment: { run: props.onCreateEnrollment, permitted: props.canCreateEnrollment },
+    quota: { run: props.onLoadQuota, permitted: props.canLoadQuota },
     sector: { run: props.onCreateSector, permitted: props.canCreateSector },
     worker: { run: props.onCreateWorker, permitted: props.canCreateWorker },
     activity: { run: props.onCreateActivity, permitted: props.canCreateActivity },

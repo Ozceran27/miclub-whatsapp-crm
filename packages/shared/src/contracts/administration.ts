@@ -397,6 +397,7 @@ export interface AdministrationRequestDto {
 export interface AdministrationMovementDto {
   id: string;
   sequenceNumber: number;
+  currencyCode: string;
   externalId?: string | null;
   date: string | null;
   type: AdministrationMovementType | null;

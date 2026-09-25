@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { PERMISSIONS, type EmployeeCompensationObligation, type FinancialCircuit, type PersistedSettlement } from '@miclub/shared';
 import { apiJson } from '../../api';
 import { useSession } from '../../session';
@@ -14,6 +14,15 @@ type OpeningObligation = { id?: string; reviewState?: string; balance?: number; 
 const formText = (form: FormData, key: string): string => { const value = form.get(key); return typeof value === 'string' ? value : ''; };
 type Workbench = { initialObligations: OpeningObligation[]; categories: (Option & { code: string; classification: string })[]; sectors: Option[]; methods: Option[]; activities: (Option & { sectorId: string })[]; startup: { revision: number; status: string; mode: string; cutoffDate: string; preview: { accounts?: { accountId: string; amount: number }[]; obligations?: OpeningObligation[]; differences: { accountId: string; expected: number; imported: number; difference: number }[] } } | null };
 type OpeningBalances = { batch: { id:string; revision:number; operation:string; status:string; reconciliationStatus:string; createdAt:string } | null; movements: { id:string; accountCode:string; amount:number; currencyCode:string; reversesMovementId:string|null }[]; revisions: { id:string; reason:string; actorId:string; createdAt:string; previousSnapshot:unknown; replacementSnapshot:unknown }[] };
+type FinanceTab = 'overview'|'settlements'|'compensation'|'reconciliation';
+const financeTabs: readonly [FinanceTab, string][] = [['overview','Resumen'],['settlements','Liquidaciones'],['compensation','Remuneraciones'],['reconciliation','Conciliación']];
+const openAdministrationArea = (id: 'movement-list'|'enrollment-list') => {
+  const target = document.getElementById(id);
+  if (!target) return;
+  window.history.replaceState(null, '', `#${id}`);
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  target.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true });
+};
 const money = (value: number | null, currency: string) => value === null ? 'No disponible' : new Intl.NumberFormat('es-AR', { style: 'currency', currency }).format(value);
 const select = (name: string, label: string, options: Option[], required = true, value = '') => <label>{label}<select name={name} required={required} defaultValue={value}><option value="">Seleccionar…</option>{options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>;
 
@@ -27,7 +36,13 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
   const [month, setMonth] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [tab, setTab] = useState<'overview'|'settlements'|'compensation'|'reconciliation'>('overview');
+  const [tab, setTab] = useState<FinanceTab>('overview');
+  const tabsRef = useRef<(HTMLButtonElement|null)[]>([]);
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = event.key === 'ArrowRight' ? (index + 1) % financeTabs.length : event.key === 'ArrowLeft' ? (index + financeTabs.length - 1) % financeTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? financeTabs.length - 1 : -1;
+    if (next < 0) return;
+    event.preventDefault(); setTab(financeTabs[next][0]); tabsRef.current[next]?.focus();
+  };
   const [search, setSearch] = useState('');
   const [reviewFilter, setReviewFilter] = useState('ALL');
   const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
@@ -68,29 +83,28 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
   const filteredSettlements = data.settlements.filter(row => `${row.activityName} ${row.personName} ${row.month}`.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) &&
     (reviewFilter === 'ALL' || row.reviewState === reviewFilter));
   return <section className="section-panel finance-circuit" aria-label="Circuito financiero">
-    <header className="section-header finance-circuit__header"><div><p className="eyebrow">Administración financiera</p><h3>{summaryOnly ? 'Saldos financieros' : 'Liquidaciones y conciliación'}</h3><p>Derechos, pagos, remuneraciones y conciliación con historia verificable.</p></div>{!summaryOnly&&<button type="button" className="ghost-btn" onClick={()=>void circuit.refetch()}>Actualizar</button>}</header>
+    <header className="section-header finance-circuit__header"><div><p className="eyebrow">Administración financiera</p><h3>{summaryOnly ? 'Saldos financieros' : 'Liquidaciones y conciliación'}</h3><p>Derechos, pagos, remuneraciones y conciliación con historia verificable.</p></div>{!summaryOnly&&<button type="button" className="ghost-btn" onClick={()=>void circuit.refetch()}>Actualizar</button>}
+      {!summaryOnly&&<nav className="finance-tabs" role="tablist" aria-label="Secciones de liquidaciones">{financeTabs.map(([key,label],index)=><button key={key} ref={element=>{tabsRef.current[index]=element;}} id={`finance-tab-${key}`} type="button" role="tab" aria-selected={tab===key} aria-controls={`finance-panel-${key}`} tabIndex={tab===key?0:-1} onKeyDown={event=>onTabKeyDown(event,index)} onClick={()=>setTab(key)}>{label}</button>)}</nav>}
+    </header>
+    {!summaryOnly&&financeTabs.filter(([key])=>key!==tab).map(([key])=><div key={key} id={`finance-panel-${key}`} role="tabpanel" aria-labelledby={`finance-tab-${key}`} hidden/>)}
     {!summaryOnly && Boolean(workbench.error) && <p role="alert">No se pudieron cargar las herramientas financieras: {workbench.error instanceof Error ? workbench.error.message : 'Error desconocido.'} <button type="button" onClick={() => void workbench.refetch()}>Reintentar</button></p>}
     {!summaryOnly && !wb && !workbench.error && <p role="status">Cargando herramientas financieras…</p>}
     {canReconcile && Boolean(opening.error) && <p role="alert">No se pudieron cargar los saldos de apertura: {opening.error instanceof Error ? opening.error.message : 'Error desconocido.'} <button type="button" onClick={() => void opening.refetch()}>Reintentar</button></p>}
-    {(summaryOnly || tab==='overview') && <><div className="finance-totals">
-      <p>Liquidez <strong>{money(p.liquidity, p.currencyCode)}</strong></p>
-      <p>Saldo proyectado <strong>{money(p.projectedBalance, p.currencyCode)}</strong></p>
-      <p>Estimación futura <strong>{money(p.futureEstimate, p.currencyCode)}</strong></p>
+    {(summaryOnly || tab==='overview') && <div id={summaryOnly?undefined:'finance-panel-overview'} role={summaryOnly?undefined:'tabpanel'} aria-labelledby={summaryOnly?undefined:'finance-tab-overview'}><div className="finance-totals economy-kpi-strip">
+      {([['Liquidez','💧','Disponible en cuentas',p.liquidity,'Saldo registrado','utility'],['Saldo proyectado','📈','Tras obligaciones pendientes',p.projectedBalance,'Según componentes y supuestos','projected'],['Estimación futura','🔭','Proyección del circuito',p.futureEstimate,'Según componentes y supuestos','positive']] as const).map(([label,icon,subtitle,value,detail,variant])=><article className={`card home-kpi-card home-kpi-card--compact finance-card economy-top-card economy-top-card--${variant} finance-projection-card`} key={label}><div className="home-card-heading finance-card__header economy-top-card__header"><div className="economy-top-card__title-row"><h4><span className="economy-top-card__icon" aria-hidden="true">{icon}</span><span>{label}</span></h4></div><p className="economy-top-card__subtitle">{subtitle}</p></div><div className="economy-top-card__value-row"><p className="economy-top-card__value">{money(value,p.currencyCode)}</p></div><p className="economy-top-card__detail">{value===null?'Sin valoración completa · ver componentes':detail}</p></article>)}
     </div>
-    <div className="finance-totals" aria-label="Saldos operativos separados">
-      {data.balanceTotals.map(total => {const approved=data.settlements.filter(row=>row.currencyCode===total.currencyCode&&row.reviewState==='APPROVED'&&row.balance>0).reduce((sum,row)=>sum+row.balance,0)+(data.compensationObligations??[]).filter(row=>row.currencyCode===total.currencyCode&&row.reviewState==='APPROVED'&&row.balance>0).reduce((sum,row)=>sum+row.balance,0);const pendingReview=data.settlements.filter(row=>row.currencyCode===total.currencyCode&&row.reviewState!=='APPROVED'&&row.balance>0).reduce((sum,row)=>sum+row.balance,0)+(data.compensationObligations??[]).filter(row=>row.currencyCode===total.currencyCode&&row.reviewState!=='APPROVED'&&row.reviewState!=='CANCELLED'&&row.balance>0).reduce((sum,row)=>sum+row.balance,0);return <div className="finance-balance-card" key={total.currencyCode}><span className="finance-balance-card__currency">{total.currencyCode}</span><p>A liquidar aprobado <strong>{money(approved,total.currencyCode)}</strong></p><p>Devengado pendiente de revisión <strong>{money(pendingReview,total.currencyCode)}</strong></p><p>A cobrar <strong>{money(total.activityToCollect,total.currencyCode)}</strong></p></div>;})}
+    <div className="finance-currency-totals" aria-label="Saldos operativos separados">
+      {data.balanceTotals.map(total => <section className="finance-balance-card" key={total.currencyCode} aria-label={`Saldos en ${total.currencyCode}`}><h4 className="finance-balance-card__currency">{total.currencyCode}</h4><div className="finance-balance-card__metrics"><div><span>A liquidar aprobado</span><strong>{money(total.approvedToPay,total.currencyCode)}</strong></div><div><span>Devengado pendiente de revisión</span><strong>{money(total.pendingReviewToPay,total.currencyCode)}</strong></div><div><span>A cobrar</span><strong>{money(total.activityToCollect,total.currencyCode)}</strong></div></div></section>)}
       {!data.balanceTotals.length && <p>Sin saldos a liquidar ni a cobrar.</p>}
     </div>
-    {!p.complete && <p role="status">Total incompleto: revise acuerdos, cuentas y cotizaciones pendientes.</p>}
-    <details><summary>Ver componentes y supuestos</summary>
-      <dl><dt>Cobros pendientes</dt><dd>{money(p.pendingCollections, p.currencyCode)}</dd><dt>Pagos pendientes</dt><dd>{money(p.pendingPayments, p.currencyCode)}</dd><dt>Liquidaciones pendientes</dt><dd>{money(p.pendingSettlements, p.currencyCode)}</dd><dt>Liquidaciones previstas</dt><dd>{money(p.expectedSettlements, p.currencyCode)}</dd><dt>Participación adicional en cuotas</dt><dd>{money(p.additionalClubReceivables, p.currencyCode)}</dd></dl>
-      <p>Calculado: {new Date(p.calculatedAt).toLocaleString('es-AR')}</p>{p.assumptions.map(a => <p key={a}>{a}</p>)}
-    </details></>}
+    {!p.complete && <p className="finance-incomplete" role="status">Proyección incompleta: revise acuerdos, cuentas y cotizaciones pendientes.</p>}
+    <details className="finance-components"><summary>Componentes y supuestos</summary>
+      <div className="finance-components__grid">{([['Cobros pendientes',p.pendingCollections],['Pagos pendientes',p.pendingPayments],['Liquidaciones pendientes',p.pendingSettlements],['Liquidaciones previstas',p.expectedSettlements],['Participación adicional en cuotas',p.additionalClubReceivables]] as const).map(([label,value])=><div key={label}><span>{label}</span><strong>{money(value,p.currencyCode)}</strong></div>)}</div>
+      <p><strong>Calculado:</strong> {new Date(p.calculatedAt).toLocaleString('es-AR')}</p>{p.assumptions.length>0&&<div className={!p.complete?'finance-components__issues':undefined}><strong>{p.complete?'Supuestos del cálculo':'Causas y supuestos a revisar'}</strong><ul>{p.assumptions.map(a => <li key={a}>{a}</li>)}</ul></div>}
+    </details>{!summaryOnly&&tab==='overview'&&<div className="finance-overview-actions"><p>Proyecciones al día de hoy. Las liquidaciones pueden mostrar períodos anteriores.</p><button type="button" onClick={()=>setTab('settlements')}>Revisar liquidaciones</button><button type="button" onClick={()=>setTab('reconciliation')}>Abrir conciliación</button></div>}</div>}
     {summaryOnly ? null : <>
-      <p role="status" aria-live="polite">{message}</p>
-      <nav className="finance-tabs" aria-label="Secciones de liquidaciones">{([['overview','Resumen'],['settlements','Liquidaciones'],['compensation','Remuneraciones'],['reconciliation','Conciliación']] as const).map(([key,label])=><button key={key} type="button" aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
-      {tab==='overview'&&<div className="finance-overview-actions"><p>Proyecciones al día de hoy. Las liquidaciones pueden mostrar períodos anteriores.</p><button type="button" onClick={()=>setTab('settlements')}>Revisar liquidaciones</button><button type="button" onClick={()=>setTab('reconciliation')}>Abrir conciliación</button></div>}
-      {tab==='settlements'&&<>
+      {message&&<p className="finance-feedback" role="status" aria-live="polite">{message}</p>}
+      {tab==='settlements'&&<div id="finance-panel-settlements" role="tabpanel" aria-labelledby="finance-tab-settlements">
       <div className="finance-toolbar"><label>Período hasta <input type="month" value={month || data.month} max={data.today.slice(0, 7)} onChange={e => setMonth(e.target.value)} /></label><label>Buscar<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Actividad o responsable" /></label><label>Revisión<select value={reviewFilter} onChange={e=>setReviewFilter(e.target.value)}><option value="ALL">Todas</option><option value="DRAFT">Borrador</option><option value="REQUIRES_REVIEW">Requiere revisión</option><option value="APPROVED">Aprobada</option></select></label></div>
       <p>Se incluyen deudas anteriores. Aprobar, pagar y cerrar son operaciones independientes.</p>
       {data.diagnostics.length > 0 && <details open><summary>Acuerdos que requieren revisión ({data.diagnostics.length})</summary>{data.diagnostics.map((d, i) => <p key={`${d.activityId}-${i}`}>{d.message}</p>)}</details>}
@@ -98,14 +112,6 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
         {filteredSettlements.map(s => <tr key={s.id}><td><strong>{s.activityName}</strong><small>{s.month}</small></td><td>{s.personName}</td><td className="finance-amount" data-negative={s.balance<0}>{money(s.balance,s.currencyCode)}</td><td><span className="finance-status" data-status={s.reviewState}>{({DRAFT:'Borrador',APPROVED:'Aprobada',REQUIRES_REVIEW:'Requiere revisión'})[s.reviewState]}{s.closedAt?' · Cerrada':''}</span></td><td><button type="button" onClick={()=>setSelectedSettlementId(s.id)}>Ver detalle</button></td></tr>)}
       </tbody></table>{filteredSettlements.length===0&&<p className="finance-empty">No hay liquidaciones para estos filtros.</p>}</div>
       {selectedSettlement&&<SettlementDetail settlement={selectedSettlement} today={data.today} canReview={can(PERMISSIONS.FINANCE_REVIEW)} canCorrect={can(PERMISSIONS.FINANCE_CORRECT)} canViewHistory={can(PERMISSIONS.SECTORS_ANY)} busy={busy} mutate={mutate} onClose={()=>setSelectedSettlementId(null)}/>}
-      </>}
-      {tab==='compensation'&&<>
-        <div className="finance-section-heading"><div><h4>Remuneraciones fijas</h4><p>Las obligaciones aprobadas se procesan con el saldo neto de la persona.</p></div></div>
-        {can(PERMISSIONS.FINANCE_REVIEW) && <form className="finance-form" onSubmit={e=>submit(e,f=>mutate('/api/finance/compensation-obligations/refresh',{through:f.get('through'),reason:f.get('reason')}))}><label>Generar hasta<input name="through" type="date" defaultValue={data.today} max={data.today}/></label><label>Motivo<input name="reason" required/></label><button disabled={busy}>Actualizar borradores</button></form>}
-        <div className="finance-table"><table><thead><tr><th>Persona</th><th>Vencimiento</th><th>Importe</th><th>Saldo</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>{(data.compensationObligations ?? []).map(o=><tr key={o.id}><td>{o.personName}</td><td>{o.dueDate}</td><td>{money(o.amount,o.currencyCode)}</td><td className="finance-amount">{money(o.balance,o.currencyCode)}</td><td><span className="finance-status" data-status={o.reviewState}>{o.reviewState==='REQUIRES_REVIEW'?'Requiere revisión':o.reviewState==='APPROVED'?'Aprobada':o.reviewState==='CANCELLED'?'Cancelada':'Borrador'}</span></td><td><button type="button" onClick={()=>setSelectedCompensationId(o.id)}>Ver detalle</button></td></tr>)}</tbody></table>{!(data.compensationObligations??[]).length&&<p className="finance-empty">No hay remuneraciones generadas para este período.</p>}</div>
-        {selectedCompensation&&<CompensationDetail obligation={selectedCompensation} sectors={wb?.sectors??[]} canReview={can(PERMISSIONS.FINANCE_REVIEW)} canCorrect={can(PERMISSIONS.FINANCE_CORRECT)} canViewHistory={can(PERMISSIONS.SECTORS_ANY)} busy={busy} mutate={mutate} onClose={()=>setSelectedCompensationId(null)}/>}
-      </>}
-      {tab==='settlements'&&<>
       {wb && can(PERMISSIONS.FINANCE_PAY) && can(PERMISSIONS.SECTORS_ANY) && <><button type="button" onClick={()=>setProcessingOpen(true)}>Procesar liquidación o remuneración</button>{processingOpen&&<ProcessingModal data={data} workbench={wb} busy={busy} mutate={mutate} onClose={()=>setProcessingOpen(false)}/>}</>}
       {(data.payoutGroups?.length??0)>0 && <details><summary>Grupos procesados ({data.payoutGroups?.length})</summary><div className="finance-table"><table><thead><tr><th>Fecha</th><th>Persona</th><th>Operación</th><th>Importe</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>{data.payoutGroups?.map(g=><tr key={g.id}><td>{new Date(g.createdAt).toLocaleString('es-AR')}</td><td>{g.personName}</td><td>{g.direction==='PAY'?'Pago':'Cobro'}</td><td>{money(g.amount,g.currencyCode)}</td><td>{g.status}</td><td><button type="button" onClick={()=>setSelectedGroupId(g.id)}>Ver detalle</button></td></tr>)}</tbody></table></div></details>}
       {data.payoutGroups?.find(g=>g.id===selectedGroupId)&&<PayoutGroupDetail group={data.payoutGroups.find(g=>g.id===selectedGroupId)!} canCorrect={can(PERMISSIONS.FINANCE_CORRECT)} busy={busy} mutate={mutate} onClose={()=>setSelectedGroupId(null)}/>}
@@ -114,8 +120,14 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
         {t.mode === 'FIXED' && <p>Los vencimientos se imputan completos al mes correspondiente, sin prorrateo.</p>}
         <label>Motivo<input name="reason" required /></label><button disabled={busy}>Guardar definición</button>
       </form>)}</details>}
-      </>}
-      {tab==='reconciliation' && <><div className="finance-overview-actions"><a href="#movement-list">Abrir Movimientos para altas, correcciones y devoluciones</a><a href="#enrollment-list">Abrir Inscripciones para cuotas y bajas</a></div>{canReconcile&&<ReconciliationQueue clubId={clubId} mutate={mutate} busy={busy}/>}
+      </div>}
+      {tab==='compensation'&&<div id="finance-panel-compensation" role="tabpanel" aria-labelledby="finance-tab-compensation">
+        <div className="finance-section-heading"><div><h4>Remuneraciones fijas</h4><p>Las obligaciones aprobadas se procesan con el saldo neto de la persona.</p></div></div>
+        {can(PERMISSIONS.FINANCE_REVIEW) && <form className="finance-form" onSubmit={e=>submit(e,f=>mutate('/api/finance/compensation-obligations/refresh',{through:f.get('through'),reason:f.get('reason')}))}><label>Generar hasta<input name="through" type="date" defaultValue={data.today} max={data.today}/></label><label>Motivo<input name="reason" required/></label><button disabled={busy}>Actualizar borradores</button></form>}
+        <div className="finance-table"><table><thead><tr><th>Persona</th><th>Vencimiento</th><th>Importe</th><th>Saldo</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>{(data.compensationObligations ?? []).map(o=><tr key={o.id}><td>{o.personName}</td><td>{o.dueDate}</td><td>{money(o.amount,o.currencyCode)}</td><td className="finance-amount">{money(o.balance,o.currencyCode)}</td><td><span className="finance-status" data-status={o.reviewState}>{o.reviewState==='REQUIRES_REVIEW'?'Requiere revisión':o.reviewState==='APPROVED'?'Aprobada':o.reviewState==='CANCELLED'?'Cancelada':'Borrador'}</span></td><td><button type="button" onClick={()=>setSelectedCompensationId(o.id)}>Ver detalle</button></td></tr>)}</tbody></table>{!(data.compensationObligations??[]).length&&<p className="finance-empty">No hay remuneraciones generadas para este período.</p>}</div>
+        {selectedCompensation&&<CompensationDetail obligation={selectedCompensation} sectors={wb?.sectors??[]} canReview={can(PERMISSIONS.FINANCE_REVIEW)} canCorrect={can(PERMISSIONS.FINANCE_CORRECT)} canViewHistory={can(PERMISSIONS.SECTORS_ANY)} busy={busy} mutate={mutate} onClose={()=>setSelectedCompensationId(null)}/>}
+      </div>}
+      {tab==='reconciliation' && <div id="finance-panel-reconciliation" role="tabpanel" aria-labelledby="finance-tab-reconciliation"><div className="finance-overview-actions">{can(PERMISSIONS.FINANCE_READ)&&<button type="button" onClick={()=>openAdministrationArea('movement-list')}>Abrir Movimientos para altas, correcciones y devoluciones</button>}{can(PERMISSIONS.ENROLLMENTS_VIEW)&&<button type="button" onClick={()=>openAdministrationArea('enrollment-list')}>Abrir Inscripciones para cuotas y bajas</button>}</div>{canReconcile&&<ReconciliationQueue clubId={clubId} mutate={mutate} busy={busy}/>}
       {wb && <>
         {can(PERMISSIONS.FINANCE_PAY) && can(PERMISSIONS.SECTORS_ANY) && <details><summary>Pagar saldos iniciales de empleados y proveedores</summary><form className="finance-form" onSubmit={e => submit(e,f => mutate(`/api/finance/initial-obligations/${formText(f,'obligationId')}/pay`,{ accountId:f.get('accountId'),categoryId:f.get('categoryId'),amount:Number(f.get('amount')),date:f.get('date'),reason:f.get('reason') }))}>
           {select('obligationId','Obligación aprobada',wb.initialObligations.filter(o => o.id && o.reviewState==='APPROVED' && ['EMPLOYEE','SUPPLIER'].includes(o.kind) && (o.balance??0)>0).map(o => ({id:o.id!,name:`${data.people.find(p=>p.id===o.personId)?.name ?? o.sourceKey} · ${money(o.balance??0,o.currencyCode)}`})))}
@@ -124,7 +136,7 @@ function FinancialCircuitContent({ summaryOnly = false }: { summaryOnly?: boolea
         {canReconcile && <OpeningBalancesCard data={opening.data} busy={busy} mutate={mutate}/>}
         {canReconcile && <StartupForm data={data} workbench={wb} busy={busy} mutate={mutate} />}
       </>}
-    </>}
+    </div>}
     </>}
   </section>;
 }

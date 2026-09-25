@@ -1,5 +1,11 @@
 # Current State
 
+## Pulido de Liquidaciones y conciliación — 2026-09-25
+
+El resumen financiero presenta pestañas en la cabecera, tarjetas con la escala de Administración, importes aprobados/pendientes/a cobrar por moneda en tres columnas y componentes con fecha y supuestos. Los dos primeros importes se calculan en el backend y llegan en `balanceTotals`; la interfaz ya no los deriva de filas visibles. Los accesos de Conciliación desplazan y enfocan las áreas reales de Movimientos e Inscripciones.
+
+Los controles de alta y de generación permanecen visibles cuando la lista está vacía, carga o falla. «Cargar Cuota» abre la generación mensual en Inscripciones; la ficha de cada inscripción muestra cuotas paginadas, pagado, cancelado y saldo. La lectura de cuotas respeta el alcance sectorial. Movimientos expone moneda real, persona y aplicaciones de cobro a cuotas; los catálogos de alta/corrección/devolución provienen de una lectura tenant-scoped con permisos de operación separados. No se agregó esquema ni SQL modificador. La verificación visual autenticada y las pruebas PostgreSQL de dos clubes aún requieren un entorno con datos y sesiones de prueba.
+
 ## Liquidaciones y conciliación — 2026-09-25
 
 Administración presenta Resumen, Liquidaciones, Remuneraciones y Conciliación con detalles y acciones revisables. Movimientos reúne altas, correcciones y devoluciones; Inscripciones reúne generación de cuotas y abandono. La conciliación actual comprende movimientos, apertura y arranque/importación, sin cotejo bancario externo. La bandeja de pendientes usa paginación tenant-scoped; el procesamiento muestra una vista previa backend y exige su hash vigente. Las categorías activas admiten ambas direcciones mediante la migración versionada `202609250001_bidirectional_movement_categories.sql`; su aplicación a la base real requiere ejecución manual.

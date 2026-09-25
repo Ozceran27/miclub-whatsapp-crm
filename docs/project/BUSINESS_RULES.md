@@ -76,6 +76,8 @@ Ejemplo:
 
 ## 6. Categorías
 
+Los totales visibles de liquidaciones se entregan por moneda desde el backend: obligaciones positivas aprobadas, positivas pendientes de revisión y saldos negativos a cobrar. La interfaz no suma monedas ni recalcula estos totales a partir de filas. Las cuotas de una inscripción muestran importe, aplicación pagada, cancelación y saldo remanente; su lectura está acotada al club y a los sectores autorizados.
+
 Existe un catálogo canónico de categorías.
 
 La arquitectura observada utiliza:

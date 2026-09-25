@@ -13,7 +13,9 @@ router.get("/movements", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandl
   res.json(await listMovements(req.auth!, { limit, offset, ...filters }));
 }));
 router.get("/receivables", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {
-  const { limit, offset, filters } = parseListQuery(req, ["dueFrom", "dueTo", "status", "personId", "enrollmentId"]);
+  const { limit, offset, filters } = parseListQuery(req, ["dueFrom", "dueTo", "status", "personId", "enrollmentId", "activityId", "currencyCode"]);
+  for(const key of ['personId','enrollmentId','activityId']) if(filters[key]&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filters[key])) return res.status(400).json({code:'INVALID_FILTER',message:`${key} inválido`});
+  if(filters.currencyCode&&!/^[A-Z]{3}$/.test(filters.currencyCode)) return res.status(400).json({code:'INVALID_FILTER',message:'Moneda inválida'});
   res.json(await listReceivables(req.auth!, { limit, offset, ...filters }));
 }));
 router.get("/payments", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {

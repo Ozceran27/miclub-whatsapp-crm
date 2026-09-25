@@ -202,7 +202,7 @@ const listDefinitions = {
     sectorColumn: "m.sector_id",
     from: "miclub.v_movements_enriched m join miclub.movements movement_sequence on movement_sequence.club_id=m.club_id and movement_sequence.id=m.id",
     clubColumn: "m.club_id",
-    select: `m.id, movement_sequence.sequence_number, m.external_id, m.movement_date, m.movement_type, m.category_id, m.category,
+    select: `m.id, movement_sequence.sequence_number, movement_sequence.currency_code, m.external_id, m.movement_date, m.movement_type, m.category_id, m.category,
       m.sector_id, m.sector_code, m.sector_name, movement_sequence.activity_id, m.concept, m.person_id, m.first_name,
       m.last_name, m.dni, m.counterparty_text, m.amount, m.taxes, m.payment_method_id,
       m.payment_method, m.financial_status, m.operational_status, m.source,

@@ -4,7 +4,7 @@ import { MovementFinanceActions } from './MovementFinanceActions';
 
 type Props = { movement: AdministrationMovementDto; onClose: () => void; onChanged: () => void };
 const focusable = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
-const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 });
+const money = (amount:number,currency:string) => new Intl.NumberFormat('es-AR', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
 const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 const showDate = (value?: string | null) => {
   if (!value) return 'Sin registro';
@@ -44,7 +44,7 @@ export function MovementDetailModal({ movement, onClose, onChanged }: Props) {
       <header className="sector-modal__header"><div><p className="eyebrow">Detalle de movimiento</p><h2 id={titleId}>{title}</h2><p id={descriptionId}>Información contable, asociaciones y trazabilidad de solo lectura.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${title}`}>×</button></header>
       <section><h3>Movimiento</h3><dl className="sector-modal__facts">
         <div><dt>Número</dt><dd>#{movement.sequenceNumber}</dd></div><div><dt>Fecha</dt><dd>{showDate(movement.date)}</dd></div><div><dt>Tipo</dt><dd>{showStatus(movement.type)}</dd></div><div><dt>Estado operativo</dt><dd>{showStatus(movement.status)}</dd></div>
-        <div><dt>Monto</dt><dd>{money.format(movement.amount)}</dd></div><div><dt>Impuestos</dt><dd>{movement.taxes == null ? 'No informados' : money.format(movement.taxes)}</dd></div><div><dt>Estado financiero</dt><dd>{showStatus(movement.financialStatus)}</dd></div>
+        <div><dt>Monto</dt><dd>{money(movement.amount,movement.currencyCode)}</dd></div><div><dt>Impuestos</dt><dd>{movement.taxes == null ? 'No informados' : money(movement.taxes,movement.currencyCode)}</dd></div><div><dt>Estado financiero</dt><dd>{showStatus(movement.financialStatus)}</dd></div>
         <div><dt>Categoría</dt><dd>{showText(movement.category)}</dd></div><div><dt>Medio de pago</dt><dd>{showText(movement.paymentMethod)}</dd></div><div><dt>Contraparte</dt><dd>{showText(movement.counterpartyText)}</dd></div>
         <div className="sector-modal__fact--wide"><dt>Concepto</dt><dd>{showText(movement.concept)}</dd></div>
       </dl></section>

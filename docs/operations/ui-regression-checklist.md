@@ -44,6 +44,13 @@ valores ausentes, cifras negativas y estados distintos; temas claro y oscuro;
 escritorio ancho, tablet y móvil. Al incorporar una tabla nueva, usar esta guía
 sin copiar tamaños de columnas que sólo tienen sentido para otro dominio.
 
+## Liquidaciones y conciliación
+
+- En 1366 × 768, las pestañas permanecen en la cabecera, los tres indicadores usan la escala de las tarjetas de Administración y cada moneda presenta aprobado, pendiente de revisión y a cobrar en una fila de tres columnas.
+- En tablet y móvil, los importes siguen completos y los componentes/filas se reorganizan sin sumar monedas ni ocultar el acceso al detalle.
+- En ambos temas, probar proyecciones disponibles e incompletas, varias monedas, tabla vacía y error de carga, con foco visible en pestañas y accesos a Movimientos/Inscripciones.
+- Abrir los accesos desde Conciliación y «Cargar Cuota»; comprobar desplazamiento, foco y disponibilidad de controles con listas vacías. En la ficha de inscripción, recorrer varias páginas de cuotas y verificar saldo, pagado y cancelado.
+
 ## Área de trabajo global
 
 Desde 1232 px CSS de viewport, la raíz usa `zoom: 0.85` y el shell compensa

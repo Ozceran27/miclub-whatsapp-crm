@@ -1,4 +1,4 @@
-import { Router, type Request } from 'express';
+import { Router, type Request, type RequestHandler } from 'express';
 import { PERMISSIONS } from '@miclub/shared';
 import { requirePermission } from '../middleware/authorization.js';
 import asyncHandler from './asyncHandler.js';
@@ -9,6 +9,25 @@ import { withTenantTransaction } from '../db/transaction.js';
 import { approveStartup, previewStartup, reconcileMovement, payInitialObligation } from '../services/financialStartupService.js';
 
 const router = Router();
+const requireMovementCatalogAccess: RequestHandler = (req,res,next) => {
+  if (!req.auth?.permissions.some(permission => permission===PERMISSIONS.MOVEMENTS_CREATE||permission===PERMISSIONS.FINANCE_CORRECT||permission===PERMISSIONS.FINANCE_PAY)) return res.status(403).json({code:'FORBIDDEN',message:'Permiso insuficiente'});
+  next();
+};
+router.get('/finance/movement-catalogs', requireMovementCatalogAccess, asyncHandler(async(req,res)=>{
+  res.set('Cache-Control','private, no-store');
+  res.json(await withTenantTransaction(req.auth!.clubId,async db=>{
+    const club=req.auth!.clubId;
+    const sectors=req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY)?null:req.auth!.sectorIds;
+    const [categories,sectorRows,activities,paymentMethods,accounts]=await Promise.all([
+      db.query(`select mc.id,mc.name,cc.code,cc.classification,cc.display_order "displayOrder",mc.is_active "isActive" from miclub.movement_categories mc join miclub.category_catalog cc on cc.id=mc.catalog_id and cc.is_active where mc.club_id=$1 and mc.is_active order by cc.display_order,mc.name`,[club]),
+      db.query(`select id,name from miclub.sectors where club_id=$1 and ($2::uuid[] is null or id=any($2)) order by name`,[club,sectors]),
+      db.query(`select id,name,sector_id "sectorId" from miclub.activities where club_id=$1 and ($2::uuid[] is null or sector_id=any($2)) order by name`,[club,sectors]),
+      db.query(`select id,name from miclub.payment_methods where club_id=$1 and is_active order by name`,[club]),
+      db.query(`select id,name,currency_code "currencyCode" from miclub.financial_accounts where club_id=$1 and status='ACTIVE' order by name`,[club]),
+    ]);
+    return {categories:categories.rows,sectors:sectorRows.rows,activities:activities.rows,paymentMethods:paymentMethods.rows,accounts:accounts.rows};
+  }));
+}));
 router.get('/finance/accounts', requirePermission(PERMISSIONS.MOVEMENTS_CREATE), asyncHandler(async (req, res) => {
   res.json(await withTenantTransaction(req.auth!.clubId, async db => (await db.query("select id,name,currency_code as \"currencyCode\" from miclub.financial_accounts where club_id=$1 and status='ACTIVE' order by name", [req.auth!.clubId])).rows));
 }));
@@ -87,7 +106,8 @@ router.get('/finance/movements/:id', requirePermission(PERMISSIONS.FINANCE_READ)
       where m.club_id=$1 and m.id=$2 and ($3::uuid[] is null or m.sector_id=any($3))`,
       [req.auth!.clubId, uuid(req.params.id), req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds])).rows[0];
     if (!row) throw financialError('Movimiento no disponible.', 404);
-    return row;
+    const applications=(await db.query(`select a.receivable_id "receivableId",a.amount::float8 amount from miclub.payments p join miclub.payment_allocations a on a.payment_id=p.id and a.club_id=p.club_id where p.club_id=$1 and p.movement_id=$2 and a.amount>0 order by a.created_at,a.id`,[req.auth!.clubId,row.id])).rows;
+    return {...row,applications};
   }));
 }));
 router.get('/finance/reconciliation/movements', requirePermission(PERMISSIONS.FINANCE_READ), requirePermission(PERMISSIONS.FINANCE_RECONCILE), asyncHandler(async (req, res) => {

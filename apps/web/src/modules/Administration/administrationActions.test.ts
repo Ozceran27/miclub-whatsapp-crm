@@ -17,8 +17,8 @@ void test('los accesos rápidos respetan orden, estado, accesibilidad y modales 
     'Cargar Movimiento', 'Cargar Inscripción', 'Cargar Cuota', 'Crear Reserva', 'Cargar Socio',
     'Gestionar Sectores', 'Gestionar Actividades', 'Gestionar Trabajadores', 'Gestionar Categorías', 'Gestionar Membresías',
   ]);
-  assert.equal((catalogSource.match(/availability: 'enabled'/g) ?? []).length, 5);
-  assert.equal((catalogSource.match(/availability: 'coming-soon'/g) ?? []).length, 5);
+  assert.equal((catalogSource.match(/availability: 'enabled'/g) ?? []).length, 6);
+  assert.equal((catalogSource.match(/availability: 'coming-soon'/g) ?? []).length, 4);
   assert.match(actions, /if \(!disabled\) run\?\.\(\)/);
   assert.match(actions, /role="tooltip"/);
   assert.match(actions, /aria-disabled=\{disabled\}/);

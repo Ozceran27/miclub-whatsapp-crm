@@ -184,6 +184,7 @@ En esta rama: API 444/444, web 83/83, shared 9/9 y manifiesto 16/16; `docs:check
 - Suite de `*.test.ts`/`*.test.tsx` de api/src, web/src y shared/src con
   `node --import tsx --test --test-concurrency=1`: **493 PASS, 0 FAIL**.
 - `financialCircuitRegression.test.ts` y `openingBalancesRegression.test.ts`
+  cubren además catálogo de movimientos tenant-scoped, lectura de cuotas por persona/actividad/moneda y rechazo de referencias de otro club. `PaginatedList.test.ts` comprueba que las acciones no desaparecen en carga, error o lista vacía.
   ejecutados secuencialmente en PostgreSQL 18 aislado: **19 PASS, 0 FAIL**.
 - `npm run typecheck`: PASS en los tres workspaces.
 - `npm run build`: PASS; Vite conserva advertencia de tamaño de bundle.

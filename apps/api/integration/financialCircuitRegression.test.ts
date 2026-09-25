@@ -222,6 +222,19 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
       const other=await request('/auth/login',{username:'financeB@test.invalid',password:'FinancialTest123!'});
       assert.equal(other.status,200);assert.ok(other.cookie);
       assert.equal((await request(`/api/finance/movements/${id}`,undefined,other.cookie)).status,404);
+      const catalogs=await request('/api/finance/movement-catalogs',undefined,cookie);
+      assert.equal(catalogs.status,200,JSON.stringify(catalogs.body));
+      assert.ok((catalogs.body.accounts as {id:string}[]).some(item=>item.id===account));
+      assert.ok((catalogs.body.categories as {id:string}[]).some(item=>item.id===category));
+      const foreignCatalogs=await request('/api/finance/movement-catalogs',undefined,other.cookie);
+      assert.equal(foreignCatalogs.status,200);
+      assert.ok(!(foreignCatalogs.body.accounts as {id:string}[]).some(item=>item.id===account));
+      const due=(await db.query<{id:string}>("insert into miclub.receivables(club_id,person_id,activity_id,sector_id,concept,amount,due_date,currency_code) values($1,$2,$3,$4,'Cuota aislada',100,'2026-09-09','ARS') returning id",[club,person,activity,sector])).rows[0].id;
+      const ownDues=await request(`/api/finance/receivables?personId=${person}&activityId=${activity}&currencyCode=ARS`,undefined,cookie);
+      assert.equal(ownDues.status,200);assert.ok((ownDues.body.items as {id:string}[]).some(item=>item.id===due));
+      const foreignDues=await request(`/api/finance/receivables?personId=${person}&activityId=${activity}&currencyCode=ARS`,undefined,other.cookie);
+      assert.equal(foreignDues.status,200);assert.equal((foreignDues.body.items as unknown[]).length,0);
+      assert.equal((await request('/api/finance/receivables?personId=invalid',undefined,cookie)).status,400);
     });
     await t.test('corrección de cierre y anulación de grupo revierten estado y saldo inicial',async()=>{
       const person2=(await db.query<{id:string}>("insert into miclub.people(club_id,first_name,last_name) values($1,'Historial','Prueba') returning id",[club])).rows[0].id;

@@ -49,14 +49,16 @@ export async function financeTransaction<T>(auth: RequestAuthContext, key: strin
 type Term = MonthlyActivityTerm & { activityName: string; personName: string; revision: number };
 export type FinanceScope = Pick<RequestAuthContext, 'clubId' | 'permissions' | 'sectorIds'>;
 type RawSettlement = { id: string; revision: number; review_state: PersistedSettlement['reviewState']; closed_at: Date | null; calculation_hash: string };
-export const calculateBalanceTotals = (settlements: Pick<PersistedSettlement, 'currencyCode'|'balance'>[], compensationObligations: Pick<NonNullable<FinancialCircuit['compensationObligations']>[number], 'currencyCode'|'reviewState'|'balance'>[]): FinancialCircuit['balanceTotals'] => {
+export const calculateBalanceTotals = (settlements: Pick<PersistedSettlement, 'currencyCode'|'balance'|'reviewState'>[], compensationObligations: Pick<NonNullable<FinancialCircuit['compensationObligations']>[number], 'currencyCode'|'reviewState'|'balance'>[]): FinancialCircuit['balanceTotals'] => {
   const currencies = new Set([...settlements.map(item => item.currencyCode), ...compensationObligations.map(item => item.currencyCode)]);
   return [...currencies].sort().map(currencyCode => {
     const activityBalances = settlements.filter(item => item.currencyCode === currencyCode).map(item => item.balance);
     const activityToPay = Math.round(activityBalances.filter(value => value > 0).reduce((sum, value) => sum + value, 0) * 100) / 100;
     const activityToCollect = Math.round(Math.abs(activityBalances.filter(value => value < 0).reduce((sum, value) => sum + value, 0)) * 100) / 100;
     const fixedCompensationToPay = Math.round(compensationObligations.filter(item => item.currencyCode === currencyCode && item.reviewState === 'APPROVED' && item.balance > 0).reduce((sum, item) => sum + item.balance, 0) * 100) / 100;
-    return { currencyCode, activityToPay, activityToCollect, fixedCompensationToPay, totalToPay: Math.round((activityToPay + fixedCompensationToPay) * 100) / 100 };
+    const approvedToPay = [...settlements, ...compensationObligations].filter(item => item.currencyCode === currencyCode && item.reviewState === 'APPROVED' && item.balance > 0).reduce((sum, item) => sum + item.balance, 0);
+    const pendingReviewToPay = [...settlements, ...compensationObligations].filter(item => item.currencyCode === currencyCode && item.reviewState !== 'APPROVED' && item.reviewState !== 'CANCELLED' && item.balance > 0).reduce((sum, item) => sum + item.balance, 0);
+    return { currencyCode, activityToPay, activityToCollect, fixedCompensationToPay, totalToPay: Math.round((activityToPay + fixedCompensationToPay) * 100) / 100, approvedToPay: Math.round(approvedToPay * 100) / 100, pendingReviewToPay: Math.round(pendingReviewToPay * 100) / 100 };
   });
 };
 export async function loadCircuit(db: QueryExecutor, auth: FinanceScope, selectedMonth?: string): Promise<FinancialCircuit> {
