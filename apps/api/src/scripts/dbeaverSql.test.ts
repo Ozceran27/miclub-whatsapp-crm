@@ -5,6 +5,16 @@ import test from "node:test";
 const sql = (name: string) => readFileSync(new URL(`../../../../docs/dbeaver/${name}`, import.meta.url), "utf8");
 const stabilizationSql = (name: string) => sql(`stabilization-2026-08/${name}`);
 
+void test('instalación CRM XLSX manual replica la migración y confirma la transacción', () => {
+  const script = sql('2026-09-28-crm-xlsx-contactos.sql').replace(/\r\n/g, '\n');
+  const migration = readFileSync(new URL('../../db/migrations/202609280001_crm_xlsx_contacts.sql', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  assert.ok(script.includes(migration.trim()), 'el SQL DBeaver debe contener la migración versionada completa');
+  assert.match(script, /status IN \('al_dia','nuevo_inscripto','adeudando','abandonado'\)/);
+  assert.match(script, /SELECT tablename, rowsecurity[\s\S]*COMMIT;/);
+  assert.doesNotMatch(script, /INSERT INTO public\.miclub_schema_migrations/i);
+  assert.doesNotMatch(script, /-- COMMIT;/);
+});
+
 test("categorías bidireccionales no dependen del ledger de precios y validan antes del commit", () => {
   const script = sql("2026-09-25-categorias-bidireccionales.sql");
   const executable = script.replace(/^--.*$/gm, "");
@@ -277,7 +287,7 @@ test("baja tenant manual exige identidad, backup, manifest, orden FK y rollback 
       const contentStart = start + startMarker.length;
       const end = source.indexOf(endMarker, contentStart);
       assert.notEqual(end, -1, `falta ${endMarker}`);
-      blocks.push(source.slice(contentStart, end).trim());
+      blocks.push(source.slice(contentStart, end).replace(/\r\n/g, "\n").trim());
       offset = end + endMarker.length;
     }
     return blocks;

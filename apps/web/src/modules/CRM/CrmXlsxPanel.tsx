@@ -1,0 +1,76 @@
+import { useCallback, useEffect, useState } from 'react';
+import { PERMISSIONS } from '@miclub/shared';
+import { useSession } from '../../session';
+import { crmXlsxApi, type DryRun, type XlsxBatch, type XlsxContact, type XlsxMessage, type XlsxPage, type XlsxStatus, type XlsxTemplate } from '../../services/api/crmXlsxApi';
+
+const empty=<T,>():XlsxPage<T>=>({items:[],total:0,page:1,pageSize:20});
+const names:Record<XlsxStatus,string>={al_dia:'Al día',nuevo_inscripto:'Nuevo Inscripto',adeudando:'Adeudando',abandonado:'Abandonado'};
+const date=(value:string|null)=>value?new Date(`${value}T12:00:00`).toLocaleDateString('es-AR'):'—';
+const explain=(error:unknown)=>error instanceof Error?error.message:'No se pudo completar la operación.';
+
+export function CrmXlsxPanel(){
+  const {permissions}=useSession(),canWrite=permissions.includes(PERMISSIONS.CRM_WRITE);
+  const [file,setFile]=useState<File|null>(null),[dry,setDry]=useState<DryRun|null>(null),[issues,setIssues]=useState<Array<{row:number;field:string;message:string}>>([]);
+  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  const [counts,setCounts]=useState<Partial<Record<XlsxStatus,number>>>({});
+  const [batches,setBatches]=useState<XlsxBatch[]>([]);
+  const [contacts,setContacts]=useState<XlsxPage<XlsxContact>>(empty()),[page,setPage]=useState(1),[status,setStatus]=useState(''),[query,setQuery]=useState(''),[search,setSearch]=useState('');
+  const [selected,setSelected]=useState<string[]>([]);
+  const [templates,setTemplates]=useState<XlsxTemplate[]>([]),[templateId,setTemplateId]=useState(''),[templateName,setTemplateName]=useState(''),[message,setMessage]=useState('Hola {nombre}, ¿podés revisar el estado de tu inscripción en {actividad}?');
+  const [pending,setPending]=useState<XlsxPage<XlsxMessage>>(empty()),[history,setHistory]=useState<XlsxPage<XlsxMessage>>(empty()),[pendingPage,setPendingPage]=useState(1),[historyPage,setHistoryPage]=useState(1);
+  const load=useCallback(async()=>{const [s,c,t,p,h,b]=await Promise.all([crmXlsxApi.summary(),crmXlsxApi.contacts(page,status,search),crmXlsxApi.templates(),crmXlsxApi.messages(pendingPage,true),crmXlsxApi.messages(historyPage,false),crmXlsxApi.batches()]);
+    setCounts(s.counts);setContacts(c);setTemplates(t);setPending(p);setHistory(h);setBatches(b);},[page,status,search,pendingPage,historyPage]);
+  useEffect(()=>{let alive=true;void Promise.all([crmXlsxApi.summary(),crmXlsxApi.contacts(page,status,search),crmXlsxApi.templates(),crmXlsxApi.messages(pendingPage,true),crmXlsxApi.messages(historyPage,false),crmXlsxApi.batches()])
+    .then(([s,c,t,p,h,b])=>{if(alive){setCounts(s.counts);setContacts(c);setTemplates(t);setPending(p);setHistory(h);setBatches(b);setError('');}})
+    .catch(e=>{if(alive)setError(explain(e));}).finally(()=>{if(alive)setLoading(false);});return()=>{alive=false;};},[page,status,search,pendingPage,historyPage]);
+  const refresh=async()=>{try{await load();setError('');}catch(e){setError(explain(e));}};
+  const choose=(next:File|null)=>{setDry(null);setIssues([]);setNotice('');setError('');
+    if(next&&!/\.xlsx$/i.test(next.name)){setFile(null);setError('El archivo debe ser .xlsx sin macros. Descargá la nueva plantilla y guardala como Libro de Excel (*.xlsx).');return;}
+    setFile(next);};
+  const validate=async()=>{if(!file)return;setBusy(true);setError('');setIssues([]);try{const result=await crmXlsxApi.dryRun(file);setDry(result);setNotice(`${result.rowCount} contactos validados. Revisá la vista previa antes de confirmar.`);}catch(e){setError(explain(e));const detail=e as Error&{issues?:Array<{row:number;field:string;message:string}>};setIssues(detail.issues??[]);}finally{setBusy(false);}};
+  const apply=async()=>{if(!file||!dry||!window.confirm(`Reemplazar la lista importada con ${dry.rowCount} contactos validados?`))return;
+    setBusy(true);setError('');try{const result=await crmXlsxApi.apply(file,dry.dryRunId);setNotice(`Lista importada actualizada: ${result.rowCount} contactos.`);setDry(null);setFile(null);setSelected([]);setPage(1);setPendingPage(1);setHistoryPage(1);await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
+  const selectTemplate=(id:string)=>{setTemplateId(id);const item=templates.find(t=>t.id===id);if(item){setTemplateName(item.name);setMessage(item.body);}};
+  const saveTemplate=async()=>{setBusy(true);setError('');try{const item=templateId?await crmXlsxApi.updateTemplate(templateId,templateName,message):await crmXlsxApi.createTemplate(templateName,message);setTemplateId(item.id);setTemplateName(item.name);setNotice('Plantilla guardada.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
+  const deleteTemplate=async()=>{if(!templateId||!window.confirm('¿Archivar esta plantilla?'))return;setBusy(true);try{await crmXlsxApi.deleteTemplate(templateId);setTemplateId('');setTemplateName('');setNotice('Plantilla archivada.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
+  const prepare=async()=>{if(!selected.length)return;setBusy(true);setError('');try{const result=await crmXlsxApi.preview(selected,message);
+    if(!window.confirm(`Preparar ${result.count} mensajes?\nEjemplo: ${result.sample}`))return;
+    await crmXlsxApi.prepare(selected,message,templateName);setSelected([]);setNotice('Mensajes preparados. Abrilos de forma individual en WhatsApp.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
+  const open=async(item:XlsxMessage)=>{const popup=window.open('about:blank','_blank');if(!popup){setError('El navegador bloqueó la ventana de WhatsApp.');return;}
+    try{const result=await crmXlsxApi.open(item.id);popup.opener=null;popup.location.href=result.waLink;await refresh();}catch(e){popup.close();setError(explain(e));}};
+  const changeStatus=async(item:XlsxMessage,next:'sent_manual'|'skipped')=>{try{await crmXlsxApi.status(item.id,next);await refresh();}catch(e){setError(explain(e));}};
+  const visible=contacts.items.filter(c=>c.status==='adeudando');
+  return <main className="module-content crm-module" aria-label="Contactos importados por XLSX">
+    <header className="module-hero module-hero--compact"><div><p className="eyebrow">Área independiente del CRM</p><h2>Contactos importados</h2><p>Estados declarados por planilla. Estos registros no alteran inscripciones, cuotas ni pagos de la aplicación.</p></div></header>
+    {loading&&<p role="status">Cargando contactos importados…</p>}{error&&<p className="error-msg" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
+    <section className="section-panel"><div className="section-header"><div><h3>Plantilla y carga XLSX</h3><p>Descargá la plantilla v1, completala localmente y guardala como Libro de Excel (.xlsx), sin macros. Validá el archivo antes de reemplazar la lista.</p></div><button className="icon-btn" onClick={()=>void crmXlsxApi.download().catch(e=>setError(explain(e)))}>Descargar plantilla XLSX</button></div>
+      {canWrite&&<><label>Seleccionar archivo XLSX <input type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e=>{choose(e.target.files?.[0]??null);e.currentTarget.value='';}}/></label>
+        {file&&<p role="status">Archivo seleccionado: {file.name}</p>}
+        <div className="actions-row"><button className="icon-btn" disabled={!file||busy} onClick={()=>void validate()}>{busy?'Procesando…':'Validar y previsualizar'}</button>{dry&&<button className="icon-btn" disabled={busy} onClick={()=>void apply()}>Confirmar y reemplazar lista</button>}</div></>}
+      {dry&&<div><p><strong>{dry.rowCount}</strong> filas válidas. Primeras diez:</p><div className="members-table-wrap"><table className="members-table"><thead><tr><th>Fila</th><th>Nombre</th><th>DNI</th><th>Estado</th><th>Actividad</th></tr></thead><tbody>{dry.preview.map(c=><tr key={c.sourceRow}><td>{c.sourceRow}</td><td>{c.firstName} {c.lastName}</td><td>{c.document}</td><td>{names[c.status]}</td><td>{c.activity??'—'}</td></tr>)}</tbody></table></div></div>}
+      {issues.length>0&&<div role="alert"><h4>Errores por fila</h4><ul>{issues.map((issue,i)=><li key={i}>Fila {issue.row||'archivo'} · {issue.field}: {issue.message}</li>)}</ul></div>}
+      <details><summary>Historial de cargas ({batches.length})</summary><ul>{batches.map(batch=><li key={batch.id}>{new Date(batch.createdAt).toLocaleString('es-AR')} · {batch.rowCount} contactos · {batch.status==='active'?'Vigente':'Reemplazada'} · {batch.version}</li>)}</ul></details>
+    </section>
+    <section className="section-panel"><div className="section-header"><div><h3>Lista importada vigente</h3><p>Solo el estado “Adeudando” permite preparar un mensaje. No representa un saldo comprobado.</p></div><button className="icon-btn ghost-btn" onClick={()=>void refresh()}>Actualizar</button></div>
+      <div className="crm-summary-grid">{(Object.keys(names) as XlsxStatus[]).map(key=><article key={key} className="card"><h4>{names[key]}</h4><p>{counts[key]??0}</p></article>)}</div>
+      <div className="actions-row"><label>Estado <select value={status} onChange={e=>{setStatus(e.target.value);setPage(1);setSelected([]);}}><option value="">Todos</option>{(Object.keys(names) as XlsxStatus[]).map(key=><option key={key} value={key}>{names[key]}</option>)}</select></label>
+        <form onSubmit={e=>{e.preventDefault();setSearch(query);setPage(1);setSelected([]);}}><label>Buscar <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nombre, DNI o actividad"/></label><button className="icon-btn">Filtrar</button></form></div>
+      {canWrite&&<div className="actions-row"><button className="icon-btn ghost-btn" disabled={!visible.length} onClick={()=>setSelected(visible.map(c=>c.id))}>Seleccionar deudados visibles</button><button className="icon-btn ghost-btn" onClick={()=>setSelected([])}>Limpiar selección</button><span>{selected.length} seleccionados</span></div>}
+      <div className="members-table-wrap"><table className="members-table"><thead><tr><th>Elegir</th><th>Nombre</th><th>DNI</th><th>Teléfono</th><th>Estado</th><th>Actividad</th><th>Inscripción declarada</th><th>Vencimiento declarado</th></tr></thead><tbody>{contacts.items.map(c=><tr key={c.id}><td><input type="checkbox" aria-label={`Seleccionar ${c.firstName} ${c.lastName}`} disabled={!canWrite||c.status!=='adeudando'} checked={selected.includes(c.id)} onChange={()=>setSelected(ids=>ids.includes(c.id)?ids.filter(id=>id!==c.id):[...ids,c.id])}/></td><td>{c.firstName} {c.lastName}</td><td>{c.document}</td><td>{c.phone}</td><td>{names[c.status]}</td><td>{c.activity??'—'}</td><td>{date(c.enrollmentDate)}</td><td>{date(c.dueDate)}</td></tr>)}</tbody></table></div>
+      {!contacts.items.length&&<p>No hay contactos para estos filtros.</p>}
+      <div className="history-pagination"><button className="icon-btn ghost-btn" disabled={page<=1} onClick={()=>{setPage(page-1);setSelected([]);}}>Anterior</button><span>Página {page} de {Math.max(1,Math.ceil(contacts.total/20))}</span><button className="icon-btn ghost-btn" disabled={page*20>=contacts.total} onClick={()=>{setPage(page+1);setSelected([]);}}>Siguiente</button></div>
+    </section>
+    {canWrite&&<section className="section-panel"><div className="section-header"><div><h3>Plantillas y preparación</h3><p>Mensajes independientes; variables: {'{nombre}'}, {'{apellido}'}, {'{actividad}'}, {'{estado}'}, {'{fecha_inscripcion}'}, {'{fecha_vencimiento}'}.</p></div></div>
+      <label>Plantilla <select value={templateId} onChange={e=>selectTemplate(e.target.value)}><option value="">Nueva plantilla</option>{templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+      <label>Nombre <input value={templateName} onChange={e=>setTemplateName(e.target.value)} maxLength={120}/></label><label>Mensaje <textarea value={message} onChange={e=>setMessage(e.target.value)} maxLength={4000} rows={5}/></label>
+      <div className="actions-row"><button className="icon-btn ghost-btn" disabled={busy||!templateName.trim()||!message.trim()} onClick={()=>void saveTemplate()}>{templateId?'Guardar cambios':'Guardar plantilla'}</button>{templateId&&<button className="icon-btn ghost-btn" disabled={busy} onClick={()=>void deleteTemplate()}>Archivar plantilla</button>}<button className="icon-btn" disabled={busy||!selected.length||!message.trim()} onClick={()=>void prepare()}>Preparar {selected.length} mensajes</button></div>
+    </section>}
+    <section className="section-panel"><div className="section-header"><div><h3>Mensajes preparados</h3><p>La apertura se bloquea si la lista vigente cambió los datos del contacto.</p></div></div>
+      <div className="prepared-grid">{pending.items.map(item=><article key={item.id} className="prepared-card"><h4>{item.name}</h4><p>{item.activity??'Sin actividad'} · {item.phone} · {item.status}</p><p>{item.message}</p>{!item.fresh&&<p role="status">Desactualizado: prepará un mensaje nuevo.</p>}{canWrite&&<div className="actions-row"><button className="icon-btn" disabled={!item.fresh} onClick={()=>void open(item)}>Abrir WhatsApp</button><button className="icon-btn" disabled={!item.fresh||item.status!=='opened'} onClick={()=>void changeStatus(item,'sent_manual')}>Marcar enviado</button><button className="icon-btn ghost-btn" onClick={()=>void changeStatus(item,'skipped')}>Omitir</button></div>}</article>)}</div>{!pending.items.length&&<p>No hay mensajes pendientes.</p>}
+      <div className="history-pagination"><button className="icon-btn ghost-btn" disabled={pendingPage<=1} onClick={()=>setPendingPage(pendingPage-1)}>Anterior</button><span>Página {pendingPage} de {Math.max(1,Math.ceil(pending.total/20))}</span><button className="icon-btn ghost-btn" disabled={pendingPage*20>=pending.total} onClick={()=>setPendingPage(pendingPage+1)}>Siguiente</button></div>
+    </section>
+    <section className="section-panel"><h3>Historial de contactos importados</h3><div className="members-table-wrap"><table className="members-table"><thead><tr><th>Fecha</th><th>Contacto</th><th>Actividad</th><th>Estado del mensaje</th><th>Vigencia</th><th>Plantilla</th></tr></thead><tbody>{history.items.map(item=><tr key={item.id}><td>{new Date(item.createdAt).toLocaleString('es-AR')}</td><td>{item.name}</td><td>{item.activity??'—'}</td><td>{item.status}</td><td>{item.fresh?'Vigente':'Desactualizado'}</td><td>{item.templateName??'—'}</td></tr>)}</tbody></table></div>
+      <div className="history-pagination"><button className="icon-btn ghost-btn" disabled={historyPage<=1} onClick={()=>setHistoryPage(historyPage-1)}>Anterior</button><span>Página {historyPage} de {Math.max(1,Math.ceil(history.total/20))}</span><button className="icon-btn ghost-btn" disabled={historyPage*20>=history.total} onClick={()=>setHistoryPage(historyPage+1)}>Siguiente</button></div>
+    </section>
+  </main>;
+}

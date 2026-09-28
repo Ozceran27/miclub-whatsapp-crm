@@ -29,4 +29,5 @@ export const getAdministrationCapabilities = (permissions: readonly string[]) =>
 };
 export const visibleModules = <T extends { id: ModuleId }>(modules: readonly T[], permissions: readonly string[], capabilities: readonly ClubCapability[] = []) =>
   modules.filter(({ id }) => (id !== 'administration' || hasAdministrationCapability(permissions, 'enter'))
+    && (id !== 'crm' || permissions.includes(PERMISSIONS.CRM_READ))
     && (id !== 'dataMigration' || (permissions.includes(PERMISSIONS.IMPORTS_RUN) && hasClubCapability(capabilities, CLUB_CAPABILITIES.DATA_MIGRATION))));

@@ -1,5 +1,43 @@
 # API Contracts
 
+## CRM — 2026-09-28
+
+### Área XLSX aislada
+
+`/api/crm/xlsx` exige sesión y membresía: `crm:read` para GET, `crm:write`
+para mutaciones y `sectors:any` en ambos casos.
+`GET /template` descarga `CRM_CONTACTOS_v1.xlsx`; `POST /dry-run` recibe `file`
+multipart y devuelve `dryRunId`, conteo, hasta diez filas y errores 422 por fila.
+La v1 acepta `al_dia`, `adeudando`, `nuevo_inscripto` y `abandonado` y exige
+actividad en todas las filas. El nombre local puede cambiar, pero el libro
+debe conservar el marcador de versión y ser un XLSX sin macros.
+`POST /apply` recibe el mismo archivo y `dryRunId`; rechaza 409 si no coincide
+el SHA-256/versión/conteo, fue aplicado o cambió la lista vigente desde el
+dry-run. `GET /summary`, `/contacts`
+(page, status, query), `/batches` (últimos 20 lotes aplicados), `/templates` y
+`/messages` (page, pending) ofrecen lecturas. CRUD de `/templates`,
+`POST /prepare/preview`, `POST /prepare`,
+`POST /messages/:id/open` y `PATCH /messages/:id/status` operan solo dentro del
+club de sesión. Los preparados se revalidan contra la lista activa. La
+respuesta de mensajes incluye `fresh`; `sent_manual` solo se acepta después de
+`opened` y mientras el contacto siga vigente.
+
+`/api/crm` requiere sesión, membresía y `crm:read`; las mutaciones también
+requieren `crm:write`. `GET /debts` acepta `kind=overdue|review|all`, `page`,
+`query`, `sectorId` y `activityId`; responde `{items,page,pageSize,total}` con
+20 inscripciones por página. `GET /debt-summary` devuelve conteos y saldos por
+moneda. `GET /catalog` enumera sectores y actividades visibles. `GET
+/eligibility/:id` revalida una inscripción antes de abrir WhatsApp.
+
+`GET /prepared?page=N` recupera mensajes preparados/abiertos desde PostgreSQL
+en páginas de 50. `GET /history?page=N&pageSize=20` muestra todo el historial
+autorizado. `POST /prepare-messages/validate` y `POST /prepare-messages`
+reciben IDs UUID de inscripción; la segunda ruta rechaza el lote completo si
+algún ID perdió deuda, queda fuera del alcance o carece de teléfono válido.
+La confirmación `sent_manual` indica una acción declarada por el operador, no
+una confirmación de entrega de WhatsApp. Los endpoints CRM envían respuestas
+privadas sin caché para lecturas de deuda y bandeja.
+
 ## Lecturas administrativas — 2026-09-24
 
 `GET /api/administration/workers` requiere `administration.view` y

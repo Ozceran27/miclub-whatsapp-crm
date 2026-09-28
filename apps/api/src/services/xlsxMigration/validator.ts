@@ -4,7 +4,7 @@ import type { ReferenceRow } from "./referenceResolver.js";
 import { inspectZip, readEntry as readZipEntry, type ZipEntry } from "./zipInspector.js";
 
 // Excel producers may use a namespace prefix instead of a default namespace.
-function readEntry(buffer: Buffer, entry: ZipEntry): string {
+export function readWorkbookEntry(buffer: Buffer, entry: ZipEntry): string {
   let xml = readZipEntry(buffer, entry);
   const prefixes = [...xml.matchAll(/xmlns:([A-Za-z_][\w.-]*)="http:\/\/schemas\.openxmlformats\.org\/(?:spreadsheetml\/2006\/main|package\/2006\/relationships)"/g)];
   for (const [, prefix] of prefixes) xml = xml.replace(new RegExp(`(<\\/?)${prefix.replace(/\./g, '\\.')}:`, 'g'), '$1');
@@ -20,12 +20,12 @@ const decodeXml = (value:string) => value.replace(/&#x([\da-f]+);|&#(\d+);|&(amp
 const columnOf = (coordinate:string) => coordinate.match(/^([A-Z]+)\d+$/)?.[1] ?? "";
 const emptyResult = (errors:MigrationIssue[]) => ({ errors, sheets: [] as string[], rowCounts: {} as Record<string,number>, referenceRows: [] as ReferenceRow[], rows:[] as ParsedWorkbookRow[] });
 
-function sharedStringTable(xml:string):string[] {
+export function sharedStringTable(xml:string):string[] {
   return [...xml.matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g)].map((match) =>
     [...match[1].matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((part) => decodeXml(part[1])).join(""));
 }
 
-function cells(body:string, strings:string[]):Map<string,string> {
+export function workbookCells(body:string, strings:string[]):Map<string,string> {
   return new Map([...body.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)].map((cell) => {
     const coordinate=cell[1].match(/\br="([A-Z]+\d+)"/)?.[1]??"";
     const content=cell[2]??"";
@@ -34,7 +34,7 @@ function cells(body:string, strings:string[]):Map<string,string> {
   }));
 }
 
-function sheetEntries(workbook:string, relationships:string, entries:ZipEntry[]):Array<{name:string;entry?:ZipEntry}> {
+export function workbookSheetEntries(workbook:string, relationships:string, entries:ZipEntry[]):Array<{name:string;entry?:ZipEntry}> {
   const targets=new Map([...relationships.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)].map((match)=>{
     const id=match[1].match(/\bId="([^"]+)"/)?.[1]??"";
     const target=match[1].match(/\bTarget="([^"]+)"/)?.[1]??"";
@@ -48,7 +48,7 @@ function sheetEntries(workbook:string, relationships:string, entries:ZipEntry[])
   });
 }
 
-function parseDate(raw:string):string|null {
+export function parseWorkbookDate(raw:string):string|null {
   if (/^\d+(?:\.\d+)?$/.test(raw)) {
     const serial=Number(raw); if (!(serial>0)) return null;
     return new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000).toISOString().slice(0,10);
@@ -57,6 +57,11 @@ function parseDate(raw:string):string|null {
   const date=new Date(`${raw}T00:00:00.000Z`);
   return Number.isNaN(date.valueOf()) || date.toISOString().slice(0,10)!==raw ? null : raw;
 }
+
+const readEntry=readWorkbookEntry;
+const cells=workbookCells;
+const sheetEntries=workbookSheetEntries;
+const parseDate=parseWorkbookDate;
 
 function parseDecimal(raw:string):number|null {
   const compact=raw.replace(/\s/g,"");

@@ -40,7 +40,19 @@ La secuencia no crea todos los objetos requeridos desde vacío: existen prerrequ
 
 PostgreSQL es la única fuente operacional. dataSourceService y crmService devuelven postgres. googleapis no es dependencia; sqlite3 permanece aislado en legacy/sqlite, sin fallback CRM runtime.
 
-Rutas raíz /members, /debtors, /summary y otras, así como endpoints CRM, mantienen contratos consumidos por frontend sobre PostgreSQL. Coexisten lecturas /api en español/inglés, dashboardService y postgresDashboard/*; no asumir que todo es código muerto.
+La excepción de importación CRM usa `/api/crm/xlsx` y tablas `crm_xlsx_batches`,
+`crm_xlsx_contacts`, `crm_xlsx_templates` y `crm_xlsx_messages`. Es una lista
+de contactos declarados por archivo, separada del modelo operacional y sin
+claves foráneas a `people`, `enrollments` o `receivables`. El XLSX se descarta
+tras validar y aplicar; las consultas leen exclusivamente PostgreSQL.
+
+Rutas raíz /members, /debtors, /summary y otras conservan contratos de Inicio
+sobre PostgreSQL. CRM usa `/api/crm`: `crmDebtRepository` calcula cuotas vencidas
+por inscripción desde receivables y payment_allocations, dentro de
+withTenantTransaction y con filtro por sectores autorizados. Plantillas e
+historial usan crmRepository; la preparación escribe todos los mensajes en
+una transacción tenant. Coexisten lecturas /api en español/inglés,
+dashboardService y postgresDashboard/*; no asumir que todo es código muerto.
 
 Los JS generados archivados, `LoginScreen.tsx`,
 `EconomyComparisonCards.tsx`, `SetupForms.tsx` y `StepPersistence.tsx` se

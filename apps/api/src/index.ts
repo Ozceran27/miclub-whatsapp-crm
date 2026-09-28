@@ -38,6 +38,7 @@ const isProduction = process.env.NODE_ENV === "production" || __dirname.includes
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
 import express from "express";
+import { createCrmXlsxRoutes } from './routes/crmXlsxRoutes.js';
 import { logger } from "./lib/logger.js";
 import dbRoutes from "./routes/dbRoutes.js";
 import catalogRoutes from "./routes/catalogRoutes.js";
@@ -60,7 +61,7 @@ import moduleRoutes from "./routes/moduleRoutes.js";
 import migrationUploadRoutes from "./routes/migrationUploadRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { createCrmRoutes } from "./routes/crmRoutes.js";
-import { createLegacyCompatRoutes, getMembersSource, isDebtorMember } from "./routes/legacyCompatRoutes.js";
+import { createLegacyCompatRoutes } from "./routes/legacyCompatRoutes.js";
 import { createFrontendRoutes } from "./routes/frontendRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { validateRuntimeConfig } from "./config/env.js";
@@ -139,7 +140,8 @@ app.use("/api", commercialPlanRoutes);
 app.use("/api", dashboardRoutes);
 
 app.use(createLegacyCompatRoutes());
-app.use(createCrmRoutes({ getMembersSource, isDebtorMember }));
+app.use('/api/crm/xlsx', createCrmXlsxRoutes());
+app.use("/api/crm", createCrmRoutes());
 
 if (isProduction) {
   app.use(createFrontendRoutes(webIndexPath));

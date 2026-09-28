@@ -13,11 +13,11 @@ import { validateWorkbook } from "../services/xlsxMigration/validator.js";
 import { projectWrites } from "../services/xlsxMigration/projector.js";
 import { applyWorkbook, dryRunWorkbook } from "../services/xlsxMigration/persistence.js";
 import { loadReferenceCatalog, resolveReferenceRows } from "../services/xlsxMigration/referenceResolver.js";
+import { parseMultipartPart as parsePart } from './multipartPart.js';
 
 const router=Router(); router.use(requireMembership,requireImportOperator,requireClubCapability(CLUB_CAPABILITIES.DATA_MIGRATION));
 const templatePath=path.join(path.dirname(createRequire(import.meta.url).resolve('@miclub/api/package.json')),'data/db',TEMPLATE_FILENAME);
-router.get("/template",asyncHandler(async(_req,res)=>{ res.type(XLSX_POLICY.mime); res.set("Content-Disposition",`attachment; filename="${TEMPLATE_FILENAME}"`); res.set("X-Content-Type-Options","nosniff"); res.sendFile(templatePath); }));
-function parsePart(raw:Buffer,boundary:string,name:string){ const marker=Buffer.from(`--${boundary}`); for(let at=raw.indexOf(marker);at>=0;at=raw.indexOf(marker,at+marker.length)){ const headersEnd=raw.indexOf(Buffer.from("\r\n\r\n"),at); if(headersEnd<0) break; const headers=raw.subarray(at,headersEnd).toString(); if(headers.includes(`name="${name}"`)){ const start=headersEnd+4,end=raw.indexOf(Buffer.from(`\r\n--${boundary}`),start); if(end<0) break; const filename=headers.match(/filename="([^"]*)"/)?.[1]; const mime=headers.match(/Content-Type:\s*([^\r\n]+)/i)?.[1]; return {data:raw.subarray(start,end),filename,mime}; } } return null; }
+router.get("/template",(_req,res)=>{ res.type(XLSX_POLICY.mime); res.set("Content-Disposition",`attachment; filename="${TEMPLATE_FILENAME}"`); res.set("X-Content-Type-Options","nosniff"); res.sendFile(templatePath); });
 router.post("/uploads",asyncHandler(async(req,res)=>{
  const contentType=req.get("content-type")??""; const boundary=contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)?.slice(1).find(Boolean);
  if(!boundary) return res.status(400).json({code:"MULTIPART_REQUIRED",message:"Se requiere multipart/form-data."});
@@ -33,7 +33,7 @@ router.post("/uploads",asyncHandler(async(req,res)=>{
   if(operation==="apply"&&!dry) return res.status(409).json({code:"MATCHING_DRY_RUN_REQUIRED",message:"La aplicación real requiere el identificador de un dry-run equivalente."});
   const batchIdentity=createHash("sha256").update([sha256,XLSX_POLICY.templateVersion,req.auth!.clubId,referenceConfigHash,JSON.stringify(references.resolved.map(({sheet,rowNumber,rowFingerprint})=>({sheet,rowNumber,rowFingerprint})))].join(":"),"utf8").digest("hex");
   const input={actor:{clubId:req.auth!.clubId,userId:req.auth!.userId,membershipId:req.auth!.membershipId,requestId:req.requestId,ip:req.ip,userAgent:req.get("user-agent")},sha256,batchIdentity,templateVersion:XLSX_POLICY.templateVersion,sourceFile:file.filename,idempotencyKey:idempotency,referenceConfigHash,dryRunOfBatchId:dry,rows:validation.rows,resolvedRows:references.resolved,projectedWrites:writes.total,errors:validation.errors,metadata:{sheets:validation.sheets,rowCounts:validation.rowCounts,writes}};
-  let batch; try { batch=operation==="dry_run"?await dryRunWorkbook(input):await applyWorkbook(input); } catch(error){ if(typeof error==='object'&&error&&'code'in error&&['MATCHING_DRY_RUN_REQUIRED','BATCH_ALREADY_EXECUTED','WORKBOOK_HAS_ERRORS','IMPORT_SOURCE_ALREADY_EXISTS'].includes(String(error.code))) return res.status(409).json({code:error.code,message:error instanceof Error?error.message:String(error)}); throw error; }
+  let batch; try { batch=operation==="dry_run"?await dryRunWorkbook(input):await applyWorkbook(input); } catch(error){ if(typeof error==='object'&&error&&'code'in error&&['MATCHING_DRY_RUN_REQUIRED','BATCH_ALREADY_EXECUTED','WORKBOOK_HAS_ERRORS','IMPORT_SOURCE_ALREADY_EXISTS'].includes(String(error.code))) return res.status(409).json({code:error.code,message:error instanceof Error?error.message:'Error de importación.'}); throw error; }
   res.status(validation.errors.length?422:200).json({...batch,fileSha256:sha256,templateVersion:XLSX_POLICY.templateVersion,rowCounts:validation.rowCounts,projectedWrites:writes,errors:validation.errors});
  } finally { await fs.rm(temp,{force:true}).catch(()=>undefined); }
 }));

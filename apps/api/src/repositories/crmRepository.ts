@@ -1,11 +1,12 @@
 import type { ContactedRecentResponse, MessageTemplate, PaginatedHistoryResponse, PreparedMessage } from "@miclub/shared";
-import { getPostgresPool } from "../db/postgres.js";
+import { getPostgresPool, type QueryExecutor } from "../db/postgres.js";
 import { withTenantTransaction, tenantExecutor } from "../db/transaction.js";
 import { auditService } from "../services/auditService.js";
 
 export type MessageStatus = NonNullable<PreparedMessage["status"]>;
 export type TemplateInput = Pick<MessageTemplate, "id" | "name" | "body" | "createdAt" | "updatedAt"> & { isDefault: boolean; legacySqliteId?: string | null };
 export type HistoryInput = Omit<PreparedMessage, "historyId" | "phone" | "message"> & { phone: string; message: string; legacySqliteId?: number | null; personId?: string | null; enrollmentId?: string | null };
+const textValue=(value:unknown):string=>typeof value==="string"?value:value instanceof Date?value.toISOString():"";
 
 const mapTemplate = (row: Record<string, unknown>): MessageTemplate => ({
   id: String(row.id),
@@ -19,16 +20,18 @@ const mapTemplate = (row: Record<string, unknown>): MessageTemplate => ({
 const mapHistory = (row: Record<string, unknown>): PreparedMessage => ({
   historyId: Number(row.legacy_sqlite_id ?? row.id),
   memberId: String(row.member_id),
-  nombre: row.nombre ? String(row.nombre) : undefined,
+  enrollmentId: row.resolved_enrollment_id ? textValue(row.resolved_enrollment_id) : row.enrollment_id ? textValue(row.enrollment_id) : null,
+  nombre: row.nombre ? textValue(row.nombre) : undefined,
   phone: String(row.phone),
   message: String(row.message),
   waLink: String(row.wa_link),
   status: String(row.status) as MessageStatus,
   createdAt: new Date(String(row.created_at)).toISOString(),
-  openedAt: row.opened_at ? new Date(String(row.opened_at)).toISOString() : null,
-  sentAt: row.sent_at ? new Date(String(row.sent_at)).toISOString() : null,
-  note: row.note ? String(row.note) : null,
-  templateName: row.template_name ? String(row.template_name) : null
+  openedAt: row.opened_at ? new Date(textValue(row.opened_at)).toISOString() : null,
+  sentAt: row.sent_at ? new Date(textValue(row.sent_at)).toISOString() : null,
+  note: row.note ? textValue(row.note) : null,
+  templateName: row.template_name ? textValue(row.template_name) : null,
+  actividad: row.activity_name ? textValue(row.activity_name) : undefined
 });
 
 export const ensureCrmSchema = async (): Promise<void> => {
@@ -58,6 +61,17 @@ export const upsertTemplate = async (clubId: string, template: TemplateInput): P
     [clubId, template.id, template.legacySqliteId ?? template.id, template.name, template.body, template.isDefault, template.createdAt, template.updatedAt]
   );
   return mapTemplate(result.rows[0]);
+};
+
+export const updateTemplate = async (clubId: string, id: string, name: string, body: string, now: string): Promise<MessageTemplate | null> => {
+  await ensureCrmSchema();
+  const pool = tenantExecutor(clubId);
+  const result = await pool.query<Record<string, unknown>>(
+    `update miclub.crm_message_templates set name=$3, body=$4, updated_at=$5
+     where club_id=$1 and id=$2 and archived_at is null returning *`,
+    [clubId, id, name, body, now],
+  );
+  return result.rows[0] ? mapTemplate(result.rows[0]) : null;
 };
 
 export const archiveTemplate = async (clubId: string, id: string, userId: string | null): Promise<"missing" | "default" | "deleted"> => {
@@ -98,12 +112,18 @@ export const replaceDefaultTemplates = async (clubId: string, templates: Templat
   return listTemplates(clubId);
 };
 
-export const getHistory = async (clubId: string, page: number, pageSize: number): Promise<PaginatedHistoryResponse> => {
+export const getHistory = async (clubId: string, page: number, pageSize: number, sectorIds: readonly string[] | null = null): Promise<PaginatedHistoryResponse> => {
   await ensureCrmSchema();
   const pool = tenantExecutor(clubId);
   const offset = (page - 1) * pageSize;
-  const count = await pool.query<{ total: string }>(`select count(*) as total from (select id from miclub.crm_message_history where club_id=$1 order by created_at desc limit 200) recent`, [clubId]);
-  const rows = await pool.query<Record<string, unknown>>(`select * from (select * from miclub.crm_message_history where club_id=$1 order by created_at desc limit 200) recent order by created_at desc limit $2 offset $3`, [clubId, pageSize, offset]);
+  const scope = `h.club_id=$1 and ($2::uuid[] is null or exists (
+    select 1 from miclub.enrollments e join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
+    where e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id)) and a.sector_id=any($2)))`;
+  const count = await pool.query<{ total: string }>(`select count(*) as total from miclub.crm_message_history h where ${scope}`, [clubId,sectorIds]);
+  const rows = await pool.query<Record<string, unknown>>(`select h.*,e.id resolved_enrollment_id,a.name activity_name from miclub.crm_message_history h
+    left join miclub.enrollments e on e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id))
+    left join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
+    where ${scope} order by h.created_at desc,h.id desc limit $3 offset $4`, [clubId,sectorIds,pageSize,offset]);
   const total = Number(count.rows[0]?.total ?? 0);
   return { items: rows.rows.map(mapHistory), page, pageSize, total, totalPages: total === 0 ? 0 : Math.ceil(total / pageSize) };
 };
@@ -119,9 +139,9 @@ export const findDuplicatePreparedMessages = async (clubId: string, memberIds: s
   return result.rows.map((row) => ({ memberId: row.member_id, nombre: row.nombre, status: row.status, createdAt: new Date(row.created_at).toISOString() }));
 };
 
-export const insertHistory = async (clubId: string, history: HistoryInput): Promise<PreparedMessage> => {
-  await ensureCrmSchema();
-  const pool = tenantExecutor(clubId);
+export const insertHistory = async (clubId: string, history: HistoryInput, executor?: QueryExecutor): Promise<PreparedMessage> => {
+  if (!executor) await ensureCrmSchema();
+  const pool = executor ?? tenantExecutor(clubId);
   const commonValues = [clubId, history.memberId, history.personId ?? null, history.enrollmentId ?? null, history.nombre ?? null, history.phone, history.message, history.waLink, history.status ?? "prepared", history.createdAt, history.openedAt ?? null, history.sentAt ?? null, history.note ?? null, history.templateName ?? null];
 
   // legacy_sqlite_id has a database sequence default. A normal application
@@ -148,21 +168,41 @@ export const insertHistory = async (clubId: string, history: HistoryInput): Prom
   return mapHistory(result.rows[0]);
 };
 
-export const updateHistoryStatus = async (clubId: string, id: number, status: MessageStatus, note?: string | null): Promise<PreparedMessage | null> => {
+export const updateHistoryStatus = async (clubId: string, id: number, status: MessageStatus, note?: string | null, sectorIds: readonly string[] | null = null): Promise<PreparedMessage | null> => {
   await ensureCrmSchema();
   const pool = tenantExecutor(clubId);
   const now = new Date().toISOString();
   const result = await pool.query<Record<string, unknown>>(
-    `update miclub.crm_message_history set status=$3, opened_at=coalesce($4, opened_at), sent_at=coalesce($5, sent_at), note=coalesce($6, note) where club_id=$1 and (legacy_sqlite_id=$2 or id::text=$2::text) returning *`,
-    [clubId, id, status, status === "opened" ? now : null, status === "sent_manual" ? now : null, note ?? null]
+    `update miclub.crm_message_history h set status=$3, opened_at=coalesce($4, opened_at), sent_at=coalesce($5, sent_at), note=coalesce($6, note)
+      where h.club_id=$1 and h.legacy_sqlite_id=$2 and h.status in ('prepared','opened')
+      and ($7::uuid[] is null or exists (select 1 from miclub.enrollments e join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
+        where e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id)) and a.sector_id=any($7))) returning *`,
+    [clubId, id, status, status === "opened" ? now : null, status === "sent_manual" ? now : null, note ?? null,sectorIds]
   );
   return result.rows[0] ? mapHistory(result.rows[0]) : null;
 };
 
-export const getContactedRecent = async (clubId: string, since: string, until: string, windowDays: number): Promise<ContactedRecentResponse> => {
+export const getPreparedHistory = async (clubId: string, sectorIds: readonly string[] | null, page: number): Promise<PaginatedHistoryResponse> => {
+  await ensureCrmSchema();
+  const db=tenantExecutor(clubId);
+  const where=`h.club_id=$1 and h.status in ('prepared','opened') and ($2::uuid[] is null or exists (
+    select 1 from miclub.enrollments e join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
+    where e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id)) and a.sector_id=any($2)))`;
+  const total=Number((await db.query<{total:string}>(`select count(*) total from miclub.crm_message_history h where ${where}`,[clubId,sectorIds])).rows[0]?.total ?? 0);
+  const pageSize=50;
+  const rows=await db.query<Record<string,unknown>>(`select h.*,e.id resolved_enrollment_id,a.name activity_name from miclub.crm_message_history h
+    left join miclub.enrollments e on e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id))
+    left join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
+    where ${where} order by h.created_at desc,h.id desc limit $3 offset $4`,[clubId,sectorIds,pageSize,(page-1)*pageSize]);
+  return {items:rows.rows.map(mapHistory),total,page,pageSize,totalPages:Math.ceil(total/pageSize)};
+};
+
+export const getContactedRecent = async (clubId: string, since: string, until: string, windowDays: number, sectorIds: readonly string[] | null = null): Promise<ContactedRecentResponse> => {
   await ensureCrmSchema();
   const pool = tenantExecutor(clubId);
-  const result = await pool.query<{ member_id: string; event_at: string }>(`select member_id, coalesce(sent_at, created_at) as event_at from miclub.crm_message_history where club_id=$1 and status='sent_manual' and coalesce(sent_at, created_at) >= $2::timestamptz and coalesce(sent_at, created_at) < $3::timestamptz order by coalesce(sent_at, created_at) desc`, [clubId, since, until]);
+  const result = await pool.query<{ member_id: string; event_at: string }>(`select h.member_id, coalesce(h.sent_at, h.created_at) as event_at from miclub.crm_message_history h where h.club_id=$1 and h.status='sent_manual' and coalesce(h.sent_at, h.created_at) >= $2::timestamptz and coalesce(h.sent_at, h.created_at) < $3::timestamptz
+    and ($4::uuid[] is null or exists(select 1 from miclub.enrollments e join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id where e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id)) and a.sector_id=any($4)))
+    order by coalesce(h.sent_at, h.created_at) desc`, [clubId, since, until, sectorIds]);
   const byMemberId: ContactedRecentResponse["byMemberId"] = {};
   for (const row of result.rows) {
     const existing = byMemberId[row.member_id];
@@ -170,18 +210,4 @@ export const getContactedRecent = async (clubId: string, since: string, until: s
     else existing.count += 1;
   }
   return { windowDays, since, memberIds: Object.keys(byMemberId), byMemberId };
-};
-
-export const resolvePostgresCrmLinks = async (clubId: string, memberId: string, phone: string): Promise<{ personId: string | null; enrollmentId: string | null }> => {
-  const pool = tenantExecutor(clubId);
-  const result = await pool.query<{ person_id: string | null; enrollment_id: string | null }>(
-    `select p.id as person_id, e.id as enrollment_id
-     from miclub.people p
-     left join miclub.enrollments e on e.person_id = p.id and e.club_id = $1 and (e.external_id = $2 or e.id::text = $2)
-     where p.club_id = $1 and (p.id::text = $2 or p.normalized_phone = $3 or p.phone = $4)
-     order by e.updated_at desc nulls last
-     limit 1`,
-    [clubId, memberId, phone.replace(/\D/g, ""), phone]
-  );
-  return { personId: result.rows[0]?.person_id ?? null, enrollmentId: result.rows[0]?.enrollment_id ?? null };
 };

@@ -1,27 +1,22 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const source = (relativePath: string) => fs.readFileSync(path.resolve(import.meta.dirname, relativePath), "utf8");
+const source=(relativePath:string)=>fs.readFileSync(path.resolve(import.meta.dirname,relativePath),'utf8');
 
-test("the legacy root routes retained by the API match current frontend consumers", () => {
-  const frontend = source("../../../web/src/services/api/homeApi.ts") + source("../../../web/src/services/api/crmApi.ts");
-  const consumed = new Set([...frontend.matchAll(/apiJson(?:<[^>]+>)?\((?:`|')([^`']+)/g), ...frontend.matchAll(/get<[^>]+>\((?:`|')([^`']+)/g)].map((match) => match[1].split("?")[0]));
-  const expected = new Set([
-    "/summary", "/members", "/debtors", "/sync-status", "/club-finance-summary", "/sector-operational-summary",
-    "/templates", "/templates/${id}", "/templates/reset-defaults", "/contacted-recent", "/history", "/history/${id}/status",
-    "/prepare-messages/validate", "/prepare-messages",
-  ]);
-  assert.deepEqual(consumed, expected);
-
-  const legacyApiRoutes = source("legacyCompatRoutes.ts");
-  const retainedRootRoutes = new Set([...legacyApiRoutes.matchAll(/router\.get\("([^"]+)"/g)].map(match => match[1]));
-  assert.deepEqual(retainedRootRoutes, new Set(["/health", "/summary", "/members", "/debtors", "/sync-status", "/club-finance-summary", "/sector-operational-summary"]));
-
-  const apiRoutes = legacyApiRoutes + source("crmRoutes.ts");
-  for (const route of expected) {
-    const staticPrefix = route.split("${")[0];
-    assert.ok(apiRoutes.includes(`\"${staticPrefix}`), `missing API contract for ${route}`);
+void test('Inicio conserva rutas raíz y CRM usa /api/crm sin depender de hojas',()=>{
+  const home=source('../../../web/src/services/api/homeApi.ts');
+  const crm=source('../../../web/src/services/api/crmApi.ts');
+  const legacy=source('legacyCompatRoutes.ts');
+  const routes=source('crmRoutes.ts');
+  const index=source('../index.ts');
+  for(const route of ['/summary','/members','/debtors','/club-finance-summary','/sector-operational-summary']){
+    assert.ok(home.includes(route));assert.ok(legacy.includes(`"${route}"`));
   }
+  assert.ok(index.includes('app.use("/api/crm", createCrmRoutes())'));
+  for(const route of ['/debts','/debt-summary','/catalog','/prepared','/templates','/history']){
+    assert.ok(crm.includes(route));assert.ok(routes.includes(`"${route}"`)||routes.includes(`"${route}/`));
+  }
+  assert.doesNotMatch(crm,/sync-status|sourceSheet|\/members|\/debtors/);
 });

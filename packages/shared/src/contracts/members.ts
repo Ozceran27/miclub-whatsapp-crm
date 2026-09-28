@@ -49,6 +49,7 @@ export interface MessageTemplate {
 export interface PreparedMessage {
   historyId?: number;
   memberId: string;
+  enrollmentId?: string | null;
   nombre?: string;
   phone: string;
   actividad?: string;

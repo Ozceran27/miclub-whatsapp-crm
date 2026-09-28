@@ -149,6 +149,15 @@ dinámicas. `areas-comunes` conserva su pestaña independiente.
 
 ## Decisiones pendientes (sin aceptación implícita)
 
+### Contactos CRM declarados por XLSX — 2026-09-28
+
+Se acepta una lista CRM importada aislada del dominio operacional como excepción
+explícita a la identidad canónica `Person`: sirve únicamente para contacto
+manual, no para crear inscripciones ni determinar deuda financiera. Cada carga
+es una foto completa por club; la versión v1 del contrato y el hash del archivo
+deben coincidir entre dry-run y confirmación. Los datos se consultan en
+PostgreSQL. El acceso requiere alcance global `sectors:any` además de CRM.
+
 DEC-016 — Confirmado por dirección 2026-09-09: liquidación por mes del cobro,
 señas incluidas al cobrar, recaudación siempre recibida por el club y déficit
 FIXED como deuda del responsable. Nueva importación v3 con Actividad explícita;

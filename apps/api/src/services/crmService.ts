@@ -9,7 +9,7 @@ export const listCrmTemplates = postgresCrm.listTemplates;
 export const createCrmTemplate = (clubId: string, name: string, body: string, id: string, now: string) =>
   postgresCrm.upsertTemplate(clubId, { id, name, body, isDefault: false, createdAt: now, updatedAt: now, legacySqliteId: null });
 export const updateCrmTemplate = (clubId: string, id: string, name: string, body: string, now: string) =>
-  postgresCrm.upsertTemplate(clubId, { id, name, body, isDefault: false, createdAt: now, updatedAt: now, legacySqliteId: null });
+  postgresCrm.updateTemplate(clubId, id, name, body, now);
 export const deleteCrmTemplate = postgresCrm.archiveTemplate;
 export const replaceCrmDefaultTemplates = (clubId: string, templates: MessageTemplate[], now: string) =>
   postgresCrm.replaceDefaultTemplates(clubId, templates.map((template) => ({ ...template, createdAt: now, updatedAt: now, isDefault: true, legacySqliteId: template.id })));

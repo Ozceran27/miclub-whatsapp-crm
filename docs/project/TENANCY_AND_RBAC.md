@@ -4,6 +4,10 @@
 
 User autenticado → Person/membership activa → Club. Nunca elegir tenant mediante body/query/XLSX, primer club o UUID fijo. user_club_memberships gobierna acceso; club_memberships es relación de persona, no autenticación.
 
+El área `crm_xlsx_*` exige además `sectors:any`, pues los nombres libres de
+actividad del archivo no confieren alcance sectorial. Todas sus tablas llevan
+`club_id`, RLS forzado y consultas parametrizadas con el tenant de la sesión.
+
 User es global; Person, roles y entidades operativas son tenant. DIRECTOR/TRABAJADOR/INSTRUCTOR y permisos se definen en shared contracts/auth.ts. Backend exige permisos; ocultar botones no autoriza.
 
 ## Tres fronteras diferentes
@@ -14,7 +18,13 @@ User es global; Person, roles y entidades operativas son tenant. DIRECTOR/TRABAJ
 
 withTenantTransaction establece app.club_id y app.current_club_id. withTransaction sólo abre/cierra transacción. El middleware no establece ese contexto en conexiones del pool.
 
-**B02:** activitiesRepository, movementsRepository, enrollmentsRepository y crmRepository tienen accesos directos/withTransaction sin contexto requerido. Con tablas protegidas pueden producir vacíos/rechazos; no significa por sí mismo filtración cross-tenant. Cobertura RLS prioritaria detallada en DATA_MODEL; no universal ni certificada.
+**B02:** activitiesRepository, movementsRepository y enrollmentsRepository
+conservan accesos directos/withTransaction sin contexto requerido. Las rutas
+CRM de deuda, plantillas e historial usan ahora withTenantTransaction o
+tenantExecutor y predicados club/sector; la integración PostgreSQL de dos
+clubes sigue pendiente. Con tablas protegidas, los accesos restantes pueden
+producir vacíos/rechazos; no significa por sí mismo filtración cross-tenant.
+Cobertura RLS prioritaria detallada en DATA_MODEL; no universal ni certificada.
 
 rejectClientClubId sólo cubre clubId camelCase; operaciones inspeccionadas usan tenant autenticado. No interpretar ausencia de rechazo de club_id como autoridad permitida.
 

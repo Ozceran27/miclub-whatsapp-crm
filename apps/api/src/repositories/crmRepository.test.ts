@@ -1,75 +1,24 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import type { PgPool } from "../db/postgres.js";
-import { setPostgresPoolForTests } from "../db/postgres.js";
-import { insertHistory, type HistoryInput } from "./crmRepository.js";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type { PgPool } from '../db/postgres.js';
+import { setPostgresPoolForTests } from '../db/postgres.js';
+import { updateTemplate } from './crmRepository.js';
 
-const history: HistoryInput = {
-  memberId: "enrollment-1",
-  nombre: "Lucía Gómez",
-  phone: "5491162341133",
-  message: "Hola Lucía",
-  waLink: "https://wa.me/5491162341133",
-  status: "prepared",
-  createdAt: "2026-07-31T12:00:00.000Z",
-};
-
-const historyRow = (legacySqliteId: number) => ({
-  id: "7a73ec18-232e-45b5-beb7-b5d0e68c6677",
-  legacy_sqlite_id: legacySqliteId,
-  member_id: history.memberId,
-  nombre: history.nombre,
-  phone: history.phone,
-  message: history.message,
-  wa_link: history.waLink,
-  status: history.status,
-  created_at: history.createdAt,
-  opened_at: null,
-  sent_at: null,
-  note: null,
-  template_name: null,
-});
-
-test.afterEach(() => setPostgresPoolForTests(undefined));
-
-test("insertHistory deja que PostgreSQL genere legacy_sqlite_id para mensajes nuevos", async () => {
-  const queries: Array<{ sql: string; params?: unknown[] }> = [];
-  const pool = {
-    query: async (sql: string, params?: unknown[]) => {
-      if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('set_config')) return {rows:[]};
-      queries.push({ sql, params });
-      if (queries.length === 1) return { rows: [{ ready: true }] };
-      return { rows: [historyRow(42)] };
-    },
-  } as PgPool;
-  pool.connect = () => Promise.resolve({query:pool.query,release:()=>undefined});
+void test('editar una plantilla ausente no inserta otra ni cambia el club', async () => {
+  const queries: string[] = [];
+  const query = (sql: string) => {
+    queries.push(sql);
+    if (sql.includes('to_regclass')) return Promise.resolve({ rows: [{ ready: true }] });
+    return Promise.resolve({ rows: [] });
+  };
+  const pool = { query, connect: () => Promise.resolve({ query, release: () => undefined }) } as unknown as PgPool;
   setPostgresPoolForTests(pool);
-
-  const created = await insertHistory("club-1", history);
-
-  assert.equal(created.historyId, 42);
-  assert.doesNotMatch(queries[1].sql, /legacy_sqlite_id/);
-  assert.equal(queries[1].params?.length, 14);
-  assert.equal(queries[1].params?.[1], history.memberId);
-});
-
-test("insertHistory conserva el id legacy y el upsert idempotente durante migraciones", async () => {
-  const queries: Array<{ sql: string; params?: unknown[] }> = [];
-  const pool = {
-    query: async (sql: string, params?: unknown[]) => {
-      if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('set_config')) return {rows:[]};
-      queries.push({ sql, params });
-      if (queries.length === 1) return { rows: [{ ready: true }] };
-      return { rows: [historyRow(99)] };
-    },
-  } as PgPool;
-  pool.connect = () => Promise.resolve({query:pool.query,release:()=>undefined});
-  setPostgresPoolForTests(pool);
-
-  const created = await insertHistory("club-1", { ...history, legacySqliteId: 99 });
-
-  assert.equal(created.historyId, 99);
-  assert.match(queries[1].sql, /legacy_sqlite_id/);
-  assert.match(queries[1].sql, /on conflict \(club_id, legacy_sqlite_id\)/);
-  assert.equal(queries[1].params?.[1], 99);
+  try {
+    const result = await updateTemplate('11111111-1111-4111-8111-111111111111', 'missing', 'Nombre', 'Cuerpo', new Date().toISOString());
+    assert.equal(result, null);
+    assert.ok(queries.some(sql => sql.includes('where club_id=$1 and id=$2 and archived_at is null')));
+    assert.ok(queries.every(sql => !sql.includes('insert into miclub.crm_message_templates')));
+  } finally {
+    setPostgresPoolForTests(undefined);
+  }
 });

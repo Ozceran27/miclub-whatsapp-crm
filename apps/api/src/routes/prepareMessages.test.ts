@@ -2,134 +2,89 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import express from 'express';
-import type { Member } from '@miclub/shared';
-// This is an explicit compatibility fixture. The productive service remains
-// PostgreSQL-only; persistence is injected so this route test stays hermetic.
-const { default: db } = await import('../legacy/sqlite/sqlite.js');
-const { createCrmRoutes } = await import('./crmRoutes.js');
+import type { PgPool } from '../db/postgres.js';
+import { setPostgresPoolForTests } from '../db/postgres.js';
+import { createCrmRoutes } from './crmRoutes.js';
 
-const memberId = '1';
-const templateMessage = 'Hola {nombre}, deuda de {actividad}.';
+const club='11111111-1111-4111-8111-111111111111';
+const first='22222222-2222-4222-8222-222222222222';
+const second='33333333-3333-4333-8333-333333333333';
+const row=(id:string)=>({enrollmentId:id,personId:'44444444-4444-4444-8444-444444444444',firstName:'Ana',lastName:'Pérez',
+  phone:'3764123456',enrollmentDate:'2026-01-01',activityId:'55555555-5555-4555-8555-555555555555',activityName:'Actividad',
+  sectorId:'66666666-6666-4666-8666-666666666666',sectorName:'Sector',status:'adeudando',overdueCount:2,
+  firstDueDate:'2026-01-01',lastDueDate:'2026-02-01',balances:[{currencyCode:'ARS',amount:1500}],generatedCount:2,undatedCount:0,kind:'overdue'});
 
-type PreparedRouteMessage = {
-  historyId: number;
-  memberId: string;
-  status: string;
-  message: string;
+const serve=async(fake:PgPool,run:(url:string,queries:string[])=>Promise<void>)=>{
+  const queries:string[]=[];
+  const original=fake.query;
+  fake.query=(sql,params)=>{queries.push(sql);return original(sql,params);};
+  fake.connect=()=>Promise.resolve({query:fake.query,release:()=>undefined});
+  setPostgresPoolForTests(fake);
+  const app=express();app.use(express.json());app.use((req,_res,next)=>{
+    req.auth={clubId:club,userId:'77777777-7777-4777-8777-777777777777',membershipId:'88888888-8888-4888-8888-888888888888',
+      permissions:['crm:read','crm:write','sectors:any'],sectorIds:[],role:'DIRECTOR',email:'test@example.invalid',legacy:false,personId:'99999999-9999-4999-8999-999999999999'};
+    next();
+  });app.use(createCrmRoutes());
+  const server=await new Promise<Server>(resolve=>{const s=app.listen(0,()=>resolve(s));});
+  const address=server.address();assert.ok(address&&typeof address==='object');
+  try{await run(`http://127.0.0.1:${address.port}`,queries);}finally{await new Promise<void>(resolve=>server.close(()=>resolve()));setPostgresPoolForTests(undefined);}
 };
-
-const debtor: Member = {
-  id: memberId, nombre: 'Lucía', apellido: 'Gómez', telefono: '5491162341133',
-  actividad: 'Fitness', modalidad: 'Mensual', cuota: 1000, estado: 'Adeudando',
-  instructor: 'Test', sourceSheet: 'FITNESS'
-};
-const app = express();
-app.use(express.json());
-app.use(createCrmRoutes({
-  getMembersSource: () => Promise.resolve({ members: [debtor] }),
-  isDebtorMember: () => true,
-  insertHistory: async (_clubId, history) => {
-    const result = await new Promise<{ lastID: number }>((resolve, reject) => {
-      db.run(
-        `INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt, templateName)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [history.memberId, history.nombre, history.phone, history.message, history.waLink, history.status, history.status, history.createdAt, history.templateName],
-        function (err) { if (err) reject(err); else resolve({ lastID: this.lastID }); }
-      );
-    });
-    return { ...history, historyId: result.lastID };
+const post=(url:string,ids:string[])=>fetch(`${url}/prepare-messages`,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({memberIds:ids,message:'Hola {nombre}, saldo {saldo}, vencimientos {vencimientos}.'})});
+const pool=(ids:string[],failInsert=false,invalidPhoneId?:string)=>({query:(sql:string,params?:unknown[])=>{
+  if(sql.includes("from classified where kind='overdue'"))return Promise.resolve({rows:ids.map(id=>({...row(id),phone:id===invalidPhoneId?'':row(id).phone}))});
+  if(sql.includes('insert into miclub.crm_message_history')){
+    if(failInsert && String(params?.[1])===second)return Promise.reject(new Error('insert failed'));
+    return Promise.resolve({rows:[{legacy_sqlite_id:1,member_id:params?.[1],enrollment_id:params?.[3],nombre:'Ana Pérez',phone:'5493764123456',
+      message:'Hola Ana',wa_link:'https://web.whatsapp.com/send',status:'prepared',created_at:new Date().toISOString(),opened_at:null,sent_at:null,note:null,template_name:null}]});
   }
-}));
+  return Promise.resolve({rows:[]});
+}} as unknown as PgPool);
 
-const runDb = (sql: string, params: unknown[] = []) =>
-  new Promise<void>((resolve, reject) => {
-    db.run(sql, params, (err) => (err ? reject(err) : resolve()));
+void test('preparación rechaza la selección completa si una inscripción no tiene deuda vigente',async()=>{
+  await serve(pool([first]),async(url,queries)=>{
+    const response=await post(url,[first,second]);assert.equal(response.status,409);
+    assert.equal(queries.filter(sql=>sql.includes('insert into miclub.crm_message_history')).length,0);
+    assert.ok(queries.includes('ROLLBACK'));
   });
-
-const getDb = <T>(sql: string, params: unknown[] = []) =>
-  new Promise<T | undefined>((resolve, reject) => {
-    db.get(sql, params, (err, row) => (err ? reject(err) : resolve(row as T | undefined)));
-  });
-
-const cleanMemberHistory = () => runDb('DELETE FROM message_history WHERE memberId = ?', [memberId]);
-
-const insertHistoricalMessage = (status: string) =>
-  runDb(
-    `INSERT INTO message_history (memberId, nombre, telefono, mensaje, waLink, estado, status, createdAt, templateName)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memberId, 'Lucía Gómez', '5491162341133', `Mensaje previo ${status}`, 'https://web.whatsapp.com/send?phone=5491162341133', status, status, new Date(Date.now() - 60_000).toISOString(), 'Histórico']
-  );
-
-const prepareMessage = async (baseUrl: string) => {
-  const response = await fetch(`${baseUrl}/prepare-messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ memberIds: [memberId], message: templateMessage, templateName: 'Test' })
-  });
-
-  assert.equal(response.status, 200);
-  return (await response.json()) as PreparedRouteMessage[];
-};
-
-const withServer = async (fn: (baseUrl: string) => Promise<void>) => {
-  const server = await new Promise<Server>((resolve) => {
-    const listeningServer = app.listen(0, () => resolve(listeningServer));
-  });
-
-  const address = server.address();
-  assert.ok(address && typeof address === 'object');
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-
-  try {
-    await fn(baseUrl);
-  } finally {
-    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
-  }
-};
-
-test.beforeEach(async () => {
-  await cleanMemberHistory();
 });
-
-test.after(async () => {
-  await cleanMemberHistory();
+void test('preparación conserva atomicidad ante un fallo en el segundo mensaje',async()=>{
+  await serve(pool([first,second],true),async(url,queries)=>{
+    const response=await post(url,[first,second]);assert.equal(response.status,500);
+    assert.equal(queries.filter(sql=>sql.includes('insert into miclub.crm_message_history')).length,2);
+    assert.ok(queries.includes('ROLLBACK'));
+    assert.ok(!queries.includes('COMMIT'));
+  });
 });
-
-test('POST /prepare-messages prepara un mensaje sin historial previo', async () => {
-  await withServer(async (baseUrl) => {
-    const prepared = await prepareMessage(baseUrl);
-
-    assert.equal(prepared.length, 1);
-    assert.equal(prepared[0].memberId, memberId);
-    assert.equal(prepared[0].status, 'prepared');
+void test('preparación rechaza todo el lote si un teléfono dejó de ser válido',async()=>{
+  await serve(pool([first,second],false,second),async(url,queries)=>{
+    const response=await post(url,[first,second]);assert.equal(response.status,409);
+    assert.equal(queries.filter(sql=>sql.includes('insert into miclub.crm_message_history')).length,0);
+    assert.ok(queries.includes('ROLLBACK'));
+  });
+});
+void test('preparación inserta vínculos a persona e inscripción y usa el saldo real',async()=>{
+  await serve(pool([first]),async(url,queries)=>{
+    const response=await post(url,[first]);assert.equal(response.status,200);
+    assert.equal((await response.json() as unknown[]).length,1);
+    assert.ok(queries.includes('COMMIT'));
   });
 });
 
-for (const status of ['pending', 'opened', 'sent_manual', 'skipped']) {
-  test(`POST /prepare-messages prepara un mensaje aunque exista historial ${status}`, async () => {
-    await insertHistoricalMessage(status);
-
-    await withServer(async (baseUrl) => {
-      const prepared = await prepareMessage(baseUrl);
-      const count = await getDb<{ total: number }>('SELECT COUNT(*) as total FROM message_history WHERE memberId = ?', [memberId]);
-
-      assert.equal(prepared.length, 1);
-      assert.equal(prepared[0].memberId, memberId);
-      assert.equal(prepared[0].status, 'prepared');
-      assert.equal(count?.total, 2);
-    });
-  });
-}
-
-test('POST /prepare-messages permite preparar dos veces seguidas el mismo contacto y conserva ambos registros', async () => {
-  await withServer(async (baseUrl) => {
-    const first = await prepareMessage(baseUrl);
-    const second = await prepareMessage(baseUrl);
-    const count = await getDb<{ total: number }>('SELECT COUNT(*) as total FROM message_history WHERE memberId = ?', [memberId]);
-
-    assert.equal(first.length, 1);
-    assert.equal(second.length, 1);
-    assert.notEqual(first[0].historyId, second[0].historyId);
-    assert.equal(count?.total, 2);
-  });
+void test('CRM exige crm:read antes de exponer deuda y crm:write para preparar',async()=>{
+  const old=process.env.AUTH_ENABLED;process.env.AUTH_ENABLED='true';
+  let permissions:string[]=[];
+  const app=express();app.use(express.json());app.use((req,_res,next)=>{
+    req.auth={clubId:club,userId:'77777777-7777-4777-8777-777777777777',membershipId:'88888888-8888-4888-8888-888888888888',
+      permissions,sectorIds:[],role:'DIRECTOR',email:'test@example.invalid',legacy:false,personId:'99999999-9999-4999-8999-999999999999'};
+    next();
+  });app.use(createCrmRoutes());process.env.AUTH_ENABLED=old;
+  const server=await new Promise<Server>(resolve=>{const s=app.listen(0,()=>resolve(s));});
+  const address=server.address();assert.ok(address&&typeof address==='object');
+  try{
+    const base=`http://127.0.0.1:${address.port}`;
+    assert.equal((await fetch(`${base}/debt-summary`)).status,403);
+    permissions=['crm:read'];
+    assert.equal((await post(base,[first])).status,403);
+  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });

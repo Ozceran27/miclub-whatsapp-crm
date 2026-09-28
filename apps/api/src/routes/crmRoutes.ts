@@ -1,24 +1,25 @@
 import { PERMISSIONS } from "@miclub/shared";
-// legacy-compat: paths raíz del CRM; no renombrar sin migración frontend.
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
-import type { Member, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
-import { buildWaLink, interpolateTemplate, normalizeArPhone } from "../services/messages.js";
-import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, insertCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
+import type { CrmDebt, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
+import { buildWaLink, normalizeArPhone } from "../services/messages.js";
+import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
 import { requireMembership, requirePermission } from "../middleware/authorization.js";
 import { isExplicitTestAuthBypass } from "../middleware/auth.js";
 import { getArgentinaLastNDaysWindow } from "../domain/argentinaTime.js";
+import { withTenantTransaction } from "../db/transaction.js";
+import { getCrmDebtSummary, getCrmDebtsByIds, listCrmDebts } from "../repositories/crmDebtRepository.js";
+import { getPreparedHistory, insertHistory } from "../repositories/crmRepository.js";
 
 const getClubId = (req: Request): string => {
   if (req.auth?.clubId) return req.auth.clubId;
-  if (isExplicitTestAuthBypass()) return "test";
   throw new Error("Tenant context missing after authentication middleware");
 };
 
 const jsonError = (res: Response, status: number, message: string) =>
   res.status(status).json({ error: true, message });
 
-const ALLOWED_TEMPLATE_VARIABLES = new Set(["{nombre}", "{apellido}", "{actividad}", "{cuota}", "{modalidad}", "{instructor}"]);
+const ALLOWED_TEMPLATE_VARIABLES = new Set(["{nombre}", "{apellido}", "{actividad}", "{cuota}", "{saldo}", "{vencimientos}", "{primer_vencimiento}", "{modalidad}", "{instructor}"]);
 const templates = [
   { id: "friendly", name: "Recordatorio amable", body: "Hola {nombre}, te recordamos que registrás una cuota pendiente de {actividad}.", isDefault: true, createdAt: "", updatedAt: "" },
   { id: "direct", name: "Recordatorio directo", body: "Hola {nombre}. Figura pendiente el pago de tu cuota de {actividad}.", isDefault: true, createdAt: "", updatedAt: "" },
@@ -45,16 +46,85 @@ const unresolvedTemplateVariables = (message: string): string[] => {
   );
 };
 
-export const createCrmRoutes = (options: {
-  getMembersSource: (clubId: string) => Promise<{ members: Member[] }>;
-  isDebtorMember: (member: Member) => boolean;
-  /** Test seam for the retired SQLite compatibility suite; production always uses PostgreSQL. */
-  insertHistory?: typeof insertCrmHistory;
-}) => {
+const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const sectorScope = (req: Request): readonly string[] | null => req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds;
+const parsePage = (value: unknown): number | null => {
+  if (value === undefined) return 1;
+  const page=Number(value);
+  return Number.isSafeInteger(page) && page>0 && page<=100000 ? page : null;
+};
+
+const validRequest=(body:Partial<PrepareMessagesRequest>):boolean=>Array.isArray(body.memberIds)
+  && body.memberIds.length>0 && body.memberIds.length<=100 && body.memberIds.every(uuid)
+  && new Set(body.memberIds).size===body.memberIds.length
+  && typeof body.message==="string" && body.message.trim().length>0 && body.message.length<=4000;
+const validPhone=(raw:string):boolean=>/^549\d{10}$/.test(normalizeArPhone(raw));
+const fillDebtTemplate=(template:string,debt:CrmDebt):string=>{
+  const balance=debt.balances.map(item=>`${item.amount.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2})} ${item.currencyCode}`).join(" y ");
+  const values:Record<string,string>={nombre:debt.firstName,apellido:debt.lastName,actividad:debt.activityName,
+    cuota:balance,saldo:balance,vencimientos:String(debt.overdueCount),primer_vencimiento:debt.firstDueDate ?? "",
+    modalidad:debt.modality,instructor:debt.instructor};
+  return template.replace(/\{(\w+)\}/g,(_,key:string)=>values[key.toLowerCase()] ?? "");
+};
+
+export const createCrmRoutes = () => {
   const router = Router();
-  const persistHistory = options.insertHistory ?? insertCrmHistory;
   if (!isExplicitTestAuthBypass()) router.use(requireMembership);
   const requireCrmWrite = isExplicitTestAuthBypass() ? (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next() : requirePermission(PERMISSIONS.CRM_WRITE);
+  const requireCrmRead = isExplicitTestAuthBypass() ? (_req: Parameters<typeof requireMembership>[0], _res: Parameters<typeof requireMembership>[1], next: Parameters<typeof requireMembership>[2]) => next() : requirePermission(PERMISSIONS.CRM_READ);
+  router.use(requireCrmRead);
+  router.use((req,res,next)=>{if(req.method==="GET")res.set("Cache-Control","private, no-store");next();});
+
+  router.get("/debts", async (req,res,next) => {
+    const page=parsePage(req.query.page);
+    const kind=req.query.kind === undefined ? "overdue" : req.query.kind;
+    if (!page || typeof kind!=="string" || !["overdue","review","all"].includes(kind) ||
+      (req.query.sectorId !== undefined && !uuid(req.query.sectorId)) ||
+      (req.query.activityId !== undefined && !uuid(req.query.activityId)) ||
+      (req.query.query !== undefined && (typeof req.query.query !== "string" || req.query.query.length>100))) return jsonError(res,400,"Filtros CRM inválidos.");
+    try {
+      const result=await withTenantTransaction(getClubId(req),db=>listCrmDebts(db,getClubId(req),sectorScope(req),{
+        kind:kind as "overdue"|"review"|"all",page,pageSize:20,
+        query:typeof req.query.query==="string"?req.query.query:undefined,
+        sectorId:typeof req.query.sectorId==="string"?req.query.sectorId:undefined,
+        activityId:typeof req.query.activityId==="string"?req.query.activityId:undefined,
+      }));
+      res.set("Cache-Control","private, no-store").json(result);
+    } catch(error){next(error);}
+  });
+
+  router.get("/debt-summary", async(req,res,next)=>{
+    try {res.set("Cache-Control","private, no-store").json(await withTenantTransaction(getClubId(req),db=>getCrmDebtSummary(db,getClubId(req),sectorScope(req))));}
+    catch(error){next(error);}
+  });
+
+  router.get("/catalog", async(req,res,next)=>{
+    try {const catalog=await withTenantTransaction(getClubId(req),async db=>{
+      const sectors=sectorScope(req);
+      const rows=await db.query<{sectorId:string;sectorName:string;activityId:string;activityName:string}>(`
+        select s.id "sectorId",s.name "sectorName",a.id "activityId",a.name "activityName"
+        from miclub.activities a join miclub.sectors s on s.id=a.sector_id and s.club_id=a.club_id
+        where a.club_id=$1 and ($2::uuid[] is null or s.id=any($2))
+        order by s.name,a.name`,[getClubId(req),sectors]);
+      return rows.rows;
+    });res.set("Cache-Control","private, no-store").json(catalog);}catch(error){next(error);}
+  });
+
+  router.get("/eligibility/:id", async(req,res,next)=>{
+    if(!uuid(req.params.id))return jsonError(res,400,"Inscripción inválida.");
+    try {const rows=await withTenantTransaction(getClubId(req),db=>getCrmDebtsByIds(db,getClubId(req),sectorScope(req),[req.params.id]));
+      const debt=rows[0];
+      res.set("Cache-Control","private, no-store").json({eligible:rows.length===1,
+        phone:debt?normalizeArPhone(debt.phone):null,balances:debt?.balances ?? [],overdueCount:debt?.overdueCount ?? 0});}
+    catch(error){next(error);}
+  });
+
+  router.get("/prepared", async(req,res,next)=>{
+    const page=parsePage(req.query.page);
+    if(!page)return jsonError(res,400,"Página inválida.");
+    try {res.set("Cache-Control","private, no-store").json(await getPreparedHistory(getClubId(req),sectorScope(req),page));}
+    catch(error){next(error);}
+  });
 
   router.get("/templates", async (req, res) => {
     try {
@@ -121,7 +191,7 @@ export const createCrmRoutes = (options: {
     const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(pageSizeRaw, 20) : 20;
 
     try {
-      res.json(await getCrmHistory(getClubId(req), page, pageSize));
+      res.set("Cache-Control","private, no-store").json(await getCrmHistory(getClubId(req), page, pageSize,sectorScope(req)));
     } catch {
       jsonError(res, 500, "No se pudo obtener el historial.");
     }
@@ -134,7 +204,7 @@ export const createCrmRoutes = (options: {
     const until = to.toISOString();
 
     try {
-      res.json(await getCrmContactedRecent(getClubId(req), since, until, windowDays));
+      res.json(await getCrmContactedRecent(getClubId(req), since, until, windowDays,sectorScope(req)));
     } catch {
       jsonError(res, 500, "No se pudo obtener contactos recientes.");
     }
@@ -142,75 +212,63 @@ export const createCrmRoutes = (options: {
 
   router.post("/prepare-messages/validate", requireCrmWrite, async (req, res) => {
     const body = req.body as Partial<PrepareMessagesRequest>;
-    if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) return jsonError(res, 400, "memberIds debe ser un array no vacío.");
-    if (typeof body.message !== "string" || body.message.trim().length === 0) return jsonError(res, 400, "message debe ser un string no vacío.");
-    const { members } = await options.getMembersSource(getClubId(req));
-    const selected = members.filter((m) => body.memberIds?.includes(m.id));
-    const missingPhoneMembers = selected.filter((m) => normalizeArPhone(m.telefono).length === 0).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}` }));
-    const unresolvedVariables = unresolvedTemplateVariables(body.message);
-    const placeholders = selected.slice(0, 3).map((m) => ({ memberId: m.id, nombre: `${m.nombre} ${m.apellido}`, actividad: m.actividad, cuota: m.cuota, phone: m.telefono }));
-    const duplicateRows = selected.length === 0 ? [] : await findCrmDuplicatePreparedMessages(getClubId(req), selected.map((m) => m.id));
-    const seen = new Set<string>();
-    const duplicates = duplicateRows.filter((r) => { if (seen.has(r.memberId)) return false; seen.add(r.memberId); return true; });
-    const sample = selected[0] ? interpolateTemplate(body.message, selected[0]) : body.message;
-    const response: PrepareMessagesValidation = { selectedCount: selected.length, selectedPreview: placeholders, missingPhoneMembers, unresolvedVariables, duplicates, sampleMessage: sample };
-    res.json(response);
+    if (!validRequest(body)) return jsonError(res, 400, "Selección o mensaje inválido.");
+    try {
+      const selected=await withTenantTransaction(getClubId(req),db=>getCrmDebtsByIds(db,getClubId(req),sectorScope(req),body.memberIds!));
+      if(selected.length!==body.memberIds!.length)return jsonError(res,409,"La selección cambió o incluye inscripciones sin deuda autorizada.");
+      const missingPhoneMembers=selected.filter(m=>!validPhone(m.phone)).map(m=>({memberId:m.enrollmentId,nombre:`${m.firstName} ${m.lastName}`}));
+      const duplicateRows=await findCrmDuplicatePreparedMessages(getClubId(req),body.memberIds!);
+      const seen=new Set<string>();
+      const duplicates=duplicateRows.filter(row=>{if(seen.has(row.memberId))return false;seen.add(row.memberId);return true;});
+      const response:PrepareMessagesValidation={selectedCount:selected.length,
+        selectedPreview:selected.slice(0,3).map(m=>({memberId:m.enrollmentId,nombre:`${m.firstName} ${m.lastName}`,actividad:m.activityName,phone:m.phone})),
+        missingPhoneMembers,unresolvedVariables:unresolvedTemplateVariables(body.message!),duplicates,
+        sampleMessage:fillDebtTemplate(body.message!,selected[0])};
+      res.json(response);
+    }catch{return jsonError(res,500,"No se pudo validar la preparación.");}
   });
 
   router.post("/prepare-messages", requireCrmWrite, async (req, res) => {
     const body = req.body as Partial<PrepareMessagesRequest>;
 
-    if (!Array.isArray(body.memberIds) || body.memberIds.length === 0) {
-      return jsonError(res, 400, "memberIds debe ser un array no vacío.");
-    }
-
-    if (typeof body.message !== "string" || body.message.trim().length === 0) {
-      return jsonError(res, 400, "message debe ser un string no vacío.");
-    }
-
-    const { members } = await options.getMembersSource(getClubId(req));
-    const selected = members.filter((m) => body.memberIds?.includes(m.id));
-    const nonDebtors = selected.filter((m) => !options.isDebtorMember(m));
-
-    if (selected.length === 0) {
-      return jsonError(res, 400, "No se encontraron miembros válidos para preparar mensajes.");
-    }
-
-    if (nonDebtors.length > 0) {
-      return jsonError(res, 400, "Solo se pueden preparar mensajes para miembros con estado Adeudando.");
-    }
-
+    if (!validRequest(body)) return jsonError(res, 400, "Selección o mensaje inválido.");
+    if(unresolvedTemplateVariables(body.message!).length)return jsonError(res,400,"El mensaje tiene variables desconocidas.");
     try {
-      const prepared: PreparedMessage[] = [];
-
-      for (const member of selected) {
-        const message = interpolateTemplate(body.message, member);
-        const phone = normalizeArPhone(member.telefono);
-        if (!phone) continue;
-        const waLink = buildWaLink(phone, message);
-        const createdAt = new Date().toISOString();
-
-        const created = await persistHistory(getClubId(req), { memberId: member.id, nombre: `${member.nombre} ${member.apellido}`, actividad: member.actividad, phone, message, waLink, status: "prepared", createdAt, templateName: body.templateName?.trim() || null });
-
-        prepared.push(created);
-      }
-
+      const prepared=await withTenantTransaction(getClubId(req),async db=>{
+        // Payment application and preparation must serialize on the fee rows.
+        await db.query(`select id from miclub.enrollments where club_id=$1 and id=any($2::uuid[]) order by id for update`,[getClubId(req),body.memberIds]);
+        await db.query(`select id from miclub.receivables where club_id=$1 and enrollment_id=any($2::uuid[]) order by id for update`,[getClubId(req),body.memberIds]);
+        const selected=await getCrmDebtsByIds(db,getClubId(req),sectorScope(req),body.memberIds!);
+        if(selected.length!==body.memberIds!.length)throw Object.assign(new Error("La deuda cambió; actualizá la lista."),{status:409});
+        if(selected.some(m=>!validPhone(m.phone)))throw Object.assign(new Error("Hay inscripciones sin teléfono argentino válido."),{status:409});
+        const created:PreparedMessage[]=[];
+        for(const member of selected){
+          const message=fillDebtTemplate(body.message!,member);
+          const phone=normalizeArPhone(member.phone);
+          const row=await insertHistory(getClubId(req),{memberId:member.enrollmentId,personId:member.personId,
+            enrollmentId:member.enrollmentId,nombre:`${member.firstName} ${member.lastName}`,actividad:member.activityName,
+            phone,message,waLink:buildWaLink(phone,message),status:"prepared",createdAt:new Date().toISOString(),
+            templateName:body.templateName?.trim() || null},db);
+          created.push({...row,actividad:member.activityName});
+        }
+        return created;
+      });
       res.json(prepared);
-    } catch {
-      jsonError(res, 500, "No se pudieron preparar los mensajes.");
+    } catch(error) {
+      jsonError(res,(error as {status?:number}).status===409?409:500,error instanceof Error && (error as {status?:number}).status===409?error.message:"No se pudieron preparar los mensajes.");
     }
   });
 
   router.patch("/history/:id/status", requireCrmWrite, async (req, res) => {
     const id = Number(req.params.id);
     const body = req.body as { status?: "prepared" | "opened" | "sent_manual" | "skipped"; note?: string | null };
-    const validStatuses = new Set(["prepared", "opened", "sent_manual", "skipped"]);
+    const validStatuses = new Set(["opened", "sent_manual", "skipped"]);
 
     if (!Number.isInteger(id) || id <= 0) return jsonError(res, 400, "id inválido.");
     if (!body.status || !validStatuses.has(body.status)) return jsonError(res, 400, "status inválido.");
 
     try {
-      const updated = await updateCrmHistoryStatus(getClubId(req), id, body.status, body.note ?? null);
+      const updated = await updateCrmHistoryStatus(getClubId(req), id, body.status, body.note ?? null,sectorScope(req));
       if (!updated) return jsonError(res, 404, "Mensaje no encontrado.");
       res.json(updated);
     } catch {

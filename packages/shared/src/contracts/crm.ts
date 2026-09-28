@@ -1,0 +1,31 @@
+export type CrmMoney = { currencyCode: string; amount: number };
+export type CrmDebt = {
+  enrollmentId: string;
+  personId: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  enrollmentDate: string;
+  lastPaymentAt: string | null;
+  lastContactAt: string | null;
+  activityId: string;
+  activityName: string;
+  modality: string;
+  instructor: string;
+  sectorId: string;
+  sectorName: string;
+  status: string;
+  overdueCount: number;
+  firstDueDate: string | null;
+  lastDueDate: string | null;
+  balances: CrmMoney[];
+  kind: "overdue" | "review";
+};
+export type CrmDebtPage = { items: CrmDebt[]; page: number; pageSize: number; total: number };
+export type CrmDebtSummary = {
+  totalEnrollments: number;
+  overdueEnrollments: number;
+  reviewEnrollments: number;
+  overdueInstallments: number;
+  balances: CrmMoney[];
+};

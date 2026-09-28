@@ -102,16 +102,21 @@ Todas, salvo `/health` ya inventariada, requieren sesión + tenant.
 | GET | `/club-finance-summary` | — | `legacyCompatRoutes.ts` |
 | GET | `/sector-operational-summary` | — | `legacyCompatRoutes.ts` |
 | GET | `/sync-status` | — | `legacyCompatRoutes.ts` |
-| GET | `/templates` | — | `crmRoutes.ts` |
-| POST | `/templates` | `crm:write` | `crmRoutes.ts` |
-| PATCH | `/templates/:id` | `crm:write` | `crmRoutes.ts` |
-| DELETE | `/templates/:id` | `crm:write` | `crmRoutes.ts` |
-| POST | `/templates/reset-defaults` | `crm:write` | `crmRoutes.ts` |
-| GET | `/history` | — | `crmRoutes.ts` |
-| PATCH | `/history/:id/status` | `crm:write` | `crmRoutes.ts` |
-| GET | `/contacted-recent` | — | `crmRoutes.ts` |
-| POST | `/prepare-messages/validate` | `crm:write` | `crmRoutes.ts` |
-| POST | `/prepare-messages` | `crm:write` | `crmRoutes.ts` |
+| GET | `/api/crm/debts` | `crm:read`, sector | `crmRoutes.ts` |
+| GET | `/api/crm/debt-summary` | `crm:read`, sector | `crmRoutes.ts` |
+| GET | `/api/crm/catalog` | `crm:read`, sector | `crmRoutes.ts` |
+| GET | `/api/crm/eligibility/:id` | `crm:read`, sector | `crmRoutes.ts` |
+| GET | `/api/crm/prepared` | `crm:read`, sector | `crmRoutes.ts` |
+| GET | `/api/crm/templates` | `crm:read` | `crmRoutes.ts` |
+| POST | `/api/crm/templates` | `crm:read` y `crm:write` | `crmRoutes.ts` |
+| PATCH | `/api/crm/templates/:id` | `crm:read` y `crm:write` | `crmRoutes.ts` |
+| DELETE | `/api/crm/templates/:id` | `crm:read` y `crm:write` | `crmRoutes.ts` |
+| POST | `/api/crm/templates/reset-defaults` | `crm:read` y `crm:write` | `crmRoutes.ts` |
+| GET | `/api/crm/history` | `crm:read`, sector | `crmRoutes.ts` |
+| PATCH | `/api/crm/history/:id/status` | `crm:read` y `crm:write`, sector | `crmRoutes.ts` |
+| GET | `/api/crm/contacted-recent` | `crm:read`, sector | `crmRoutes.ts` |
+| POST | `/api/crm/prepare-messages/validate` | `crm:read` y `crm:write`, sector | `crmRoutes.ts` |
+| POST | `/api/crm/prepare-messages` | `crm:read` y `crm:write`, sector | `crmRoutes.ts` |
 
 ## Reconciliación respecto del inventario anterior
 
@@ -126,3 +131,12 @@ rg -n 'app\.use|router\.(get|post|patch|put|delete)|path:' apps/api/src/index.ts
 ```
 
 La salida requiere reconciliación humana de prefijos, loops, factories y feature flags; no debe publicarse como una lista de coincidencias sin resolver.
+# Contactos importados del CRM
+
+`/api/crm/xlsx` usa el club de sesión, `crm:read` para lecturas,
+`crm:write` para cambios y siempre `sectors:any`. Incluye `GET /template`,
+`POST /dry-run`, `POST /apply`, `GET /summary`, `GET /batches`,
+`GET /contacts`, CRUD de `/templates`, `POST /prepare/preview`,
+`POST /prepare`, `GET /messages`, `POST /messages/:id/open` y
+`PATCH /messages/:id/status`. Los datos de esta área son declarados por XLSX
+y permanecen separados de la cobranza operativa.

@@ -1,5 +1,37 @@
 # Current State
 
+## CRM sobre cuotas PostgreSQL — 2026-09-28
+
+El panel incorpora un área separada **Contactos importados** para la plantilla
+`CRM_CONTACTOS_v1.xlsx`. La carga declara cuatro estados y se persiste como una
+foto completa en tablas `crm_xlsx_*`; no se vincula ni altera personas,
+inscripciones, cuotas o pagos operativos. El flujo es descarga, validación con
+vista previa y confirmación del mismo archivo. Solo «Adeudando» admite mensajes
+manuales, sin montos. La instalación requiere aplicar manualmente
+`docs/dbeaver/2026-09-28-crm-xlsx-contactos.sql` en DBeaver. Quedan pendientes
+la prueba integrada con PostgreSQL descartable de dos clubes y el recorrido
+autenticado en navegador; el circuito nuevo no está certificado en un entorno real.
+
+Corrección de la prueba local del 28/09/2026: el libro anterior tenía un tipo
+OOXML interno inválido para Excel. La plantilla se regeneró como `.xlsx` sin
+macros, con marca de versión y estados «Al día», «Adeudando», «Nuevo Inscripto»
+y «Abandonado». `miclub_audit`, con `transaction_read_only=on`, confirmó que
+`miclub_gestion` todavía no tiene ninguna de las cuatro tablas `crm_xlsx_*`;
+el script DBeaver anterior dejaba `COMMIT` comentado. El script corregido
+incluye `COMMIT` después de las validaciones. La instalación real sigue a
+cargo del operador en DBeaver; no se ejecutó SQL modificador sobre esa base.
+
+El CRM cuenta cuotas de inscripción generadas con saldo vencido, descontando
+cancelaciones y pagos aplicados; muestra importes por moneda, fechas y
+cantidad de vencimientos. Expone una revisión separada para inscripciones
+`adeudando` sin cuota o con cuota sin fecha. La bandeja preparada se recupera
+de `crm_message_history`; la preparación es transaccional y enlaza persona e
+inscripción. El frontend usa `/api/crm`, sectores dinámicos y permisos CRM;
+Inicio conserva sus rutas generales PostgreSQL. No se agregó DDL ni SQL
+modificador. La auditoría con `miclub_audit` sólo encontró un club sin
+inscripciones, cuotas ni mensajes: el recorrido visual autenticado y la
+integración PostgreSQL de dos clubes con importes siguen sin certificación.
+
 ## Pulido de Liquidaciones y conciliación — 2026-09-25
 
 El resumen financiero presenta pestañas en la cabecera, tarjetas con la escala de Administración, importes aprobados/pendientes/a cobrar por moneda en tres columnas y componentes con fecha y supuestos. Los dos primeros importes se calculan en el backend y llegan en `balanceTotals`; la interfaz ya no los deriva de filas visibles. Los accesos de Conciliación desplazan y enfocan las áreas reales de Movimientos e Inscripciones.
@@ -473,7 +505,7 @@ No son reglas aceptadas. A = documentación desactualizada; B = bug; C = ambiguo
 | ID | Clase | Hallazgo / evidencia |
 | --- | --- | --- |
 | B01 | B | Instalación vacía no autocontenida: objetos necesarios dependen de schema previo o DDL manual. Ver DATA_MODEL. |
-| B02 | B | Activities, movements, enrollments y CRM acceden a tablas protegidas sin contexto transaccional RLS. Ver TENANCY_AND_RBAC. |
+| B02 | B | Activities, movements y enrollments conservan accesos a tablas protegidas sin contexto transaccional RLS. CRM ya usa contexto tenant, pero falta certificarlo en integración PostgreSQL de dos clubes. Ver TENANCY_AND_RBAC. |
 | B03 | Histórico, mitigado en runtime | La vista SQL antigua usa `monthly_fixed_fee`, pero los tableros y la tabla de trabajadores consultan el circuito moderno. La vista permanece para auditoría y requiere revisión antes de otros consumos. |
 | C01 | Histórico, resuelto en código | `financialCircuitService.loadCircuit` materializa `activity_settlements`; la base real sigue sin certificación por ausencia de acceso de auditoría. |
 | B04 | B | XLSX admite ANULADO pero workbook.ts lo transforma en COMPLETADO. |

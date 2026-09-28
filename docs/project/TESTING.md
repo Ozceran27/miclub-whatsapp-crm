@@ -1,5 +1,17 @@
 # Testing
 
+## CRM XLSX — corrección 2026-09-28
+
+La plantilla regenerada se abrió con `openpyxl` como un XLSX de una sola hoja,
+con validación de estados y sin contenido macro habilitado. La suite API pasó
+482/482 (incluye archivo real editado y revalidado, estados, 503 de esquema,
+dry-run/apply y rollback); la suite web pasó 92/92. Pasaron también
+`db:migrations:check` (16/16), `typecheck`, `build`, lint focalizado,
+`docs:check` y frontera Google Sheets. La auditoría PostgreSQL de solo lectura
+confirmó que faltan las cuatro tablas en `miclub_gestion`. La prueba integrada
+con dos clubes y el recorrido autenticado en navegador aún dependen de la
+instalación manual del esquema y de datos/sesiones de prueba.
+
 ## Escala de escritorio al 85 % — 2026-09-25
 
 `npm run test -w @miclub/web` pasó (88/88), junto con `typecheck` y `build`.

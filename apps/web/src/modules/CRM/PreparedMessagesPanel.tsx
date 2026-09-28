@@ -1,11 +1,22 @@
 import type { PreparedMessage } from '@miclub/shared';
 import type { MessageStatus } from './types';
-import { ACTIONABLE_STATUSES, getStatusClass, getStatusIcon, getStatusLabel } from './types';
-import { Icon } from './Icon';
+import { getStatusClass, getStatusLabel } from './types';
 
-type Props = { prepared: PreparedMessage[]; setPrepared: React.Dispatch<React.SetStateAction<PreparedMessage[]>>; openWhatsApp: (item: PreparedMessage) => Promise<void>; updatePreparedStatus: (historyId: number | undefined, status: MessageStatus) => Promise<void> };
-export const PreparedMessagesPanel = ({ prepared, setPrepared, openWhatsApp, updatePreparedStatus }: Props) => {
-  const preparedCounts = prepared.reduce((acc, item) => { const key = item.status ?? 'prepared'; acc[key] += 1; return acc; }, { prepared: 0, opened: 0, sent_manual: 0, skipped: 0 } as Record<MessageStatus, number>);
-  const actionablePrepared = prepared.filter((item) => ACTIONABLE_STATUSES.includes(item.status ?? 'prepared'));
-  return <section className="section-panel"><div className="section-header"><div><h3>Mensajes preparados</h3><p>Gestioná los mensajes listos para enviar y movelos al historial cuando finalices.</p></div><button className="icon-btn ghost-btn" onClick={() => setPrepared([])}><Icon label="⌫" />Limpiar mensajes preparados de pantalla</button></div><p className="section-note">Esta acción solo limpia la pantalla actual y no borra historial.</p><div className="count-chips"><span className="status-chip status-chip--prepared">Pendientes: {preparedCounts.prepared}</span><span className="status-chip status-chip--opened">Abiertos: {preparedCounts.opened}</span><span className="status-chip status-chip--sent">Enviados: {preparedCounts.sent_manual}</span><span className="status-chip status-chip--skipped">Omitidos: {preparedCounts.skipped}</span></div>{actionablePrepared.length === 0 ? <div className="empty-state"><div className="empty-state-icon">📭</div><p className="empty-state-title">No hay mensajes pendientes</p><p>Prepará mensajes desde la lista de deudores para gestionarlos acá.</p></div> : <div className="prepared-grid">{actionablePrepared.map((p) => <article key={`${p.historyId ?? p.memberId}-${p.createdAt}`} className="prepared-card"><div className="prepared-header"><h4>{p.nombre ?? p.memberId}</h4><span className={`status-chip ${getStatusClass(p.status)}`}><Icon label={getStatusIcon(p.status)} />{getStatusLabel(p.status)}</span></div><p className="prepared-meta"><strong>Teléfono destino:</strong> {p.phone}</p><p className="prepared-meta"><strong>Actividad:</strong> {p.actividad ?? '-'}</p><div className="actions-row prepared-actions"><button className="icon-btn" onClick={() => void openWhatsApp(p)}><Icon label="↗" />Abrir WhatsApp</button><button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'sent_manual')}><Icon label="✓" />Marcar enviado</button><button className="icon-btn" onClick={() => void updatePreparedStatus(p.historyId, 'skipped')}><Icon label="✕" />Omitir</button></div></article>)}</div>}</section>;
-};
+type Props={prepared:PreparedMessage[];page:number;total:number;loadPage:(page:number)=>Promise<void>;canWrite:boolean;
+  openWhatsApp:(item:PreparedMessage)=>Promise<void>;updatePreparedStatus:(id:number|undefined,status:MessageStatus)=>Promise<void>};
+export const PreparedMessagesPanel=({prepared,page,total,loadPage,canWrite,openWhatsApp,updatePreparedStatus}:Props)=><section className="section-panel">
+  <div className="section-header"><div><h3>Mensajes preparados</h3><p>Bandeja persistente del club. Abrí cada mensaje en WhatsApp y confirmá el envío manualmente.</p></div>
+    <button className="icon-btn ghost-btn" onClick={()=>void loadPage(page)}>Actualizar bandeja</button></div>
+  {!prepared.length?<div className="empty-state"><p className="empty-state-title">No hay mensajes pendientes</p><p>Los mensajes preparados y abiertos aparecerán acá, incluso después de recargar.</p></div>
+    :<div className="prepared-grid">{prepared.map(item=><article key={item.historyId} className="prepared-card"><div className="prepared-header"><h4>{item.nombre ?? item.memberId}</h4>
+      <span className={`status-chip ${getStatusClass(item.status)}`}>{getStatusLabel(item.status)}</span></div>
+      <p className="prepared-meta"><strong>Teléfono:</strong> {item.phone}</p><p className="prepared-meta"><strong>Actividad:</strong> {item.actividad ?? 'Sin vínculo histórico'}</p>
+      <p>{item.message}</p>{canWrite&&<div className="actions-row prepared-actions">
+        <button className="icon-btn" onClick={()=>void openWhatsApp(item)}>Abrir WhatsApp</button>
+        <button className="icon-btn" onClick={()=>void updatePreparedStatus(item.historyId,'sent_manual')}>Marcar enviado</button>
+        <button className="icon-btn" onClick={()=>void updatePreparedStatus(item.historyId,'skipped')}>Omitir</button>
+      </div>}</article>)}</div>}
+  <div className="history-pagination"><button className="icon-btn ghost-btn" disabled={page<=1} onClick={()=>void loadPage(page-1)}>Anterior</button>
+    <span>Página {page} de {Math.max(1,Math.ceil(total/50))}</span>
+    <button className="icon-btn ghost-btn" disabled={page*50>=total} onClick={()=>void loadPage(page+1)}>Siguiente</button></div>
+</section>;

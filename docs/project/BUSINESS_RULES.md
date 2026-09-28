@@ -1,5 +1,29 @@
 # Business Rules
 
+## CRM y cobranza manual — 2026-09-28
+
+### Contactos importados por XLSX
+
+`CRM_CONTACTOS_v1.xlsx` contiene DNI, Nombre, Apellido, Teléfono, Estado,
+Actividad y fechas opcionales de inscripción y vencimiento. Actividad es
+obligatoria en los cuatro estados: «Al día», «Adeudando», «Nuevo Inscripto» y
+«Abandonado». Una carga confirmada reemplaza toda la
+lista vigente del club y conserva lotes anteriores. Los estados y fechas son
+declaraciones externas, no deuda financiera comprobada. Solo «Adeudando» es
+contactable; ninguna plantilla de esta área admite variables de saldo o cuota.
+La apertura de WhatsApp y la confirmación `sent_manual` requieren que el
+contacto siga vigente sin cambios relevantes. El envío sigue siendo manual.
+
+El CRM considera vencida una cuota generada de inscripción cuando su fecha de
+vencimiento es anterior al día local del club y su saldo es positivo: importe
+menos cancelaciones y pagos aplicados. Cuenta cada cuota vencida y suma saldos
+por moneda, sin conversión nominal. Sólo se contactan inscripciones activas;
+`abandonado`, `cancelado`, inactivos y reemplazos quedan fuera. Una inscripción
+operativamente `adeudando` sin cuota generada, o con cuota impaga sin fecha,
+aparece para revisión y no habilita recordatorio de importe. Abrir WhatsApp
+revalida que siga habiendo deuda; el envío es manual y su marca en CRM es una
+declaración del operador.
+
 ## Precios y horarios de actividades
 
 Inscripción y cuota son cargos al alumno, no condiciones de reparto con el responsable. Ambos admiten `$0` y sólo enteros; la cuota requiere frecuencia diaria, semanal, mensual o anual. Son obligatorios al crear o reactivar una actividad que admite inscripciones sólo si no existe un precio vigente. Una actividad sin inscripciones no configura precios nuevos. Una nueva vigencia puede comenzar en el pasado dentro de un tramo existente: éste se cierra el día anterior y la nueva versión conserva el final previo. Una fecha de inicio ya ocupada con otros valores se rechaza; valores idénticos dentro del tramo no generan otra versión. Los snapshots de inscripciones previas nunca se reescriben. Al deshabilitar inscripciones se cancelan las vigencias futuras, se reabre la vigente y se conservan los registros cancelados para auditoría y referencias históricas. Un alta legacy sin precios permite inscripción manual con importes editables, por defecto cero. No se crean automáticamente movimientos ni cobros. Los horarios son locales a la zona del club, terminan el mismo día y no pueden solaparse dentro de una actividad.

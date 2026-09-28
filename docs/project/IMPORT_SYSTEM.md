@@ -14,6 +14,16 @@ ni el pipeline de importación.
 
 XLSX → PostgreSQL; sin Google Sheets. MICLUB_XLSX_IMPORT_VERSION es v4 desde 2026-09-11. El identificador XLSX_IMPORT_V1_SCHEMA conserva su nombre por compatibilidad de código.
 
+`CRM_CONTACTOS_v1.xlsx` es un contrato independiente del importador universal
+v4: una hoja `CONTACTOS_CRM`, columnas A:H fijas, sin montos ni referencias a
+entidades operativas. Se valida y se previsualiza antes de una sustitución
+atómica de la lista CRM importada vigente. La base registra los lotes, no
+consulta el archivo tras la carga.
+La plantilla se genera con `scripts/build-crm-contacts-template.py` como XLSX
+sin macros. Su marca `CRM_CONTACTOS_v1` en K14 permite renombrar el archivo
+sin perder la verificación de versión. Actividad es obligatoria para los cuatro
+estados declarados.
+
 Archivo: apps/api/data/db/Modelo_Import_miClub.xlsx. Hojas exactas (orden no contractual), headers fila 1, datos desde fila 2:
 
 - ADMINISTRACIÓN A:AC: Fecha, Tipo, Categoría, Concepto, Contra-parte, Sector, Monto, Impuestos, Estado, M.P., Actividad (AA), Identificador de origen (AB), Cuenta (AC).

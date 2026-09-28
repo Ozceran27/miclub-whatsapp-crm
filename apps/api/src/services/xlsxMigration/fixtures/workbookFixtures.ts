@@ -4,7 +4,7 @@ type FixtureOptions={swappedHeaders?:boolean;missingRequiredCell?:boolean;formul
 const xml=(value:string)=>value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const cell=(coordinate:string,value:string,type="inlineStr")=>`<c r="${coordinate}" t="${type}">${type==="inlineStr"?`<is><t>${xml(value)}</t></is>`:`<v>${value}</v>`}</c>`;
 
-function zip(files:Record<string,string>):Buffer {
+export function zip(files:Record<string,string>):Buffer {
   const locals:Buffer[]=[]; const centrals:Buffer[]=[]; let offset=0;
   for(const [name,text] of Object.entries(files)) {
     const filename=Buffer.from(name),data=Buffer.from(text);
