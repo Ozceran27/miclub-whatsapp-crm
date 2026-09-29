@@ -111,7 +111,6 @@ Todas, salvo `/health` ya inventariada, requieren sesión + tenant.
 | POST | `/api/crm/templates` | `crm:read` y `crm:write` | `crmRoutes.ts` |
 | PATCH | `/api/crm/templates/:id` | `crm:read` y `crm:write` | `crmRoutes.ts` |
 | DELETE | `/api/crm/templates/:id` | `crm:read` y `crm:write` | `crmRoutes.ts` |
-| POST | `/api/crm/templates/reset-defaults` | `crm:read` y `crm:write` | `crmRoutes.ts` |
 | GET | `/api/crm/history` | `crm:read`, sector | `crmRoutes.ts` |
 | PATCH | `/api/crm/history/:id/status` | `crm:read` y `crm:write`, sector | `crmRoutes.ts` |
 | GET | `/api/crm/contacted-recent` | `crm:read`, sector | `crmRoutes.ts` |

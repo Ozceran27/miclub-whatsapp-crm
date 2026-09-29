@@ -3856,3 +3856,64 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 .movement-applications input{min-width:0;width:100%}
 .enrollment-receivables{min-width:0}.enrollment-receivables .finance-table{max-width:100%;overflow-x:auto}
 @media(max-width:680px){.movement-person-picker,.movement-applications label{grid-template-columns:1fr}}
+
+/* CRM: navegación y ritmo de las superficies operativa e importada. */
+.crm-area-tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:18px 0 20px;padding:6px;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface)}
+.crm-area-tab{min-height:42px;padding:10px 18px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--color-text-soft);font-weight:700;transition:background .15s ease,color .15s ease,border-color .15s ease}
+.crm-area-tab:hover{background:var(--color-card-muted);color:var(--color-text)}
+.crm-area-tab[aria-current='page']{background:var(--color-card);border-color:var(--color-accent);color:var(--color-accent);box-shadow:var(--shadow-sm)}
+.crm-area-tab:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.crm-module .section-header{margin-bottom:18px}
+.crm-module .section-header h3{color:var(--color-text-strong)}
+.crm-module .section-header p{color:var(--color-text-soft);line-height:1.5}
+.crm-module .section-panel{min-width:0}
+.crm-module .section-panel>.actions-row{margin:18px 0}
+.crm-module .section-panel .history-pagination{margin-top:18px}
+.crm-module .prepared-grid{gap:14px;margin-top:18px}
+.crm-module .prepared-card{min-width:0;padding:18px;background:var(--color-card);border-color:var(--color-border);box-shadow:var(--shadow-sm)}
+.crm-module .prepared-card>p{overflow-wrap:anywhere;line-height:1.55}
+.crm-module .prepared-card .actions-row{margin-bottom:0}
+.crm-module .crm-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0 24px}
+.crm-module .crm-summary-grid .card{min-width:0;box-shadow:var(--shadow-sm)}
+.crm-module .crm-summary-grid .card h4{color:var(--color-text-soft)}
+.crm-module .crm-summary-grid .card p{color:var(--color-text-strong)}
+.crm-module .dashboard .card,.crm-module .crm-summary-grid .card{text-align:center}
+.crm-module .dashboard .card h4,.crm-module .crm-summary-grid .card h4{justify-content:center}
+.crm-imported-list .actions-row form{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:0}
+.crm-imported-list .actions-row label,.crm-imported-composer label{display:inline-grid;gap:6px}
+.crm-imported-list .members-table-wrap{margin-top:22px}
+.crm-imported-composer>label{margin:0 14px 16px 0;vertical-align:top}
+.crm-imported-composer>label:has(textarea){display:grid;margin-right:0}
+.crm-imported-composer textarea{margin-top:0;min-height:120px;resize:vertical}
+.crm-imported-composer .actions-row{margin-top:4px}
+.crm-module .composer{display:grid;gap:14px;margin-top:24px;padding:20px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface);box-shadow:var(--shadow-sm)}
+.crm-module .composer>*{min-width:0;margin:0}
+.crm-module .composer textarea{margin:0;resize:vertical}
+.crm-module .composer pre{overflow-wrap:anywhere;white-space:pre-wrap;background:var(--color-card-muted);color:var(--color-text);border-color:var(--color-border);padding:16px}
+.crm-module .composer .actions-row{margin:4px 0}
+.crm-composer-grid{display:grid;grid-template-columns:minmax(250px,.9fr) minmax(0,1.4fr);gap:24px}
+.crm-composer-details{display:grid;align-content:start;gap:14px;min-width:0}
+.crm-composer-details label,.crm-composer-editor{display:grid;align-content:start;gap:8px;font-weight:700}
+.crm-composer-details input,.crm-composer-details select{width:100%;min-width:0}
+.crm-composer-details .section-note{line-height:1.5}
+.crm-composer-details .actions-row{align-items:stretch;align-content:start}
+.crm-composer-editor textarea{min-height:260px;height:100%;font-weight:400}
+.crm-composer-preview{display:grid;gap:12px}.crm-composer-preview h3{margin:0}
+.crm-composer-submit{display:flex;justify-content:center}
+.crm-composer-submit .icon-btn{min-height:44px;padding:11px 22px;border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 16%,var(--color-card));color:var(--color-text-strong);font-weight:700}
+.crm-imported-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:20px 0}
+.crm-imported-toolbar label{display:grid;gap:6px}
+.crm-imported-toolbar form{display:flex;align-items:end;gap:10px;margin:0}
+.crm-imported-toolbar>button,.crm-imported-toolbar>span{align-self:end}
+.crm-imported-toolbar>span{padding:9px 2px}
+.crm-module .prepared-card{display:flex;flex-direction:column;gap:10px}
+.crm-module .prepared-card .prepared-header,.crm-module .prepared-card .prepared-meta,.crm-module .prepared-card .prepared-template{margin:0}
+.crm-module .prepared-card .prepared-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.crm-module .prepared-card .prepared-meta>span{color:var(--color-accent)}
+.crm-module .prepared-card .prepared-actions{justify-content:center;margin-top:auto}
+.crm-sort-button{display:inline-flex;align-items:center;gap:7px;padding:3px 0;background:none;border:0;border-radius:3px;color:inherit;font:inherit;text-align:left;white-space:nowrap}
+.crm-sort-button:hover{color:var(--color-accent)}.crm-sort-button:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.crm-sort-button span{color:var(--color-accent);font-size:1rem}
+@media(max-width:800px){.crm-composer-grid{grid-template-columns:1fr}.crm-composer-editor textarea{min-height:220px}}
+@media(max-width:900px){.crm-module .crm-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.crm-area-tabs{display:grid;grid-template-columns:1fr 1fr}.crm-area-tab{padding:10px 8px}.crm-module .crm-summary-grid{gap:10px}.crm-imported-composer>label{display:grid;margin-right:0}.crm-imported-composer>label input,.crm-imported-composer>label select{width:100%}.crm-module .section-panel{padding:16px}.crm-module .prepared-card{padding:16px}}

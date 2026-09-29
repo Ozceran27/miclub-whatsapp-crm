@@ -95,24 +95,13 @@ export const archiveTemplate = async (clubId: string, id: string, userId: string
   });
 };
 
-export const replaceDefaultTemplates = async (clubId: string, templates: TemplateInput[]): Promise<MessageTemplate[]> => {
-  await ensureCrmSchema();
-  const pool = await getPostgresPool();
-  await withTenantTransaction(clubId, async (executor) => {
-    await executor.query("update miclub.crm_message_templates set archived_at=now(), updated_at=now() where club_id=$1 and is_default=true and archived_at is null", [clubId]);
-    for (const template of templates) {
-      await executor.query(
-        `insert into miclub.crm_message_templates (club_id,id,legacy_sqlite_id,name,body,is_default,created_at,updated_at,archived_at,archived_by)
-         values ($1,$2,$3,$4,$5,true,$6,$7,null,null)
-         on conflict (club_id,id) do update set name=excluded.name,body=excluded.body,is_default=true,updated_at=excluded.updated_at,archived_at=null,archived_by=null`,
-        [clubId, template.id, template.legacySqliteId ?? template.id, template.name, template.body, template.createdAt, template.updatedAt],
-      );
-    }
-  }, pool);
-  return listTemplates(clubId);
-};
+export const crmHistorySortFields = {
+  status: 'h.status', date: 'h.created_at', name: 'coalesce(h.nombre,h.member_id)',
+  phone: 'h.phone', template: "coalesce(nullif(trim(h.template_name),''),'Mensaje personalizado')", activity: 'a.name',
+} as const;
 
-export const getHistory = async (clubId: string, page: number, pageSize: number, sectorIds: readonly string[] | null = null): Promise<PaginatedHistoryResponse> => {
+export const getHistory = async (clubId: string, page: number, pageSize: number, sectorIds: readonly string[] | null = null,
+  sortBy?: keyof typeof crmHistorySortFields, sortDirection: 'asc'|'desc' = 'asc'): Promise<PaginatedHistoryResponse> => {
   await ensureCrmSchema();
   const pool = tenantExecutor(clubId);
   const offset = (page - 1) * pageSize;
@@ -120,10 +109,11 @@ export const getHistory = async (clubId: string, page: number, pageSize: number,
     select 1 from miclub.enrollments e join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
     where e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id)) and a.sector_id=any($2)))`;
   const count = await pool.query<{ total: string }>(`select count(*) as total from miclub.crm_message_history h where ${scope}`, [clubId,sectorIds]);
+  const order=sortBy?`${crmHistorySortFields[sortBy]} ${sortDirection} nulls last,h.id`:'h.created_at desc,h.id desc';
   const rows = await pool.query<Record<string, unknown>>(`select h.*,e.id resolved_enrollment_id,a.name activity_name from miclub.crm_message_history h
     left join miclub.enrollments e on e.club_id=h.club_id and (e.id=h.enrollment_id or (h.enrollment_id is null and e.id::text=h.member_id))
     left join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id
-    where ${scope} order by h.created_at desc,h.id desc limit $3 offset $4`, [clubId,sectorIds,pageSize,offset]);
+    where ${scope} order by ${order} limit $3 offset $4`, [clubId,sectorIds,pageSize,offset]);
   const total = Number(count.rows[0]?.total ?? 0);
   return { items: rows.rows.map(mapHistory), page, pageSize, total, totalPages: total === 0 ? 0 : Math.ceil(total / pageSize) };
 };

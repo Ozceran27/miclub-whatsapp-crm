@@ -48,6 +48,17 @@ const safeText=(value:unknown)=>typeof value==='string'?value:'';
 const isFresh=(m:Record<string,unknown>)=>Boolean(m.active_contact_id)&&m.active_status==='adeudando'&&m.active_phone===m.phone
   &&`${safeText(m.active_first_name)} ${safeText(m.active_last_name)}`===m.name&&m.active_activity===m.activity
   &&dateText(m.active_enrollment_date)===dateText(m.stored_enrollment_date)&&dateText(m.active_due_date)===dateText(m.stored_due_date);
+const contactSort={name:['c.last_name','c.first_name'],document:'c.document',phone:'c.phone',status:'c.status',activity:'c.activity',enrollmentDate:'c.enrollment_date',dueDate:'c.due_date'} as const;
+const messageFreshSql=`c.id is not null and c.status='adeudando' and c.phone=m.phone and c.first_name||' '||c.last_name=m.name
+  and c.activity is not distinct from m.activity and c.enrollment_date is not distinct from m.enrollment_date and c.due_date is not distinct from m.due_date`;
+const messageSort={date:'m.created_at',name:'m.name',activity:'m.activity',status:'m.status',fresh:`(${messageFreshSql})`,template:"coalesce(nullif(trim(m.template_name),''),'Mensaje personalizado')"} as const;
+const sortRequest=(query:Request['query'],fields:Record<string,string|readonly string[]>)=>{
+  const key=query.sortBy,direction=query.sortDirection;
+  if(key===undefined&&direction===undefined)return {order:null};
+  if(typeof key!=='string'||!Object.hasOwn(fields,key)||direction!==undefined&&direction!=='asc'&&direction!=='desc')return null;
+  const columns=Array.isArray(fields[key])?fields[key] as readonly string[]:[fields[key] as string];
+  return {order:columns.map(field=>`${field} ${direction==='desc'?'desc':'asc'} nulls last`).join(',')};
+};
 
 export const createCrmXlsxRoutes=()=>{
   const router=Router();
@@ -109,12 +120,13 @@ export const createCrmXlsxRoutes=()=>{
     from miclub.crm_xlsx_batches where club_id=$1 and status in ('active','replaced') and dry_run_id is not null order by created_at desc,id desc limit 20`,[club(req)]))).rows);}catch(error){next(error);}});
   router.get('/contacts',async(req,res,next)=>{
     const currentPage=page(req.query.page),status=req.query.status,query=req.query.query;
-    if(!currentPage||(status!==undefined&&(typeof status!=='string'||!['al_dia','nuevo_inscripto','adeudando','abandonado'].includes(status)))||(query!==undefined&&(typeof query!=='string'||query.length>100)))return fail(res,400,'Filtros inválidos.');
+    const sorting=sortRequest(req.query,contactSort);
+    if(!currentPage||!sorting||(status!==undefined&&(typeof status!=='string'||!['al_dia','nuevo_inscripto','adeudando','abandonado'].includes(status)))||(query!==undefined&&(typeof query!=='string'||query.length>100)))return fail(res,400,'Filtros inválidos.');
     try{const response=await withTenantTransaction(club(req),async db=>{
       const params=[club(req),status??null,typeof query==='string'?query.trim():null];
       const filter=`and ($2::text is null or c.status=$2) and ($3::text is null or (c.first_name||' '||c.last_name||' '||c.document||' '||coalesce(c.activity,'')) ilike '%'||$3||'%')`;
       const count=(await db.query<{total:number}>(`select count(*)::int total from (${activeContactSql} ${filter}) x`,params)).rows[0]?.total??0;
-      const items=(await db.query<Contact>(`${activeContactSql} ${filter} order by c.last_name,c.first_name,c.id limit 20 offset $4`,[...params,(currentPage-1)*20])).rows;
+      const items=(await db.query<Contact>(`${activeContactSql} ${filter} order by ${sorting.order??'c.last_name,c.first_name'},c.id limit 20 offset $4`,[...params,(currentPage-1)*20])).rows;
       return {items,total:count,page:currentPage,pageSize:20};
     });res.json(response);}catch(error){next(error);}
   });
@@ -152,7 +164,7 @@ export const createCrmXlsxRoutes=()=>{
     });res.json(result);}catch(error){if((error as {status?:number}).status===409)return fail(res,409,(error as Error).message);next(error);}
   });
   router.get('/messages',async(req,res,next)=>{
-    const currentPage=page(req.query.page);if(!currentPage)return fail(res,400,'Página inválida.');
+    const currentPage=page(req.query.page),sorting=sortRequest(req.query,messageSort);if(!currentPage||!sorting)return fail(res,400,'Página u orden inválido.');
     const pending=req.query.pending==='true';
     try{const result=await withTenantTransaction(club(req),async db=>{
       const where=`where m.club_id=$1 ${pending?"and m.status in ('prepared','opened')":''}`;
@@ -161,7 +173,7 @@ export const createCrmXlsxRoutes=()=>{
         c.id active_contact_id,c.phone active_phone,c.status active_status,c.first_name active_first_name,c.last_name active_last_name,c.activity active_activity,c.enrollment_date::text active_enrollment_date,c.due_date::text active_due_date
         from miclub.crm_xlsx_messages m left join miclub.crm_xlsx_contacts c on c.club_id=m.club_id and c.contact_key=m.contact_key
           and exists(select 1 from miclub.crm_xlsx_batches b where b.club_id=c.club_id and b.id=c.batch_id and b.status='active')
-        ${where} order by m.created_at desc,m.id desc limit 20 offset $2`,[club(req),(currentPage-1)*20])).rows;
+        ${where} order by ${sorting.order??'m.created_at desc'},m.id ${sorting.order?'asc':'desc'} limit 20 offset $2`,[club(req),(currentPage-1)*20])).rows;
       return {items:rows.map(r=>({id:r.id,contactId:r.contactId,name:r.name,activity:r.activity,phone:r.phone,message:r.message,waLink:r.waLink,status:r.status,templateName:r.templateName,createdAt:r.createdAt,openedAt:r.openedAt,sentAt:r.sentAt,fresh:isFresh(r)})),total,page:currentPage,pageSize:20};
     });res.json(result);}catch(error){next(error);}
   });

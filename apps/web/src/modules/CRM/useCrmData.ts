@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CrmDebtPage, CrmDebtSummary, MessageTemplate, PreparedMessage } from '@miclub/shared';
 import { crmApi, type CrmCatalogItem, type DebtFilters } from '../../services/api/crmApi';
+import { nextCrmSort, type CrmSort } from './SortableHeader';
 
 const emptyPage:CrmDebtPage={items:[],page:1,pageSize:20,total:0};
 export const useCrmData=(filter:DebtFilters)=>{
@@ -13,10 +14,12 @@ export const useCrmData=(filter:DebtFilters)=>{
   const [preparedTotal,setPreparedTotal]=useState(0);
   const [history,setHistory]=useState<PreparedMessage[]>([]);
   const [historyPage,setHistoryPage]=useState(1);
+  const [historySort,setHistorySortState]=useState<CrmSort>(null);
   const [historyMeta,setHistoryMeta]=useState({pageSize:20,total:0,totalPages:0});
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState<string|null>(null);
   const generation=useRef(0);
+  const historyGeneration=useRef(0);
   const loadDebts=useCallback(async()=>{
     const current=++generation.current;
     setLoading(true);
@@ -25,10 +28,12 @@ export const useCrmData=(filter:DebtFilters)=>{
     finally{if(current===generation.current)setLoading(false);}
   },[filter]);
   const loadHistory=useCallback(async(page=1)=>{
-    const result=await crmApi.history(page);
-    setHistory(result.items);setHistoryPage(result.page);
-    setHistoryMeta({pageSize:result.pageSize,total:result.total,totalPages:result.totalPages});
-  },[]);
+    const current=++historyGeneration.current;
+    const result=await crmApi.history(page,historySort?.by,historySort?.direction);
+    if(current===historyGeneration.current){setHistory(result.items);setHistoryPage(result.page);
+      setHistoryMeta({pageSize:result.pageSize,total:result.total,totalPages:result.totalPages});}
+  },[historySort]);
+  const setHistorySort=(field:string)=>{setHistorySortState(current=>nextCrmSort(current,field));setHistoryPage(1);};
   const loadPrepared=useCallback(async(page=1)=>{
     const result=await crmApi.prepared(page);
     setPrepared(result.items);setPreparedPage(result.page);setPreparedTotal(result.total);
@@ -40,9 +45,11 @@ export const useCrmData=(filter:DebtFilters)=>{
     }catch(e){setError(e instanceof Error?e.message:'No se pudo actualizar el CRM.');}
   },[loadDebts,loadPrepared,loadHistory,preparedPage,historyPage]);
   useEffect(()=>{void Promise.resolve().then(loadDebts);return()=>{generation.current+=1;};},[loadDebts]);
-  useEffect(()=>{void Promise.all([crmApi.debtSummary(),crmApi.catalog(),crmApi.templates(),crmApi.prepared(),crmApi.history()])
-    .then(([sum,cat,t,p,h])=>{setSummary(sum);setCatalog(cat);setTemplates(t);setPrepared(p.items);setPreparedTotal(p.total);setHistory(h.items);setHistoryMeta({pageSize:h.pageSize,total:h.total,totalPages:h.totalPages});})
+  useEffect(()=>{void Promise.all([crmApi.debtSummary(),crmApi.catalog(),crmApi.templates(),crmApi.prepared()])
+    .then(([sum,cat,t,p])=>{setSummary(sum);setCatalog(cat);setTemplates(t);setPrepared(p.items);setPreparedTotal(p.total);})
     .catch(e=>setError(e instanceof Error?e.message:'No se pudo cargar el CRM.'));},[]);
+  useEffect(()=>{void Promise.resolve().then(()=>loadHistory(1)).catch(e=>setError(e instanceof Error?e.message:'No se pudo cargar el historial.'));
+    return()=>{historyGeneration.current+=1;};},[loadHistory]);
   return {debts,summary,catalog,templates,setTemplates,prepared,preparedPage,preparedTotal,history,historyPage,historyMeta,
-    loading,error,setError,loadDebts,loadHistory,loadPrepared,refresh};
+    historySort,setHistorySort,loading,error,setError,loadDebts,loadHistory,loadPrepared,refresh};
 };

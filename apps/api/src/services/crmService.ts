@@ -1,4 +1,4 @@
-import type { MessageTemplate, PreparedMessage } from "@miclub/shared";
+import type { PreparedMessage } from "@miclub/shared";
 import * as postgresCrm from "../repositories/crmRepository.js";
 
 /** Productive CRM is deliberately PostgreSQL-only. SQLite migration tooling lives outside the runtime graph. */
@@ -11,8 +11,6 @@ export const createCrmTemplate = (clubId: string, name: string, body: string, id
 export const updateCrmTemplate = (clubId: string, id: string, name: string, body: string, now: string) =>
   postgresCrm.updateTemplate(clubId, id, name, body, now);
 export const deleteCrmTemplate = postgresCrm.archiveTemplate;
-export const replaceCrmDefaultTemplates = (clubId: string, templates: MessageTemplate[], now: string) =>
-  postgresCrm.replaceDefaultTemplates(clubId, templates.map((template) => ({ ...template, createdAt: now, updatedAt: now, isDefault: true, legacySqliteId: template.id })));
 export const getCrmHistory = postgresCrm.getHistory;
 export const getCrmContactedRecent = postgresCrm.getContactedRecent;
 export const findCrmDuplicatePreparedMessages = postgresCrm.findDuplicatePreparedMessages;

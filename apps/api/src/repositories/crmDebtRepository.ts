@@ -8,7 +8,16 @@ export type CrmDebtFilter = {
   query?: string;
   sectorId?: string;
   activityId?: string;
+  sortBy?: keyof typeof crmDebtSortFields;
+  sortDirection?: "asc" | "desc";
 };
+
+export const crmDebtSortFields = {
+  name: '"lastName", "firstName"', phone: 'phone', sectorActivity: '"sectorName", "activityName"',
+  enrollmentDate: '"enrollmentDate"', firstDueDate: '"firstDueDate"', lastDueDate: '"lastDueDate"',
+  overdueCount: '"overdueCount"', balance: "balances->0->>'currencyCode'", lastPaymentAt: '"lastPaymentAt"',
+  lastContactAt: '"lastContactAt"', kind: 'kind',
+} as const;
 
 // All CRM reads use the same source: generated enrollment fees and their
 // allocations. The operational lifecycle only identifies rows needing review.
@@ -91,8 +100,13 @@ export const listCrmDebts = async (
 ): Promise<CrmDebtPage> => {
   const params = [clubId,sectorIds,filter.kind,filter.query?.trim() || null,filter.sectorId ?? null,filter.activityId ?? null];
   const count = await db.query<{ total: number }>(`${debtCte} select count(*)::int total from classified where ${visible}`, params);
+  const direction=filter.sortDirection==='desc'?'desc':'asc';
+  const order=filter.sortBy==='balance'
+    ? `balances->0->>'currencyCode' ${direction} nulls last,(balances->0->>'amount')::numeric ${direction} nulls last,"enrollmentId"`
+    : filter.sortBy ? `${crmDebtSortFields[filter.sortBy].split(', ').map(field=>`${field} ${direction} nulls last`).join(',')},"enrollmentId"`
+      : 'case when kind=\'overdue\' then 0 else 1 end,"firstDueDate" asc nulls last,"lastName","firstName","enrollmentId"';
   const rows = await db.query<DbRow>(`${debtCte} select * from classified where ${visible}
-    order by case when kind='overdue' then 0 else 1 end,"firstDueDate" asc nulls last,"lastName","firstName","enrollmentId"
+    order by ${order}
     limit $7 offset $8`, [...params,filter.pageSize,(filter.page-1)*filter.pageSize]);
   return {items:rows.rows.map(map),page:filter.page,pageSize:filter.pageSize,total:count.rows[0]?.total ?? 0};
 };

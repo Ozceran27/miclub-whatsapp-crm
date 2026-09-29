@@ -14,6 +14,7 @@ import { useCrmFilters } from './CRM/useCrmFilters';
 import type { MessageStatus } from './CRM/types';
 import { CrmXlsxPanel } from './CRM/CrmXlsxPanel';
 import { confirmAction, requestText } from './shared/ActionDialog';
+import { nextCrmSort, type CrmSort } from './CRM/SortableHeader';
 
 const preview=(template:string,debt?:CrmDebt)=>{
   if(!debt)return template;
@@ -32,6 +33,7 @@ function OperationalCrm(){
   const canViewEnrollments=permissions.includes(PERMISSIONS.ENROLLMENTS_VIEW);
   const filters=useCrmFilters();
   const data=useCrmData(filters.filter);
+  const debtSort:CrmSort=filters.filter.sortBy?{by:filters.filter.sortBy,direction:filters.filter.sortDirection??'asc'}:null;
   const [selectedTemplateId,setSelectedTemplateId]=useState('');
   const [templateName,setTemplateName]=useState('');
   const [message,setMessage]=useState('');
@@ -61,9 +63,6 @@ function OperationalCrm(){
   const deleteTemplate=async()=>{if(!selectedTemplate||selectedTemplate.isDefault||!await confirmAction({title:'¿Eliminar plantilla seleccionada?',description:'La plantilla dejará de estar disponible.',confirmLabel:'Eliminar plantilla'}))return;
     try{await crmApi.deleteTemplate(selectedTemplate.id);const rest=data.templates.filter(t=>t.id!==selectedTemplate.id);data.setTemplates(rest);
       setSelectedTemplateId(rest[0]?.id ?? '');setTemplateName(rest[0]?.name ?? '');setMessage(rest[0]?.body ?? '');setTemplateStatus('idle');}catch(e){fail(e);}};
-  const resetDefaultTemplates=async()=>{if(!await confirmAction({title:'Restaurar plantillas predeterminadas',description:'Esto restaurará las plantillas predeterminadas.',confirmLabel:'Restaurar plantillas'}))return;
-    try{const restored=await crmApi.resetTemplates();data.setTemplates(restored);setSelectedTemplateId(restored[0]?.id ?? '');
-      setTemplateName(restored[0]?.name ?? '');setMessage(restored[0]?.body ?? '');setTemplateStatus('idle');}catch(e){fail(e);}};
   const prepare=async()=>{
     if(!filters.selected.length)return;
     setPreparing(true);data.setError(null);
@@ -97,18 +96,20 @@ function OperationalCrm(){
     {data.error&&<p className="error-msg" role="alert">{data.error}</p>}
     <CrmSummaryCards summary={data.summary}/>
     <CrmFilters filter={filters.filter} change={filters.change} catalog={data.catalog}/>
-    <MembersTable debts={data.debts} selected={filters.selected} setSelected={filters.setSelected} pageChange={page=>filters.change({page})} loading={data.loading}/>
+    <MembersTable debts={data.debts} selected={filters.selected} setSelected={filters.setSelected} pageChange={page=>filters.change({page})} loading={data.loading}
+      sort={debtSort} onSort={field=>{const next=nextCrmSort(debtSort,field);filters.change({sortBy:next?.by,sortDirection:next?.direction});}}/>
     {filters.filter.kind==='review'&&<div className="section-note">Estas inscripciones necesitan una cuota generada o una fecha de vencimiento válida antes de preparar un recordatorio de deuda.
       {canViewEnrollments&&<button className="icon-btn ghost-btn" onClick={()=>{navigate('/app/administration');window.setTimeout(()=>document.getElementById('enrollment-list')?.scrollIntoView({behavior:'smooth',block:'start'}),0);}}>Ir a Inscripciones</button>}</div>}
     {canWrite&&<MessageTemplatePanel templates={data.templates} selectedTemplateId={selectedTemplateId} handleTemplateChange={id=>{void changeTemplate(id);}}
       templateName={templateName} setTemplateName={setTemplateName} message={message} setMessage={setMessage}
       templateStatus={templateStatus} setTemplateStatus={setTemplateStatus} selectedTemplate={selectedTemplate}
       saveTemplate={saveTemplate} createTemplate={createTemplate} duplicateTemplate={duplicateTemplate} deleteTemplate={deleteTemplate}
-      resetDefaultTemplates={resetDefaultTemplates} preview={preview(message,selectedDebt)} canPrepare={filters.selected.length>0&&message.trim().length>0&&!preparing}
+      preview={preview(message,selectedDebt)} canPrepare={filters.selected.length>0&&message.trim().length>0&&!preparing}
       prepare={prepare} preparing={preparing}/>}
     <PreparedMessagesPanel prepared={data.prepared} page={data.preparedPage} total={data.preparedTotal}
       loadPage={data.loadPrepared} openWhatsApp={openWhatsApp} updatePreparedStatus={updatePreparedStatus} canWrite={canWrite}/>
-    <CrmHistoryPanel history={data.history} historyPage={data.historyPage} historyMeta={data.historyMeta} loadHistory={data.loadHistory}/>
+    <CrmHistoryPanel history={data.history} historyPage={data.historyPage} historyMeta={data.historyMeta} loadHistory={data.loadHistory}
+      sort={data.historySort} onSort={data.setHistorySort}/>
   </main>;
 }
 
@@ -116,8 +117,8 @@ export default function CrmModule(){
   const {permissions,clubId}=useSession();
   const canOpenImported=permissions.includes(PERMISSIONS.CRM_READ)&&permissions.includes(PERMISSIONS.SECTORS_ANY);
   const [area,setArea]=useState<'operational'|'xlsx'>('operational');
-  return <><nav className="actions-row" aria-label="Áreas del CRM">
-    <button type="button" className="icon-btn" aria-pressed={area==='operational'} onClick={()=>setArea('operational')}>Cobranza operativa</button>
-    {canOpenImported&&<button type="button" className="icon-btn" aria-pressed={area==='xlsx'} onClick={()=>setArea('xlsx')}>Contactos importados</button>}
+  return <><nav className="crm-area-tabs" aria-label="Áreas del CRM">
+    <button type="button" className="crm-area-tab" aria-current={area==='operational'?'page':undefined} onClick={()=>setArea('operational')}>Cobranza operativa</button>
+    {canOpenImported&&<button type="button" className="crm-area-tab" aria-current={area==='xlsx'?'page':undefined} onClick={()=>setArea('xlsx')}>Contactos importados</button>}
   </nav>{area==='xlsx'&&canOpenImported?<CrmXlsxPanel key={clubId??'no-club'}/>:<OperationalCrm/>}</>;
 }

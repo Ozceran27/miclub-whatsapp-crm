@@ -10,8 +10,9 @@ export const PreparedMessagesPanel=({prepared,page,total,loadPage,canWrite,openW
   {!prepared.length?<div className="empty-state"><p className="empty-state-title">No hay mensajes pendientes</p><p>Los mensajes preparados y abiertos aparecerán acá, incluso después de recargar.</p></div>
     :<div className="prepared-grid">{prepared.map(item=><article key={item.historyId} className="prepared-card"><div className="prepared-header"><h4>{item.nombre ?? item.memberId}</h4>
       <span className={`status-chip ${getStatusClass(item.status)}`}>{getStatusLabel(item.status)}</span></div>
-      <p className="prepared-meta"><strong>Teléfono:</strong> {item.phone}</p><p className="prepared-meta"><strong>Actividad:</strong> {item.actividad ?? 'Sin vínculo histórico'}</p>
-      <p>{item.message}</p>{canWrite&&<div className="actions-row prepared-actions">
+      <p className="prepared-meta"><span aria-hidden="true">◈</span><strong>Actividad:</strong> {item.actividad ?? 'Sin vínculo histórico'}</p>
+      <p className="prepared-meta"><span aria-hidden="true">☎</span><strong>Teléfono:</strong> {item.phone}</p>
+      <p className="prepared-template"><strong>Plantilla:</strong> {item.templateName?.trim() || 'Mensaje personalizado'}</p>{canWrite&&<div className="actions-row prepared-actions">
         <button className="icon-btn" onClick={()=>void openWhatsApp(item)}>Abrir WhatsApp</button>
         <button className="icon-btn" onClick={()=>void updatePreparedStatus(item.historyId,'sent_manual')}>Marcar enviado</button>
         <button className="icon-btn" onClick={()=>void updatePreparedStatus(item.historyId,'skipped')}>Omitir</button>

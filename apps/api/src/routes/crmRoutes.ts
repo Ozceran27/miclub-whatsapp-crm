@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import type { CrmDebt, PrepareMessagesRequest, PreparedMessage, PrepareMessagesValidation } from "@miclub/shared";
 import { buildWaLink, normalizeArPhone } from "../services/messages.js";
-import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, listCrmTemplates, replaceCrmDefaultTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
+import { createCrmTemplate, deleteCrmTemplate, findCrmDuplicatePreparedMessages, getCrmContactedRecent, getCrmHistory, listCrmTemplates, updateCrmHistoryStatus, updateCrmTemplate } from "../services/crmService.js";
 import { requireMembership, requirePermission } from "../middleware/authorization.js";
 import { isExplicitTestAuthBypass } from "../middleware/auth.js";
 import { getArgentinaLastNDaysWindow } from "../domain/argentinaTime.js";
 import { withTenantTransaction } from "../db/transaction.js";
-import { getCrmDebtSummary, getCrmDebtsByIds, listCrmDebts } from "../repositories/crmDebtRepository.js";
-import { getPreparedHistory, insertHistory } from "../repositories/crmRepository.js";
+import { crmDebtSortFields, getCrmDebtSummary, getCrmDebtsByIds, listCrmDebts } from "../repositories/crmDebtRepository.js";
+import { crmHistorySortFields, getPreparedHistory, insertHistory } from "../repositories/crmRepository.js";
 
 const getClubId = (req: Request): string => {
   if (req.auth?.clubId) return req.auth.clubId;
@@ -20,11 +20,6 @@ const jsonError = (res: Response, status: number, message: string) =>
   res.status(status).json({ error: true, message });
 
 const ALLOWED_TEMPLATE_VARIABLES = new Set(["{nombre}", "{apellido}", "{actividad}", "{cuota}", "{saldo}", "{vencimientos}", "{primer_vencimiento}", "{modalidad}", "{instructor}"]);
-const templates = [
-  { id: "friendly", name: "Recordatorio amable", body: "Hola {nombre}, te recordamos que registrás una cuota pendiente de {actividad}.", isDefault: true, createdAt: "", updatedAt: "" },
-  { id: "direct", name: "Recordatorio directo", body: "Hola {nombre}. Figura pendiente el pago de tu cuota de {actividad}.", isDefault: true, createdAt: "", updatedAt: "" },
-];
-
 const validateTemplateInput = (name: unknown, body: unknown): string | null => {
   if (typeof name !== "string" || name.trim().length === 0) return "name no puede estar vacío.";
   if (typeof body !== "string" || body.trim().length === 0) return "body no puede estar vacío.";
@@ -81,13 +76,18 @@ export const createCrmRoutes = () => {
     if (!page || typeof kind!=="string" || !["overdue","review","all"].includes(kind) ||
       (req.query.sectorId !== undefined && !uuid(req.query.sectorId)) ||
       (req.query.activityId !== undefined && !uuid(req.query.activityId)) ||
-      (req.query.query !== undefined && (typeof req.query.query !== "string" || req.query.query.length>100))) return jsonError(res,400,"Filtros CRM inválidos.");
+      (req.query.query !== undefined && (typeof req.query.query !== "string" || req.query.query.length>100)) ||
+      (req.query.sortBy !== undefined && (typeof req.query.sortBy !== 'string' || !Object.hasOwn(crmDebtSortFields,req.query.sortBy))) ||
+      (req.query.sortDirection !== undefined && (typeof req.query.sortDirection!=='string'||!['asc','desc'].includes(req.query.sortDirection))) ||
+      (req.query.sortDirection !== undefined && req.query.sortBy === undefined)) return jsonError(res,400,"Filtros CRM inválidos.");
     try {
       const result=await withTenantTransaction(getClubId(req),db=>listCrmDebts(db,getClubId(req),sectorScope(req),{
         kind:kind as "overdue"|"review"|"all",page,pageSize:20,
         query:typeof req.query.query==="string"?req.query.query:undefined,
         sectorId:typeof req.query.sectorId==="string"?req.query.sectorId:undefined,
         activityId:typeof req.query.activityId==="string"?req.query.activityId:undefined,
+        sortBy:typeof req.query.sortBy==='string'?req.query.sortBy as keyof typeof crmDebtSortFields:undefined,
+        sortDirection:req.query.sortDirection==='desc'?'desc':'asc',
       }));
       res.set("Cache-Control","private, no-store").json(result);
     } catch(error){next(error);}
@@ -175,23 +175,18 @@ export const createCrmRoutes = () => {
     }
   });
 
-  router.post("/templates/reset-defaults", requireCrmWrite, async (req, res) => {
-    const now = new Date().toISOString();
-    try {
-      res.json(await replaceCrmDefaultTemplates(getClubId(req), templates, now));
-    } catch {
-      jsonError(res, 500, "No se pudieron restaurar las plantillas predeterminadas.");
-    }
-  });
-
   router.get("/history", async (req, res) => {
     const pageRaw = Number.parseInt(typeof req.query.page === "string" ? req.query.page : "1", 10);
     const pageSizeRaw = Number.parseInt(typeof req.query.pageSize === "string" ? req.query.pageSize : "20", 10);
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
     const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? Math.min(pageSizeRaw, 20) : 20;
+    if ((req.query.sortBy !== undefined && (typeof req.query.sortBy!=='string'||!Object.hasOwn(crmHistorySortFields,req.query.sortBy))) ||
+      (req.query.sortDirection!==undefined&&(typeof req.query.sortDirection!=='string'||!['asc','desc'].includes(req.query.sortDirection))) ||
+      (req.query.sortDirection!==undefined&&req.query.sortBy===undefined)) return jsonError(res,400,"Orden CRM inválido.");
 
     try {
-      res.set("Cache-Control","private, no-store").json(await getCrmHistory(getClubId(req), page, pageSize,sectorScope(req)));
+      res.set("Cache-Control","private, no-store").json(await getCrmHistory(getClubId(req), page, pageSize,sectorScope(req),
+        req.query.sortBy as keyof typeof crmHistorySortFields|undefined,req.query.sortDirection==='desc'?'desc':'asc'));
     } catch {
       jsonError(res, 500, "No se pudo obtener el historial.");
     }

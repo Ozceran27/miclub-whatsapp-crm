@@ -1,5 +1,32 @@
 # Current State
 
+## CRM — editor, tarjetas y tablas 2026-09-29
+
+El editor operativo distribuye controles y texto en dos columnas, con vista
+previa y acción de preparación centrada. Se eliminó la restauración de
+plantillas predeterminadas en UI y API; las plantillas existentes se conservan
+y siguen protegidas contra eliminación. Los mensajes preparados muestran
+metadatos y nombre de plantilla sin repetir el cuerpo completo. Las tablas
+CRM admiten ordenación validada por servidor antes de paginar, y la vista
+previa XLSX ordena sus diez filas localmente. Sin migración ni SQL nuevo.
+Typecheck, build, 494 pruebas de API, 97 pruebas web y lint de los archivos
+modificados pasaron. Los lints generales conservan errores fuera del cambio
+(API: 124; web: 25). La revisión visual autenticada en navegador y la
+ejecución de consultas contra PostgreSQL real no estuvieron disponibles en
+esta sesión.
+
+## CRM — pulido de interfaz 2026-09-29
+
+Las áreas de Cobranza operativa y Contactos importados se muestran como pestañas
+con estado activo visible. El CRM ajusta espacios entre encabezados, resúmenes,
+filtros, plantillas y mensajes; la lista importada muestra cuatro indicadores por
+fila en escritorio y dos en pantallas estrechas. Al elegir «Nueva plantilla» se
+restablecen nombre y cuerpo para evitar sobrescribir visualmente una plantilla
+anterior. No hubo cambios de esquema, API ni SQL. Typecheck, build y pruebas web
+pasaron; el lint general web conserva errores preexistentes fuera de estos archivos.
+Queda pendiente la verificación visual autenticada de ambos temas y tamaños de
+pantalla en el entorno del usuario.
+
 ## Superficies de diálogos de la aplicación — 2026-09-29
 
 La auditoría de los cuadros emergentes unificó las fichas de inscripción,

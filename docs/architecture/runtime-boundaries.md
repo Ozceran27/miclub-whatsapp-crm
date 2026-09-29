@@ -14,7 +14,7 @@ Google Sheets fue retirado definitivamente después de certificar el E2E XLSX: n
 
 La carga de archivos `.xlsx` continúa soportada exclusivamente mediante `POST /api/migration`. Es un flujo local de archivo: inspecciona el contenedor XLSX, valida el lote y persiste en PostgreSQL. **No llama a Google Sheets API, no requiere credenciales `GOOGLE_*` y no usa `googleapis`.** Su operación vigente está documentada en [`import-xlsx.md`](../imports/xlsx-runbook.md).
 
-SQLite se conserva exclusivamente como origen de auditoría/migración CRM. `crmService` importa el adaptador dinámicamente cuando una operación selecciona explícitamente `CRM_SOURCE=sqlite`; producción rechaza esa configuración. No existe seed automático: restaurar plantillas predeterminadas es una acción autenticada, explícita e idempotente por club mediante `POST /templates/reset-defaults`.
+SQLite se conserva exclusivamente como origen de auditoría/migración CRM. `crmService` importa el adaptador dinámicamente cuando una operación selecciona explícitamente `CRM_SOURCE=sqlite`; producción rechaza esa configuración. No existe seed automático de plantillas CRM; las plantillas predeterminadas existentes conservan su protección contra eliminación.
 
 Por este uso operativo, `sqlite3` continúa como dependencia del workspace API, aunque queda fuera del grafo principal. Esto no aplica a `googleapis`, que ya fue eliminado.
 

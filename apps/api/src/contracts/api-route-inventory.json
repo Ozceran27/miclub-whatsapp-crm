@@ -2021,26 +2021,6 @@
       ]
     },
     {
-      "id": "POST /templates/reset-defaults",
-      "method": "POST",
-      "path": "/templates/reset-defaults",
-      "source": "apps/api/src/routes/crmRoutes.ts",
-      "authentication": "session",
-      "membership": "active",
-      "permission": "crm.write",
-      "role": "any-with-permission",
-      "sectorScope": "tenant",
-      "mutability": "write",
-      "idempotency": "non-idempotent",
-      "testCategories": [
-        "authentication",
-        "authorization",
-        "tenant-isolation",
-        "validation",
-        "success"
-      ]
-    },
-    {
       "source": "apps/api/src/routes/onboardingRoutes.ts",
       "authentication": "session",
       "membership": "active",

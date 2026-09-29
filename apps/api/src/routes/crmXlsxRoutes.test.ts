@@ -65,6 +65,18 @@ void test('el filtro acepta Nuevo Inscripto y rechaza el estado retirado',async(
   assert.equal((await fetch(`${base}/contacts?status=no_inscripto`)).status,400);
 }));
 
+void test('orden importado valida columnas y se aplica antes de paginar dentro del club',async()=>serve(async(base,queries,setClub)=>{
+  assert.equal((await fetch(`${base}/contacts?page=2&sortBy=dueDate&sortDirection=desc`)).status,200);
+  assert.match(queries.find(q=>q.includes('limit 20 offset $4'))??'',/order by c.due_date desc nulls last,c.id limit 20 offset \$4/);
+  assert.equal((await fetch(`${base}/messages?pending=false&sortBy=template&sortDirection=asc`)).status,200);
+  assert.match(queries.find(q=>q.includes('limit 20 offset $2'))??'',/order by coalesce\(nullif\(trim\(m.template_name\),''\),'Mensaje personalizado'\) asc nulls last,m.id asc limit 20 offset \$2/);
+  assert.equal((await fetch(`${base}/contacts?sortBy=unknown`)).status,400);
+  assert.equal((await fetch(`${base}/messages?sortDirection=desc`)).status,400);
+  setClub(clubB);
+  assert.equal((await fetch(`${base}/contacts?sortBy=name`)).status,200);
+  assert.ok(queries.some(q=>q.includes('where c.club_id=$1')&&q.includes('order by c.last_name asc nulls last,c.first_name asc nulls last,c.id')));
+}));
+
 void test('dry-run y apply utilizan el club de sesión y hacen rollback ante un fallo de escritura',async()=>serve(async(base,queries)=>{
   const dry=await upload(base,'/dry-run');assert.equal(dry.status,200);const token=(await dry.json() as {dryRunId:string}).dryRunId;
   const applied=await upload(base,'/apply',token);assert.equal(applied.status,500);

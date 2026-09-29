@@ -42,7 +42,12 @@ respuestas 422 incluyen `message` e `issues` por fila.
 el SHA-256/versión/conteo, fue aplicado o cambió la lista vigente desde el
 dry-run. `GET /summary`, `/contacts`
 (page, status, query), `/batches` (últimos 20 lotes aplicados), `/templates` y
-`/messages` (page, pending) ofrecen lecturas. CRUD de `/templates`,
+`/messages` (page, pending) ofrecen lecturas. `/contacts` y `/messages` admiten
+`sortBy` y `sortDirection=asc|desc` con claves permitidas por tabla; el orden
+se aplica antes de paginar y conserva un ID de desempate. En contactos las
+claves son `name`, `document`, `phone`, `status`, `activity`, `enrollmentDate`
+y `dueDate`; en mensajes son `date`, `name`, `activity`, `status`, `fresh` y
+`template`. Valores desconocidos reciben 400. CRUD de `/templates`,
 `POST /prepare/preview`, `POST /prepare`,
 `POST /messages/:id/open` y `PATCH /messages/:id/status` operan solo dentro del
 club de sesión. Los preparados se revalidan contra la lista activa. La
@@ -51,14 +56,19 @@ respuesta de mensajes incluye `fresh`; `sent_manual` solo se acepta después de
 
 `/api/crm` requiere sesión, membresía y `crm:read`; las mutaciones también
 requieren `crm:write`. `GET /debts` acepta `kind=overdue|review|all`, `page`,
-`query`, `sectorId` y `activityId`; responde `{items,page,pageSize,total}` con
-20 inscripciones por página. `GET /debt-summary` devuelve conteos y saldos por
+`query`, `sectorId`, `activityId`, `sortBy` y `sortDirection=asc|desc`;
+responde `{items,page,pageSize,total}` con
+20 inscripciones por página. Las claves de orden de deuda son `name`, `phone`,
+`sectorActivity`, `enrollmentDate`, `firstDueDate`, `lastDueDate`,
+`overdueCount`, `balance`, `lastPaymentAt`, `lastContactAt` y `kind`.
+`balance` compara moneda y después importe, sin conversión. `GET /debt-summary` devuelve conteos y saldos por
 moneda. `GET /catalog` enumera sectores y actividades visibles. `GET
 /eligibility/:id` revalida una inscripción antes de abrir WhatsApp.
 
 `GET /prepared?page=N` recupera mensajes preparados/abiertos desde PostgreSQL
 en páginas de 50. `GET /history?page=N&pageSize=20` muestra todo el historial
-autorizado. `POST /prepare-messages/validate` y `POST /prepare-messages`
+autorizado y admite `sortBy=status|date|name|phone|template|activity` y
+`sortDirection=asc|desc`. `POST /prepare-messages/validate` y `POST /prepare-messages`
 reciben IDs UUID de inscripción; la segunda ruta rechaza el lote completo si
 algún ID perdió deuda, queda fuera del alcance o carece de teléfono válido.
 La confirmación `sent_manual` indica una acción declarada por el operador, no

@@ -26,3 +26,14 @@ void test('listado y resumen limitan club y sectores antes de agregar deuda',asy
     assert.match(call.sql,/r\.amount-r\.cancelled_amount-coalesce\(sum\(pa\.amount\),0\)/);
   }
 });
+
+void test('orden de deuda se aplica antes de paginar, agrupa saldos por moneda y conserva tenant',async()=>{
+  const calls:Array<{sql:string;params?:unknown[]}>=[];
+  const db:QueryExecutor={query:<T>(sql:string,params?:unknown[])=>{calls.push({sql,params});return Promise.resolve({rows:sql.includes('count(*)::int total from classified')?[{total:0} as T]:[]});}};
+  await listCrmDebts(db,club,[sector],{kind:'all',page:2,pageSize:20,sortBy:'balance',sortDirection:'desc'});
+  const list=calls[1];
+  assert.match(list.sql,/order by balances->0->>'currencyCode' desc nulls last,\(balances->0->>'amount'\)::numeric desc nulls last,"enrollmentId"\s+limit \$7 offset \$8/);
+  assert.equal(list.params?.[0],club);assert.deepEqual(list.params?.[1],[sector]);assert.deepEqual(list.params?.slice(-2),[20,20]);
+  await listCrmDebts(db,club,[sector],{kind:'all',page:1,pageSize:20,sortBy:'name',sortDirection:'asc'});
+  assert.match(calls[3].sql,/order by "lastName" asc nulls last,"firstName" asc nulls last,"enrollmentId"/);
+});
