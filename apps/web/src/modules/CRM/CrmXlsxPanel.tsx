@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { PERMISSIONS } from '@miclub/shared';
 import { useSession } from '../../session';
 import { crmXlsxApi, type DryRun, type XlsxBatch, type XlsxContact, type XlsxMessage, type XlsxPage, type XlsxStatus, type XlsxTemplate } from '../../services/api/crmXlsxApi';
+import { confirmAction } from '../shared/ActionDialog';
 
 const empty=<T,>():XlsxPage<T>=>({items:[],total:0,page:1,pageSize:20});
 const names:Record<XlsxStatus,string>={al_dia:'Al día',nuevo_inscripto:'Nuevo Inscripto',adeudando:'Adeudando',abandonado:'Abandonado'};
@@ -28,13 +29,13 @@ export function CrmXlsxPanel(){
     if(next&&!/\.xlsx$/i.test(next.name)){setFile(null);setError('El archivo debe ser .xlsx sin macros. Descargá la nueva plantilla y guardala como Libro de Excel (*.xlsx).');return;}
     setFile(next);};
   const validate=async()=>{if(!file)return;setBusy(true);setDry(null);setNotice('');setError('');setIssues([]);try{const result=await crmXlsxApi.dryRun(file);setDry(result);setNotice(`${result.rowCount} contactos validados. Revisá la vista previa antes de confirmar.`);}catch(e){setError(explain(e));const detail=e as Error&{issues?:Array<{row:number;field:string;message:string}>};setIssues(detail.issues??[]);}finally{setBusy(false);}};
-  const apply=async()=>{if(!file||!dry||!window.confirm(`Reemplazar la lista importada con ${dry.rowCount} contactos validados?`))return;
+  const apply=async()=>{if(!file||!dry||!await confirmAction({title:'¿Reemplazar la lista importada?',description:`Se cargarán ${dry.rowCount} contactos validados y la lista anterior quedará como historial.`,confirmLabel:'Reemplazar lista'}))return;
     setBusy(true);setError('');try{const result=await crmXlsxApi.apply(file,dry.dryRunId);setNotice(`Lista importada actualizada: ${result.rowCount} contactos.`);setDry(null);setFile(null);setSelected([]);setPage(1);setPendingPage(1);setHistoryPage(1);await refresh();}catch(e){setError(explain(e));const detail=e as Error&{issues?:Array<{row:number;field:string;message:string}>};setIssues(detail.issues??[]);if(detail.issues?.length)setDry(null);}finally{setBusy(false);}};
   const selectTemplate=(id:string)=>{setTemplateId(id);const item=templates.find(t=>t.id===id);if(item){setTemplateName(item.name);setMessage(item.body);}};
   const saveTemplate=async()=>{setBusy(true);setError('');try{const item=templateId?await crmXlsxApi.updateTemplate(templateId,templateName,message):await crmXlsxApi.createTemplate(templateName,message);setTemplateId(item.id);setTemplateName(item.name);setNotice('Plantilla guardada.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
-  const deleteTemplate=async()=>{if(!templateId||!window.confirm('¿Archivar esta plantilla?'))return;setBusy(true);try{await crmXlsxApi.deleteTemplate(templateId);setTemplateId('');setTemplateName('');setNotice('Plantilla archivada.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
+  const deleteTemplate=async()=>{if(!templateId||!await confirmAction({title:'¿Archivar esta plantilla?',description:'Dejará de estar disponible para nuevos mensajes.',confirmLabel:'Archivar plantilla'}))return;setBusy(true);try{await crmXlsxApi.deleteTemplate(templateId);setTemplateId('');setTemplateName('');setNotice('Plantilla archivada.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
   const prepare=async()=>{if(!selected.length)return;setBusy(true);setError('');try{const result=await crmXlsxApi.preview(selected,message);
-    if(!window.confirm(`Preparar ${result.count} mensajes?\nEjemplo: ${result.sample}`))return;
+    if(!await confirmAction({title:`¿Preparar ${result.count} mensajes?`,description:`Ejemplo: ${result.sample}`,confirmLabel:'Preparar mensajes'}))return;
     await crmXlsxApi.prepare(selected,message,templateName);setSelected([]);setNotice('Mensajes preparados. Abrilos de forma individual en WhatsApp.');await refresh();}catch(e){setError(explain(e));}finally{setBusy(false);}};
   const open=async(item:XlsxMessage)=>{const popup=window.open('about:blank','_blank');if(!popup){setError('El navegador bloqueó la ventana de WhatsApp.');return;}
     try{const result=await crmXlsxApi.open(item.id);popup.opener=null;popup.location.href=result.waLink;await refresh();}catch(e){popup.close();setError(explain(e));}};

@@ -6,6 +6,7 @@ import { archiveAdministrationActivity, changeAdministrationActivityStatus, getA
 import { ActivityDetailModal } from './ActivityDetailModal';
 import { ActivityCreateEditModal } from './ActivityCreateEditModal';
 import { activityStatusLabel, describeActivityTerms, formatActivityCivilDate, formatActivityProfitability, formatFrequency, formatMoney } from './activityPresentation';
+import { confirmAction } from '../shared/ActionDialog';
 
 const integer = new Intl.NumberFormat('es-AR');
 
@@ -51,7 +52,7 @@ export function ActivityList({ canViewFinancials }: { canViewFinancials: boolean
   const selectedActivity=activities.find(activity=>activity.id===selectedActivityId);
   const ranking=useMemo(()=>activities.filter(activity=>activity.annualOperatingProfitabilityStatus==='AVAILABLE'&&activity.annualOperatingProfitability!=null).sort((a,b)=>(b.annualOperatingProfitability??0)-(a.annualOperatingProfitability??0)),[activities]);
   const mutate=async(activity:AdministrationActivityDto,operation:'status'|'archive')=>{
-    if(operation==='archive'&&!window.confirm(`¿Archivar “${activity.name}”?\n\nDejará de mostrarse, pero su historia permanecerá conservada.`))return;
+    if(operation==='archive'&&!await confirmAction({title:`¿Archivar “${activity.name}”?`,description:'Dejará de mostrarse, pero su historia permanecerá conservada.',confirmLabel:'Archivar actividad'}))return;
     setMutationId(activity.id);setError(null);
     try { if(operation==='archive'){await archiveAdministrationActivity(activity.id,activity.updatedAt);setSelectedActivityId(null);}else await changeAdministrationActivityStatus(activity.id,activity.updatedAt,activity.status==='active'?'inactive':'active');await load(); }
     catch(reason){const dependencies=reason instanceof ApiError&&reason.code==='ACTIVITY_HAS_DEPENDENCIES';throw new Error(dependencies?`No se puede archivar “${activity.name}” porque tiene inscripciones, movimientos o términos asociados.`:reason instanceof Error?reason.message:'No se pudo modificar la actividad.');}

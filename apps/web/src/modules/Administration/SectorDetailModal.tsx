@@ -2,6 +2,7 @@ import { DEFAULT_SECTOR_ICON_KEY, type AdministrationActivityDto, type Administr
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { archiveAdministrationSector, changeAdministrationSectorStatus, getSectorManagerCandidates, getSectorActivities, updateAdministrationSector, type SectorManagerCandidate } from '../../services/api/administrationApi';
 import { ConfigurationEditorModal } from '../shared/ConfigurationEditorModal';
+import { confirmAction } from '../shared/ActionDialog';
 import { getSectorVisualMeta } from '../sectorVisualMeta';
 import { activityStatusLabel } from './activityPresentation';
 import { SectorConfigurationFields } from './SectorConfigurationFields';
@@ -76,7 +77,7 @@ export function SectorDetailModal({ sector, canEdit, canArchive, canViewFinancia
   };
 
   const archive = async () => {
-    if (!window.confirm(`¿Eliminar el sector “${sector.name}”?\n\nSe archivará y dejará de mostrarse, pero su historia permanecerá conservada.`)) return;
+    if (!await confirmAction({title:`¿Eliminar el sector “${sector.name}”?`,description:'Se archivará y dejará de mostrarse, pero su historia permanecerá conservada.',confirmLabel:'Archivar sector'})) return;
     setSaving(true); setError(null);
     try { await archiveAdministrationSector(sector.id, sector.updatedAt); await onChanged(); }
     catch (archiveError) { setError(archiveError instanceof Error ? archiveError.message : 'No se pudo eliminar el sector.'); setSaving(false); }

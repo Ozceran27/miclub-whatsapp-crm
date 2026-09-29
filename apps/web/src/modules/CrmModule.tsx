@@ -13,6 +13,7 @@ import { useCrmData } from './CRM/useCrmData';
 import { useCrmFilters } from './CRM/useCrmFilters';
 import type { MessageStatus } from './CRM/types';
 import { CrmXlsxPanel } from './CRM/CrmXlsxPanel';
+import { confirmAction, requestText } from './shared/ActionDialog';
 
 const preview=(template:string,debt?:CrmDebt)=>{
   if(!debt)return template;
@@ -44,23 +45,23 @@ function OperationalCrm(){
     if(!selectedTemplateId)setSelectedTemplateId(current.id);
     if(templateStatus!=='dirty'){setTemplateName(current.name);setMessage(current.body);}
   });return()=>{active=false;};},[data.templates,selectedTemplateId,templateStatus]);
-  const changeTemplate=(id:string)=>{
-    if(templateStatus==='dirty'&&!window.confirm('Tenés cambios sin guardar. ¿Deseás descartarlos?'))return;
+  const changeTemplate=async(id:string)=>{
+    if(templateStatus==='dirty'&&!await confirmAction({title:'¿Descartar cambios?',description:'Tenés cambios sin guardar en la plantilla actual.',confirmLabel:'Descartar cambios'}))return;
     const chosen=data.templates.find(t=>t.id===id);if(!chosen)return;
     setSelectedTemplateId(id);setTemplateName(chosen.name);setMessage(chosen.body);setTemplateStatus('idle');
   };
   const fail=(error:unknown)=>data.setError(error instanceof Error?error.message:'No se pudo completar la acción.');
   const saveTemplate=async()=>{if(!selectedTemplate)return;try{const updated=await crmApi.updateTemplate(selectedTemplate.id,templateName,message);
     data.setTemplates(prev=>prev.map(t=>t.id===updated.id?updated:t));setTemplateStatus('saved');}catch(e){fail(e);}};
-  const createTemplate=async()=>{const name=window.prompt('Nombre de la nueva plantilla:');if(!name?.trim())return;
+  const createTemplate=async()=>{const name=await requestText({title:'Nueva plantilla',inputLabel:'Nombre de la plantilla',confirmLabel:'Crear plantilla'});if(!name?.trim())return;
     try{const created=await crmApi.createTemplate(name.trim(),message||'Hola {nombre}, ');data.setTemplates(prev=>[...prev,created]);
       setSelectedTemplateId(created.id);setTemplateName(created.name);setMessage(created.body);setTemplateStatus('saved');}catch(e){fail(e);}};
   const duplicateTemplate=async()=>{if(!selectedTemplate)return;try{const created=await crmApi.createTemplate(`${templateName} (copia)`,message);
     data.setTemplates(prev=>[...prev,created]);setSelectedTemplateId(created.id);setTemplateName(created.name);setTemplateStatus('saved');}catch(e){fail(e);}};
-  const deleteTemplate=async()=>{if(!selectedTemplate||selectedTemplate.isDefault||!window.confirm('¿Eliminar plantilla seleccionada?'))return;
+  const deleteTemplate=async()=>{if(!selectedTemplate||selectedTemplate.isDefault||!await confirmAction({title:'¿Eliminar plantilla seleccionada?',description:'La plantilla dejará de estar disponible.',confirmLabel:'Eliminar plantilla'}))return;
     try{await crmApi.deleteTemplate(selectedTemplate.id);const rest=data.templates.filter(t=>t.id!==selectedTemplate.id);data.setTemplates(rest);
       setSelectedTemplateId(rest[0]?.id ?? '');setTemplateName(rest[0]?.name ?? '');setMessage(rest[0]?.body ?? '');setTemplateStatus('idle');}catch(e){fail(e);}};
-  const resetDefaultTemplates=async()=>{if(!window.confirm('Esto restaurará las plantillas predeterminadas.'))return;
+  const resetDefaultTemplates=async()=>{if(!await confirmAction({title:'Restaurar plantillas predeterminadas',description:'Esto restaurará las plantillas predeterminadas.',confirmLabel:'Restaurar plantillas'}))return;
     try{const restored=await crmApi.resetTemplates();data.setTemplates(restored);setSelectedTemplateId(restored[0]?.id ?? '');
       setTemplateName(restored[0]?.name ?? '');setMessage(restored[0]?.body ?? '');setTemplateStatus('idle');}catch(e){fail(e);}};
   const prepare=async()=>{
@@ -70,7 +71,7 @@ function OperationalCrm(){
       if(validated.missingPhoneMembers.length)throw new Error(`${validated.missingPhoneMembers.length} inscripciones no tienen teléfono argentino válido.`);
       if(validated.unresolvedVariables.length)throw new Error(`Variables desconocidas: ${validated.unresolvedVariables.join(', ')}`);
       const warning=validated.duplicates.length?`\n${validated.duplicates.length} contactos tienen mensajes previos.`:'';
-      if(!window.confirm(`Preparar ${validated.selectedCount} mensajes.\nEjemplo: ${validated.sampleMessage}${warning}`))return;
+      if(!await confirmAction({title:`Preparar ${validated.selectedCount} mensajes`,description:`Ejemplo: ${validated.sampleMessage}${warning}`,confirmLabel:'Preparar mensajes'}))return;
       await crmApi.prepareMessages(filters.selected,message,selectedTemplate?.name ?? templateName);
       filters.clearSelection();await Promise.all([data.loadPrepared(1),data.loadHistory(1),data.loadDebts()]);
     }catch(e){fail(e);}finally{setPreparing(false);}
@@ -84,7 +85,7 @@ function OperationalCrm(){
     try{const current=item.enrollmentId?await crmApi.eligibility(item.enrollmentId):null;
       if(!current?.eligible){popup.close();throw new Error('La deuda ya no está vencida o no tenés acceso a esta inscripción.');}
       if(current.phone!==item.phone){popup.close();throw new Error('El teléfono cambió. Prepará un nuevo mensaje con los datos actuales.');}
-      if(!window.confirm(`Saldo actual: ${money(current.balances)} (${current.overdueCount} cuotas). Revisá que el mensaje preparado siga vigente antes de abrir WhatsApp.`)){popup.close();return;}
+      if(!await confirmAction({title:'Revisar saldo antes de abrir WhatsApp',description:`Saldo actual: ${money(current.balances)} (${current.overdueCount} cuotas). Revisá que el mensaje preparado siga vigente.`,confirmLabel:'Abrir WhatsApp'})){popup.close();return;}
       popup.opener=null;popup.location.href=item.waLink;await updatePreparedStatus(item.historyId,'opened');
     }catch(e){popup.close();fail(e);}
   };
@@ -99,7 +100,7 @@ function OperationalCrm(){
     <MembersTable debts={data.debts} selected={filters.selected} setSelected={filters.setSelected} pageChange={page=>filters.change({page})} loading={data.loading}/>
     {filters.filter.kind==='review'&&<div className="section-note">Estas inscripciones necesitan una cuota generada o una fecha de vencimiento válida antes de preparar un recordatorio de deuda.
       {canViewEnrollments&&<button className="icon-btn ghost-btn" onClick={()=>{navigate('/app/administration');window.setTimeout(()=>document.getElementById('enrollment-list')?.scrollIntoView({behavior:'smooth',block:'start'}),0);}}>Ir a Inscripciones</button>}</div>}
-    {canWrite&&<MessageTemplatePanel templates={data.templates} selectedTemplateId={selectedTemplateId} handleTemplateChange={changeTemplate}
+    {canWrite&&<MessageTemplatePanel templates={data.templates} selectedTemplateId={selectedTemplateId} handleTemplateChange={id=>{void changeTemplate(id);}}
       templateName={templateName} setTemplateName={setTemplateName} message={message} setMessage={setMessage}
       templateStatus={templateStatus} setTemplateStatus={setTemplateStatus} selectedTemplate={selectedTemplate}
       saveTemplate={saveTemplate} createTemplate={createTemplate} duplicateTemplate={duplicateTemplate} deleteTemplate={deleteTemplate}

@@ -1,5 +1,30 @@
 # Testing
 
+## Superficies de diálogos — 2026-09-29
+
+La prueba estática `draftModalStyles.test.ts` cubre la opacidad y la estructura
+de fichas, finanzas, onboarding y confirmación de migración. En navegador
+autenticado con PostgreSQL descartable se inspeccionaron la ficha de movimiento,
+la ficha de inscripción y «Procesar saldo neto» en escritorio; el último se
+revisó también a 390 × 844 px. El detalle exacto de una liquidación no tenía
+registros en la instalación de prueba, pero comparte el mismo contenedor
+`sector-modal finance-detail` y su cuerpo desplazable con el flujo verificado.
+Se abrió y canceló la confirmación de archivo de actividad encima de su ficha:
+Escape cerró sólo la confirmación. Se abrió y canceló la solicitud de nombre de
+plantilla CRM, con foco inicial en el campo. Ninguna prueba alteró la base real.
+Pasaron 94/94 pruebas web, `typecheck`, `build`, `docs:check`, lint de los archivos
+TSX modificados y `git diff --check`. El lint global conserva 150 errores y 595
+advertencias de deuda previa fuera de estos cambios.
+
+## Pulido visual de operaciones — 2026-09-29
+
+La regresión de estilos cubre que Movimiento, Inscripción y Cuota compartan
+superficie opaca, contenido desplazable y pie fijo. Se recorrieron los tres
+accesos rápidos con sesión autenticada en PostgreSQL descartable de dos clubes,
+incluidos los cargos de una inscripción y el formulario de cobro en escritorio;
+Cuota se comprobó también a 390 × 844 px. El circuito integrado de inscripción,
+cuotas y movimiento pasó en ese clúster. La base real permanece sin cambios.
+
 ## Inscripción, cuota y movimiento — 2026-09-29
 
 El test `apps/api/integration/enrollmentFlow.test.ts` instala el esquema en

@@ -49,3 +49,35 @@ test('matriz visual estática cubre diálogos, temas, viewports, scroll y apilam
   assert.match(styles, /\.draft-modal > header,\.draft-modal__footer\s*\{[^}]*background:var\(--draft-modal-surface\)[^}]*z-index:1/s);
   assert.match(styles, /\.draft-modal-backdrop\s*\{ align-items:flex-end; padding:0;/);
 });
+
+test('los tres formularios operativos comparten superficie opaca, cuerpo desplazable y acciones fijas', async () => {
+  const styles = await readSource('../styles.css');
+  for (const path of ['Administration/MovementCreateModal.tsx', 'Administration/EnrollmentCreateModal.tsx', 'Administration/QuotaModal.tsx']) {
+    const source = await readSource(`./${path}`);
+    assert.match(source, /className="draft-modal-backdrop"/);
+    assert.match(source, /className="draft-modal draft-modal--large operation-modal"/);
+    assert.match(source, /className="draft-modal__body operation-modal__body"/);
+    assert.match(source, /className="draft-modal__footer"/);
+    assert.doesNotMatch(source, /className="sector-modal movement-form-modal"/);
+  }
+  assert.match(styles, /\.operation-modal\s*\{[^}]*background:\s*var\(--operation-surface\)/);
+  assert.match(styles, /\.operation-modal__form\s*\{[^}]*grid-template-rows:\s*minmax\(0,1fr\) auto/);
+});
+
+test('las fichas, finanzas, onboarding y confirmación de migración conservan un panel opaco', async () => {
+  const [styles, finance, migration, onboarding, movement, enrollment, worker] = await Promise.all([
+    readSource('../styles.css'), readSource('./Finance/financialCircuit.css'), readSource('./DataMigrationModule.tsx'),
+    readSource('./Onboarding/OnboardingDialog.tsx'), readSource('./Administration/MovementDetailModal.tsx'),
+    readSource('./Administration/EnrollmentDetailModal.tsx'), readSource('./Administration/WorkerDetailModal.tsx'),
+  ]);
+  for (const selector of ['.sector-modal', '.onboarding-dialog', '.onboarding-dialog__top', '.onboarding-viewport', '.onboarding-actions', '.ui-dialog']) {
+    const declaration = [...styles.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, candidate]) => candidate.trim() === selector)?.[2] ?? '';
+    assert.match(declaration, /background:\s*var\(--draft-modal-surface\)/, `Superficie no opaca en ${selector}`);
+  }
+  assert.match(styles, /\.sector-modal\s*\{[^}]*grid-template-rows:\s*auto minmax\(0,1fr\)[^}]*overflow:\s*hidden/);
+  assert.match(styles, /\.sector-modal__body,\.sector-modal > \.finance-detail__body\s*\{[^}]*overflow-y:\s*auto/);
+  assert.match(finance, /\.finance-detail\{[^}]*overflow:hidden/);
+  for (const source of [movement, enrollment, worker]) assert.match(source, /className="sector-modal__body"/);
+  assert.match(onboarding, /className="onboarding-dialog" role="dialog"/);
+  assert.match(migration, /className="ui-dialog__body"/);
+});

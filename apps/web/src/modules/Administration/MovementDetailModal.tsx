@@ -42,6 +42,7 @@ export function MovementDetailModal({ movement, onClose, onChanged }: Props) {
   return <div className="sector-modal__backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="sector-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} ref={dialogRef} tabIndex={-1}>
       <header className="sector-modal__header"><div><p className="eyebrow">Detalle de movimiento</p><h2 id={titleId}>{title}</h2><p id={descriptionId}>Información contable, asociaciones y trazabilidad de solo lectura.</p></div><button className="sector-modal__close" type="button" onClick={onClose} aria-label={`Cerrar detalle de ${title}`}>×</button></header>
+      <div className="sector-modal__body">
       <section><h3>Movimiento</h3><dl className="sector-modal__facts">
         <div><dt>Número</dt><dd>#{movement.sequenceNumber}</dd></div><div><dt>Fecha</dt><dd>{showDate(movement.date)}</dd></div><div><dt>Tipo</dt><dd>{showStatus(movement.type)}</dd></div><div><dt>Estado operativo</dt><dd>{showStatus(movement.status)}</dd></div>
         <div><dt>Monto</dt><dd>{money(movement.amount,movement.currencyCode)}</dd></div><div><dt>Impuestos</dt><dd>{movement.taxes == null ? 'No informados' : money(movement.taxes,movement.currencyCode)}</dd></div><div><dt>Estado financiero</dt><dd>{showStatus(movement.financialStatus)}</dd></div>
@@ -55,6 +56,7 @@ export function MovementDetailModal({ movement, onClose, onChanged }: Props) {
       </dl></section>
       <section><h3>Origen y auditoría</h3><dl className="sector-modal__facts activity-modal__audit"><div><dt>Fuente</dt><dd>{showText(movement.source)}</dd></div><div><dt>ID externo</dt><dd><code>{showText(movement.externalId)}</code></dd></div><div><dt>Identificador</dt><dd><code>{movement.id}</code></dd></div><div><dt>Creado</dt><dd>{showDate(movement.createdAt)}</dd></div><div><dt>Última actualización</dt><dd>{showDate(movement.updatedAt)}</dd></div></dl></section>
       <MovementFinanceActions movement={movement} onChanged={onChanged}/>
+      </div>
     </div>
   </div>;
 }

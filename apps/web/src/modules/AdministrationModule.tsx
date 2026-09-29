@@ -105,9 +105,9 @@ export default function AdministrationModule() {
         {capabilities.tasks ? <TaskPanel canCreate={capabilities.createTask} canEdit={capabilities.editTask} /> : <UnavailableSurface capability="tasks" title="Tareas" />}
         {capabilities.requests ? <RequestPanel canApprove={capabilities.approveRequest} canReject={capabilities.rejectRequest} /> : <UnavailableSurface capability="requests" title="Solicitudes" />}
       </div>
-      {capabilities.createMovement && <MovementCreateModal open={movementOpen} onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
-      {capabilities.createEnrollment && <EnrollmentCreateModal open={enrollmentOpen} onClose={()=>setEnrollmentOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
-      {capabilities.enrollments && <QuotaModal open={quotaOpen} onClose={()=>setQuotaOpen(false)}/>}
+      {capabilities.createMovement && movementOpen && <MovementCreateModal open onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
+      {capabilities.createEnrollment && enrollmentOpen && <EnrollmentCreateModal open onClose={()=>setEnrollmentOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
+      {capabilities.enrollments && quotaOpen && <QuotaModal open onClose={()=>setQuotaOpen(false)}/>}
     </main>
   );
 }

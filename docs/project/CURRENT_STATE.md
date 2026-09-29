@@ -1,5 +1,27 @@
 # Current State
 
+## Superficies de diálogos de la aplicación — 2026-09-29
+
+La auditoría de los cuadros emergentes unificó las fichas de inscripción,
+movimiento y trabajador, los detalles y operaciones del circuito financiero,
+el onboarding y la confirmación de migración con la superficie opaca de los
+editores operativos. Las fichas y finanzas separan encabezado fijo y contenido
+desplazable, con secciones legibles en ambos temas y en móvil. La confirmación
+de migración separa encabezado, explicación y acciones. Las confirmaciones y
+pedidos de texto de Administración y CRM usan ahora el diálogo visual común en
+lugar de los cuadros nativos del navegador. Se conservan sus contratos y
+permisos; no se modificó el esquema ni se aplicó SQL a la base real.
+
+## Pulido visual de operaciones — 2026-09-29
+
+Los formularios de Cargar Inscripción, Cargar Cuota y Cargar Movimiento usan ahora
+la superficie opaca de los editores de Sectores, Actividades y Trabajadores.
+Separan encabezado, secciones del formulario con desplazamiento y acciones
+fijas; la tabla de cargos conserva desplazamiento horizontal en móvil. El
+cobro de cuota limpia la selección después de confirmarse, y el formulario de
+movimiento sólo permite aplicar ingresos completados a cuotas. No hubo cambios
+de esquema ni se aplicó SQL a la base real.
+
 ## Primera versión operativa de inscripción, movimiento y cuota — 2026-09-29
 
 Los accesos rápidos abren altas con persona nueva/existente y cobro inicial
