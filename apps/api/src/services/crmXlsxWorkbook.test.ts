@@ -13,7 +13,7 @@ const fixture=(rows:string[][],header=CRM_XLSX_HEADERS as readonly string[],work
   'xl/_rels/workbook.xml.rels':'<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
   'xl/worksheets/sheet1.xml':`<worksheet><sheetData><row r="1">${header.map((v,i)=>cell(`${'ABCDEFGH'[i]}1`,v)).join('')}</row>${rows.map((values,index)=>`<row r="${index+2}">${values.map((v,i)=>v?cell(`${'ABCDEFGH'[i]}${index+2}`,v):'').join('')}</row>`).join('')}<row r="14">${cell('K14',marker)}</row></sheetData></worksheet>`,
 });
-const valid=(buffer:Buffer)=>validateCrmXlsx(buffer,'CRM_CONTACTOS_v1.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+const valid=(buffer:Buffer)=>validateCrmXlsx(buffer,'CRM_CONTACTOS_v1.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','ARS');
 
 void test('la plantilla distribuida se reconoce y no importa ejemplos de la guía',()=>{
   const result=valid(readFileSync(new URL('../../data/db/CRM_CONTACTOS_v1.xlsx',import.meta.url)));
@@ -25,7 +25,7 @@ void test('la plantilla real editada y renombrada se puede volver a validar',()=
   const files=Object.fromEntries(inspectZip(downloaded).map(entry=>[entry.name,readEntry(downloaded,entry)]));
   const editedRow=`<row r="2">${['12345678','Ana','Pérez','3764123456','Nuevo Inscripto','Tenis','',''].map((value,index)=>value?cell(`${'ABCDEFGH'[index]}2`,value):'').join('')}</row>`;
   files['xl/worksheets/sheet1.xml']=files['xl/worksheets/sheet1.xml'].replace(/<row r="2"[^>]*>[\s\S]*?<\/row>/,editedRow);
-  const result=validateCrmXlsx(zip(files),'mis_contactos.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  const result=validateCrmXlsx(zip(files),'mis_contactos.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','ARS');
   assert.deepEqual(result.issues,[]);
   assert.equal(result.rows[0].status,'nuevo_inscripto');
 });
@@ -51,4 +51,25 @@ void test('rechaza duplicado, fecha, estado, teléfono y estructura insegura',()
   assert.ok(valid(fixture([row],CRM_XLSX_HEADERS,undefined,'CRM_CONTACTOS_v2')).issues.some(i=>i.field==='versión'));
   assert.ok(valid(zip({'../xl/workbook.xml':'bad'})).issues.length>0);
   assert.ok(valid(fixture([row],['Otro',...CRM_XLSX_HEADERS.slice(1)])).issues.some(i=>i.row===1));
+});
+
+void test('interpreta teléfonos numéricos de Excel, fechas locales y ausencia declarada de vencimiento',()=>{
+  const file=fixture([
+    ['12345678','Ana','Pérez','3.764123456E9','Adeudando','Tenis','01/02/2026','Sin Pagos'],
+    ['12345679','Beto','Gómez','3.764153456E9','Adeudando','Tenis','','28/09/2026'],
+    ['12345680','Caro','López','3764123458.0','Al día','Tenis','',''],
+  ]);
+  const result=valid(file);
+  assert.deepEqual(result.issues,[]);
+  assert.equal(result.rows[0].phone,'5493764123456');
+  assert.equal(result.rows[0].enrollmentDate,'2026-02-01');
+  assert.equal(result.rows[0].dueDate,null);
+  assert.equal(result.rows[1].phone,'5493764153456');
+  assert.equal(result.rows[1].dueDate,'2026-09-28');
+});
+
+void test('la moneda ARS permite número local; otra moneda exige prefijo internacional',()=>{
+  const file=fixture([['12345678','Ana','Pérez','3764123456','Adeudando','Tenis','','']]);
+  const result=validateCrmXlsx(file,'CRM_CONTACTOS_v1.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','USD');
+  assert.ok(result.issues.some(issue=>issue.field==='Teléfono'));
 });

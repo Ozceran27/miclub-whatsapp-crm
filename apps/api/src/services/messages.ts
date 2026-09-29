@@ -6,17 +6,17 @@ export const normalizeArPhone = (raw: string): string => {
 
   let digits = digitsOnly;
 
-  if (digits.startsWith("549")) {
+  if (digits.length === 13 && digits.startsWith("549")) {
     digits = digits.slice(3);
-  } else if (digits.startsWith("54")) {
+  } else if (digits.length === 12 && digits.startsWith("54")) {
     digits = digits.slice(2);
   }
 
-  if (digits.startsWith("0")) {
+  if (digits.length === 11 && digits.startsWith("0")) {
     digits = digits.slice(1);
   }
 
-  digits = digits.replace(/^(\d{2,4})15/, "$1");
+  if (digits.length === 12) digits = digits.replace(/^(\d{2,4})15/, "$1");
 
   return `549${digits}`;
 };

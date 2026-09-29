@@ -45,7 +45,7 @@ export function MovementDetailModal({ movement, onClose, onChanged }: Props) {
       <section><h3>Movimiento</h3><dl className="sector-modal__facts">
         <div><dt>Número</dt><dd>#{movement.sequenceNumber}</dd></div><div><dt>Fecha</dt><dd>{showDate(movement.date)}</dd></div><div><dt>Tipo</dt><dd>{showStatus(movement.type)}</dd></div><div><dt>Estado operativo</dt><dd>{showStatus(movement.status)}</dd></div>
         <div><dt>Monto</dt><dd>{money(movement.amount,movement.currencyCode)}</dd></div><div><dt>Impuestos</dt><dd>{movement.taxes == null ? 'No informados' : money(movement.taxes,movement.currencyCode)}</dd></div><div><dt>Estado financiero</dt><dd>{showStatus(movement.financialStatus)}</dd></div>
-        <div><dt>Categoría</dt><dd>{showText(movement.category)}</dd></div><div><dt>Medio de pago</dt><dd>{showText(movement.paymentMethod)}</dd></div><div><dt>Contraparte</dt><dd>{showText(movement.counterpartyText)}</dd></div>
+        <div><dt>Categoría</dt><dd>{showText(movement.category)}</dd></div><div><dt>Medio de pago</dt><dd>{showText(movement.paymentMethod)}</dd></div><div><dt>Contraparte</dt><dd>{showText(movement.counterpartyText)}</dd></div><div><dt>Identificación</dt><dd>{movement.counterpartyDocumentType?`${movement.counterpartyDocumentType} ${movement.counterpartyDocumentValue??''}`:'No informada (registro anterior)'}</dd></div>
         <div className="sector-modal__fact--wide"><dt>Concepto</dt><dd>{showText(movement.concept)}</dd></div>
       </dl></section>
       <section><h3>Asociaciones</h3><dl className="sector-modal__facts">

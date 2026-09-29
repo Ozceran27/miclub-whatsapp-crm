@@ -5,6 +5,7 @@ import asyncHandler from './asyncHandler.js';
 import { adjustSettlement, assertFinancialSchema, financeTransaction, financialError, financialMoney, previewResponsiblePayment, readFinancialCircuit, recordResponsiblePayment, resolveTerm, reviewSettlement, voidPayoutGroup, voidSettlementAdjustment } from '../services/financialCircuitService.js';
 import { editEmployeeCompensationObligation, listEmployeeCompensationObligations, refreshEmployeeCompensationObligations, reviewEmployeeCompensationObligation } from '../services/employeeCompensationService.js';
 import { abandonEnrollment, correctFinancialMovement, createFinancialMovement, refundCollection } from '../services/financialMovementService.js';
+import { collectFee, generateFeesForMonth } from '../services/enrollmentOperationsService.js';
 import { withTenantTransaction } from '../db/transaction.js';
 import { approveStartup, previewStartup, reconcileMovement, payInitialObligation } from '../services/financialStartupService.js';
 
@@ -72,21 +73,20 @@ router.get('/finance/workbench', requirePermission(PERMISSIONS.FINANCE_READ), as
 }));
 
 router.post('/finance/receivables/generate', requirePermission(PERMISSIONS.ENROLLMENTS_CREATE), asyncHandler(async (req, res) => {
-  const b = body(req, ['month']);
+  const b = body(req, ['month','enrollmentId']);
   const month = text(b.month);
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw financialError('Mes inválido.', 400);
-  res.json(await run(req, async db => {
-    const result = await db.query(`insert into miclub.receivables(club_id,person_id,enrollment_id,activity_id,sector_id,concept,period_month,period_year,due_date,amount,currency_code,source_key)
-      select e.club_id,e.person_id,e.id,e.activity_id,a.sector_id,'Cuota '||$2,extract(month from $3::date),extract(year from $3::date),$3,
-      coalesce(e.normalized_fee_amount,e.fee_amount),c.base_currency_code,'monthly:'||e.id||':'||$2
-      from miclub.enrollments e join miclub.activities a on a.id=e.activity_id and a.club_id=e.club_id join miclub.clubs c on c.id=e.club_id
-      where e.club_id=$1 and not e.inactive and e.status::text not in ('abandonado','cancelado')
-      and e.start_date<($3::date+interval '1 month') and (e.end_date is null or e.end_date>=$3::date)
-      and ($4::uuid[] is null or a.sector_id=any($4))
-      and not exists(select 1 from miclub.receivables r where r.club_id=e.club_id and r.enrollment_id=e.id and r.period_month=extract(month from $3::date) and r.period_year=extract(year from $3::date))
-      on conflict(club_id,source_key) where source_key is not null do nothing returning id`, [req.auth!.clubId, month, `${month}-01`, req.auth!.permissions.includes(PERMISSIONS.SECTORS_ANY) ? null : req.auth!.sectorIds]);
-    return { generated: result.rows.length };
-  }));
+  res.json(await run(req, db => generateFeesForMonth(db,req.auth!,month,b.enrollmentId==null?undefined:uuid(b.enrollmentId))));
+}));
+router.post('/finance/receivables/:id/collect', requirePermission(PERMISSIONS.MOVEMENTS_CREATE), asyncHandler(async(req,res)=>{
+  const b=body(req,['amount','accountId','paymentMethodId','date','documentType','documentValue']);
+  if(b.documentType!==undefined&&(typeof b.documentType!=='string'||!['DNI','CUIL','REGISTRO'].includes(b.documentType))) throw financialError('Tipo de identificación inválido.',400);
+  res.status(201).json(await run(req,db=>collectFee(db,req.auth!,{
+    receivableId:uuid(req.params.id),amount:Number(b.amount),accountId:uuid(b.accountId),
+    paymentMethodId:uuid(b.paymentMethodId),date:text(b.date),
+    documentType:b.documentType as 'DNI'|'CUIL'|'REGISTRO'|undefined,
+    documentValue:b.documentValue===undefined?undefined:text(b.documentValue),
+  })));
 }));
 
 router.get('/finance/circuit', requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => {
@@ -100,7 +100,8 @@ router.get('/finance/movements/:id', requirePermission(PERMISSIONS.FINANCE_READ)
       (m.movement_date at time zone coalesce(c.timezone,'America/Argentina/Buenos_Aires'))::date::text "movementDate",
       m.movement_type "movementType",m.account_id "accountId",m.category_id "categoryId",m.sector_id "sectorId",
       m.activity_id "activityId",m.person_id "personId",m.payment_method_id "paymentMethodId",m.concept,
-      m.counterparty_text "counterpartyText",m.operational_status "operationalStatus",m.receivable_id "receivableId",
+      m.counterparty_text "counterpartyText",m.counterparty_document_type "counterpartyDocumentType",
+      m.counterparty_document_value "counterpartyDocumentValue",m.operational_status "operationalStatus",m.receivable_id "receivableId",
       m.reconciled_at "reconciledAt",m.currency_code "currencyCode",m.voided_at "voidedAt"
       from miclub.movements m join miclub.clubs c on c.id=m.club_id
       where m.club_id=$1 and m.id=$2 and ($3::uuid[] is null or m.sector_id=any($3))`,
@@ -189,7 +190,7 @@ router.patch('/finance/compensation-obligations/:id', requirePermission(PERMISSI
 for (const operation of ['approve','cancel'] as const) router.post(`/finance/compensation-obligations/:id/${operation}`,requirePermission(PERMISSIONS.FINANCE_REVIEW),asyncHandler(async(req,res)=>{
   const b=body(req,['revision']); res.json(await run(req,db=>reviewEmployeeCompensationObligation(db,req.auth!,uuid(req.params.id),revision(b.revision),operation==='approve',text(b.reason))));
 }));
-const cashKeys = ['movementDate', 'movementType', 'accountId', 'categoryId', 'sectorId', 'activityId', 'personId', 'paymentMethodId', 'concept', 'counterpartyText', 'amount', 'taxes', 'operationalStatus', 'receivableId'];
+const cashKeys = ['movementDate', 'movementType', 'accountId', 'categoryId', 'sectorId', 'activityId', 'personId', 'paymentMethodId', 'concept', 'counterpartyText', 'counterpartyDocumentType', 'counterpartyDocumentValue', 'amount', 'taxes', 'operationalStatus', 'receivableId'];
 const cash = (value: unknown) => {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k => !cashKeys.includes(k))) throw financialError('Movimiento inválido o campos no editables.', 400);
   const v = value as Record<string, unknown>;

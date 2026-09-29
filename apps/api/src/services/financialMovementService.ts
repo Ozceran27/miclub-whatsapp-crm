@@ -3,7 +3,7 @@ import type { QueryExecutor } from '../db/postgres.js';
 import { PERMISSIONS } from '@miclub/shared';
 import { financialDate, financialError, financialMoney, loadCircuit, localDay } from './financialCircuitService.js';
 
-type CashInput = { movementDate: string; movementType: 'INGRESOS' | 'EGRESOS'; accountId: string; categoryId: string; sectorId: string; activityId?: string | null; personId?: string | null; paymentMethodId?: string | null; concept: string; counterpartyText: string; amount: number; taxes?: number; operationalStatus?: 'COMPLETADO' | 'PENDIENTE' | 'ANULADO'; receivableId?: string | null };
+type CashInput = { movementDate: string; movementType: 'INGRESOS' | 'EGRESOS'; accountId: string; categoryId: string; sectorId: string; activityId?: string | null; personId?: string | null; paymentMethodId?: string | null; concept: string; counterpartyText: string; counterpartyDocumentType?: 'DNI' | 'CUIL' | 'REGISTRO'; counterpartyDocumentValue?: string; amount: number; taxes?: number; operationalStatus?: 'COMPLETADO' | 'PENDIENTE' | 'ANULADO'; receivableId?: string | null };
 type Movement = { id: string; revision: number; amount: number; currency_code: string; activity_id: string | null; person_id: string | null; sector_id: string; payment_method_id: string | null; movement_date: Date; operational_status: string; movement_type: string; account_id: string; receivable_id: string | null; initial_obligation_id: string | null };
 const movementSelect = 'id,revision,amount::float8 amount,currency_code,activity_id,person_id,sector_id,payment_method_id,movement_date,operational_status::text,movement_type::text,account_id,receivable_id,initial_obligation_id';
 
@@ -13,9 +13,12 @@ async function movement(db: QueryExecutor, auth: RequestAuthContext, id: string)
   return row;
 }
 
-async function validateCash(db: QueryExecutor, auth: RequestAuthContext, input: CashInput) {
+async function validateCash(db: QueryExecutor, auth: RequestAuthContext, input: CashInput, requireDocument = false) {
   financialDate(input.movementDate); financialMoney(input.amount); financialMoney(input.taxes ?? 0);
   if (input.amount <= 0 || !input.concept?.trim() || !input.counterpartyText?.trim() || !['INGRESOS', 'EGRESOS'].includes(input.movementType) || !['COMPLETADO', 'PENDIENTE', 'ANULADO'].includes(input.operationalStatus ?? 'COMPLETADO')) throw financialError('Complete tipo, concepto, contraparte, importe y estado.', 400);
+  if ((requireDocument || input.counterpartyDocumentType || input.counterpartyDocumentValue) && (!['DNI','CUIL','REGISTRO'].includes(input.counterpartyDocumentType ?? '') || !input.counterpartyDocumentValue?.trim() || input.counterpartyDocumentValue.trim().length>80)) throw financialError('Identificación de contraparte obligatoria.',400);
+  if (input.counterpartyDocumentType==='DNI' && !/^\d{7,9}$/.test((input.counterpartyDocumentValue??'').replace(/\D/g,''))) throw financialError('DNI de contraparte inválido.',400);
+  if (input.counterpartyDocumentType==='CUIL' && !/^\d{11}$/.test((input.counterpartyDocumentValue??'').replace(/\D/g,''))) throw financialError('CUIL de contraparte inválido.',400);
   if (!auth.permissions.includes(PERMISSIONS.SECTORS_ANY) && !auth.sectorIds.includes(input.sectorId)) throw financialError('Sector no disponible.', 404);
   const reference = (await db.query<{ currency: string; timezone: string }>(`select f.currency_code currency,coalesce(c.timezone,'America/Argentina/Buenos_Aires') timezone
     from miclub.financial_accounts f join miclub.clubs c on c.id=f.club_id
@@ -28,14 +31,18 @@ async function validateCash(db: QueryExecutor, auth: RequestAuthContext, input: 
     and ($8::uuid is null or exists(select 1 from miclub.receivables r where r.club_id=$1 and r.id=$8 and r.person_id=$6 and r.activity_id is not distinct from $5::uuid and r.currency_code=f.currency_code))`,
   [auth.clubId, input.accountId, input.sectorId, input.categoryId, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.receivableId ?? null])).rows[0];
   if (!reference) throw financialError('Cuenta, categoría, sector o referencias no compatibles dentro del club.', 404);
+  if(input.personId && input.counterpartyDocumentType==='DNI') {
+    const person=(await db.query<{dni:string|null}>('select dni from miclub.people where club_id=$1 and id=$2',[auth.clubId,input.personId])).rows[0];
+    if(person?.dni && person.dni.replace(/\D/g,'')!==(input.counterpartyDocumentValue??'').replace(/\D/g,'')) throw financialError('El DNI no coincide con la persona seleccionada.',409);
+  }
   return reference;
 }
 
 export async function createFinancialMovement(db: QueryExecutor, auth: RequestAuthContext, input: CashInput, applications: { receivableId: string; amount: number }[] = []) {
-  const reference = await validateCash(db, auth, input);
-  const row = (await db.query<{ id: string }>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,account_id,currency_code,category_id,sector_id,activity_id,person_id,payment_method_id,concept,counterparty_text,amount,taxes,operational_status,financial_status,source,receivable_id)
-    values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'otro','finance_circuit',$17) returning id`,
-  [auth.clubId, input.movementDate, reference.timezone, input.movementType, input.accountId, reference.currency, input.categoryId, input.sectorId, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.concept, input.counterpartyText, input.amount, input.taxes ?? 0, input.operationalStatus ?? 'COMPLETADO', input.receivableId ?? null])).rows[0];
+  const reference = await validateCash(db, auth, input, true);
+  const row = (await db.query<{ id: string }>(`insert into miclub.movements(club_id,sequence_number,external_id,movement_date,movement_type,account_id,currency_code,category_id,sector_id,activity_id,person_id,payment_method_id,concept,counterparty_text,counterparty_document_type,counterparty_document_value,amount,taxes,operational_status,financial_status,source,receivable_id)
+    values($1,miclub.next_tenant_sequence($1,'movement'),'finance:'||gen_random_uuid(),$2::date at time zone $3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'otro','finance_circuit',$19) returning id`,
+  [auth.clubId, input.movementDate, reference.timezone, input.movementType, input.accountId, reference.currency, input.categoryId, input.sectorId, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.concept, input.counterpartyText, input.counterpartyDocumentType, input.counterpartyDocumentValue!.trim(), input.amount, input.taxes ?? 0, input.operationalStatus ?? 'COMPLETADO', input.receivableId ?? null])).rows[0];
   await synchronizePayment(db, auth, await movement(db, auth, row.id), applications);
   return { id: row.id };
 }
@@ -49,8 +56,9 @@ export async function correctFinancialMovement(db: QueryExecutor, auth: RequestA
   const refundSum = (await db.query<{ amount: number }>(`select coalesce(sum(m.amount),0)::float8 amount from miclub.movement_refunds r join miclub.movements m on m.club_id=r.club_id and m.id=r.refund_movement_id where r.club_id=$1 and r.original_movement_id=$2 and m.operational_status='COMPLETADO' and m.voided_at is null`, [auth.clubId, id])).rows[0].amount;
   if (refundSum > 0 && (input.amount < refundSum || input.movementType !== 'INGRESOS' || input.operationalStatus === 'ANULADO' || input.operationalStatus === 'PENDIENTE' || input.activityId !== before.activity_id || input.personId !== before.person_id || reference.currency !== before.currency_code)) throw financialError('La corrección no puede invalidar devoluciones ya realizadas.');
   await db.query(`update miclub.movements set movement_date=$3::date at time zone $4,movement_type=$5,account_id=$6,currency_code=$7,category_id=$8,sector_id=$9,activity_id=$10,person_id=$11,payment_method_id=$12,concept=$13,counterparty_text=$14,amount=$15,taxes=$16,operational_status=$17::text::miclub.movement_status,receivable_id=$18,
+    counterparty_document_type=coalesce($20,counterparty_document_type),counterparty_document_value=coalesce($21,counterparty_document_value),
     voided_at=case when $17='ANULADO' then now() else null end,voided_by=case when $17='ANULADO' then $19::uuid else null end,void_reason=case when $17='ANULADO' then current_setting('app.finance_reason') else null end,updated_at=now()
-    where club_id=$1 and id=$2`, [auth.clubId, id, input.movementDate, reference.timezone, input.movementType, input.accountId, reference.currency, input.categoryId, input.sectorId, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.concept, input.counterpartyText, input.amount, input.taxes ?? 0, input.operationalStatus ?? 'COMPLETADO', input.receivableId ?? null, auth.userId]);
+    where club_id=$1 and id=$2`, [auth.clubId, id, input.movementDate, reference.timezone, input.movementType, input.accountId, reference.currency, input.categoryId, input.sectorId, input.activityId ?? null, input.personId ?? null, input.paymentMethodId ?? null, input.concept, input.counterpartyText, input.amount, input.taxes ?? 0, input.operationalStatus ?? 'COMPLETADO', input.receivableId ?? null, auth.userId,input.counterpartyDocumentType??null,input.counterpartyDocumentValue?.trim()??null]);
   const allocations = (await db.query<{ id: string; settlement_id: string }>('select id,settlement_id from miclub.activity_settlement_allocations where club_id=$1 and movement_id=$2', [auth.clubId, id])).rows;
   if (allocations.length) {
     if (input.activityId !== before.activity_id || input.personId !== before.person_id || input.movementType !== before.movement_type || reference.currency !== before.currency_code) throw financialError('Un pago de liquidación conserva receptor, actividad y moneda; corrija importe, fecha o estado.');

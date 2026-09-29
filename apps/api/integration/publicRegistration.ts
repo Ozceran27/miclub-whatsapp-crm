@@ -105,8 +105,8 @@ const main = async () => {
   assert.deepEqual(provisioned, {
     first_name: registration.firstName, last_name: registration.lastName, email: registration.email,
     club_name: registration.club.name, plan_code: "FREE", onboarding_status: "NOT_STARTED",
-    role_code: "DIRECTOR", membership_status: "active", position: "Director",
-    payment_mode: "VARIABLE", monthly_fixed_amount: null,
+    role_code: "DIRECTOR", membership_status: "active", position: "DIRECTOR",
+    payment_mode: null, monthly_fixed_amount: null,
     role_count: String(Object.keys(CLUB_ROLE_DEFINITIONS).length),
   });
   assert.deepEqual(new Set(paymentMethods), new Set(["Efectivo", "Transferencia"]));

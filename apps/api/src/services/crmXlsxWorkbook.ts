@@ -18,7 +18,43 @@ const normalized=(value:string)=>value.trim().normalize('NFKD').replace(/[\u0300
 const text=(value:string)=>value.trim().normalize('NFC').replace(/\s+/g,' ');
 const problem=(row:number,field:string,message:string):CrmXlsxIssue=>({row,field,message});
 
-export function validateCrmXlsx(buffer:Buffer,filename:string,mime:string):CrmXlsxValidation {
+// Excel can serialize a numeric phone as scientific notation even when the
+// cell displays a complete number. Reject unsafe or fractional values.
+const phoneDigits=(raw:string):string=>{
+  const compact=raw.trim().replace(/[\s\u00a0]/g,'');
+  if(/^[\d.,]+[eE][+]?[\d]+$/.test(compact)){
+    const value=Number(compact.replace(',','.'));
+    return Number.isSafeInteger(value)?String(value):'';
+  }
+  if(/^\d+[.,]0+$/.test(compact))return compact.split(/[.,]/)[0];
+  return raw.replace(/\D/g,'');
+};
+
+export const normalizeCrmXlsxPhone=(raw:string,baseCurrencyCode:string):string=>{
+  const digits=phoneDigits(raw);
+  if(!digits)return '';
+  if(baseCurrencyCode.toUpperCase()==='ARS'){
+    const withoutInternationalPrefix=digits.startsWith('0054')?digits.slice(2):digits;
+    const phone=normalizeArPhone(withoutInternationalPrefix);
+    return /^549\d{10}$/.test(phone)?phone:'';
+  }
+  // For other currencies the number must carry an explicit country code.
+  // Currency by itself cannot identify a telephone country code.
+  return raw.trim().startsWith('+')&&/^[1-9]\d{7,14}$/.test(digits)?digits:'';
+};
+
+const parseCrmDate=(raw:string):string|null=>{
+  const date=parseWorkbookDate(raw);
+  if(date)return date;
+  const match=raw.match(/^(\d{1,2})[-.\x2f](\d{1,2})[-.\x2f](\d{4})$/);
+  if(!match)return null;
+  const [,day,month,year]=match;
+  const iso=`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+  return parseWorkbookDate(iso);
+};
+const optionalDate=(raw:string)=>/^(?:sin pagos|sin fecha|s\/?f|s\/?d|n\/?a|[-—])$/i.test(raw)?'':raw;
+
+export function validateCrmXlsx(buffer:Buffer,filename:string,mime:string,baseCurrencyCode:string):CrmXlsxValidation {
   const sha256=createHash('sha256').update(buffer).digest('hex');
   const issues:CrmXlsxIssue[]=[];const rows:CrmXlsxRow[]=[];
   if(!/\.xlsx$/i.test(filename))issues.push(problem(0,'archivo','Se requiere un archivo .xlsx sin macros.'));
@@ -56,17 +92,19 @@ export function validateCrmXlsx(buffer:Buffer,filename:string,mime:string):CrmXl
       const value=(index:number)=>text(cells.get(`${letters[index]}${sourceRow}`)??'');
       const document=value(0).replace(/[.\s-]/g,'');const firstName=value(1),lastName=value(2),phoneRaw=value(3),statusRaw=value(4),activity=value(5);
       const status=statusMap[normalized(statusRaw)];
-      const phone=normalizeArPhone(phoneRaw);
-      const enrolled=value(6),due=value(7),enrollmentDate=enrolled?parseWorkbookDate(enrolled):null,dueDate=due?parseWorkbookDate(due):null;
+      const phone=normalizeCrmXlsxPhone(phoneRaw,baseCurrencyCode);
+      const enrolled=optionalDate(value(6)),due=optionalDate(value(7)),enrollmentDate=enrolled?parseCrmDate(enrolled):null,dueDate=due?parseCrmDate(due):null;
       if(!/^\d{7,9}$/.test(document))issues.push(problem(sourceRow,'DNI','DNI inválido; usá entre 7 y 9 dígitos.'));
       if(!firstName||firstName.length>120)issues.push(problem(sourceRow,'Nombre','Nombre obligatorio de hasta 120 caracteres.'));
       if(!lastName||lastName.length>120)issues.push(problem(sourceRow,'Apellido','Apellido obligatorio de hasta 120 caracteres.'));
-      if(!/^549\d{10}$/.test(phone))issues.push(problem(sourceRow,'Teléfono','Teléfono argentino válido obligatorio.'));
+      if(!phone)issues.push(problem(sourceRow,'Teléfono',baseCurrencyCode.toUpperCase()==='ARS'
+        ?'Ingresá un teléfono argentino completo (10 dígitos locales o +54 9 y 10 dígitos).'
+        :'Ingresá un teléfono internacional completo con + y código de país.'));
       if(!status)issues.push(problem(sourceRow,'Estado','Estado inválido: Al día, Adeudando, Nuevo Inscripto o Abandonado.'));
       if(!activity)issues.push(problem(sourceRow,'Actividad','Actividad obligatoria para este estado.'));
       if(activity.length>160)issues.push(problem(sourceRow,'Actividad','Actividad demasiado larga.'));
-      if(enrolled&&!enrollmentDate)issues.push(problem(sourceRow,'Fecha de inscripción','Usá una fecha Excel o AAAA-MM-DD.'));
-      if(due&&!dueDate)issues.push(problem(sourceRow,'Fecha de vencimiento','Usá una fecha Excel o AAAA-MM-DD.'));
+      if(enrolled&&!enrollmentDate)issues.push(problem(sourceRow,'Fecha de inscripción','Usá una fecha Excel, AAAA-MM-DD o DD/MM/AAAA; también podés dejarla vacía.'));
+      if(due&&!dueDate)issues.push(problem(sourceRow,'Fecha de vencimiento','Usá una fecha Excel, AAAA-MM-DD o DD/MM/AAAA; también podés dejarla vacía.'));
       const contactKey=`${document}:${activity?normalized(activity):'_sin_actividad'}`;
       if(seen.has(contactKey))issues.push(problem(sourceRow,'DNI/Actividad','Contacto repetido para el mismo DNI y actividad.'));
       seen.add(contactKey);

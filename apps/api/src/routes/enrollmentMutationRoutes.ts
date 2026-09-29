@@ -1,24 +1,43 @@
 import { Router, type Request, type Response } from "express";
-import { isActivityPrice } from "@miclub/shared";
 import { requireAuthorizationCapability } from "../middleware/authorization.js";
-import { createEnrollment, setEnrollmentStatus, type EnrollmentActor, type EnrollmentInput } from "../repositories/enrollmentsRepository.js";
+import { setEnrollmentStatus, type EnrollmentActor } from "../repositories/enrollmentsRepository.js";
 import asyncHandler from "./asyncHandler.js";
+import { financeTransaction } from "../services/financialCircuitService.js";
+import { createOperationalEnrollment, previewEnrollmentPrice, type EnrollmentOperation } from "../services/enrollmentOperationsService.js";
+import { withTenantTransaction } from "../db/transaction.js";
 
 const router = Router();
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const actor=(req:Request):EnrollmentActor=>({userId:req.auth!.userId,membershipId:req.auth!.membershipId,clubId:req.auth!.clubId,requestId:req.requestId,ip:req.ip,userAgent:req.get("user-agent")});
 const fail=(res:Response,status:number,code:string,message:string,details?:unknown)=>res.status(status).json({ok:false,error:true,status,code,message,details});
 
+router.get('/inscripciones/pricing',requireAuthorizationCapability('ENROLLMENTS_CREATE'),asyncHandler(async(req,res)=>{
+  res.set('Cache-Control','private, no-store');
+  const activityId=typeof req.query.activityId==='string'?req.query.activityId:'';
+  const date=typeof req.query.date==='string'?req.query.date:'';
+  res.json(await withTenantTransaction(req.auth!.clubId,db=>previewEnrollmentPrice(db,req.auth!,activityId,date)));
+}));
+
 router.post("/inscripciones", requireAuthorizationCapability("ENROLLMENTS_CREATE"), asyncHandler(async(req,res)=>{
   const body=req.body as Record<string,unknown>;
-  const allowed=new Set(["personId","activityId","feeAmount","enrollmentPrice","status","dueDate","enrollmentDate"]);
-  if(Object.keys(body).some(key=>!allowed.has(key))||!UUID.test(String(body.personId))||!UUID.test(String(body.activityId)))return fail(res,400,"VALIDATION_ERROR","Persona y actividad válidas son obligatorias.");
-  const fee=Number(body.feeAmount); const status=String(body.status); const date=String(body.enrollmentDate);
-  if(!isActivityPrice(fee)||(body.enrollmentPrice!==undefined&&!isActivityPrice(body.enrollmentPrice))||!["al_dia","nuevo_inscripto","adeudando"].includes(status)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||(body.dueDate!=null&&(typeof body.dueDate!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(body.dueDate))))return fail(res,400,"VALIDATION_ERROR","Inscripción, cuota, estado y fechas no son válidos.");
-  const result=await createEnrollment(actor(req),{personId:String(body.personId),activityId:String(body.activityId),feeAmount:fee,enrollmentPrice:body.enrollmentPrice,status,dueDate:typeof body.dueDate==="string"?body.dueDate:null,enrollmentDate:date} as EnrollmentInput);
-  if(result.kind==="invalid_reference")return fail(res,404,"REFERENCE_NOT_FOUND","No se encontraron la persona o la actividad.");
-  if(result.kind==="duplicate")return fail(res,409,"ENROLLMENT_ALREADY_EXISTS","La persona ya tiene una inscripción activa en esta actividad.",result.enrollment);
-  return res.status(201).json(result.enrollment);
+  if(body && typeof body==='object' && !Array.isArray(body) && body.person && typeof body.person==='object') {
+    const allowed=new Set(['personId','person','activityId','enrollmentDate','feeAmount','enrollmentPrice','initialPayment']);
+    if(Object.keys(body).some(key=>!allowed.has(key))) return fail(res,400,'VALIDATION_ERROR','La inscripción contiene campos no editables.');
+    const person=body.person as Record<string,unknown>;
+    if(Array.isArray(person)||Object.keys(person).some(key=>!['firstName','lastName','document','phone'].includes(key))) return fail(res,400,'VALIDATION_ERROR','Datos de persona inválidos.');
+    if(body.initialPayment!==undefined) {
+      const payment=body.initialPayment as Record<string,unknown>;
+      if(!payment||typeof payment!=='object'||Array.isArray(payment)||Object.keys(payment).some(key=>!['accountId','paymentMethodId','date','enrollmentAmount','feeAmount'].includes(key))||
+        typeof payment.enrollmentAmount!=='number'||typeof payment.feeAmount!=='number'||payment.enrollmentAmount<0||payment.feeAmount<0||payment.enrollmentAmount+payment.feeAmount<=0)
+        return fail(res,400,'VALIDATION_ERROR','Cobro inicial inválido.');
+    }
+    const key=req.get('idempotency-key');
+    if(!key) return fail(res,400,'IDEMPOTENCY_KEY_REQUIRED','La clave de operación es obligatoria.');
+    const result=await financeTransaction(req.auth!,key,{route:req.originalUrl,body},'Alta de inscripción',db=>
+      createOperationalEnrollment(db,req.auth!,body as EnrollmentOperation));
+    return res.status(201).json(result);
+  }
+  return fail(res,400,'ENROLLMENT_PERSON_REQUIRED','La inscripción requiere nombre, apellido, identificación y teléfono.');
 }));
 
 router.patch("/inscripciones/:id/estado", requireAuthorizationCapability("ENROLLMENTS_EDIT"), asyncHandler(async(req,res)=>{

@@ -33,7 +33,7 @@ const activeContactSql=`select c.id,c.batch_id "batchId",c.source_row "sourceRow
   where c.club_id=$1`;
 const fetchSelected=async(db:import('../db/postgres.js').QueryExecutor,clubId:string,ids:string[])=>
   (await db.query<Contact>(`${activeContactSql} and c.id=any($2::uuid[]) and c.status='adeudando' order by c.id`,[clubId,ids])).rows;
-const contactable=(rows:Contact[],ids:string[])=>rows.length===ids.length&&rows.every(row=>/^549\d{10}$/.test(row.phone));
+const contactable=(rows:Contact[],ids:string[])=>rows.length===ids.length&&rows.every(row=>/^[1-9]\d{7,14}$/.test(row.phone));
 const prepareInput=(body:Record<string,unknown>)=>{
   const ids=body.contactIds,message=body.message;
   return Array.isArray(ids)&&ids.length>0&&ids.length<=100&&ids.every(uuid)&&new Set(ids).size===ids.length&&validText(message,4000)&&variables(message as string).every(v=>allowed.has(v));
@@ -64,25 +64,28 @@ export const createCrmXlsxRoutes=()=>{
   });
   router.post('/dry-run',write,express.raw({type:'multipart/form-data',limit:'9mb'}),async(req,res,next)=>{
     const file=parseUpload(req);if(!file)return fail(res,400,'Se requiere un archivo XLSX.');
-    const result=validateCrmXlsx(file.data,file.filename!,file.mime??'');
-    if(result.issues.length)return res.status(422).json({version:CRM_XLSX_VERSION,issues:result.issues,rowCount:result.rows.length});
-    try{const id=await withTenantTransaction(club(req),async db=>{
-      await db.query('select id from miclub.clubs where id=$1 for update',[club(req)]);
+    try{const response=await withTenantTransaction(club(req),async db=>{
+      const clubRow=(await db.query<{base_currency_code:string}>('select base_currency_code from miclub.clubs where id=$1 for update',[club(req)])).rows[0];
+      if(!clubRow)throw Object.assign(new Error('Club no encontrado.'),{status:404});
+      const result=validateCrmXlsx(file.data,file.filename!,file.mime??'',clubRow.base_currency_code);
+      if(result.issues.length)return {issues:result.issues,rowCount:result.rows.length};
       const base=(await db.query<{id:string}>(`select id from miclub.crm_xlsx_batches where club_id=$1 and status='active'`,[club(req)])).rows[0]?.id??null;
       const inserted=await db.query<{id:string}>(`insert into miclub.crm_xlsx_batches(club_id,file_sha256,template_version,status,row_count,uploaded_by,base_batch_id)
         values($1,$2,$3,'dry_run',$4,$5,$6) returning id`,[club(req),result.sha256,CRM_XLSX_VERSION,result.rows.length,req.auth!.userId,base]);
-      return inserted.rows[0].id;});
-      res.json({dryRunId:id,version:CRM_XLSX_VERSION,rowCount:result.rows.length,preview:result.rows.slice(0,10),issues:[]});
-    }catch(error){next(error);}
+      return {dryRunId:inserted.rows[0].id,rowCount:result.rows.length,preview:result.rows.slice(0,10),issues:[]};});
+      if(response.issues.length)return res.status(422).json({message:`La planilla tiene ${response.issues.length} errores. Corregí las filas indicadas y volvé a validar.`,version:CRM_XLSX_VERSION,...response});
+      res.json({version:CRM_XLSX_VERSION,...response});
+    }catch(error){const status=(error as {status?:number}).status;if(status===404)return fail(res,404,(error as Error).message);next(error);}
   });
   router.post('/apply',write,express.raw({type:'multipart/form-data',limit:'9mb'}),async(req,res,next)=>{
     const file=parseUpload(req),boundary=(req.get('content-type')??'').match(/boundary=(?:"([^"]+)"|([^;]+))/i)?.slice(1).find(Boolean);
     const dryRunId=boundary&&Buffer.isBuffer(req.body)?parseMultipartPart(req.body,boundary,'dryRunId')?.data.toString().trim():null;
     if(!file||!uuid(dryRunId))return fail(res,400,'Archivo y dryRunId válidos obligatorios.');
-    const result=validateCrmXlsx(file.data,file.filename!,file.mime??'');
-    if(result.issues.length)return res.status(422).json({issues:result.issues});
     try{const applied=await withTenantTransaction(club(req),async db=>{
-      await db.query('select id from miclub.clubs where id=$1 for update',[club(req)]);
+      const clubRow=(await db.query<{base_currency_code:string}>('select base_currency_code from miclub.clubs where id=$1 for update',[club(req)])).rows[0];
+      if(!clubRow)throw Object.assign(new Error('Club no encontrado.'),{status:404});
+      const result=validateCrmXlsx(file.data,file.filename!,file.mime??'',clubRow.base_currency_code);
+      if(result.issues.length)throw Object.assign(new Error(`La planilla tiene ${result.issues.length} errores. Corregí las filas indicadas y volvé a validar.`),{status:422,issues:result.issues});
       const dry=(await db.query<{file_sha256:string;row_count:number;base_batch_id:string|null}>(`select file_sha256,row_count,base_batch_id from miclub.crm_xlsx_batches
         where club_id=$1 and id=$2 and status='dry_run' and template_version=$3 for update`,[club(req),dryRunId,CRM_XLSX_VERSION])).rows[0];
       if(!dry||dry.file_sha256!==result.sha256||Number(dry.row_count)!==result.rows.length)throw Object.assign(new Error('El dry-run no corresponde al archivo actual.'),{status:409});
@@ -97,7 +100,7 @@ export const createCrmXlsxRoutes=()=>{
         values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,[club(req),batch.id,row.sourceRow,row.document,row.contactKey,row.firstName,row.lastName,row.phone,row.status,row.activity,row.enrollmentDate,row.dueDate]);
       await db.query(`update miclub.crm_xlsx_batches set status='replaced' where club_id=$1 and id=$2`,[club(req),dryRunId]);
       return {batchId:batch.id,rowCount:result.rows.length};
-    });res.json(applied);}catch(error){const status=(error as {status?:number}).status;if(status===409)return fail(res,409,(error as Error).message);next(error);}
+    });res.json(applied);}catch(error){const status=(error as {status?:number}).status;if(status===409||status===404)return fail(res,status,(error as Error).message);if(status===422)return res.status(422).json({message:(error as Error).message,issues:(error as {issues:unknown}).issues});next(error);}
   });
   router.get('/summary',async(req,res,next)=>{try{const result=await withTenantTransaction(club(req),db=>db.query<{status:string;count:number}>(`
     select c.status,count(*)::int count from miclub.crm_xlsx_contacts c join miclub.crm_xlsx_batches b on b.club_id=c.club_id and b.id=c.batch_id and b.status='active'

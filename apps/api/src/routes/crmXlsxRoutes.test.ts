@@ -17,12 +17,13 @@ const workbook=zip({
   'xl/_rels/workbook.xml.rels':'<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
   'xl/worksheets/sheet1.xml':`<worksheet><sheetData><row r="1">${CRM_XLSX_HEADERS.map((v,i)=>cell(`${'ABCDEFGH'[i]}1`,v)).join('')}</row><row r="2">${['12345678','Ana','Perez','3764123456','Adeudando','Tenis','',''].map((v,i)=>v?cell(`${'ABCDEFGH'[i]}2`,v):'').join('')}</row><row r="14">${cell('K14','CRM_CONTACTOS_v1')}</row></sheetData></worksheet>`,
 });
-const upload=async(base:string,path:string,dryRunId?:string)=>{const form=new FormData();form.append('file',new Blob([new Uint8Array(workbook)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'CRM_CONTACTOS_v1.xlsx');if(dryRunId)form.append('dryRunId',dryRunId);return fetch(`${base}${path}`,{method:'POST',body:form});};
+const upload=async(base:string,path:string,dryRunId?:string,data=workbook)=>{const form=new FormData();form.append('file',new Blob([new Uint8Array(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'CRM_CONTACTOS_v1.xlsx');if(dryRunId)form.append('dryRunId',dryRunId);return fetch(`${base}${path}`,{method:'POST',body:form});};
 
 const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void,setPermissions:(value:string[])=>void)=>Promise<void>,failInsert=false,changeActive=false,schemaReady=true)=>{
   let currentClub=clubA,permissions=['crm:read','crm:write','sectors:any'];const queries:string[]=[];
   const fake:PgPool={query:async<T>(sql:string,params?:unknown[])=>{queries.push(sql);
     if(sql.includes('to_regclass'))return {rows:[{ready:schemaReady}] as T[]};
+    if(sql.includes('select base_currency_code from miclub.clubs'))return {rows:[{base_currency_code:'ARS'}] as T[]};
     if(sql.includes("status='dry_run' and template_version"))return {rows:[{file_sha256:await import('node:crypto').then(({createHash})=>createHash('sha256').update(workbook).digest('hex')),row_count:1,base_batch_id:null}] as T[]};
     if(sql.includes('insert into miclub.crm_xlsx_batches'))return {rows:[{id}] as T[]};
     if(sql.includes('insert into miclub.crm_xlsx_contacts')&&failInsert)throw new Error('forced insert failure');
@@ -49,6 +50,15 @@ void test('la plantilla se descarga y el esquema ausente se explica con 503',asy
   assert.equal(response.status,503);
   assert.match((await response.json() as {message:string}).message,/DBeaver/);
 },false,false,false));
+
+void test('la validación devuelve mensaje legible y errores por fila en lugar de HTTP 422 genérico',async()=>serve(async(base,queries)=>{
+  const response=await upload(base,'/dry-run',undefined,Buffer.from('archivo inválido'));
+  assert.equal(response.status,422);
+  const payload=await response.json() as {message:string;issues:Array<{field:string}>};
+  assert.match(payload.message,/planilla tiene/);
+  assert.ok(payload.issues.length>0);
+  assert.equal(queries.filter(query=>query.includes('insert into miclub.crm_xlsx_batches')).length,0);
+}));
 
 void test('el filtro acepta Nuevo Inscripto y rechaza el estado retirado',async()=>serve(async(base)=>{
   assert.equal((await fetch(`${base}/contacts?status=nuevo_inscripto`)).status,200);

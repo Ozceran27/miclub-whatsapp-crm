@@ -1,5 +1,33 @@
 # Current State
 
+## Primera versión operativa de inscripción, movimiento y cuota — 2026-09-29
+
+Los accesos rápidos abren altas con persona nueva/existente y cobro inicial
+opcional, movimientos con identificación de contraparte, y cuotas individuales
+con generación por frecuencia y cobro parcial. El esquema nuevo está versionado
+en `202609290001_enrollment_charges_and_counterparties.sql` y entregado para
+aplicación manual en `docs/dbeaver/2026-09-29-inscripciones-cuotas-movimientos.sql`.
+La migración, el SQL manual y el circuito HTTP de dos clubes se verificaron en
+un clúster PostgreSQL 18 descartable. Se recorrieron los tres modales con
+sesión autenticada en escritorio y 390 × 844 px; la tabla de cuotas desplaza
+horizontalmente en móvil. El SQL no se ejecutó sobre la base real; su
+aplicación manual en DBeaver sigue pendiente.
+
+## CRM XLSX — corrección de importación 2026-09-28
+
+El importador ahora interpreta teléfonos numéricos serializados por Excel en
+notación científica o con sufijo `.0`, sin eliminar un `15` que forme parte de
+un número local de diez dígitos. Usa la moneda principal del club autenticado:
+ARS permite formatos argentinos y otra moneda exige prefijo internacional.
+Las fechas admiten `DD/MM/AAAA`; `Sin Pagos` en vencimiento equivale a ausencia
+de fecha. El 422 muestra un mensaje claro y errores por fila. El archivo real
+aportado en esta tarea contiene 200 contactos; después de la corrección solo
+quedan tres teléfonos sin dígitos (filas 5, 30 y 31). No se inventaron esos
+números ni se importó parcialmente la lista. El esquema CRM XLSX ya está
+presente en la base local de auditoría, verificada con `miclub_audit` en modo
+solo lectura. La prueba de navegador autenticado y la integración PostgreSQL
+con dos clubes siguen pendientes.
+
 ## CRM sobre cuotas PostgreSQL — 2026-09-28
 
 El panel incorpora un área separada **Contactos importados** para la plantilla

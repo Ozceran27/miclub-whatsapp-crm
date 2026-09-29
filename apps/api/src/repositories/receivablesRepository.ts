@@ -1,11 +1,11 @@
-import { getPostgresPool } from "../db/postgres.js";
+import { tenantExecutor } from "../db/transaction.js";
 
 export type ReceivableRow = Record<string, unknown>;
 export type ReceivableQuery = { clubId: string; limit: number; offset: number; sectorIds?: readonly string[]; dueFrom?: string; dueTo?: string; status?: string; personId?: string; enrollmentId?: string; activityId?:string; currencyCode?:string };
 
 export const getReceivables = async ({ clubId, limit, offset, sectorIds, dueFrom, dueTo, status, personId, enrollmentId, activityId, currencyCode }: ReceivableQuery): Promise<{ rows: ReceivableRow[]; total: number }> => {
-  const pool = await getPostgresPool();
-  const result = await pool.query<ReceivableRow & { total_count: string | number }>(`
+  const db = tenantExecutor(clubId);
+  const result = await db.query<ReceivableRow & { total_count: string | number }>(`
     select r.*, coalesce((select sum(a.amount) from miclub.payment_allocations a where a.club_id=r.club_id and a.receivable_id=r.id),0)::float8 as paid_amount,
       greatest(0,r.amount-r.cancelled_amount-coalesce((select sum(a.amount) from miclub.payment_allocations a where a.club_id=r.club_id and a.receivable_id=r.id),0))::float8 as outstanding_amount,
       count(*) over() as total_count

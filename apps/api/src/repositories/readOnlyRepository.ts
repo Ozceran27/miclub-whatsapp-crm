@@ -202,10 +202,11 @@ const listDefinitions = {
     sectorColumn: "m.sector_id",
     from: "miclub.v_movements_enriched m join miclub.movements movement_sequence on movement_sequence.club_id=m.club_id and movement_sequence.id=m.id",
     clubColumn: "m.club_id",
-    select: `m.id, movement_sequence.sequence_number, movement_sequence.currency_code, m.external_id, m.movement_date, m.movement_type, m.category_id, m.category,
-      m.sector_id, m.sector_code, m.sector_name, movement_sequence.activity_id, m.concept, m.person_id, m.first_name,
-      m.last_name, m.dni, m.counterparty_text, m.amount, m.taxes, m.payment_method_id,
-      m.payment_method, m.financial_status, m.operational_status, m.source,
+    select: `m.id, movement_sequence.sequence_number, movement_sequence.currency_code, m.external_id, m.movement_date as date, m.movement_type as type, m.category_id, m.category,
+      m.sector_id, m.sector_code, m.sector_name as sector, movement_sequence.activity_id, m.concept, m.person_id, m.first_name,
+      m.last_name, m.dni, m.counterparty_text, movement_sequence.counterparty_document_type,
+      movement_sequence.counterparty_document_value, m.amount, m.taxes, m.payment_method_id,
+      m.payment_method, m.financial_status, m.operational_status as status, m.source,
       m.source_payload, m.created_at, m.updated_at`,
     orderBy: "m.movement_date desc nulls last, m.id desc",
     filters: {
@@ -227,17 +228,21 @@ const listDefinitions = {
       join miclub.people p on p.id = e.person_id and p.club_id = e.club_id
       join miclub.activities a on a.id = e.activity_id and a.club_id = e.club_id
       join miclub.sectors s on s.id = a.sector_id and s.club_id = e.club_id
+      join miclub.v_enrollment_lifecycle_v2 life on life.enrollment_id=e.id and life.club_id=e.club_id
+      join miclub.clubs club_currency on club_currency.id=e.club_id
+      left join miclub.activity_price_terms enrollment_price on enrollment_price.id=e.activity_price_term_id and enrollment_price.club_id=e.club_id
       left join miclub.instructors i on i.id = a.instructor_id and i.club_id = e.club_id`,
     clubColumn: "e.club_id",
     select: `e.id, e.sequence_number, e.external_id, e.person_id, p.first_name, p.last_name, p.dni, p.phone,
       e.activity_id, a.name as activity_name, a.modality, a.sector_id, s.code as sector_code,
       s.name as sector_name, i.display_name as instructor_name, e.fee_amount,
-      e.enrollment_price_snapshot, e.fee_price_snapshot, e.fee_frequency_snapshot, e.activity_price_term_id, e.status,
+      coalesce(enrollment_price.currency_code,club_currency.base_currency_code) currency_code,
+      e.enrollment_price_snapshot, e.fee_price_snapshot, e.fee_frequency_snapshot, e.activity_price_term_id, life.effective_status as status,
       e.due_date, e.enrollment_date, e.source, e.notes, e.created_at, e.updated_at`,
     orderBy: "coalesce(e.enrollment_date, e.created_at::date) desc nulls last, e.id desc",
     filters: {
       search: textSearch(["p.first_name", "p.last_name", "p.dni", "p.phone", "a.name", "s.name", "i.display_name"]),
-      status: { column: "e.status", cast: "miclub.enrollment_status" },
+      status: { column: "life.effective_status", cast: "miclub.enrollment_status" },
       sectorId: { column: "a.sector_id", cast: "uuid" },
       activityId: { column: "e.activity_id", cast: "uuid" },
       dueFrom: { column: "e.due_date", operator: ">=", cast: "date" },

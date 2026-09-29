@@ -13,20 +13,21 @@ const baseMember: Member = {
   actividad: 'Spinning'
 };
 
-test('normalizeArPhone soporta formatos argentinos comunes', () => {
+void test('normalizeArPhone soporta formatos argentinos comunes', () => {
   assert.equal(normalizeArPhone('3764123456'), '5493764123456');
   assert.equal(normalizeArPhone('03764123456'), '5493764123456');
   assert.equal(normalizeArPhone('376154123456'), '5493764123456');
   assert.equal(normalizeArPhone('5493764123456'), '5493764123456');
   assert.equal(normalizeArPhone('+54 9 376 412-3456'), '5493764123456');
+  assert.equal(normalizeArPhone('3764153456'), '5493764153456');
 });
 
-test('interpolateTemplate reemplaza placeholders esperados', () => {
+void test('interpolateTemplate reemplaza placeholders esperados', () => {
   const text = interpolateTemplate('Hola {nombre} {apellido}, actividad: {actividad}.', baseMember);
   assert.equal(text, 'Hola Ana Pérez, actividad: Spinning.');
 });
 
-test('buildWaLink conserva emojis y unicode en query param text', () => {
+void test('buildWaLink conserva emojis y unicode en query param text', () => {
   const message = 'Hola 👋 ✅ 📌 💬';
   const link = buildWaLink('5493764123456', message);
   const parsed = new URL(link);

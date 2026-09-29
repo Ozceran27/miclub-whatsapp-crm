@@ -1,5 +1,27 @@
 # API Contracts
 
+## Altas y cobros operativos — 2026-09-29
+
+- `GET /api/inscripciones/pricing?activityId=<uuid>&date=YYYY-MM-DD` devuelve
+  precio, frecuencia y moneda vigentes para la actividad accesible.
+- `POST /api/inscripciones` requiere `Idempotency-Key` y
+  `{personId?,person:{firstName,lastName,document,phone},activityId,enrollmentDate,
+  feeAmount?,enrollmentPrice?,initialPayment?}`. Los importes manuales sólo se
+  usan si no existe precio vigente. `initialPayment` contiene `accountId`,
+  `paymentMethodId`, `date`, `enrollmentAmount` y `feeAmount`; devuelve IDs de
+  inscripción, persona, cargos y movimientos. Todo se confirma junto.
+- `POST /api/finance/receivables/generate` requiere `Idempotency-Key`, `month`
+  y `reason`, con `enrollmentId` opcional. Devuelve `generated`, `existing` y
+  `rejected` por falta de precio. Genera los ciclos de la frecuencia de cada
+  inscripción que vencen en ese mes.
+- `POST /api/finance/receivables/:id/collect` requiere `Idempotency-Key`,
+  `reason`, `amount`, `accountId`, `paymentMethodId`, `date`, `documentType` y
+  `documentValue`. Rechaza sobrepagos, referencias cruzadas y moneda distinta.
+- `POST /api/finance/movements` exige en `movement`
+  `counterpartyDocumentType` (`DNI`, `CUIL`, `REGISTRO`) y
+  `counterpartyDocumentValue`; `taxes` es opcional. Los movimientos anteriores
+  mantienen estos campos nulos.
+
 ## CRM — 2026-09-28
 
 ### Área XLSX aislada
@@ -11,6 +33,11 @@ multipart y devuelve `dryRunId`, conteo, hasta diez filas y errores 422 por fila
 La v1 acepta `al_dia`, `adeudando`, `nuevo_inscripto` y `abandonado` y exige
 actividad en todas las filas. El nombre local puede cambiar, pero el libro
 debe conservar el marcador de versión y ser un XLSX sin macros.
+El teléfono se normaliza según la moneda principal del club de sesión: con
+ARS se aceptan formatos argentinos locales o internacionales; con otras
+monedas se exige `+` y código de país. Se aceptan fechas de Excel,
+`AAAA-MM-DD`, `DD/MM/AAAA` y marcadores de ausencia como `Sin Pagos`. Las
+respuestas 422 incluyen `message` e `issues` por fila.
 `POST /apply` recibe el mismo archivo y `dryRunId`; rechaza 409 si no coincide
 el SHA-256/versión/conteo, fue aplicado o cambió la lista vigente desde el
 dry-run. `GET /summary`, `/contacts`

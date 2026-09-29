@@ -120,7 +120,9 @@ export const createAdministrationMovement = (input: Record<string,unknown>, idem
   apiJson<Record<string,unknown>>('/api/finance/movements',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify({ movement: input, applications, reason: 'Registro de movimiento desde Administración' })});
 
 export type EnrollmentCatalogItem={id:string;name:string;status?:string;generatesEnrollments?:boolean;pricingConfigured?:boolean;enrollmentPrice?:number|null;feePrice?:number|null;feeFrequency?:string|null;currencyCode?:string|null};
-type EnrollmentPerson = { id:string; firstName?:string; lastName?:string; dni?:string };
+export type EnrollmentPerson = { id:string; firstName?:string; lastName?:string; dni?:string; phone?:string };
+export type EnrollmentPricePreview={pricingConfigured:boolean;enrollmentPrice:number|null;feePrice:number|null;feeFrequency:string|null;currencyCode:string|null};
+export const getEnrollmentPricePreview=(activityId:string,date:string,signal?:AbortSignal)=>apiJson<EnrollmentPricePreview>(`/api/inscripciones/pricing?activityId=${encodeURIComponent(activityId)}&date=${encodeURIComponent(date)}` as `/${string}`,{signal,cache:'no-store'});
 const getEnrollmentPeople = async (signal?:AbortSignal) => {
   const items: EnrollmentPerson[] = [];
   let total = 0;
@@ -136,6 +138,6 @@ export const getEnrollmentFormCatalogs=async(signal?:AbortSignal)=>{const [peopl
   getEnrollmentPeople(signal),
   getAdministrationActivities(signal)
 ]);
-  return {people:peopleResponse.map(person=>({id:person.id,name:`${person.firstName??''} ${person.lastName??''}`.trim()+(person.dni?` · DNI ${person.dni}`:'')})),activities:activitiesResponse.items.map(activity=>({id:activity.id,name:activity.name,status:activity.status,generatesEnrollments:activity.generatesEnrollments,pricingConfigured:activity.pricingConfigured,enrollmentPrice:activity.enrollmentPrice,feePrice:activity.feePrice,feeFrequency:activity.feeFrequency,currencyCode:activity.priceCurrencyCode??activity.operatingCurrencyCode}))};
+  return {people:peopleResponse,activities:activitiesResponse.items.map(activity=>({id:activity.id,name:activity.name,status:activity.status,generatesEnrollments:activity.generatesEnrollments,pricingConfigured:activity.pricingConfigured,enrollmentPrice:activity.enrollmentPrice,feePrice:activity.feePrice,feeFrequency:activity.feeFrequency,currencyCode:activity.priceCurrencyCode??activity.operatingCurrencyCode}))};
 };
-export const createAdministrationEnrollment=(input:Record<string,unknown>)=>apiJson<Record<string,unknown>>('/api/inscripciones',{method:'POST',body:JSON.stringify(input)});
+export const createAdministrationEnrollment=(input:Record<string,unknown>,idempotencyKey:string)=>apiJson<Record<string,unknown>>('/api/inscripciones',{method:'POST',headers:{'Idempotency-Key':idempotencyKey},body:JSON.stringify(input)});

@@ -1,5 +1,40 @@
 # Testing
 
+## Inscripción, cuota y movimiento — 2026-09-29
+
+El test `apps/api/integration/enrollmentFlow.test.ts` instala el esquema en
+PostgreSQL descartable y crea dos clubes. Comprueba alta nueva y existente,
+completado de teléfono, identificación obligatoria, dos cargos iniciales,
+cobro inicial, reintento idempotente, cobro parcial y rechazo por exceso,
+precio histórico, cuota futura, movimiento documentado, baja explícita y
+aislamiento de lectura/escritura. Pasó junto con el gate de tenant y registro
+público. El gate de instalación vacía pasó; su variante de restauración requiere
+un backup certificado que no se suministró. El SQL de DBeaver pasó una segunda
+ejecución y postvalidación en el clúster descartable.
+
+API: 491/491; web: 92/92; migraciones: 16/16; `typecheck`, `build`,
+`docs:check`, `git diff --check` y lint focalizado pasaron. El lint global
+mantiene 151 errores y 593 advertencias ajenos a los archivos de este flujo.
+Se abrieron los tres modales en navegador autenticado de escritorio y de
+390 × 844 px, se inspeccionaron sus campos, resumen y tabla desplazable.
+La lectura HTTP del movimiento comprueba fecha, tipo, sector y estado.
+
+## CRM XLSX — teléfonos y fechas reales 2026-09-28
+
+El XLSX aportado por el operador contiene 200 contactos. La auditoría local
+en memoria detectó 196 teléfonos numéricos serializados por Excel, once
+vencimientos textuales `Sin Pagos` y tres teléfonos sin dígitos. Tras la
+corrección, el validador reporta únicamente las filas 5, 30 y 31 por teléfono;
+no se importó ninguna fila ni se expusieron datos personales en logs. La
+conexión `miclub_audit` confirmó `transaction_read_only=on`, moneda principal
+ARS y presencia de tablas `crm_xlsx_*`.
+
+Pasaron 485/485 tests API, 92/92 web y 17/17 pruebas CRM focalizadas;
+también `typecheck`, `build`, lint de archivos modificados, `docs:check` y
+frontera Google Sheets. Quedan pendientes la confirmación de importación con
+los tres teléfonos corregidos, el recorrido autenticado hasta WhatsApp y la
+integración PostgreSQL descartable con dos clubes.
+
 ## CRM XLSX — corrección 2026-09-28
 
 La plantilla regenerada se abrió con `openpyxl` como un XLSX de una sola hoja,

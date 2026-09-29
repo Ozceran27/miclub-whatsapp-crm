@@ -1,5 +1,16 @@
 # Architecture
 
+## Operación de inscripciones y cuotas — 2026-09-29
+
+`people` conserva la identidad única por club; una persona es inscripta por su
+relación activa en `enrollments`, sin crear otra tabla de personas ni equipararla
+con un socio. Los cargos viven en `receivables` y las aplicaciones de cobros en
+`payments`/`payment_allocations`. La primera cuota se crea con la inscripción;
+la generación posterior calcula ciclos desde el día de alta y usa el precio
+vigente de la actividad en cada vencimiento. `financeTransaction` serializa por
+club el alta, la generación y el cobro con clave de idempotencia. Los movimientos
+manuales guardan identificación estructurada de la contraparte.
+
 ## Alcance y autoridad
 
 Sincronizado con el bootstrap aprobado del commit 42b81a3 (2026-09-07). Código runtime y migraciones son autoridad de implementación; [CURRENT_STATE.md](CURRENT_STATE.md) distingue bugs de comportamiento aceptado. No certifica PostgreSQL desplegado.

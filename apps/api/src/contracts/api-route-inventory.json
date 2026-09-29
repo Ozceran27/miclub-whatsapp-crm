@@ -1588,6 +1588,20 @@
       ]
     },
     {
+      "id": "GET /api/inscripciones/pricing",
+      "method": "GET",
+      "path": "/api/inscripciones/pricing",
+      "source": "apps/api/src/routes/enrollmentMutationRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "enrollments.create",
+      "role": "any-with-permission",
+      "sectorScope": "sector",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"]
+    },
+    {
       "id": "PATCH /api/inscripciones/:id/estado",
       "method": "PATCH",
       "path": "/api/inscripciones/:id/estado",
@@ -1616,9 +1630,9 @@
       "membership": "active",
       "permission": "enrollments.create",
       "role": "any-with-permission",
-      "sectorScope": "tenant",
+      "sectorScope": "sector",
       "mutability": "write",
-      "idempotency": "non-idempotent",
+      "idempotency": "keyed",
       "testCategories": [
         "authentication",
         "authorization",

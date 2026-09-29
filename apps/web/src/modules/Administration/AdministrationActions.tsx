@@ -14,7 +14,7 @@ type AdministrationAction = {
 export const administrationActions: readonly AdministrationAction[] = [
   { operation: 'movement', label: 'Cargar Movimiento', description: 'Registrá ingresos, egresos o ajustes administrativos del club.', icon: '↕', availability: 'enabled' },
   { operation: 'enrollment', label: 'Cargar Inscripción', description: 'Iniciá el alta de una persona en una actividad o plan.', icon: '📝', availability: 'enabled' },
-  { operation: 'quota', label: 'Cargar Cuota', description: 'Generá cuotas mensuales y consultá sus saldos en Inscripciones.', icon: '💳', availability: 'enabled' },
+  { operation: 'quota', label: 'Cargar Cuota', description: 'Generá cuotas de una inscripción y registrá cobros totales o parciales.', icon: '💳', availability: 'enabled' },
   { label: 'Crear Reserva', description: 'Permitirá reservar espacios y recursos con disponibilidad, pagos y reglas de cancelación.', icon: '📅', availability: 'coming-soon' },
   { label: 'Cargar Socio', description: 'Permitirá dar de alta o actualizar los datos principales de un socio.', icon: '👤', availability: 'coming-soon' },
   { operation: 'sector', label: 'Gestionar Sectores', description: 'Creá sectores y administrá su identidad visual, capacidad y estado.', icon: '🏟️', availability: 'enabled' },

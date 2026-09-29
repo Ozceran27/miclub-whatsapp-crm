@@ -72,7 +72,7 @@ export async function provisionClub(
       club_id, person_id, user_id, membership_id, status, position,
       employment_start_date, has_fixed_compensation, fixed_compensation_amount, fixed_compensation_frequency
     )
-    values ($1, $2, $3, $4, 'active', 'Director', current_date, false, null, null)`,
+    values ($1, $2, $3, $4, 'active', 'DIRECTOR', current_date, false, null, null)`,
   [clubId, person.rows[0].id, user.rows[0].id, membership.rows[0].id]);
   await client.query(`
     insert into miclub.sectors (club_id, code, name, icon, icon_key, is_system, status, uses_activities)

@@ -21,7 +21,7 @@ const debtCte = `with tenant_day as (
   from miclub.receivables r
   left join miclub.payment_allocations pa on pa.club_id=r.club_id and pa.receivable_id=r.id
   where r.club_id=$1 and r.enrollment_id is not null
-    and (r.source_key like 'monthly:%' or (r.period_month is not null and r.period_year is not null))
+    and (r.charge_kind='FEE' or r.source_key like 'monthly:%' or (r.charge_kind is null and r.period_month is not null and r.period_year is not null))
   group by r.id
 ), overdue as (
   select f.enrollment_id,f.currency_code,sum(f.balance) amount,
@@ -35,7 +35,7 @@ const debtCte = `with tenant_day as (
     (select max(pay.paid_at)::text from miclub.receivables r
       join miclub.payment_allocations pa on pa.receivable_id=r.id and pa.club_id=r.club_id
       join miclub.payments pay on pay.id=pa.payment_id and pay.club_id=pa.club_id
-      where r.club_id=e.club_id and r.enrollment_id=e.id and (r.source_key like 'monthly:%' or (r.period_month is not null and r.period_year is not null))) "lastPaymentAt",
+      where r.club_id=e.club_id and r.enrollment_id=e.id and (r.charge_kind='FEE' or r.source_key like 'monthly:%' or (r.charge_kind is null and r.period_month is not null and r.period_year is not null))) "lastPaymentAt",
     (select max(coalesce(h.sent_at,h.created_at))::text from miclub.crm_message_history h
       where h.club_id=e.club_id and h.status='sent_manual' and (h.enrollment_id=e.id or (h.enrollment_id is null and h.member_id=e.id::text))) "lastContactAt",
     a.id "activityId",a.name "activityName",coalesce(e.modality,a.modality,'') modality,

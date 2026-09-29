@@ -31,7 +31,7 @@ const request = async (base: string, method: string, route: string, body?: unkno
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
-  return { status: response.status, body: text ? JSON.parse(text) as Json : {}, headers: response.headers };
+  return { status: response.status, body: text && response.headers.get('content-type')?.includes('application/json') ? JSON.parse(text) as Json : {}, headers: response.headers };
 };
 
 const registration = (suffix: string, club: string, dni: string) => ({
@@ -83,10 +83,11 @@ const main = async () => {
   await admin.query("insert into miclub.person_kind_links(person_id,kind,club_id) values($1,'instructor',$2)", [ids.person, clubB]);
   await admin.query("insert into miclub.instructors(id,person_id,club_id,display_name) values($1,$2,$3,'Instructor B')", [ids.instructor, ids.person, clubB]);
   await admin.query("insert into miclub.sectors(id,club_id,code,name,status,operational_status,uses_enrollments,uses_activities) values($1,$2,'B-SEC','Sector B','active','activa',true,true)", [ids.sector, clubB]);
-  await admin.query("insert into miclub.activities(id,club_id,sector_id,manager_person_id,instructor_id,code,name,status) values($1,$2,$3,$4,$5,'B-ACT','Actividad B','activa')", [ids.activity, clubB, ids.sector, ids.person, ids.instructor]);
+  const responsible = (await admin.query<{id:string}>("select id from miclub.employees where club_id=$1 and position='DIRECTOR' limit 1",[clubB])).rows[0].id;
+  await admin.query("insert into miclub.activities(id,club_id,sector_id,manager_person_id,instructor_id,responsible_employee_id,code,name,status) values($1,$2,$3,$4,$5,$6,'B-ACT','Actividad B','activa')", [ids.activity, clubB, ids.sector, ids.person, ids.instructor,responsible]);
   await admin.query("insert into miclub.movements(id,club_id,movement_type,sector_id,activity_id,concept,counterparty_text,amount,sequence_number) values($1,$2,'INGRESOS',$3,$4,'Movimiento B','Club B',100,1)", [ids.movement, clubB, ids.sector, ids.activity]);
   await admin.query("insert into miclub.enrollments(id,club_id,person_id,activity_id,fee_amount,enrollment_date,sequence_number) values($1,$2,$3,$4,100,current_date,1)", [ids.enrollment, clubB, ids.person, ids.activity]);
-  await admin.query("insert into miclub.import_batches(id,club_id,source,source_file,status,uploaded_by,operation_type) select $1,$2,'xlsx','club-b.xlsx','dry_run',u.id,'dry_run' from miclub.app_users u where lower(u.email)=lower($3)", [ids.import, clubB, userB.email]);
+  await admin.query("insert into miclub.import_batches(id,club_id,source,source_file,status,uploaded_by,operation_type) select $1,$2,'xlsx','club-b.xlsx','dry_run',u.id,'dry_run' from miclub.users u where lower(u.email)=lower($3)", [ids.import, clubB, userB.email]);
 
   const login = await request(base, "POST", "/auth/login", { username: userA.email, password: userA.password });
   assert.equal(login.status, 200, "Usuario A debe autenticarse por la superficie HTTP real");
@@ -129,7 +130,7 @@ const main = async () => {
   assert.deepEqual(await snapshotClub(clubB), before, "ninguna fila de Club B puede cambiar");
   const rlsSql = await readFile(path.join(root, "apps/api/db/tests/runtime_rls_negative.sql"), "utf8");
   await admin.query(rlsSql);
-  console.log("OK: aislamiento HTTP Club A -> Club B y runtime RLS negativo");
+  process.stdout.write("OK: aislamiento HTTP Club A -> Club B y runtime RLS negativo\n");
 };
 
 try { await main(); }

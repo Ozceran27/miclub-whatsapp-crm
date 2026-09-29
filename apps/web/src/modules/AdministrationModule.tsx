@@ -12,6 +12,7 @@ import { MovementList } from './Administration/MovementList';
 import { EnrollmentList } from './Administration/EnrollmentList';
 import { MovementCreateModal } from './Administration/MovementCreateModal';
 import { EnrollmentCreateModal } from './Administration/EnrollmentCreateModal';
+import { QuotaModal } from './Administration/QuotaModal';
 import { useSession } from '../session';
 import { useState } from 'react';
 import { PERMISSIONS } from '@miclub/shared';
@@ -25,7 +26,7 @@ function UnavailableSurface({ capability, title }: { capability: AdministrationC
 
 export default function AdministrationModule() {
   const dashboard = useAdministrationSummary();
-  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false);
+  const session=useSession(); const [movementOpen,setMovementOpen]=useState(false),[enrollmentOpen,setEnrollmentOpen]=useState(false),[quotaOpen,setQuotaOpen]=useState(false);
   const capabilities = getAdministrationCapabilities(session.permissions);
   const canCreateSector=session.permissions.includes(PERMISSIONS.SECTORS_CREATE);
   const canCreateWorker=session.permissions.includes(PERMISSIONS.WORKERS_MANAGE);
@@ -81,13 +82,13 @@ export default function AdministrationModule() {
           <AdministrationActions
             onCreateMovement={()=>setMovementOpen(true)}
             onCreateEnrollment={()=>setEnrollmentOpen(true)}
-            onLoadQuota={()=>{document.getElementById('enrollment-list')?.scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('enrollment-list-title')?.focus({preventScroll:true});window.dispatchEvent(new Event('miclub:open-quotas'));}}
+            onLoadQuota={()=>setQuotaOpen(true)}
             onCreateSector={()=>window.dispatchEvent(new Event('miclub:create-sector'))}
             onCreateWorker={()=>window.dispatchEvent(new Event('miclub:create-worker'))}
             onCreateActivity={()=>window.dispatchEvent(new Event('miclub:create-activity'))}
             canCreateMovement={capabilities.createMovement}
             canCreateEnrollment={capabilities.createEnrollment}
-            canLoadQuota={capabilities.enrollments&&session.permissions.includes(PERMISSIONS.ENROLLMENTS_CREATE)}
+            canLoadQuota={capabilities.enrollments&&(session.permissions.includes(PERMISSIONS.ENROLLMENTS_CREATE)||session.permissions.includes(PERMISSIONS.MOVEMENTS_CREATE))}
             canCreateSector={canCreateSector}
             canCreateWorker={canCreateWorker}
             canCreateActivity={canCreateActivity}
@@ -106,6 +107,7 @@ export default function AdministrationModule() {
       </div>
       {capabilities.createMovement && <MovementCreateModal open={movementOpen} onClose={()=>setMovementOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
       {capabilities.createEnrollment && <EnrollmentCreateModal open={enrollmentOpen} onClose={()=>setEnrollmentOpen(false)} onCreated={()=>void dashboard.loadAdministrationSummary()}/>}
+      {capabilities.enrollments && <QuotaModal open={quotaOpen} onClose={()=>setQuotaOpen(false)}/>}
     </main>
   );
 }

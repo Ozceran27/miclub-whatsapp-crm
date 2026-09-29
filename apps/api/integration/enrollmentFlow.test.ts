@@ -1,0 +1,113 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import express from 'express';
+import pg from 'pg';
+import { assertIsolatedTestCluster } from '../src/db/testClusterGuard.js';
+
+const controlUrl=process.env.MIGRATION_GATE_DATABASE_URL;
+const visual=process.env.ENROLLMENT_VISUAL==='true';
+void test('inscripción, cuotas y movimiento manual en PostgreSQL aislado con dos clubes', {skip:!controlUrl,timeout:visual?900000:120000},async()=>{
+ const control=new pg.Pool({connectionString:controlUrl});
+ await assertIsolatedTestCluster(control);
+ const name=`enrollment_${randomBytes(6).toString('hex')}`;
+ const url=new URL(controlUrl!);url.pathname=`/${name}`;
+ await control.query(`create database ${name}`);
+ const db=new pg.Pool({connectionString:url.toString()});
+ let server:import('node:http').Server|undefined;
+ try{
+  await promisify(execFile)(process.execPath,['--import','tsx','apps/api/src/scripts/runMigrations.ts'],{env:{...process.env,ADMIN_DATABASE_URL:url.toString(),PGADMINROLE:''},maxBuffer:4*1024*1024});
+  Object.assign(process.env,{NODE_ENV:'test',DATABASE_URL:url.toString(),ADMIN_DATABASE_URL:url.toString(),PUBLIC_APP_URL:'http://localhost:5173',CORS_ORIGINS:'http://localhost:5173',AUTH_ENABLED:'true',PUBLIC_REGISTRATION_ENABLED:'true',SESSION_SECRET:'enrollment-flow-secret-32-characters',DATA_SOURCE:'postgres',CRM_SOURCE:'postgres'});
+  const {app}=await import('../src/index.js');
+  const host=express();
+  if(visual){host.use(express.static(path.resolve('apps/web/dist')));host.get(['/','/login','/app','/app/:module'],(_req,res)=>res.sendFile(path.resolve('apps/web/dist/index.html')));}
+  host.use(app);server=host.listen(visual?5190:0,'127.0.0.1');
+  await new Promise<void>(resolve=>server!.once('listening',resolve));
+  const address=server.address();assert.ok(address&&typeof address==='object');
+  const base=`http://127.0.0.1:${address.port}`;
+  const request=async(route:string,body?:unknown,cookie?:string,key=randomUUID())=>{
+   const payload=body!==undefined&&route.startsWith('/api/finance/')?{reason:'Prueba integrada de cuotas',...body as Record<string,unknown>}:body;
+   const response=await fetch(base+route,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',origin:'http://localhost:5173','idempotency-key':key,...(cookie?{cookie}:{})},...(body===undefined?{}:{body:JSON.stringify(payload)})});
+   return {status:response.status,body:await response.json() as Record<string,unknown>,cookie:response.headers.get('set-cookie')?.split(';')[0]};
+  };
+  const register=async(suffix:'A'|'B')=>{
+   const email=`enroll${suffix}@test.invalid`,password='EnrollmentTest123!';
+   const registration=await request('/auth/register',{firstName:'Test',lastName:suffix,dni:suffix==='A'?'30111111':'30222222',phone:'1123456789',email,password,club:{name:`Enrollment ${suffix}`}});
+   assert.equal(registration.status,201,JSON.stringify(registration.body));
+   const login=await request('/auth/login',{username:email,password});assert.equal(login.status,200,JSON.stringify(login.body));assert.ok(login.cookie);
+   const club=(await db.query<{id:string}>('select id from miclub.clubs where name=$1',[`Enrollment ${suffix}`])).rows[0].id;
+   const person=(await db.query<{id:string}>('select id from miclub.people where club_id=$1',[club])).rows[0].id;
+   const sector=(await db.query<{id:string}>('select id from miclub.sectors where club_id=$1 limit 1',[club])).rows[0].id;
+   const instructor=(await db.query<{id:string}>("insert into miclub.instructors(club_id,person_id,display_name) values($1,$2,'Instructor') returning id",[club,person])).rows[0].id;
+   const employee=(await db.query<{id:string}>('select id from miclub.employees where club_id=$1 and person_id=$2',[club,person])).rows[0].id;
+   const activity=(await db.query<{id:string}>("insert into miclub.activities(club_id,sector_id,instructor_id,responsible_employee_id,name,code,status,generates_enrollments) values($1,$2,$3,$4,'Natación',$5,'activa',true) returning id",[club,sector,instructor,employee,`NAT-${suffix}`])).rows[0].id;
+   await db.query("insert into miclub.activity_price_terms(club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from,effective_to) values($1,$2,1000,5000,'MONTHLY','ARS','2026-09-01','2026-09-30')",[club,activity]);
+   await db.query("insert into miclub.activity_price_terms(club_id,activity_id,enrollment_price,fee_price,fee_frequency,currency_code,effective_from) values($1,$2,1000,6000,'MONTHLY','ARS','2026-10-01')",[club,activity]);
+   const account=(await db.query<{id:string}>("insert into miclub.financial_accounts(club_id,code,name,currency_code) values($1,'TEST','Caja prueba','ARS') returning id",[club])).rows[0].id;
+   const method=(await db.query<{id:string}>('select id from miclub.payment_methods where club_id=$1 and is_active limit 1',[club])).rows[0].id;
+   return {club,cookie:login.cookie,activity,account,method};
+  };
+  const a=await register('A'),b=await register('B');
+  const input={person:{firstName:'Ana',lastName:'Prueba',document:'12345678',phone:'1133445566'},activityId:a.activity,enrollmentDate:'2026-09-28',initialPayment:{accountId:a.account,paymentMethodId:a.method,date:'2026-09-28',enrollmentAmount:1000,feeAmount:2000}};
+  const key=randomUUID(),created=await request('/api/inscripciones',input,a.cookie,key);
+  assert.equal(created.status,201,JSON.stringify(created.body));
+  assert.equal((await request('/api/inscripciones',input,a.cookie,key)).body.id,created.body.id);
+  assert.equal((await request('/api/inscripciones',input,a.cookie)).status,409);
+  assert.equal((await request('/api/inscripciones',{...input,activityId:b.activity},a.cookie)).status,404);
+  const enrollmentId=String(created.body.id);
+  const charges=(await db.query<{id:string;charge_kind:string;amount:number;period_start:string}>("select id,charge_kind,amount::float8 amount,period_start::text from miclub.receivables where club_id=$1 and enrollment_id=$2 order by charge_kind",[a.club,enrollmentId])).rows;
+  assert.equal(charges.length,2);
+  assert.equal((await db.query<{count:string}>('select count(*) from miclub.payment_allocations where club_id=$1',[a.club])).rows[0].count,'2');
+  const fee=charges.find(c=>c.charge_kind==='FEE');assert.ok(fee);assert.equal(fee.amount,5000);
+  const listed=await request(`/api/receivables?enrollmentId=${enrollmentId}&limit=100&offset=0`,undefined,a.cookie);
+  assert.equal(listed.status,200,JSON.stringify(listed.body));
+  assert.equal((listed.body.items as Array<{id:string}>).length,2);
+  const hidden=await request(`/api/receivables?enrollmentId=${enrollmentId}&limit=100&offset=0`,undefined,b.cookie);
+  assert.equal(hidden.status,200,JSON.stringify(hidden.body));
+  assert.equal((hidden.body.items as Array<{id:string}>).length,0);
+  const crossAccount=await request(`/api/finance/receivables/${fee.id}/collect`,{amount:1000,accountId:b.account,paymentMethodId:a.method,date:'2026-09-29',documentType:'DNI',documentValue:'12345678'},a.cookie);
+  assert.equal(crossAccount.status,404,JSON.stringify(crossAccount.body));
+  assert.equal((await request(`/api/finance/receivables/${fee.id}/collect`,{amount:4000,accountId:a.account,paymentMethodId:a.method,date:'2026-09-29'},a.cookie)).status,400);
+  const paid=await request(`/api/finance/receivables/${fee.id}/collect`,{amount:3000,accountId:a.account,paymentMethodId:a.method,date:'2026-09-29',documentType:'DNI',documentValue:'12345678'},a.cookie);
+  assert.equal(paid.status,201,JSON.stringify(paid.body));
+  assert.equal((await request(`/api/finance/receivables/${fee.id}/collect`,{amount:1,accountId:b.account,paymentMethodId:b.method,date:'2026-09-29',documentType:'DNI',documentValue:'12345678'},b.cookie)).status,404);
+  const generated=await request('/api/finance/receivables/generate',{month:'2026-10',enrollmentId},a.cookie);
+  assert.equal(generated.status,200,JSON.stringify(generated.body));assert.equal(generated.body.generated,1);
+  const later=(await db.query<{amount:number;period_start:string}>("select amount::float8 amount,period_start::text from miclub.receivables where club_id=$1 and enrollment_id=$2 and charge_kind='FEE' order by period_start",[a.club,enrollmentId])).rows;
+  assert.deepEqual(later.map(c=>c.amount),[5000,6000]);assert.deepEqual(later.map(c=>c.period_start),['2026-09-28','2026-10-28']);
+  const existingPerson=(await db.query<{id:string}>("insert into miclub.people(club_id,first_name,last_name,dni) values($1,'Beto','Existente','22334455') returning id",[a.club])).rows[0].id;
+  const existingEnrollment=await request('/api/inscripciones',{personId:existingPerson,person:{firstName:'Beto',lastName:'Existente',document:'22334455',phone:'1133445566'},activityId:a.activity,enrollmentDate:'2026-09-29'},a.cookie);
+  assert.equal(existingEnrollment.status,201,JSON.stringify(existingEnrollment.body));
+  assert.equal((await db.query<{phone:string}>('select phone from miclub.people where club_id=$1 and id=$2',[a.club,existingPerson])).rows[0].phone,'1133445566');
+  assert.equal((await request('/api/inscripciones',{person:{firstName:'Sin',lastName:'Teléfono',document:'44556677',phone:''},activityId:a.activity,enrollmentDate:'2026-09-29'},a.cookie)).status,400);
+  const catalogs=await request('/api/finance/movement-catalogs',undefined,a.cookie);assert.equal(catalogs.status,200);
+  const categories=catalogs.body.categories as Array<{id:string;code:string}>;
+  const manual=await request('/api/finance/movements',{reason:'Ingreso de prueba',movement:{movementDate:'2026-09-29',movementType:'INGRESOS',accountId:a.account,categoryId:categories.find(c=>c.code==='OTROS_INGRESOS')?.id??categories[0].id,sectorId:(await db.query<{sector_id:string}>('select sector_id from miclub.activities where id=$1',[a.activity])).rows[0].sector_id,concept:'Ingreso prueba',counterpartyText:'Cliente prueba',counterpartyDocumentType:'DNI',counterpartyDocumentValue:'12345678',amount:100,operationalStatus:'COMPLETADO',paymentMethodId:a.method}},a.cookie);
+  assert.equal(manual.status,201,JSON.stringify(manual.body));
+  const movementList=await request('/api/movimientos?limit=20&offset=0',undefined,a.cookie);
+  assert.equal(movementList.status,200,JSON.stringify(movementList.body));
+  const movement=(movementList.body.items as Array<Record<string,unknown>>).find(item=>item.id===manual.body.id);
+  assert.ok(movement);assert.ok(movement.date);assert.equal(movement.type,'INGRESOS');assert.equal(movement.sector,'Administración');assert.equal(movement.status,'COMPLETADO');
+  const abandoned=await request(`/api/finance/enrollments/${enrollmentId}/abandon`,{decision:'KEEP'},a.cookie);
+  assert.equal(abandoned.status,200,JSON.stringify(abandoned.body));
+  const status=(await db.query<{effective_status:string}>('select effective_status::text from miclub.v_enrollment_lifecycle_v2 where club_id=$1 and enrollment_id=$2',[a.club,enrollmentId])).rows[0];
+  assert.equal(status.effective_status,'abandonado');
+  if(visual){
+   await db.query("update miclub.club_onboarding set status='COMPLETED',completed_at=now() where club_id=$1",[a.club]);
+   process.stdout.write('VISUAL_READY http://127.0.0.1:5190/login\n');
+   while(!existsSync(path.join(process.cwd(),'.local-evidence','enrollment-visual-stop'))) await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+ }finally{
+  if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));
+  const {closePostgresPool,closePostgresAdminPool}=await import('../src/db/postgres.js');
+  await closePostgresPool();await closePostgresAdminPool();
+  await db.end();
+  await control.query('select pg_terminate_backend(pid) from pg_stat_activity where datname=$1 and pid<>pg_backend_pid()',[name]);
+  await control.query(`drop database if exists ${name}`);
+  await control.end();
+ }
+});

@@ -1,5 +1,28 @@
 # Business Rules
 
+## Inscripciones y cuotas operativas — 2026-09-29
+
+Inscripto significa persona vinculada a una actividad; socio es un producto
+futuro independiente. Una inscripción nueva exige nombre, apellido,
+identificación y teléfono de la persona, además de la actividad. Se reutiliza
+la persona existente del club por identificación normalizada y se impide una
+segunda inscripción activa en la misma actividad. El alta genera un cargo de
+inscripción sólo si el precio es positivo y una primera cuota con vencimiento
+en la fecha de alta. El cobro inicial es opcional y puede aplicarse por separado
+a ambos cargos, cada uno con su categoría canónica.
+
+Los vencimientos diarios, semanales, mensuales y anuales conservan la fecha
+ancla original; el último día del mes sustituye un día inexistente sin cambiar
+la siguiente ancla. Un cargo ya creado no cambia con precios posteriores.
+Cada cobro exige medio de pago y cuenta compatible con la moneda, permite pago
+parcial y nunca supera el saldo del cargo. El estado de deuda se calcula desde
+cargos, cancelaciones y aplicaciones; un ingreso genérico no renueva una
+inscripción. El abandono requiere operación explícita con destino de la deuda.
+
+Cada movimiento manual exige fecha, tipo, categoría, concepto, nombre e
+identificación tipo/valor de contraparte, sector, monto, estado, cuenta y medio
+de pago. El impuesto es opcional y se guarda como cero cuando se omite.
+
 ## CRM y cobranza manual — 2026-09-28
 
 ### Contactos importados por XLSX
@@ -11,6 +34,14 @@ obligatoria en los cuatro estados: «Al día», «Adeudando», «Nuevo Inscripto
 lista vigente del club y conserva lotes anteriores. Los estados y fechas son
 declaraciones externas, no deuda financiera comprobada. Solo «Adeudando» es
 contactable; ninguna plantilla de esta área admite variables de saldo o cuota.
+Con moneda principal ARS, el teléfono puede escribirse como diez dígitos
+locales, con prefijo nacional o como `+54 9` seguido de diez dígitos; se guarda
+normalizado para WhatsApp. La moneda se lee del club de la sesión. Con otra
+moneda se exige prefijo internacional explícito, ya que la moneda no identifica
+un país. Teléfono, DNI, nombre, apellido, estado y actividad siguen siendo
+obligatorios. Las fechas vacías y los marcadores `Sin Pagos`/`Sin fecha` no
+bloquean la carga; se guardan sin fecha. También se aceptan fechas de Excel,
+`AAAA-MM-DD` y `DD/MM/AAAA`.
 La apertura de WhatsApp y la confirmación `sent_manual` requieren que el
 contacto siga vigente sin cambios relevantes. El envío sigue siendo manual.
 

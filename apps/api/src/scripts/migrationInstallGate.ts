@@ -54,7 +54,7 @@ async function assertCatalog(url: string): Promise<void> {
     );
 
     const objects = await db.query<{ kind: string; name: string }>(`
-      select 'table', table_name from information_schema.tables where table_schema='miclub' and table_name in ('clubs','users','movements','features')
+      select 'table' as kind, table_name as name from information_schema.tables where table_schema='miclub' and table_name in ('clubs','users','movements','features')
       union all select 'enum', typname from pg_type join pg_namespace n on n.oid=typnamespace where n.nspname='miclub' and typtype='e' and typname='entity_status'
       union all select 'view', table_name from information_schema.views where table_schema='miclub' and table_name='v_opening_balance_reconciliation'
       union all select 'function', proname from pg_proc join pg_namespace n on n.oid=pronamespace where n.nspname='miclub' and proname='next_tenant_sequence'

@@ -410,6 +410,8 @@ export interface AdministrationMovementDto {
   concept: string | null;
   personId?: string | null;
   counterpartyText?: string | null;
+  counterpartyDocumentType?: 'DNI' | 'CUIL' | 'REGISTRO' | null;
+  counterpartyDocumentValue?: string | null;
   amount: number;
   taxes?: number | null;
   paymentMethodId?: string | null;
@@ -423,6 +425,7 @@ export interface AdministrationMovementDto {
 
 export interface AdministrationEnrollmentDto {
   id: string;
+  currencyCode?: string;
   sequenceNumber: number;
   externalId?: string | null;
   clubId?: string | null;
