@@ -51,7 +51,7 @@ const isFresh=(m:Record<string,unknown>)=>Boolean(m.active_contact_id)&&m.active
 const contactSort={name:['c.last_name','c.first_name'],document:'c.document',phone:'c.phone',status:'c.status',activity:'c.activity',enrollmentDate:'c.enrollment_date',dueDate:'c.due_date'} as const;
 const messageFreshSql=`c.id is not null and c.status='adeudando' and c.phone=m.phone and c.first_name||' '||c.last_name=m.name
   and c.activity is not distinct from m.activity and c.enrollment_date is not distinct from m.enrollment_date and c.due_date is not distinct from m.due_date`;
-const messageSort={date:'m.created_at',name:'m.name',activity:'m.activity',status:'m.status',fresh:`(${messageFreshSql})`,template:"coalesce(nullif(trim(m.template_name),''),'Mensaje personalizado')"} as const;
+const messageSort={date:'m.created_at',name:'m.name',phone:'m.phone',activity:'m.activity',status:'m.status',fresh:`(${messageFreshSql})`,template:"coalesce(nullif(trim(m.template_name),''),'Mensaje personalizado')"} as const;
 const sortRequest=(query:Request['query'],fields:Record<string,string|readonly string[]>)=>{
   const key=query.sortBy,direction=query.sortDirection;
   if(key===undefined&&direction===undefined)return {order:null};
@@ -164,16 +164,19 @@ export const createCrmXlsxRoutes=()=>{
     });res.json(result);}catch(error){if((error as {status?:number}).status===409)return fail(res,409,(error as Error).message);next(error);}
   });
   router.get('/messages',async(req,res,next)=>{
-    const currentPage=page(req.query.page),sorting=sortRequest(req.query,messageSort);if(!currentPage||!sorting)return fail(res,400,'Página u orden inválido.');
+    const currentPage=page(req.query.page),sorting=sortRequest(req.query,messageSort),sentOnly=req.query.status==='sent_manual';
+    if(!currentPage||!sorting||(req.query.status!==undefined&&!sentOnly)||(sentOnly&&req.query.pending==='true'))return fail(res,400,'Página o filtros de mensajes inválidos.');
     const pending=req.query.pending==='true';
     try{const result=await withTenantTransaction(club(req),async db=>{
-      const where=`where m.club_id=$1 ${pending?"and m.status in ('prepared','opened')":''}`;
+      const where=`where m.club_id=$1 ${sentOnly?"and m.status='sent_manual'":pending?"and m.status in ('prepared','opened')":''}`;
+      const order=sorting.order?(sentOnly&&req.query.sortBy==='date'?`m.sent_at ${req.query.sortDirection==='desc'?'desc':'asc'} nulls last`:sorting.order)
+        :sentOnly?'m.sent_at desc nulls last':'m.created_at desc';
       const total=(await db.query<{total:number}>(`select count(*)::int total from miclub.crm_xlsx_messages m ${where}`,[club(req)])).rows[0]?.total??0;
       const rows=(await db.query<Record<string,unknown>>(`select m.id,m.contact_id "contactId",m.name,m.activity,m.phone,m.message,m.wa_link "waLink",m.status,m.template_name "templateName",m.created_at "createdAt",m.opened_at "openedAt",m.sent_at "sentAt",m.contact_key,m.enrollment_date::text stored_enrollment_date,m.due_date::text stored_due_date,
         c.id active_contact_id,c.phone active_phone,c.status active_status,c.first_name active_first_name,c.last_name active_last_name,c.activity active_activity,c.enrollment_date::text active_enrollment_date,c.due_date::text active_due_date
         from miclub.crm_xlsx_messages m left join miclub.crm_xlsx_contacts c on c.club_id=m.club_id and c.contact_key=m.contact_key
           and exists(select 1 from miclub.crm_xlsx_batches b where b.club_id=c.club_id and b.id=c.batch_id and b.status='active')
-        ${where} order by ${sorting.order??'m.created_at desc'},m.id ${sorting.order?'asc':'desc'} limit 20 offset $2`,[club(req),(currentPage-1)*20])).rows;
+        ${where} order by ${order},m.id ${sorting.order?'asc':'desc'} limit 20 offset $2`,[club(req),(currentPage-1)*20])).rows;
       return {items:rows.map(r=>({id:r.id,contactId:r.contactId,name:r.name,activity:r.activity,phone:r.phone,message:r.message,waLink:r.waLink,status:r.status,templateName:r.templateName,createdAt:r.createdAt,openedAt:r.openedAt,sentAt:r.sentAt,fresh:isFresh(r)})),total,page:currentPage,pageSize:20};
     });res.json(result);}catch(error){next(error);}
   });

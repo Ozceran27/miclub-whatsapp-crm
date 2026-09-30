@@ -19,9 +19,9 @@ const workbook=zip({
 });
 const upload=async(base:string,path:string,dryRunId?:string,data=workbook)=>{const form=new FormData();form.append('file',new Blob([new Uint8Array(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'CRM_CONTACTOS_v1.xlsx');if(dryRunId)form.append('dryRunId',dryRunId);return fetch(`${base}${path}`,{method:'POST',body:form});};
 
-const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void,setPermissions:(value:string[])=>void)=>Promise<void>,failInsert=false,changeActive=false,schemaReady=true)=>{
-  let currentClub=clubA,permissions=['crm:read','crm:write','sectors:any'];const queries:string[]=[];
-  const fake:PgPool={query:async<T>(sql:string,params?:unknown[])=>{queries.push(sql);
+const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void,setPermissions:(value:string[])=>void,calls:Array<{sql:string;params?:unknown[]}> )=>Promise<void>,failInsert=false,changeActive=false,schemaReady=true)=>{
+  let currentClub=clubA,permissions=['crm:read','crm:write','sectors:any'];const queries:string[]=[],calls:Array<{sql:string;params?:unknown[]}>=[];
+  const fake:PgPool={query:async<T>(sql:string,params?:unknown[])=>{queries.push(sql);calls.push({sql,params});
     if(sql.includes('to_regclass'))return {rows:[{ready:schemaReady}] as T[]};
     if(sql.includes('select base_currency_code from miclub.clubs'))return {rows:[{base_currency_code:'ARS'}] as T[]};
     if(sql.includes("status='dry_run' and template_version"))return {rows:[{file_sha256:await import('node:crypto').then(({createHash})=>createHash('sha256').update(workbook).digest('hex')),row_count:1,base_batch_id:null}] as T[]};
@@ -34,7 +34,7 @@ const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void
   setPostgresPoolForTests(fake);
   const app=express();app.use(express.json());app.use((req,_res,next)=>{req.auth={clubId:currentClub,userId:clubA,membershipId:id,permissions,sectorIds:[],role:'DIRECTOR',email:'test@example.invalid',legacy:false,personId:id};next();});app.use(createCrmXlsxRoutes());app.use((_err:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(500).json({message:'error'}));
   const server=await new Promise<Server>(resolve=>{const s=app.listen(0,()=>resolve(s));});const address=server.address();assert.ok(address&&typeof address==='object');
-  try{await run(`http://127.0.0.1:${address.port}`,queries,v=>{currentClub=v;},v=>{permissions=v;});}finally{await new Promise<void>(resolve=>server.close(()=>resolve()));setPostgresPoolForTests(undefined);}
+  try{await run(`http://127.0.0.1:${address.port}`,queries,v=>{currentClub=v;},v=>{permissions=v;},calls);}finally{await new Promise<void>(resolve=>server.close(()=>resolve()));setPostgresPoolForTests(undefined);}
 };
 
 void test('el área exige CRM y alcance global incluso para lectura y cargas',async()=>serve(async(base,_q,_club,permissions)=>{
@@ -75,6 +75,27 @@ void test('orden importado valida columnas y se aplica antes de paginar dentro d
   setClub(clubB);
   assert.equal((await fetch(`${base}/contacts?sortBy=name`)).status,200);
   assert.ok(queries.some(q=>q.includes('where c.club_id=$1')&&q.includes('order by c.last_name asc nulls last,c.first_name asc nulls last,c.id')));
+}));
+
+void test('historial enviado filtra solo confirmados y ordena por fecha de confirmación',async()=>serve(async(base,queries,setClub,_permissions,calls)=>{
+  const response=await fetch(`${base}/messages?pending=false&status=sent_manual&page=2`);
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{items:[],total:0,page:2,pageSize:20});
+  const count=queries.find(q=>q.includes('count(*)::int total from miclub.crm_xlsx_messages m'))??'';
+  const rows=queries.find(q=>q.includes('from miclub.crm_xlsx_messages m left join'))??'';
+  assert.match(count,/where m.club_id=\$1 and m.status='sent_manual'/);
+  assert.match(rows,/where m.club_id=\$1 and m.status='sent_manual' order by m.sent_at desc nulls last,m.id desc limit 20 offset \$2/);
+  assert.equal((await fetch(`${base}/messages?status=sent_manual&sortBy=date&sortDirection=asc`)).status,200);
+  assert.ok(queries.some(q=>q.includes('order by m.sent_at asc nulls last,m.id asc limit 20 offset $2')));
+  assert.equal((await fetch(`${base}/messages?pending=true&status=sent_manual`)).status,400);
+  assert.equal((await fetch(`${base}/messages?status=skipped`)).status,400);
+  assert.equal((await fetch(`${base}/messages?pending=false`)).status,200);
+  assert.ok(queries.some(q=>q.includes('where m.club_id=$1  order by m.created_at desc,m.id desc')));
+  setClub(clubB);
+  assert.equal((await fetch(`${base}/messages?status=sent_manual`)).status,200);
+  const tenantCounts=calls.filter(call=>call.sql.includes('count(*)::int total from miclub.crm_xlsx_messages m')&&call.sql.includes("m.status='sent_manual'"));
+  assert.equal(tenantCounts[0].params?.[0],clubA);
+  assert.equal(tenantCounts.at(-1)?.params?.[0],clubB);
 }));
 
 void test('dry-run y apply utilizan el club de sesión y hacen rollback ante un fallo de escritura',async()=>serve(async(base,queries)=>{

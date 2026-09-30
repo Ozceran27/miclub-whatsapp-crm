@@ -31,7 +31,7 @@ export const crmXlsxApi={
   deleteTemplate:(id:string)=>apiJson<void>(path(`/templates/${id}`),{method:'DELETE'}),
   preview:(contactIds:string[],message:string)=>apiJson<{count:number;sample:string}>(path('/prepare/preview'),json('POST',{contactIds,message})),
   prepare:(contactIds:string[],message:string,templateName:string)=>apiJson<unknown[]>(path('/prepare'),json('POST',{contactIds,message,templateName})),
-  messages:(page:number,pending:boolean,sortBy?:string,sortDirection?:'asc'|'desc')=>apiJson<XlsxPage<XlsxMessage>>(path(`/messages?${new URLSearchParams({page:String(page),pending:String(pending),...(sortBy?{sortBy,sortDirection:sortDirection??'asc'}:{})})}`)),
+  messages:(page:number,pending:boolean,sortBy?:string,sortDirection?:'asc'|'desc',status?:'sent_manual')=>apiJson<XlsxPage<XlsxMessage>>(path(`/messages?${new URLSearchParams({page:String(page),pending:String(pending),...(sortBy?{sortBy,sortDirection:sortDirection??'asc'}:{}),...(status?{status}:{})})}`)),
   open:(id:string)=>apiJson<{waLink:string}>(path(`/messages/${id}/open`),{method:'POST'}),
   status:(id:string,status:'sent_manual'|'skipped')=>apiJson<{id:string;status:string}>(path(`/messages/${id}/status`),json('PATCH',{status})),
 };

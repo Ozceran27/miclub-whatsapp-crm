@@ -42,11 +42,16 @@ respuestas 422 incluyen `message` e `issues` por fila.
 el SHA-256/versión/conteo, fue aplicado o cambió la lista vigente desde el
 dry-run. `GET /summary`, `/contacts`
 (page, status, query), `/batches` (últimos 20 lotes aplicados), `/templates` y
-`/messages` (page, pending) ofrecen lecturas. `/contacts` y `/messages` admiten
+`/messages` (page, pending) ofrecen lecturas. `/messages` admite además
+`status=sent_manual` para el historial de envíos confirmados, con 20 resultados
+por página; esta opción es incompatible con `pending=true`. En ese historial
+el orden inicial y la clave `sortBy=date` usan `sentAt`. Sin el filtro se
+conserva la lectura previa de todos los estados y la fecha de creación.
+`/contacts` y `/messages` admiten
 `sortBy` y `sortDirection=asc|desc` con claves permitidas por tabla; el orden
 se aplica antes de paginar y conserva un ID de desempate. En contactos las
 claves son `name`, `document`, `phone`, `status`, `activity`, `enrollmentDate`
-y `dueDate`; en mensajes son `date`, `name`, `activity`, `status`, `fresh` y
+y `dueDate`; en mensajes son `date`, `name`, `phone`, `activity`, `status`, `fresh` y
 `template`. Valores desconocidos reciben 400. CRUD de `/templates`,
 `POST /prepare/preview`, `POST /prepare`,
 `POST /messages/:id/open` y `PATCH /messages/:id/status` operan solo dentro del

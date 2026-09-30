@@ -1,5 +1,14 @@
 # Current State
 
+## CRM — historial de enviados 2026-09-29
+
+Contactos importados muestra un historial de mensajes confirmados manualmente
+(`sent_manual`) en lugar del historial de todos los estados. Usa la fecha de
+confirmación, nombre de plantilla, tabla ordenable y 20 filas por página. La
+API conserva la lectura anterior sin filtro y aplica el nuevo filtro dentro
+del club de sesión, tanto al conteo como a las filas. Las pestañas CRM vuelven
+a alinearse a la izquierda también en móvil. No hay cambios de esquema ni SQL.
+
 ## CRM — editor, tarjetas y tablas 2026-09-29
 
 El editor operativo distribuye controles y texto en dos columnas, con vista
