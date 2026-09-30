@@ -1,3 +1,4 @@
+import React from 'react';
 import { InfoTooltip } from './InfoTooltip';
 import { economyMetricTooltips } from './economyMetricTooltips';
 import { formatEconomyMoney } from './formatters';
@@ -21,7 +22,7 @@ type TopCard = {
 
 const formatVariation = (item?: EconomyComparisonMetric) => {
   if (!item) return '—';
-  if (item.comparable === false || item.available === false) return 'Sin historial suficiente';
+  if (item.comparable === false || item.available === false) return item.reason ?? 'Sin historial suficiente';
   const value = item.percentageChange ?? item.variation;
   return typeof value === 'number' && Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(1)}%` : 'Sin base comparable';
 };
@@ -40,14 +41,16 @@ export function EconomySummaryCards({ summary, comparison }: Props) {
     ? `${comparison.currentPeriod} vs ${comparison.previousPeriod}`
     : 'Último mes completo vs mes anterior';
   const cards: TopCard[] = [
-    { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Tesorería', value: formatEconomyMoney(summary.income), variant: 'positive', tooltip: economyMetricTooltips.monthlyIncome },
-    { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Tesorería', value: formatEconomyMoney(summary.expenses), variant: 'negative', tooltip: economyMetricTooltips.monthlyExpenses },
-    { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Tesorería', value: formatEconomyMoney(summary.balance), variant: 'utility', tooltip: economyMetricTooltips.monthlyBalance },
+    { label: `Ingresos mes de ${monthLabel}`, icon: '📈', subtitle: 'Tesorería', value: formatEconomyMoney(summary.income, summary.currencyCode), variant: 'positive', tooltip: economyMetricTooltips.monthlyIncome },
+    { label: `Egresos mes de ${monthLabel}`, icon: '📉', subtitle: 'Tesorería', value: formatEconomyMoney(summary.expenses, summary.currencyCode), variant: 'negative', tooltip: economyMetricTooltips.monthlyExpenses },
+    { label: `Balance mes de ${monthLabel}`, icon: '⚖️', subtitle: 'Tesorería', value: formatEconomyMoney(summary.balance, summary.currencyCode), variant: 'utility', tooltip: economyMetricTooltips.monthlyBalance },
+    { label: 'Liquidez actual', icon: '💰', subtitle: 'Circuito financiero', value: formatEconomyMoney(summary.liquidity, summary.currencyCode), variant: 'positive', tooltip: economyMetricTooltips.liquidity },
+    { label: 'Saldo proyectado', icon: '📊', subtitle: 'Circuito financiero', value: formatEconomyMoney(summary.projectedBalance, summary.currencyCode), variant: 'projected', tooltip: economyMetricTooltips.projectedBalance },
     { label: 'Variación de Ingresos', icon: '↗️', subtitle: comparisonSubtitle, value: formatVariation(find('income')), variant: 'positive', metric: find('income'), centerValue: true, tooltip: economyMetricTooltips.incomeVariation },
     { label: 'Variación de Egresos', icon: '↘️', subtitle: comparisonSubtitle, value: formatVariation(find('expenses')), variant: 'negative', metric: find('expenses'), centerValue: true, tooltip: economyMetricTooltips.expensesVariation },
     { label: 'Variación de Utilidad', icon: '🔰', subtitle: comparisonSubtitle, value: formatVariation(find('utility')), variant: 'utility', metric: find('utility'), centerValue: true, tooltip: economyMetricTooltips.utilityVariation },
     { label: 'Crecimiento', icon: '🌱', subtitle: growthSubtitle, value: formatVariation(growth), variant: 'positive', metric: growth, centerValue: true, tooltip: economyMetricTooltips.growth },
-    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: operatingProfitability?.currentPeriod ?? comparison.currentPeriod ?? 'Último mes completo', value: formatEconomyMoney(operatingProfitability?.current), detail: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected', tooltip: economyMetricTooltips.operatingProfitability },
+    { label: 'Rentabilidad Operativa', icon: '⚙️', subtitle: operatingProfitability?.currentPeriod ?? comparison.currentPeriod ?? 'Último mes completo', value: formatEconomyMoney(operatingProfitability?.current, summary.currencyCode), detail: `${formatVariation(operatingProfitability)}`, metric: operatingProfitability, variant: 'projected', tooltip: economyMetricTooltips.operatingProfitability },
   ];
 
   return (

@@ -201,10 +201,27 @@ void test('DEC-017 circuito financiero HTTP y PostgreSQL aislado', { skip: !cont
       await db.query('alter table miclub.activity_terms alter column revision set not null');
     });
     await t.test('recursos integrados de Economía y herramientas financieras responden', async () => {
-      for (const endpoint of ['summary','monthly-evolution','by-sector','by-category','sector-rankings','payment-methods','recent-movements','pending','annual-summary','comparison','insights','yearly-breakdown']) {
+      for (const endpoint of ['summary','available-years','monthly-evolution','by-sector','by-category','sector-rankings','payment-methods','recent-movements','pending','annual-summary','comparison','insights','yearly-breakdown']) {
         const response = await request(`/api/economy/${endpoint}`, undefined, cookie);
         assert.equal(response.status, 200, `${endpoint}: ${JSON.stringify(response.body)}`);
       }
+      const years = await request('/api/economy/available-years', undefined, cookie);
+      assert.ok((years.body.items as number[]).includes(2026));
+      const evolution = await request('/api/economy/monthly-evolution?year=2026', undefined, cookie);
+      const september = (evolution.body.items as Array<{ month: number; income: number; expenses: number; balance: number }>).find(item => item.month === 9)!;
+      const ledger = (await db.query<{ income: string; expenses: string }>(`
+        select coalesce(sum(amount) filter (where movement_type='INGRESOS'),0)::text income,
+          coalesce(sum(amount) filter (where movement_type='EGRESOS'),0)::text expenses
+        from miclub.movements where club_id=$1 and operational_status='COMPLETADO'
+          and movement_date >= '2026-09-01'::timestamptz and movement_date < '2026-10-01'::timestamptz
+          and movement_type in ('INGRESOS','EGRESOS')`, [club])).rows[0];
+      assert.equal(september.income, Number(ledger.income));
+      assert.equal(september.expenses, Number(ledger.expenses));
+      assert.equal(september.balance, Number(ledger.income) - Number(ledger.expenses));
+      const summary = await request('/api/economy/summary', undefined, cookie);
+      const circuit = await read();
+      assert.equal(summary.body.liquidity, circuit.projection.liquidity);
+      assert.equal(summary.body.projectedBalance, circuit.projection.projectedBalance);
       assert.equal((await request('/api/finance/workbench', undefined, cookie)).status, 200);
     });
     await t.test('categoría activa sirve para ambos tipos y doble conciliación conserva la marca',async()=>{

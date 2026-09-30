@@ -13,18 +13,18 @@ const getMonthLabel = (item: EconomyMonthlyEvolutionItem) => {
 };
 
 type TooltipPayload = { payload?: { balance?: number | string | null; utility?: number | string | null; label: string; year: number } };
-type TooltipProps = { active?: boolean; payload?: TooltipPayload[] };
+type TooltipProps = { active?: boolean; payload?: TooltipPayload[]; currencyCode?: string };
 
-function EconomyProfitTooltip({ active, payload }: TooltipProps) {
+function EconomyProfitTooltip({ active, payload, currencyCode }: TooltipProps) {
   const item = payload?.[0]?.payload;
   if (!active || !item) return null;
-  const balance = typeof item.balance === 'number' ? item.balance : Number(item.balance ?? item.utility ?? 0);
+  const balance = item.balance === null || item.utility === null ? null : typeof item.balance === 'number' ? item.balance : Number(item.balance ?? item.utility ?? 0);
 
   return (
     <div className="economy-chart-tooltip">
       <strong>{item.label} {item.year}</strong>
-      <span className={balance >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>
-        Utilidad: {formatEconomyMoney(balance)}
+      <span className={balance !== null && balance >= 0 ? 'economy-chart-tooltip__positive' : 'economy-chart-tooltip__negative'}>
+        Utilidad: {formatEconomyMoney(balance, currencyCode)}
       </span>
     </div>
   );
@@ -45,11 +45,11 @@ export function EconomyProfitChart({ monthlyEvolution }: Props) {
             <BarChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="rgba(143, 164, 200, 0.16)" vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} tickFormatter={(value: number) => formatEconomyMoney(Number(value))} width={86} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} tickFormatter={(value: number) => formatEconomyMoney(Number(value), monthlyEvolution.currencyCode)} width={86} />
               <ReferenceLine y={0} stroke="rgba(244, 248, 255, 0.34)" />
-              <Tooltip content={<EconomyProfitTooltip />} cursor={{ fill: 'rgba(143, 216, 255, 0.08)' }} />
+              <Tooltip content={<EconomyProfitTooltip currencyCode={monthlyEvolution.currencyCode} />} cursor={{ fill: 'rgba(143, 216, 255, 0.08)' }} />
               <Bar dataKey="balance" name="Utilidad" radius={[8, 8, 8, 8]} barSize={24}>
-                {data.map((item) => <Cell key={item.period} fill={item.balance >= 0 ? '#76f0c3' : '#ff6b7a'} />)}
+                {data.map((item) => <Cell key={item.period} fill={item.balance === null ? '#91a4c8' : item.balance >= 0 ? '#76f0c3' : '#ff6b7a'} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>

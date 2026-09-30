@@ -7,6 +7,8 @@ import {
   getMonthlySummary,
   getYearlyBreakdownRows,
   getPendingMovements,
+  getPendingSummary,
+  getAvailableYears,
   getRankingBySector,
   getRecentMovements,
   getSectorTrends,
@@ -24,13 +26,13 @@ const withTenantFixture = async (
 ): Promise<void> => {
   const calls: QueryCall[] = [];
   const pool = {
-    query: async <T>(sql: string, params: unknown[] = []) => {
+    query: <T>(sql: string, params: unknown[] = []) => {
       calls.push({ sql, params });
       const clubId = params.find((value) => value === CLUB_A || value === CLUB_B);
-      return { rows: [{ club_id: clubId, name: clubId === CLUB_A ? "Club A" : "Club B" }] as T[] };
+      return Promise.resolve({ rows: [{ club_id: clubId, name: clubId === CLUB_A ? "Club A" : "Club B" }] as T[] });
     },
-    connect: async () => { throw new Error("connect no esperado"); },
-    end: async () => undefined,
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
   };
   setPostgresPoolForTests(pool);
   try {
@@ -54,7 +56,7 @@ test("agregados y enrollments quedan aislados entre Club A y Club B", async () =
     assert.equal(evolutionA.club_id, CLUB_A);
     assert.equal(evolutionB.club_id, CLUB_B);
     assert.match(calls[0].sql, /m\.club_id = \$3/);
-    assert.match(calls[2].sql, /e\.club_id = \$3/);
+    assert.match(calls[2].sql, /e\.club_id = \$2/);
     assert.match(calls[2].sql, /a\.club_id = e\.club_id/);
     assert.match(calls[2].sql, /s\.club_id = a\.club_id/);
   });
@@ -73,11 +75,28 @@ test("Inicio y Economía consumen movimientos por cuenta como autoridad de liqui
   });
 });
 
-test("las tablas mensuales replican la exclusión de egresos en DÓLARES de la planilla", async () => {
+test("los egresos en moneda extranjera se valoran sin excluir categorías por nombre", async () => {
   await withTenantFixture(async (calls) => {
     await getMonthlySummary(new Date("2026-06-01T03:00:00Z"), new Date("2026-07-01T03:00:00Z"), CLUB_A);
-    assert.match(calls[0].sql, /movement_type = 'EGRESOS'.+<> 'DOLARES'/s);
-    assert.match(calls[0].sql, /movement_type = 'INGRESOS'.+operational_status = 'COMPLETADO'/s);
+    assert.match(calls[0].sql, /miclub\.exchange_rates/);
+    assert.match(calls[0].sql, /valued_amount/);
+    assert.match(calls[0].sql, /rate_type = 'official'/);
+    assert.doesNotMatch(calls[0].sql, /<> 'DOLARES'|ADMINISTRACI[ÓO]N/);
+    assert.match(calls[0].sql, /missing_rate_count/);
+  });
+});
+
+test("pendientes del circuito y años históricos conservan tenant y estado", async () => {
+  await withTenantFixture(async (calls) => {
+    await getPendingSummary(CLUB_A);
+    await getAvailableYears(CLUB_B);
+    assert.deepEqual(calls[0].params, [CLUB_A]);
+    assert.match(calls[0].sql, /operational_status = 'PENDIENTE'/);
+    assert.match(calls[0].sql, /pending_missing_rate_count|missing_rate_count/);
+    assert.doesNotMatch(calls[0].sql, /source_payload|ADMINISTRACI[ÓO]N/);
+    assert.deepEqual(calls[1].params, [CLUB_B]);
+    assert.match(calls[1].sql, /m\.club_id = \$1/);
+    assert.match(calls[1].sql, /time zone/);
   });
 });
 
@@ -99,10 +118,10 @@ test("rankings, pendientes y movimientos recientes nunca mezclan tenants", async
       assert.equal(rowA.club_id, CLUB_A);
       assert.equal(rowB.club_id, CLUB_B);
     }
-    assert.match(calls[0].sql, /m\.club_id = \$5/);
+    assert.match(calls[0].sql, /m\.club_id = \$4/);
     assert.match(calls[0].sql, /s\.club_id = m\.club_id/);
-    assert.match(calls[2].sql, /where club_id = \$2/);
-    assert.match(calls[4].sql, /where club_id = \$2/);
+    assert.match(calls[2].sql, /where v\.club_id = \$2/);
+    assert.match(calls[4].sql, /where v\.club_id = \$2/);
     for (const call of [calls[2], calls[3], calls[4], calls[5]]) {
       assert.doesNotMatch(call.sql, /select\s+\*/i);
       assert.doesNotMatch(call.sql, /source_payload|created_at\s*,|updated_at/i);
@@ -118,17 +137,17 @@ test("rankings y trends respetan club, límite, año y joins tenant", async () =
     await getSectorTrends(2026, 4, CLUB_B);
 
     assert.deepEqual(calls[0].params.slice(0, 3), [from, to, 7]);
-    assert.equal(calls[0].params[4], CLUB_A);
-    assert.match(calls[0].sql, /m\.club_id = \$5/);
+    assert.equal(calls[0].params[3], CLUB_A);
+    assert.match(calls[0].sql, /m\.club_id = \$4/);
     assert.match(calls[0].sql, /s\.club_id = m\.club_id/);
-    assert.match(calls[0].sql, /order by balance desc, income desc/);
+    assert.match(calls[0].sql, /order by balance desc nulls last, income desc nulls last/);
     assert.match(calls[0].sql, /limit \$3::integer/);
 
     assert.deepEqual(calls[1].params.slice(0, 3), [2026, 4, CLUB_B]);
     assert.match(calls[1].sql, /where id = \$3/);
     assert.match(calls[1].sql, /m\.club_id = \$3/);
     assert.match(calls[1].sql, /s\.club_id = m\.club_id/);
-    assert.match(calls[1].sql, /partition by month order by balance desc, income desc/);
+    assert.match(calls[1].sql, /partition by month order by balance desc nulls last, income desc nulls last/);
     assert.match(calls[1].sql, /rank <= \$2::integer/);
   });
 });
@@ -136,12 +155,12 @@ test("rankings y trends respetan club, límite, año y joins tenant", async () =
 test("la consulta anual acumula un egreso CMV exclusivamente como NON_OPERATING", async () => {
   const calls: QueryCall[] = [];
   setPostgresPoolForTests({
-    query: async <T>(sql: string, params: unknown[] = []) => {
+    query: <T>(sql: string, params: unknown[] = []) => {
       calls.push({ sql, params });
-      return { rows: [{ year: 2026, month: 9, category_code: "CMV", classification: "NON_OPERATIONAL", category_label: "CMV", movement_type: "EGRESOS", amount: 725, movements: 1 }] as T[] };
+      return Promise.resolve({ rows: [{ year: 2026, month: 9, category_code: "CMV", classification: "NON_OPERATIONAL", category_label: "CMV", movement_type: "EGRESOS", amount: 725, movements: 1 }] as T[] });
     },
-    connect: async () => { throw new Error("connect no esperado"); },
-    end: async () => undefined,
+    connect: () => Promise.reject(new Error("connect no esperado")),
+    end: () => Promise.resolve(),
   });
   try {
     const window = getRollingInterannualMonthWindow(new Date("2026-09-05T12:00:00Z"));
@@ -150,8 +169,8 @@ test("la consulta anual acumula un egreso CMV exclusivamente como NON_OPERATING"
     const groups = new Map((result.expensesByType as any[]).map((item) => [item.key, item.values]));
     const septemberIndex = window.months.findIndex(({ key }) => key === "2026-09");
 
-    assert.match(calls[0].sql, /cc\.classification/);
-    assert.match(calls[0].sql, /cc\.id = c\.catalog_id/);
+    assert.match(calls[0].sql, /catalog\.classification/);
+    assert.match(calls[0].sql, /catalog\.id = category\.catalog_id/);
     assert.equal((groups.get("NON_OPERATING") as number[])[septemberIndex], 725);
     assert.equal((groups.get("OPERATING") as number[])[septemberIndex], 0);
     assert.equal(result.operatingIncomeByCategory.length, 0);

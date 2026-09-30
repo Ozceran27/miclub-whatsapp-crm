@@ -1,7 +1,9 @@
 import type { EconomyRecentMovement } from './types';
-import { formatArPeso } from '../../utils';
 
-export const formatEconomyMoney = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? formatArPeso(value) : '—');
+export const formatEconomyMoney = (value: number | null | undefined, currencyCode = 'ARS') =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: currencyCode }).format(value)
+    : 'Sin cotización';
 
 export const formatEconomyDate = (value?: string | null) => {
   if (!value) return 'Sin fecha';
@@ -11,7 +13,7 @@ export const formatEconomyDate = (value?: string | null) => {
 
 export const getMovementAmountLabel = (movement: EconomyRecentMovement) => {
   const sign = movement.movementType === 'EGRESOS' ? '-' : '';
-  return `${sign}${formatEconomyMoney(Math.abs(movement.amount))}`;
+  return `${sign}${formatEconomyMoney(Math.abs(movement.amount), movement.currencyCode ?? 'ARS')}`;
 };
 
 export const getMovementPersonLabel = (movement: EconomyRecentMovement) => {

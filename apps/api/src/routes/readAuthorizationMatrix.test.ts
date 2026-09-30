@@ -26,6 +26,7 @@ const cases: Array<{ endpoint: string; permission: KnownPermission; sectorial: b
   { endpoint: "/api/movements", permission: "finance:read", sectorial: true },
   { endpoint: "/api/dashboard/basic", permission: "dashboard:read", sectorial: false },
   { endpoint: "/api/economy/summary", permission: "finance:read", sectorial: false },
+  { endpoint: "/api/economy/available-years", permission: "finance:read", sectorial: false },
   { endpoint: "/api/modules/economy/summary", permission: "finance:read", sectorial: false },
   { endpoint: "/members", permission: "people:read", sectorial: false },
   { endpoint: "/club-finance-debug", permission: "administration.configure", sectorial: false },

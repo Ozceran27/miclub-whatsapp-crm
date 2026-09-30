@@ -631,6 +631,20 @@
       ]
     },
     {
+      "id": "GET /api/economy/available-years",
+      "method": "GET",
+      "path": "/api/economy/available-years",
+      "source": "apps/api/src/routes/economyRoutes.ts",
+      "authentication": "session",
+      "membership": "active",
+      "permission": "finance.read",
+      "role": "any-with-permission",
+      "sectorScope": "tenant",
+      "mutability": "read",
+      "idempotency": "safe",
+      "testCategories": ["authentication", "authorization", "tenant-isolation", "validation", "success"]
+    },
+    {
       "id": "GET /api/economy/summary",
       "method": "GET",
       "path": "/api/economy/summary",

@@ -285,6 +285,22 @@ El provisioning observado crea clubes con `America/Argentina/Buenos_Aires`.
 
 Los cálculos deben respetar timezone del club cuando el modelo permita personalizarlo.
 
+### Tesorería: agregación y valoración vigente
+
+- Los indicadores ordinarios usan movimientos `COMPLETADO` de tipo técnico
+  `INGRESOS` o `EGRESOS`, con clasificación de `category_catalog`. El nombre
+  visible de una categoría no excluye dinero.
+- Los pendientes incluyen todos los movimientos `PENDIENTE` elegibles del club,
+  cualquiera sea su origen; no dependen de la hoja histórica Administración.
+- Cada importe se valora en la moneda base del club con la cotización oficial
+  admisible a la fecha local del movimiento. Sin cotización, el agregado
+  afectado queda incompleto y su importe es `null`, no cero.
+- Un movimiento retroactivo se imputa al mes de su fecha. Sólo un movimiento
+  completado y posterior al corte de arranque aprobado afecta la liquidez
+  vigente; una operación anterior requiere conciliación o ajuste explícito.
+- Generar una cuota crea un derecho de cobro, no liquidez. El cobro completado
+  crea el movimiento que modifica la liquidez.
+
 ## 19. Configuración administrativa y remuneraciones (vigente 2026-09-19)
 
 - Archivar reemplaza eliminar para sectores, trabajadores, actividades y hechos

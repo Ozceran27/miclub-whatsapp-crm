@@ -58,14 +58,20 @@ export type LegacyEconomyFinancialStatus = LegacyUnknownCode<"financial-status">
 export type EconomyFinancialStatus = KnownEconomyFinancialStatus | LegacyEconomyFinancialStatus;
 
 export interface EconomySummary {
-  month?: { label: string; income: number; expenses: number; balance: number };
-  current?: { liquidity: number; projectedBalance: number };
-  income: number;
-  expenses: number;
-  balance: number;
-  liquidity?: number;
-  projectedBalance?: number;
-  pendingBalance: number;
+  month?: { label: string; income: number | null; expenses: number | null; balance: number | null };
+  current?: { liquidity: number | null; projectedBalance: number | null };
+  income: number | null;
+  expenses: number | null;
+  balance: number | null;
+  liquidity?: number | null;
+  projectedBalance?: number | null;
+  pendingBalance: number | null;
+  currencyCode: string;
+  period: string;
+  valuationStatus: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount: number;
+  projectionComplete: boolean;
+  projectionAssumptions: string[];
   completedMovements: number;
   totalMovements: number;
 }
@@ -74,11 +80,13 @@ export interface EconomyMonthlyEvolutionItem {
   year: number;
   month: number;
   period: string;
-  income: number;
-  expenses: number;
-  balance: number;
-  utility?: number;
-  operatingProfitability?: number;
+  income: number | null;
+  expenses: number | null;
+  balance: number | null;
+  utility?: number | null;
+  operatingProfitability?: number | null;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
   growth?: number | null;
   economicGrowth?: number | null;
   clientGrowth?: number | null;
@@ -92,8 +100,8 @@ export interface EconomyMonthlyEvolutionItem {
 export interface EconomyComparisonMetric {
   key: "income" | "expenses" | "balance" | "liquidity" | LegacyUnknownCode<"comparison-metric">;
   label: string;
-  current: number;
-  previous: number;
+  current: number | null;
+  previous: number | null;
   variation?: number | null;
   percentageChange?: number | null;
   absoluteChange?: number;
@@ -114,6 +122,7 @@ export interface EconomyComparisonMetric {
 }
 
 export interface EconomyComparison {
+  currencyCode?: string;
   currentPeriod: string;
   previousPeriod: string;
   items: EconomyComparisonMetric[];
@@ -123,13 +132,16 @@ export interface EconomyComparison {
 export interface EconomySectorBreakdownItem {
   id: string | null;
   name: string;
-  income: number;
-  expenses: number;
-  balance: number;
+  income: number | null;
+  expenses: number | null;
+  balance: number | null;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
   movements: number;
 }
 
 export interface EconomySectorRankings {
+  currencyCode?: string;
   monthly: EconomyDashboardCollection<EconomySectorBreakdownItem> & { label: string };
   annual: EconomyDashboardCollection<EconomySectorBreakdownItem> & { year: number };
 }
@@ -137,18 +149,22 @@ export interface EconomySectorRankings {
 export interface EconomyCategoryBreakdownItem {
   id: string | null;
   name: string;
-  income: number;
-  expenses: number;
-  balance: number;
+  income: number | null;
+  expenses: number | null;
+  balance: number | null;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
   movements: number;
 }
 
 export interface EconomyPaymentMethodItem {
   id: string | null;
   name: string;
-  amount: number;
+  amount: number | null;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
   movements: number;
-  percentage?: number;
+  percentage?: number | null;
 }
 
 export interface EconomyPaymentMethodPeriod {
@@ -167,22 +183,23 @@ export interface EconomyPaymentMethodStatusCounts {
 }
 
 export interface EconomyPaymentMethodsSummary extends EconomyDashboardCollection<EconomyPaymentMethodItem> {
+  currencyCode?: string;
   monthly?: EconomyPaymentMethodPeriod;
   annual?: EconomyPaymentMethodPeriod;
   statusCounts?: EconomyPaymentMethodStatusCounts;
   nonOperatingExpenses?: {
     categories: string[];
-    monthly: { amount: number; movements: number };
-    annual: { amount: number; movements: number };
+    monthly: { amount: number | null; movements: number };
+    annual: { amount: number | null; movements: number };
   };
   debtLiabilities?: {
     categories: string[];
-    monthly: { amount: number; movements: number };
-    annual: { amount: number; movements: number };
+    monthly: { amount: number | null; movements: number };
+    annual: { amount: number | null; movements: number };
   };
   servicesAndTaxes?: {
-    services: { categories: string[]; monthly: number; annual: number };
-    taxes: { categories: string[]; monthly: number; annual: number };
+    services: { categories: string[]; monthly: number | null; annual: number | null };
+    taxes: { categories: string[]; monthly: number | null; annual: number | null };
   };
 }
 
@@ -202,6 +219,7 @@ export interface EconomyRecentMovement {
   lastName?: string | null;
   counterpartyText?: string | null;
   amount: number;
+  currencyCode?: string | null;
   taxes?: number | null;
   paymentMethodId?: string | null;
   paymentMethod?: string | null;
@@ -211,9 +229,12 @@ export interface EconomyRecentMovement {
 }
 
 export interface EconomyPendingSummary {
-  pendingBalance: number;
-  pendingIncome: number;
-  pendingExpenses: number;
+  pendingBalance: number | null;
+  pendingIncome: number | null;
+  pendingExpenses: number | null;
+  currencyCode?: string | null;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
   pendingMovements: number;
   items: EconomyRecentMovement[];
   total: number;
@@ -248,6 +269,7 @@ export interface EconomyYearlyBreakdownPeriod {
 }
 
 export interface EconomyYearlyBreakdown {
+  currencyCode?: string;
   period: EconomyYearlyBreakdownPeriod;
   months: EconomyYearlyBreakdownMonth[];
   operatingIncomeByCategory: EconomyOperatingIncomeCategorySeries[];
@@ -259,14 +281,19 @@ export interface EconomyYearlyBreakdown {
     timezone: string;
     signConvention?: string;
     consideredMovements?: number;
+    valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+    missingRateCount?: number;
   };
 }
 
 export interface EconomyAnnualSummary {
   year: number;
-  income: number;
-  expenses: number;
-  balance: number;
+  income: number | null;
+  expenses: number | null;
+  balance: number | null;
+  currencyCode?: string | null;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
   movements: number;
 }
 
@@ -285,6 +312,11 @@ export interface EconomyInsight {
 export interface EconomyDashboardCollection<TItem> {
   items: TItem[];
   total: number;
+  currencyCode?: string;
+  period?: string;
+  year?: number;
+  valuationStatus?: "COMPLETE" | "INCOMPLETE_EXCHANGE_RATE";
+  missingRateCount?: number;
 }
 
 export interface EconomyDashboardResponse {

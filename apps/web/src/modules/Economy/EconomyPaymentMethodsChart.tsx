@@ -7,25 +7,24 @@ type Props = { paymentMethods: EconomyPaymentMethodsSummary };
 
 const colors = ['#8fd8ff', '#76f0c3', '#ffad66', '#c59bff', '#ff8787', '#f7dc6f', '#7dd3fc'];
 
-const safePercentage = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
-const getTone = (value: number) => value > 0 ? 'economy-finance-value--positive' : value < 0 ? 'economy-finance-value--negative' : 'economy-finance-value--neutral';
+const getTone = (value: number | null) => value === null ? 'economy-finance-value--neutral' : value > 0 ? 'economy-finance-value--positive' : value < 0 ? 'economy-finance-value--negative' : 'economy-finance-value--neutral';
 
-function PaymentRows({ items, emptyLabel }: { items: EconomyPaymentMethodItem[]; emptyLabel: string }) {
+function PaymentRows({ items, emptyLabel, currencyCode }: { items: EconomyPaymentMethodItem[]; emptyLabel: string; currencyCode: string }) {
   return items.length > 0 ? (
     <ul className="economy-payment-list economy-payment-list--compact">
       {items.map((item, index) => (
         <li key={item.id ?? item.name}>
           <span className="economy-payment-list__swatch" style={{ background: colors[index % colors.length] }} />
           <strong>{item.name}</strong>
-          <span>{formatEconomyMoney(item.amount)} · {safePercentage(item.percentage).toFixed(1)}%</span>
+          <span>{formatEconomyMoney(item.amount, currencyCode)} · {item.percentage === null || item.percentage === undefined ? 'Sin porcentaje' : `${item.percentage.toFixed(1)}%`}</span>
         </li>
       ))}
     </ul>
   ) : <p className="economy-chart-empty">{emptyLabel}</p>;
 }
 
-function PeriodValue({ label, value, className }: { label: string; value: number; className?: string }) {
-  return <span className="economy-finance-row"><strong>{label}</strong><span className={className ?? getTone(value)}>{formatEconomyMoney(value)}</span></span>;
+function PeriodValue({ label, value, className, currencyCode }: { label: string; value: number | null; className?: string; currencyCode: string }) {
+  return <span className="economy-finance-row"><strong>{label}</strong><span className={className ?? getTone(value)}>{formatEconomyMoney(value, currencyCode)}</span></span>;
 }
 
 export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
@@ -35,6 +34,7 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
   const debtLiabilities = paymentMethods.debtLiabilities;
   const servicesAndTaxes = paymentMethods.servicesAndTaxes;
   const status = paymentMethods.statusCounts ?? { completed: 0, pending: 0, canceled: 0 };
+  const currencyCode = paymentMethods.currencyCode ?? 'ARS';
 
   return (
     <div className="economy-finance-triptych" aria-label="Indicadores complementarios de Tesorería">
@@ -46,13 +46,13 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
         <div className="economy-finance-section economy-finance-section--split">
           <div>
             <div className="economy-finance-subtitle-row"><strong className="economy-finance-subtitle">📉 Gastos no Operativos</strong><InfoTooltip content={economyMetricTooltips.nonOperatingExpenses} label="Ayuda sobre Gastos no Operativos" /></div>
-            <PeriodValue label="Mes actual" value={nonOperating?.monthly.amount ?? 0} />
-            <PeriodValue label="Acumulado anual" value={nonOperating?.annual.amount ?? 0} />
+            <PeriodValue label="Mes actual" value={nonOperating?.monthly.amount ?? null} currencyCode={currencyCode} />
+            <PeriodValue label="Acumulado anual" value={nonOperating?.annual.amount ?? null} currencyCode={currencyCode} />
           </div>
           <div>
             <div className="economy-finance-subtitle-row"><strong className="economy-finance-subtitle">💳 Deudas/Pasivos</strong><InfoTooltip content={economyMetricTooltips.debtLiabilities} label="Ayuda sobre Deudas/Pasivos" /></div>
-            <PeriodValue label="Mes actual" value={debtLiabilities?.monthly.amount ?? 0} />
-            <PeriodValue label="Acumulado anual" value={debtLiabilities?.annual.amount ?? 0} />
+            <PeriodValue label="Mes actual" value={debtLiabilities?.monthly.amount ?? null} currencyCode={currencyCode} />
+            <PeriodValue label="Acumulado anual" value={debtLiabilities?.annual.amount ?? null} currencyCode={currencyCode} />
           </div>
         </div>
       </article>
@@ -65,13 +65,13 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
         <div className="economy-finance-section economy-finance-section--split">
           <div>
             <div className="economy-finance-subtitle-row"><strong className="economy-finance-subtitle">🧾 Servicios</strong><InfoTooltip content={economyMetricTooltips.services} label="Ayuda sobre Servicios" /></div>
-            <PeriodValue label="Mes actual" value={servicesAndTaxes?.services.monthly ?? 0} />
-            <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.services.annual ?? 0} />
+            <PeriodValue label="Mes actual" value={servicesAndTaxes?.services.monthly ?? null} currencyCode={currencyCode} />
+            <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.services.annual ?? null} currencyCode={currencyCode} />
           </div>
           <div>
             <div className="economy-finance-subtitle-row"><strong className="economy-finance-subtitle">🏛️ Impuestos</strong><InfoTooltip content={economyMetricTooltips.taxes} label="Ayuda sobre Impuestos" /></div>
-            <PeriodValue label="Mes actual" value={servicesAndTaxes?.taxes.monthly ?? 0} />
-            <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.taxes.annual ?? 0} />
+            <PeriodValue label="Mes actual" value={servicesAndTaxes?.taxes.monthly ?? null} currencyCode={currencyCode} />
+            <PeriodValue label="Acumulado anual" value={servicesAndTaxes?.taxes.annual ?? null} currencyCode={currencyCode} />
           </div>
         </div>
       </article>
@@ -82,8 +82,8 @@ export function EconomyPaymentMethodsChart({ paymentMethods }: Props) {
           <p>INGRESOS completados por medio de pago</p>
         </div>
         <div className="economy-payment-periods">
-          <section><strong className="economy-finance-subtitle">Mes actual</strong><PaymentRows items={monthlyPayments} emptyLabel="Sin ingresos del mes actual." /></section>
-          <section><strong className="economy-finance-subtitle">Acumulado anual</strong><PaymentRows items={annualPayments} emptyLabel="Sin ingresos del año actual." /></section>
+          <section><strong className="economy-finance-subtitle">Mes actual</strong><PaymentRows items={monthlyPayments} emptyLabel="Sin ingresos del mes actual." currencyCode={currencyCode} /></section>
+          <section><strong className="economy-finance-subtitle">Acumulado anual</strong><PaymentRows items={annualPayments} emptyLabel="Sin ingresos del año actual." currencyCode={currencyCode} /></section>
         </div>
         <div className="economy-status-badges" aria-label="Estados de movimientos del mes actual">
           <span>Completados: {status.completed}</span>

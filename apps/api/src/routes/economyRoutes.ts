@@ -1,12 +1,13 @@
 import { PERMISSIONS } from "@miclub/shared";
 import { Router } from "express";
 import asyncHandler from "./asyncHandler.js";
-import { getActivityRankings, getActivityTrends, getAnnualSummary, getYearlyBreakdown, getByCategory, getBySector, getComparison, getInsights, getMonthlyEvolution, getPaymentMethods, getPending, getRecentMovements, getSectorRankings, getSectorTrends, getSummary } from "../services/economyService.js";
+import { getActivityRankings, getActivityTrends, getAnnualSummary, getAvailableYears, getYearlyBreakdown, getByCategory, getBySector, getComparison, getInsights, getMonthlyEvolution, getPaymentMethods, getPending, getRecentMovements, getSectorRankings, getSectorTrends, getSummary } from "../services/economyService.js";
 import { requirePermission } from "../middleware/authorization.js";
 
 const router = Router();
 
-router.get("/summary", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => res.json(await getSummary(req.auth!.clubId))));
+router.get("/summary", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => res.json(await getSummary(req.auth!))));
+router.get("/available-years", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => res.json(await getAvailableYears(req.auth!.clubId))));
 router.get("/monthly-evolution", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => res.json(await getMonthlyEvolution(req.auth!.clubId, req.query.year))));
 router.get("/by-sector", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => res.json(await getBySector(req.auth!.clubId, req.query.limit))));
 router.get("/sector-rankings", requirePermission(PERMISSIONS.FINANCE_READ), asyncHandler(async (req, res) => res.json(await getSectorRankings(req.auth!.clubId, req.query.limit))));

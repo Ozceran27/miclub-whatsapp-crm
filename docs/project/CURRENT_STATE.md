@@ -1,5 +1,29 @@
 # Current State
 
+## Tesorería — recuperación funcional y visual 2026-09-30
+
+Los agregados de `/api/economy/*` consultan movimientos del club de sesión y
+valoran cada importe en la moneda base del club con cotización oficial vigente
+al día local del movimiento. Las categorías se clasifican desde el catálogo
+canónico y los pendientes incluyen `finance_circuit` y cualquier otro origen
+elegible, sin filtro de hoja histórica. Una cotización faltante produce un
+agregado incompleto (`null`, estado y conteo); la interfaz no muestra cero.
+Liquidez y saldo proyectado de las tarjetas consumen el circuito financiero
+vigente, con su corte de arranque. La API añade `/available-years`.
+
+La web presenta diez tarjetas en dos filas de cinco en escritorio, selector
+de año para series históricas, resumen en bloques de cuatro meses, rankings
+mensuales por sector y categoría, ranking sectorial anual y detalle financiero
+debajo de las tarjetas. Las consultas tienen caché separada por club y filtros;
+un error de sección no oculta el resto. Inicio no recibió cambios visuales.
+
+No hubo migración ni SQL de escritura. Las consultas de esquema se verificaron
+con `AUDIT_DATABASE_URL`, `current_user` y `transaction_read_only=on`. La base
+local auditada contiene un club y ningún movimiento, inscripción o cuenta por
+cobrar; por eso la conciliación de importes reales sigue pendiente. Se entrega
+`docs/dbeaver/treasury_readonly_reconciliation.sql` para ejecutarla sobre la
+base que contiene los movimientos del usuario.
+
 ## CRM — historial de enviados 2026-09-29
 
 Contactos importados muestra un historial de mensajes confirmados manualmente

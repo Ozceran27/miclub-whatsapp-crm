@@ -14,8 +14,8 @@ function GrowthTooltip({ active, payload }: TooltipProps) {
 }
 
 export const buildGrowthEvolutionUntilCurrentMonth = (items: EconomyMonthlyEvolutionItem[], now = new Date()) => {
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const currentYear = Number(items[0]?.year ?? now.getFullYear());
+  const currentMonth = currentYear === now.getFullYear() ? now.getMonth() + 1 : 12;
   const byCurrentYearMonth = new Map(items
     .filter((item) => Number(item.year) === currentYear)
     .map((item) => [Number(item.month), { ...item, year: Number(item.year), month: Number(item.month) }]));

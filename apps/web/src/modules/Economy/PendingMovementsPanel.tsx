@@ -8,9 +8,9 @@ export function PendingMovementsPanel({ pending }: Props) {
     <article className="card home-kpi-card home-kpi-card--modern home-kpi-card--enrollment">
       <div className="home-card-heading"><h4>Pendientes</h4><p>Movimientos financieros u operativos sin cerrar</p></div>
       <div className="status-breakdown-grid">
-        <span className="metric-row metric-row--highlight-green"><strong className="metric-row__label">A cobrar</strong><span className="metric-row__value">{formatEconomyMoney(pending.pendingIncome)}</span></span>
-        <span className="metric-row"><strong className="metric-row__label">A pagar</strong><span className="metric-row__value">{formatEconomyMoney(pending.pendingExpenses)}</span></span>
-        <span className="metric-row"><strong className="metric-row__label">Balance</strong><span className="metric-row__value">{formatEconomyMoney(pending.pendingBalance)}</span></span>
+        <span className="metric-row metric-row--highlight-green"><strong className="metric-row__label">A cobrar</strong><span className="metric-row__value">{formatEconomyMoney(pending.pendingIncome, pending.currencyCode ?? 'ARS')}</span></span>
+        <span className="metric-row"><strong className="metric-row__label">A pagar</strong><span className="metric-row__value">{formatEconomyMoney(pending.pendingExpenses, pending.currencyCode ?? 'ARS')}</span></span>
+        <span className="metric-row"><strong className="metric-row__label">Balance</strong><span className="metric-row__value">{formatEconomyMoney(pending.pendingBalance, pending.currencyCode ?? 'ARS')}</span></span>
         <span className="metric-row"><strong className="metric-row__label">Cantidad</strong><span className="metric-row__value">{pending.pendingMovements}</span></span>
       </div>
       <div className="finance-lines finance-lines--compact">

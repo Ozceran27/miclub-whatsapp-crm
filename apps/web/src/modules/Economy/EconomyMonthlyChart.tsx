@@ -16,9 +16,9 @@ const chartColors = { income: '#76f0c3', expenses: '#ffad66', balance: '#8fd8ff'
 
 type TooltipPayload = { name?: string; value?: number | string | null; color?: string; dataKey?: string; payload?: EconomyMonthlyEvolutionItem };
 
-type TooltipProps = { active?: boolean; payload?: TooltipPayload[]; label?: string };
+type TooltipProps = { active?: boolean; payload?: TooltipPayload[]; label?: string; currencyCode?: string };
 
-function EconomyChartTooltip({ active, payload, label }: TooltipProps) {
+function EconomyChartTooltip({ active, payload, label, currencyCode }: TooltipProps) {
   if (!active || !payload?.length) return null;
 
   return (
@@ -26,7 +26,7 @@ function EconomyChartTooltip({ active, payload, label }: TooltipProps) {
       <strong>{label}</strong>
       {payload.map((entry) => (
         <span key={entry.name} style={{ color: entry.color }}>
-          {entry.name}: {formatEconomyMoney(typeof entry.value === 'number' ? entry.value : Number(entry.value ?? entry.payload?.[String(entry.dataKey ?? '') as keyof EconomyMonthlyEvolutionItem] ?? 0))}
+          {entry.name}: {formatEconomyMoney(entry.value === null || entry.payload?.[String(entry.dataKey ?? '') as keyof EconomyMonthlyEvolutionItem] === null ? null : typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0), currencyCode)}
         </span>
       ))}
     </div>
@@ -48,8 +48,8 @@ export function EconomyMonthlyChart({ monthlyEvolution }: Props) {
             <ComposedChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="rgba(143, 164, 200, 0.16)" vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} tickFormatter={(value: number) => formatEconomyMoney(Number(value))} width={86} />
-              <Tooltip content={<EconomyChartTooltip />} cursor={{ fill: 'rgba(143, 216, 255, 0.08)' }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#91a4c8', fontSize: 11 }} tickFormatter={(value: number) => formatEconomyMoney(Number(value), monthlyEvolution.currencyCode)} width={86} />
+              <Tooltip content={<EconomyChartTooltip currencyCode={monthlyEvolution.currencyCode} />} cursor={{ fill: 'rgba(143, 216, 255, 0.08)' }} />
               <Legend wrapperStyle={{ color: '#9fb4d8', fontSize: 12, paddingTop: 8 }} />
               <Bar dataKey="income" name="Ingresos" fill={chartColors.income} radius={[8, 8, 0, 0]} barSize={18} />
               <Bar dataKey="expenses" name="Egresos" fill={chartColors.expenses} radius={[8, 8, 0, 0]} barSize={18} />

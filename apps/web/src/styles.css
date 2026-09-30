@@ -1907,7 +1907,7 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 .economy-ranking-item__left {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   flex: 1 1 auto;
@@ -2166,6 +2166,35 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
+}
+
+.economy-rankings-grid--annual {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.economy-ranking-card .economy-ranking-list {
+  margin-top: 0.8rem;
+}
+
+.economy-year-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted-text, #9fb4d8);
+  font-weight: 700;
+}
+
+.economy-year-control select {
+  min-height: 2.2rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgba(143, 216, 255, 0.38);
+  border-radius: 9px;
+  color: inherit;
+  background: var(--color-surface, #102039);
+}
+
+.finance-totals--treasury-detail {
+  grid-template-columns: minmax(0, 280px);
 }
 
 .economy-ranking-card--sector { --finance-accent: #8fd8ff; --finance-accent-rgb: 143, 216, 255; }
@@ -2634,10 +2663,26 @@ a { color: #88d8ff; display:inline-flex; align-items:center; gap:6px; }
 
 @media (max-width: 760px) {
   .economy-monthly-box { padding: 12px; }
-  .economy-monthly-box__blocks { min-width: 590px; }
+  .economy-monthly-box__blocks { grid-template-columns: minmax(0, 1fr); min-width: 0; }
   .economy-monthly-row { font-size: 0.76rem; }
   .economy-final-grid { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 760px) {
+  .economy-ranking-item__value { padding-left: 38px; }
+}
+
+[data-theme='light'] .economy-ranking-item,
+[data-theme='light'] .economy-ranking-item:hover {
+  background: #f1f6fc;
+  border-color: #c7d7e8;
+  box-shadow: none;
+}
+
+[data-theme='light'] .economy-ranking-item__title { color: #14253b; }
+[data-theme='light'] .economy-ranking-item__meta { color: #4d627d; }
+[data-theme='light'] .economy-ranking-item__value--positive { color: #087353; }
+[data-theme='light'] .economy-ranking-item__value--negative { color: #ae2d41; }
 
 .economy-finance-triptych {
   display: grid;
