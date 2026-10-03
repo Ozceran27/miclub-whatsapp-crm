@@ -131,7 +131,8 @@ INSERT INTO _expected_manifest(name,checksum) VALUES
     ('202609220002_cancel_future_activity_prices.sql', '54f0feba7d5cc6e4280c1636a68906f5f43a891b1fa040ed83c1ea252b91f1d2'),
     ('202609250001_bidirectional_movement_categories.sql', 'b16fe616acdb795ab6535e3e41c4c73041a28b69049903ac6ac908ad1555a44c'),
     ('202609280001_crm_xlsx_contacts.sql', '4f8edb49d4792eb230b7aeb77cedcd1f843dcbae4816f48e73b328ac2c53fdb4'),
-    ('202609290001_enrollment_charges_and_counterparties.sql', 'fe308ca81d3b4e0a944d1f316131b7748f921c36c0f8dfd853b50c2e9d1a412d')
+    ('202609290001_enrollment_charges_and_counterparties.sql', 'fe308ca81d3b4e0a944d1f316131b7748f921c36c0f8dfd853b50c2e9d1a412d'),
+    ('202610020001_crm_xlsx_recent_sent_index.sql', 'dc39882679b6ebfc0533fd12877913c8f79e563111cfd5f5ec37e7f178dc6ddc')
 -- MIGRATION_MANIFEST_VALUES:END
 ;
 DO $$ DECLARE v_mismatches bigint; BEGIN

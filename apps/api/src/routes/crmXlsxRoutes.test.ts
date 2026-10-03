@@ -19,7 +19,7 @@ const workbook=zip({
 });
 const upload=async(base:string,path:string,dryRunId?:string,data=workbook)=>{const form=new FormData();form.append('file',new Blob([new Uint8Array(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'CRM_CONTACTOS_v1.xlsx');if(dryRunId)form.append('dryRunId',dryRunId);return fetch(`${base}${path}`,{method:'POST',body:form});};
 
-const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void,setPermissions:(value:string[])=>void,calls:Array<{sql:string;params?:unknown[]}> )=>Promise<void>,failInsert=false,changeActive=false,schemaReady=true)=>{
+const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void,setPermissions:(value:string[])=>void,calls:Array<{sql:string;params?:unknown[]}> )=>Promise<void>,failInsert=false,changeActive=false,schemaReady=true,recentFixture=false)=>{
   let currentClub=clubA,permissions=['crm:read','crm:write','sectors:any'];const queries:string[]=[],calls:Array<{sql:string;params?:unknown[]}>=[];
   const fake:PgPool={query:async<T>(sql:string,params?:unknown[])=>{queries.push(sql);calls.push({sql,params});
     if(sql.includes('to_regclass'))return {rows:[{ready:schemaReady}] as T[]};
@@ -30,6 +30,13 @@ const serve=async(run:(base:string,queries:string[],setClub:(value:string)=>void
     if(sql.includes("select id from miclub.crm_xlsx_batches where club_id=$1 and status='active'"))return {rows:(changeActive&&queries.filter(q=>q===sql).length>1?[{id:missing}]:[]) as T[]};
     if(sql.includes('from miclub.crm_xlsx_messages m')&&sql.includes('for update of m'))return {rows:[{id,status:'prepared',phone:'5493764123456',active_phone:'5493764999999',active_contact_id:id,active_status:'adeudando',name:'Ana Perez',active_first_name:'Ana',active_last_name:'Perez',activity:'Tenis',active_activity:'Tenis',stored_enrollment_date:null,active_enrollment_date:null,stored_due_date:null,active_due_date:null}] as T[]};
     if(sql.includes("from miclub.crm_xlsx_contacts c join")&&sql.includes('c.id=any'))return {rows:(params?.[0]===clubA?[{id,batchId:id,sourceRow:2,document:'12345678',contactKey:'12345678:tenis',firstName:'Ana',lastName:'Perez',phone:'5493764123456',status:'adeudando',activity:'Tenis',enrollmentDate:null,dueDate:null}]:[]) as T[]};
+    if(recentFixture&&sql.includes('select count(*)::int total from ('))return {rows:[{total:params?.[0]===clubA?3:0}] as T[]};
+    if(recentFixture&&sql.includes('limit 20 offset $4'))return {rows:(params?.[0]===clubA?[
+      {id,document:'12345678',firstName:'Ana',lastName:'Perez',phone:'5493764123456',activity:'Tenis',status:'adeudando'},
+      {id:missing,document:'12345678',firstName:'Ana María',lastName:'Perez',phone:'5493764999999',activity:'Natación',status:'al_dia'},
+      {id:clubA,document:'87654321',firstName:'Otra',lastName:'Persona',phone:'5493764000000',activity:'Tenis',status:'adeudando'},
+    ]:[]) as T[]};
+    if(recentFixture&&sql.includes('max(m.sent_at) "lastSentAt"'))return {rows:(params?.[0]===clubA?[{document:'12345678',lastSentAt:'2026-10-02T12:00:00.000Z'}]:[]) as T[]};
     return {rows:[] as T[]};},connect:()=>Promise.resolve({query:fake.query,release:()=>undefined}),end:()=>Promise.resolve()};
   setPostgresPoolForTests(fake);
   const app=express();app.use(express.json());app.use((req,_res,next)=>{req.auth={clubId:currentClub,userId:clubA,membershipId:id,permissions,sectorIds:[],role:'DIRECTOR',email:'test@example.invalid',legacy:false,personId:id};next();});app.use(createCrmXlsxRoutes());app.use((_err:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(500).json({message:'error'}));
@@ -76,6 +83,26 @@ void test('orden importado valida columnas y se aplica antes de paginar dentro d
   assert.equal((await fetch(`${base}/contacts?sortBy=name`)).status,200);
   assert.ok(queries.some(q=>q.includes('where c.club_id=$1')&&q.includes('order by c.last_name asc nulls last,c.first_name asc nulls last,c.id')));
 }));
+
+void test('contactos recientes se calculan por DNI histórico en la página y dentro del club',async()=>serve(async(base,queries,setClub,_permissions,calls)=>{
+  const response=await fetch(`${base}/contacts?page=2&status=adeudando&query=Ana`);
+  assert.equal(response.status,200);
+  const body=await response.json() as {items:Array<{document:string;lastSentAt:string|null}>;page:number;total:number};
+  assert.equal(body.page,2);assert.equal(body.total,3);
+  assert.deepEqual(body.items.map(row=>row.lastSentAt),['2026-10-02T12:00:00.000Z','2026-10-02T12:00:00.000Z',null]);
+  const recent=calls.find(call=>call.sql.includes('max(m.sent_at) "lastSentAt"'));
+  assert.ok(recent);
+  assert.match(recent.sql,/previous\.club_id=m\.club_id and previous\.id=m\.contact_id/);
+  assert.match(recent.sql,/m\.club_id=\$1 and m\.status='sent_manual'/);
+  assert.match(recent.sql,/m\.sent_at >= statement_timestamp\(\)-interval '720 hours'/);
+  assert.match(recent.sql,/m\.sent_at <= statement_timestamp\(\)/);
+  assert.deepEqual(recent.params,[clubA,['12345678','87654321']]);
+  assert.ok(queries.some(sql=>sql.includes('limit 20 offset $4')));
+  setClub(clubB);
+  const other=await (await fetch(`${base}/contacts`)).json() as {items:unknown[]};
+  assert.deepEqual(other.items,[]);
+  assert.equal(calls.filter(call=>call.sql.includes('max(m.sent_at) "lastSentAt"')).length,1);
+},false,false,true,true));
 
 void test('historial enviado filtra solo confirmados y ordena por fecha de confirmación',async()=>serve(async(base,queries,setClub,_permissions,calls)=>{
   const response=await fetch(`${base}/messages?pending=false&status=sent_manual&page=2`);

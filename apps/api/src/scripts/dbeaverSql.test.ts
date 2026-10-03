@@ -15,6 +15,16 @@ void test('instalación CRM XLSX manual replica la migración y confirma la tran
   assert.doesNotMatch(script, /-- COMMIT;/);
 });
 
+void test('índice de envíos recientes tiene SQL manual verificable sin tocar el ledger', () => {
+  const script = sql('2026-10-02-crm-contactos-recientes.sql').replace(/\r\n/g, '\n');
+  const migration = readFileSync(new URL('../../db/migrations/202610020001_crm_xlsx_recent_sent_index.sql', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  assert.ok(script.includes(migration.trim()));
+  assert.match(script, /BEGIN;[\s\S]*COMMIT;/);
+  assert.match(script, /SELECT indexname,indexdef FROM pg_indexes/);
+  assert.match(script, /DROP INDEX IF EXISTS miclub\.crm_xlsx_messages_sent_recent/);
+  assert.doesNotMatch(script, /INSERT INTO public\.miclub_schema_migrations/i);
+});
+
 test("categorías bidireccionales no dependen del ledger de precios y validan antes del commit", () => {
   const script = sql("2026-09-25-categorias-bidireccionales.sql");
   const executable = script.replace(/^--.*$/gm, "");

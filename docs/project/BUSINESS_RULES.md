@@ -44,6 +44,11 @@ bloquean la carga; se guardan sin fecha. También se aceptan fechas de Excel,
 `AAAA-MM-DD` y `DD/MM/AAAA`.
 La apertura de WhatsApp y la confirmación `sent_manual` requieren que el
 contacto siga vigente sin cambios relevantes. El envío sigue siendo manual.
+La lista vigente marca durante las 720 horas siguientes a la confirmación
+`sent_manual` todas las filas del mismo DNI en el club, incluso si una carga
+reemplazó la lista o cambió el nombre, teléfono o actividad. La marca expresa
+una confirmación del operador, no acredita la entrega de WhatsApp. Los estados
+`prepared`, `opened` y `skipped` no generan esa marca.
 
 El CRM considera vencida una cuota generada de inscripción cuando su fecha de
 vencimiento es anterior al día local del club y su saldo es positivo: importe

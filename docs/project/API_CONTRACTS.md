@@ -42,7 +42,11 @@ respuestas 422 incluyen `message` e `issues` por fila.
 el SHA-256/versión/conteo, fue aplicado o cambió la lista vigente desde el
 dry-run. `GET /summary`, `/contacts`
 (page, status, query), `/batches` (últimos 20 lotes aplicados), `/templates` y
-`/messages` (page, pending) ofrecen lecturas. `/messages` admite además
+`/messages` (page, pending) ofrecen lecturas. Cada contacto de `/contacts`
+incluye `lastSentAt` (fecha ISO o `null`): último `sent_manual` de su DNI dentro
+de las 720 horas anteriores a la consulta, incluyendo mensajes de listas
+reemplazadas del mismo club. Se calcula para los DNI de la página pedida; no
+depende de la paginación de `/messages`. `/messages` admite además
 `status=sent_manual` para el historial de envíos confirmados, con 20 resultados
 por página; esta opción es incompatible con `pending=true`. En ese historial
 el orden inicial y la clave `sortBy=date` usan `sentAt`. Sin el filtro se

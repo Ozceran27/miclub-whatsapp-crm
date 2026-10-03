@@ -2,13 +2,13 @@ import { apiFetch, apiJson, readApiError } from '../../api';
 
 const path=(suffix:string)=>`/api/crm/xlsx${suffix}` as `/${string}`;
 export type XlsxStatus='al_dia'|'nuevo_inscripto'|'adeudando'|'abandonado';
-export type XlsxContact={id:string;batchId:string;sourceRow:number;document:string;contactKey:string;firstName:string;lastName:string;phone:string;status:XlsxStatus;activity:string|null;enrollmentDate:string|null;dueDate:string|null};
+export type XlsxContact={id:string;batchId:string;sourceRow:number;document:string;contactKey:string;firstName:string;lastName:string;phone:string;status:XlsxStatus;activity:string|null;enrollmentDate:string|null;dueDate:string|null;lastSentAt:string|null};
 export type XlsxIssue={row:number;field:string;message:string};
 export type XlsxPage<T>={items:T[];total:number;page:number;pageSize:number};
 export type XlsxTemplate={id:string;name:string;body:string};
 export type XlsxBatch={id:string;status:'active'|'replaced';rowCount:number;version:string;createdAt:string;activatedAt:string|null};
 export type XlsxMessage={id:string;contactId:string;name:string;activity:string|null;phone:string;message:string;waLink:string;status:'prepared'|'opened'|'sent_manual'|'skipped';templateName:string|null;createdAt:string;openedAt:string|null;sentAt:string|null;fresh:boolean};
-export type DryRun={dryRunId:string;version:string;rowCount:number;preview:Omit<XlsxContact,'id'|'batchId'>[];issues:XlsxIssue[]};
+export type DryRun={dryRunId:string;version:string;rowCount:number;preview:Omit<XlsxContact,'id'|'batchId'|'lastSentAt'>[];issues:XlsxIssue[]};
 const sendFile=async(url:string,file:File,dryRunId?:string)=>{
   const form=new FormData();form.append('file',file);if(dryRunId)form.append('dryRunId',dryRunId);
   const response=await apiFetch(path(url),{method:'POST',body:form});

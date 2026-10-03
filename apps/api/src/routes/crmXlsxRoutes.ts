@@ -127,7 +127,15 @@ export const createCrmXlsxRoutes=()=>{
       const filter=`and ($2::text is null or c.status=$2) and ($3::text is null or (c.first_name||' '||c.last_name||' '||c.document||' '||coalesce(c.activity,'')) ilike '%'||$3||'%')`;
       const count=(await db.query<{total:number}>(`select count(*)::int total from (${activeContactSql} ${filter}) x`,params)).rows[0]?.total??0;
       const items=(await db.query<Contact>(`${activeContactSql} ${filter} order by ${sorting.order??'c.last_name,c.first_name'},c.id limit 20 offset $4`,[...params,(currentPage-1)*20])).rows;
-      return {items,total:count,page:currentPage,pageSize:20};
+      const documents=[...new Set(items.map(item=>item.document))];
+      const recent=documents.length?(await db.query<{document:string;lastSentAt:Date|string}>(`select previous.document,max(m.sent_at) "lastSentAt"
+        from miclub.crm_xlsx_messages m
+        join miclub.crm_xlsx_contacts previous on previous.club_id=m.club_id and previous.id=m.contact_id
+        where m.club_id=$1 and m.status='sent_manual' and m.sent_at >= statement_timestamp()-interval '720 hours'
+          and m.sent_at <= statement_timestamp() and previous.document=any($2::text[])
+        group by previous.document`,[club(req),documents])).rows:[];
+      const sentByDocument=new Map(recent.map(row=>[row.document,new Date(row.lastSentAt).toISOString()]));
+      return {items:items.map(item=>({...item,lastSentAt:sentByDocument.get(item.document)??null})),total:count,page:currentPage,pageSize:20};
     });res.json(response);}catch(error){next(error);}
   });
   router.get('/templates',async(req,res,next)=>{try{res.json((await withTenantTransaction(club(req),db=>db.query(`select id,name,body from miclub.crm_xlsx_templates where club_id=$1 and archived_at is null order by created_at`,[club(req)]))).rows);}catch(error){next(error);}});

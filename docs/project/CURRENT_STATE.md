@@ -1,5 +1,18 @@
 # Current State
 
+## CRM — contactos recientes e historial compacto 2026-10-02
+
+La lista de contactos importados marca todas las filas vigentes del DNI que
+tuvo un envío `sent_manual` durante las 720 horas anteriores. La lectura
+consulta PostgreSQL para los DNI de la página y conserva el vínculo con
+contactos de lotes reemplazados. El historial importado centra verticalmente
+las filas y ajusta el cuadro de plantilla a su contenido. Se agregó un índice
+versionado y SQL manual DBeaver; no se ejecutó sobre la base real.
+Typecheck, build, 499 pruebas API, 100 pruebas web, validación del manifiesto,
+lint de los archivos TypeScript modificados y revisión documental pasaron.
+Queda pendiente aplicar el índice en DBeaver y validar visualmente con sesión
+autenticada en escritorio/móvil y temas claro/oscuro.
+
 ## Tesorería — recuperación funcional y visual 2026-09-30
 
 Los agregados de `/api/economy/*` consultan movimientos del club de sesión y
